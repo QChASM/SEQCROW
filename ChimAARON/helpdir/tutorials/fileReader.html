@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<meta charset="UTF-8">
+<title>ChimAARON Help</title>
+<meta http-equiv="Content-Type" content="text/html">
+<link rel="icon" href="../images/AARON_tiny.png" type="image/png">
+<link rel="stylesheet" href="../ChimAARONStyle.css">
+</head>
+
+<div class="head">
+<object data="../ribbon.html" class="head"></object>
+</div>
+
+<div class="gen">
+
+<h2>Opening Files through the AaronTools FileReader</h2>
+
+<p>
+ChimAARON enables several file types to be opened in Chimera by passing them through AaronTools' FileReader. 
+This includes Gaussian .com files and .log files. 
+To open such files using the <span class="menulike">File</span> &rarr; <span class="menulike">Open...</span> option, you can specify that the <span class="menulike">File type</span> is an <span class="menulike">AaronTools coordinate</span> file.
+This is not necessary if no other Chimera-readable file has a .com or .log extension, as Chimera just uses the first thing it finds that can open a given file type.
+</p>
+
+<p>
+Similarly, the <code>open</code> command can be used to open AaronTools-readable files. 
+The <code>AaronTools:</code> prefix can be used to ensure the file is parsed by AaronTools and not some other Chimera file reader:
+</p>
+<p>
+<pre>
+open AaronTools:path/to/file.log
+</pre>
+</p>
+
+<p>
+Like before, using prefixes is not necessary if no other Chimera-readable filetype has a .com or .log extension.
+</p>
+
+</div>
+
+</html>

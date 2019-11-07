@@ -1,0 +1,40 @@
+<html>
+
+<head>
+<meta charset="UTF-8">
+<title>allgeom</title>
+<meta http-equiv="Content-Type" content="text/html">
+<link rel="icon" href="../images/AARON_tiny.png" type="image/png">
+<link rel="stylesheet" href="../ChimAARONStyle.css">
+</head>
+
+<div class="head">
+    <object data="../ribbon.html" class="head"></object>
+</div>
+
+<body class="command">
+
+<div class="side">
+	<object data="commandTable.html" class="side-content"></object>
+</div>
+
+<div class="command-description">
+<h2>allgeom</h2>
+
+<h3>Usage:<br>
+allgeom <i>path/to/some.file</i> [ roundTrip true | <b>false</b> ] [ dynamicBonds <b>true</b> | false ] [ drawMode <b>Stick</b> | Wire ]
+</h3>
+
+<p>
+<b>allgeom</b> loads the specified file as a movie. 
+If <b>roundTrip</b> is true, the loaded animation will play from the first coordinate set to the last, and then back to the start before the movie player resets to the first frame.
+If <b>dynamicBonds</b> is true, all arguments will be passed to <code>ChimAARON.getDynamicBondScript()</code>.
+The movie's script will then be set to the output of this subroutine. 
+This should result in an an animation where bonds and coordination pseudobonds are broken and formed dynamically.
+</p>
+
+</div>
+
+</body>
+
+</html>

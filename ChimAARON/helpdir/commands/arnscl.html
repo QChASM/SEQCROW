@@ -1,0 +1,42 @@
+<html>
+
+<head>
+<meta charset="UTF-8">
+<title>arnscl</title>
+<meta http-equiv="Content-Type" content="text/html">
+<link rel="icon" href="../images/AARON_tiny.png" type="image/png">
+<link rel="stylesheet" href="../ChimAARONStyle.css">
+</head>
+
+<div class="head">
+    <object data="../ribbon.html" class="head"></object>
+</div>
+
+<body class="command">
+
+<div class="side">
+	<object data="commandTable.html" class="side-content"></object>
+</div>
+
+<div class="command-description">
+<h2>arnscl</h2>
+
+<h3>Usage:<br>
+arnscl</h3>
+
+<p>
+<b>arnscl</b> sets the label on atoms for all open models to match AARON's relative numbering. 
+Atoms on the substrate are labeled S<i>n</i>, where <i>n</i> is the relative atom number.
+Likewise, atoms on the center and ligand are labeled C<i>n</i> and L<i>n</i>, respectively.
+Note that although multiple centers may be labled for the same molecule, AARON currently only supports single-center structures.
+</p>
+
+<p>
+Labels are determined by reaading the comment line of the file for an open model (Chimera sets the name of molecules opened from .xyz files to the comment line, if there is one). 
+If no center is found in the comment or the comment doesn't appear to be in AARON's format, <b>arnscl</b> will look for transition metals instead. 
+The first transition metal found will be marked as the center; all atoms before the center are marked as substrate, and all after are marked as ligand.
+</p>
+
+</body>
+
+</html>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<meta charset="UTF-8">
+<title>ChimAARON Help</title>
+<meta http-equiv="Content-Type" content="text/html">
+<link rel="icon" href="../images/AARON_tiny.png" type="image/png">
+<link rel="stylesheet" href="../ChimAARONStyle.css">
+</head>
+
+<div class="head">
+<object data="../ribbon.html" class="head"></object>
+</div>
+
+<div class="gen">
+
+<h2>Visualizing Normal Modes</h2>
+
+<p>
+ChimAARON makes it easy to visualize normal vibrational modes in Chimera. 
+In order to load the normal modes of a molecule, ChimAARON requires a Gaussian .log file containing frequency information is required. 
+</p>
+
+<p>
+To load the frequency information, go to the <span class="menulike">Visualize Normal Mode...</span> option under <span class="menulike">Tools</span> &rarr; <span class="menulike">ChimAARON</span>. 
+You will then be prompted to locate your frequency file. 
+Once the file is selected, a dialog menu will open up listing the normal modes. These modes may be sorted by frequency or IR Intensity. 
+A mode can be selected from the table and visualized by pressing the <span class="buttonlike">Display mode</span> button.
+</p>
+
+<img src="../images/normalModes.png" alt="Normal Mode Dialog">
+
+<p>
+There are two ways to visualize a normal mode: displacement vectors, and an animation.
+</p>
+
+<p>
+When a normal mode is displayed using vectors, you can change several things about the vectors:
+<ul>
+    <li>Vector scaling - change the length of the longest vector</li>
+    <li>Use mass-weighted - whether or not to remove mass-weighting from the vectors</li>
+    <li>Vector color - the color of the vectors</li>
+</ul>
+</p>
+
+<p>
+When loading the mode as an animation, you have different settings:
+<ul>
+    <li>Max. displacement - most any atom moves from its equilibrium position</li>
+    <li>Number of frames - how long the animation is</li>
+</ul>
+
+<p>
+These tools can also be accessed through the command line. 
+See the documentation on <a href="../commands/follow.html"><code>follow</code></a> and <a href="../commands/freqvec.html"><code>freqvec</code></a> for details.
+</p>
+
+</div>
+
+</html>

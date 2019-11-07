@@ -1,0 +1,42 @@
+<html>
+
+<head>
+<meta charset="UTF-8">
+<title>substitute</title>
+<meta http-equiv="Content-Type" content="text/html">
+<link rel="icon" href="../images/AARON_tiny.png" type="image/png">
+<link rel="stylesheet" href="../ChimAARONStyle.css">
+</head>
+
+<div class="head">
+    <object data="../ribbon.html" class="head"></object>
+</div>
+
+<body class="command">
+
+<div class="side">
+	<object data="commandTable.html" class="side-content"></object>
+</div>
+
+<div class="command-description">
+<h2>substitute</h2>
+
+<h3>Usage:<br>
+substitute <i>substituent</i> [ form <i>format</i> ]
+</h3>
+
+<p>
+<b>substitute</b> replaces a functional group that starts on the specified atom with a new <i>substituent</i>.
+The format of <i>substituent</i> is passed to <b>form</b>:
+<ul>
+	<li>from_library (default) - substituent is loaded from the <a href="../tutorials/libraries.html">AaronTools library</a></li>
+	<li>iupac - substituent is grabbed from the <a href="https://cactus.nci.nih.gov/translate/"> CACTVS web API</a> after the IUPAC name is parsed by <a href="https://opsin.ch.cam.ac.uk/">OPSIN web API</a></li>
+	<li>smiles - substituent is grabbed from the <a href="https://cactus.nci.nih.gov/translate/">the CACTVS web API</a></li>
+</ul>
+</p>
+
+</div>
+
+</body>
+
+</html>

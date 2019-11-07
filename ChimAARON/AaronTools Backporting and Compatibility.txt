@@ -1,0 +1,75 @@
+Backporting:
+	for FileNotFoundError:
+		import sys
+		if sys.version_info < (3,):
+			FileNotFoundError = IOError
+			
+		or
+		
+		import os
+		os.path.exists(filename or directory)
+			
+	for JSONDecodeError:
+		import sys
+		if sys.version_info < (3,5):
+			JSONDecodeError = ValueError
+		else:
+			from json.decode import JSONDecodeError
+
+	for json.dump:
+		encoding requirements are strange in python 2
+        example:
+			with open(Substituent.CACHE_FILE, "w") as f:
+				f.write(unicode(json.dumps(Substituent.cache)))
+
+			works (sometimes), but not...
+			with open(Substituent.CACHE_FILE, "w") as f:
+				json.dump(Substituent.cache, f)
+				
+	for scipy:
+		I can't get scipy installed for Chimera
+		Chimera uses numpy 1.7, newer versions of scipy need > 1.8
+			these numpys have a different sized dtype, so it doesn't work
+			I can't/don't want to uninstall Chimera's numpy to install a new one, as I know they
+			use the numpy arrays to go from the python representation of a molecule and the underlying C object
+		older versions of scipy expect to find an external BLAS/LAPACK library
+			hard pass
+			
+		scipy is only used to integrate the length of a cubic spline in Pathway
+			replace with another integration method
+			
+	for isinstance(x, str):
+		use isinstance(x, basestring)
+
+OS Compatibility:	
+	for paths:
+		use os.path.join 
+		example:
+			BUILTIN = os.path.join(QCHASM, "AaronTools", "Substituents", "*.xyz")
+	
+		use os.sep
+		example:
+			match = re.search(os.sep + sub + ".xyz", f)
+	
+		use os.path.basename and os.path.dirname
+		example:
+			sub = ps.path.basename(sub).rstrip(".xyz")
+	
+		DO NOT use "/" + filename
+		
+	regular expressions seem to be fucked on windows for paths - they don't match for no apparent reason
+		example:
+			match = sub + ".xyz" == os.path.basename(f)
+			results in match=True
+			
+			but...
+			match = re.search(os.sep + sub + ".xyz", f)
+			results in match=None (or sometimes an error)
+		
+		I've plugged this into an online regex tester, and it worked there
+			tried unicode, repr, and str of os.sep + sub + ".xyz", and at least one of them worked (forget which)
+
+for f in os.listdir(os.path.dirname(AaronTools.__file__)):
+	if f.endswith('.py'):
+		exec "import AaronTools.%s" % ".".join(f.split('.')[:-1])
+		print(f)

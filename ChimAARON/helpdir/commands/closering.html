@@ -1,0 +1,44 @@
+<html>
+
+<head>
+<meta charset="UTF-8">
+<title>closering</title>
+<meta http-equiv="Content-Type" content="text/html">
+<link rel="icon" href="../images/AARON_tiny.png" type="image/png">
+<link rel="stylesheet" href="../ChimAARONStyle.css">
+</head>
+
+<div class="head">
+    <object data="../ribbon.html" class="head"></object>
+</div>
+
+<body class="command">
+
+<div class="side">
+	<object data="commandTable.html" class="side-content"></object>
+</div>
+
+<div class="command-description">
+<h2>closering</h2>
+
+<h3>Usage:<br>
+closering <i>ring</i> form <i>format</i>
+</h3>
+
+<p>
+<b>closering</b> closes an incomplete ring. 
+Two atoms must be selected for <b>closering</b> to attempt to turn these atoms and the atoms between them into a <i>ring</i> ring.
+The format of <i>ring</i> is specified by <b>form</b>. Valid keywords for <b>form</b> are:
+<ul>
+	<li>from_library (default) - ring fragment is loaded from the <a href="../tutorials/libraries.html">AaronTools library</a></li>
+	<li>iupac - ring fragment is grabbed from the <a href="https://cactus.nci.nih.gov/translate/"> CACTVS web API</a> after the IUPAC name is parsed by <a href="https://opsin.ch.cam.ac.uk/">OPSIN web API</a></li>
+	<li>smiles - ring fragment is grabbed from the <a href="https://cactus.nci.nih.gov/translate/">the CACTVS web API</a></li>
+</ul>
+
+</p>
+
+</div>
+
+</body>
+
+</html>

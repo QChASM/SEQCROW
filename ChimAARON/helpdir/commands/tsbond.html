@@ -1,0 +1,40 @@
+<html>
+
+<head>
+<meta charset="UTF-8">
+<title>tsbond</title>
+<meta http-equiv="Content-Type" content="text/html">
+<link rel="icon" href="../images/AARON_tiny.png" type="image/png">
+<link rel="stylesheet" href="../ChimAARONStyle.css">
+</head>
+
+<div class="head">
+    <object data="../ribbon.html" class="head"></object>
+</div>
+
+<body class="command">
+
+<div class="side">
+	<object data="commandTable.html" class="side-content"></object>
+</div>
+
+<div class="command-description">
+<h2>tsbond</h2>
+
+<h3>Usage:<br>
+tsbond [ selec <i>atom-spec</i> ] [ color <i>color</i> ] [ transparency <i>precent</i> ]
+</h3>
+
+<p>
+<b>tsbond</b> replaces the selected bonds (either in <i>atom-spec</i> or the current selection) with transparent cylinders.
+Alternatively, if two atoms are specified that are not bonded, these cylinders are drawn where the bond between these atoms would be.
+The keywords modify the appearance of these cylinders:
+<ul>
+	<li>color (default byatom) - color of cylinders; may be Chimera named color, r,g,b[,a] tuple, or byatom. <br><b>NOTE</b> If you don't want to color the cylinders byatom, consider coloring the bond and setting its transparency with the <b>color</b> and <b>transparency</b> Chimera commands. An actual bond will move with the atoms in an animation, and <b>tsbond</b> cylinders will not.</li>
+	<li>transparency (default 50) - percent transparency of the cylinder</li>
+</ul>
+</p>
+
+</body>
+
+</html>

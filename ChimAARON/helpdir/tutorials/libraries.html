@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<meta charset="UTF-8">
+<title>ChimAARON Help</title>
+<meta http-equiv="Content-Type" content="text/html">
+<link rel="icon" href="../images/AARON_tiny.png" type="image/png">
+<link rel="stylesheet" href="../ChimAARONStyle.css">
+</head>
+
+
+<div class="head">
+<object data="../ribbon.html" class="head"></object>
+</div>
+
+<div class="gen">
+
+<h2>Browse AaronTools Libraries</h2>
+
+<p>
+To browse the AaronTools Ligand, Substituent, and Ring Fragment libraries in Chimera, open the <span class="menulike">AaronTools Libraries</span> iterface under <span class="menulike">Tools</span> &rarr; <span class="menulike">ChimAARON</span>.
+The Ligand Library can be sorted by ligand name, denticity, or the elements of coordinating atoms. 
+Items in the Substituent Library can be sorted by name and conformer information.
+Ring Fragments can be sorted by name only.
+</p>
+
+<img src="../images/ligandLibrary.png" alt="Ligand library menu">
+
+<p>
+In the menu shown above, three ligands are selected. 
+All of these coordinate to a catalyst center with two oxygen atoms (per the "<span class="menulike">Coordinating Elements</span>" column).
+Pressing <span class="buttonlike">Open selected ligands</span> results in the scene shown below. 
+The sphere in the center has been added to show where a catalyst center (<i>i.e.</i> transition metal) would be.
+</p>
+
+<object data="dioxLigands.html" width="540" height="389" class="molview"></object>
+
+<p>
+To quickly look at many ligands at once, you can load in all the ligands you want to compare. 
+You can then use the Tile Structures tool in Chimera to spread them out. 
+Below is the result for loading in many bisphosphine ligands in this way. 
+It may be more straightforward to compare them after selecting the key atoms, using ChimAARON's  
+<a href="../commands/rmsdalign.html"><code>rmsdalign</code></a>, and tiling the structures.
+</p>
+
+<object data="diphosLigands.html" width="975" height="644" class="molview"></object>
+
+
+</div>
+
+</html>
