@@ -9,7 +9,7 @@ class GetAaronToolsDialog(ModelessDialog):
     title = "Get or Backport AaronTools"
     
     buttons = ("Close",)
-    help = ("tutorials/backportAaronTools.html", ChimAARON)
+    help = ("tutorials/setupGuide.html", ChimAARON)
 
     def __init__(self):
         if sys.version_info < (3,):

@@ -26,12 +26,17 @@ tsbond [ selec <i>atom-spec</i> ] [ color <i>color</i> ] [ transparency <i>prece
 </h3>
 
 <p>
-<b>tsbond</b> replaces the selected bonds (either in <i>atom-spec</i> or the current selection) with transparent cylinders.
-Alternatively, if two atoms are specified that are not bonded, these cylinders are drawn where the bond between these atoms would be.
-The keywords modify the appearance of these cylinders:
+<b>tsbond</b> deletes the selected bonds and puts transparent ghost atoms on top of the previously bonded atoms. 
+These ghost atoms are not displayed (unless <code>show</code> or <code>display</code> is run), but the bond between them is.
+<br>
+Alternatively, if two atoms are specified, bonded ghost atoms are placed on top of these and the bond between the selected atoms is deleted (if they are bonded).
+<br><br>
+The keywords modify the appearance of these bonds:
 <ul>
-	<li>color (default byatom) - color of cylinders; may be Chimera named color, r,g,b[,a] tuple, or byatom. <br><b>NOTE</b> If you don't want to color the cylinders byatom, consider coloring the bond and setting its transparency with the <b>color</b> and <b>transparency</b> Chimera commands. An actual bond will move with the atoms in an animation, and <b>tsbond</b> cylinders will not.</li>
-	<li>transparency (default 50) - percent transparency of the cylinder</li>
+	<li>color (default byatom) - color of bonds; may be Chimera named color, r,g,b[,a] tuple, or byatom. 
+	<br><b>NOTE</b> If you don't want to color the bonds byatom, consider coloring the bond and setting its transparency with the <b>color</b> and <b>transparency</b> Chimera commands. 
+	An actual bond will move with the atoms in an animation, and <b>tsbond</b> cylinders will not.</li>
+	<li>transparency (default 50) - percent transparency of the bonds</li>
 </ul>
 </p>
 

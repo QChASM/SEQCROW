@@ -55,7 +55,8 @@ def ChimeraMolecule2AaronGeometry(mol):
     #create a list of AaronTools atoms from the Molecule atoms 
     atoms = []
     for atom in mol.atoms:
-        atoms.append(ChimeraAtom2AaronAtom(atom))
+        if not atom.__destroyed__ and atom.name != "ghost":
+            atoms.append(ChimeraAtom2AaronAtom(atom))
 
     #make Geometry
     geom = Geometry(atoms, mol.name, mol.name)
@@ -569,9 +570,8 @@ def doRmsdAlign(cmdName, arg_str):
             mol.atoms[i].setCoord(Coord(*known_mols[mol]['geom'].atoms[i].coords))
 
 def doTSBond(cmdName, arg_str):
-    from chimera import MaterialColor, specifier, Bond, openModels, replyobj
+    from chimera import MaterialColor, specifier, Bond, replyobj, Element
     from chimera.colorTable import colors
-    from Bld2VRML import openBildString
     
     parser = ArgumentParser()
     
@@ -641,64 +641,56 @@ def doTSBond(cmdName, arg_str):
     for ts_bond in bonds:
         m = ts_bond.molecule
         atom_pair = ts_bond.atoms
+        r = atom_pair[0].residue
         
         if ts_bond.drawMode >= 1:
             radius = ts_bond.radius*ts_bond.molecule.stickScale
         
         if color == 'byatom':
-            #color half of the bond based on the color of one of the atoms
-            v = atom_pair[1].coord() - atom_pair[0].coord()
-            ratio = atom_pair[0].radius/(atom_pair[0].radius + atom_pair[1].radius)
-            mid = atom_pair[0].coord() + ratio*v            
-            
-            ts_bond.halfbond = True
-            
             color1 = atom_pair[0].color
             if color1 is None:
-                color1 = ts_bond.molecule.color
-            
+                color1 = m.color
+                
             color1_rgba = list(color1.rgba())
             color1_rgba[-1] = transparency
             color1 = MaterialColor(*color1_rgba)
             
             color2 = atom_pair[1].color
             if color2 is None:
-                color2 = ts_bond.molecule.color
-
+                color2 = m.color
+                
             color2_rgba = list(color2.rgba())
             color2_rgba[-1] = transparency
             color2 = MaterialColor(*color2_rgba)
             
-            #bonds are actually bild thingies
-            bild_str = ".cylinder %f %f %f" % tuple(atom_pair[0].coord())
-            bild_str += "         %f %f %f" % tuple(mid)
-            bild_str += "         %f open\n" % radius
-            mdls = openBildString(bild_str)
-            for mdl in mdls:
-                mdl.color = color1
-            
-            openModels.add(mdls, hidden=False, sameAs=m)
-            
-            bild_str = ".cylinder %f %f %f" % tuple(atom_pair[1].coord())
-            bild_str += "         %f %f %f" % tuple(mid)
-            bild_str += "         %f open\n" % radius
-            mdls = openBildString(bild_str)
-            for mdl in mdls:
-                mdl.color = color2
-                
-            openModels.add(mdls, hidden=False, sameAs=m)
-            
         else:
-            #color the entire bond with the specified color
-            bild_str = ".cylinder %f %f %f" % tuple(atom_pair[0].coord())
-            bild_str += "         %f %f %f" % tuple(atom_pair[1].coord())
-            bild_str += "         %f open\n" % radius            
-            mdls = openBildString(bild_str)
-            for mdl in mdls:
-                mdl.color = color
+            color1 = color
+            color2 = color
             
-            openModels.add(mdls, hidden=False, sameAs=m)
+        ghostElement1 = Element(atom_pair[0].element)
+        ghostElement2 = Element(atom_pair[1].element)
         
+        ghostAtom1 = m.newAtom(atom_pair[0].name, ghostElement1)
+        ghostAtom2 = m.newAtom(atom_pair[1].name, ghostElement2)
+        r.addAtom(ghostAtom1)
+        r.addAtom(ghostAtom2)
+        for coordset in m.coordSets:
+            ghostAtom1.setCoord(m.coordSets[coordset].coords()[atom_pair[0].coordIndex], m.coordSets[coordset])
+            ghostAtom2.setCoord(m.coordSets[coordset].coords()[atom_pair[1].coordIndex], m.coordSets[coordset])
+        ghostAtom1.color = color1
+        ghostAtom2.color = color2
+        ghostAtom1.radius = atom_pair[0].radius
+        ghostAtom2.radius = atom_pair[1].radius
+        ghostAtom1.name = "ghost"
+        ghostAtom2.name = "ghost"
+        
+        new_bond = m.newBond(ghostAtom1, ghostAtom2)
+        new_bond.display = Bond.Always
+        new_bond.drawMode = ts_bond.drawMode        
+        
+        ghostAtom1.display = False
+        ghostAtom2.display = False
+            
         ts_bond.molecule.deleteBond(ts_bond)
 
 def doAllGeom(cmdName, arg_str):
@@ -706,8 +698,8 @@ def doAllGeom(cmdName, arg_str):
     from chimera import replyobj
     from AaronTools.fileIO import FileReader, read_types
     from AaronTools.geometry import Geometry
-    from Movie.gui import MovieDialog
-    from Movie.prefs import SCRIPT_PYTHON, DICT_NAME
+    from Movie.gui import MovieDialog, ScriptDialog
+    from Movie.prefs import prefs, SCRIPT_PYTHON, DICT_NAME
     
     parser = ArgumentParser()
     parser.addArg('roundTrip', nargs=1, default=False, kind=bool)
@@ -730,9 +722,17 @@ def doAllGeom(cmdName, arg_str):
         ensemble = GeomList2Ensemble(geoms)
         
         movie = MovieDialog(ensemble)
+        replyobj.status("loaded trajectory")
         if args['dynamicBonds']:
             script = getDynamicBondScript(cmdName, arg_str)
-            movie.setScript(script, SCRIPT_PYTHON, frameSubst='mdInfo')
+            movie.scriptDialog = ScriptDialog(movie)
+            movie.scriptDialog._setFrameSubst(SCRIPT_PYTHON)
+            movie.scriptDialog.scriptText.insert('insert', script)
+            movie.scriptDialog.scriptType.setvalue(SCRIPT_PYTHON)
+            movie.scriptDialog.Cancel()
+
+            movie.setScript(script, SCRIPT_PYTHON, frameSubst=prefs[DICT_NAME])
+            
             replyobj.status("Movie script set to dynamically break and form bonds")
 
 def doArnRecord(cmdName, arg_str):
@@ -886,12 +886,12 @@ from chimera.misc import getPseudoBondGroup
 mol = mdInfo['mol']
 
 for bond in mol.bonds:
-	mol.deleteBond(bond)
+    mol.deleteBond(bond)
 
 if mol.id == OpenModels.Default:
-	cat = "coordination complexes of %s " % (mol.name,)
+    cat = "coordination complexes of %s " % (mol.name,)
 else:
-	cat = "coordination complexes of %s (%s)" % (mol.name, mol)
+    cat = "coordination complexes of %s (%s)" % (mol.name, mol)
 
 coordination_pb = getPseudoBondGroup(cat, associateWith=[mol])
 coordination_pb.deleteAll()
@@ -900,7 +900,7 @@ connectMolecule(mol)
 """
     script += """
 for bond in mol.bonds:
-	bond.drawMode = Bond.%s
+    bond.drawMode = Bond.%s
 
 makePseudoBondsToMetals([mol])
 """ % args['drawMode']

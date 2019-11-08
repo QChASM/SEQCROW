@@ -210,7 +210,7 @@ class AARON_Input_Dialog_EMO(EMO):
 
 class GetAaronTools_EMO(EMO):
     def name(self):
-        return "Get/backport AaronTools"
+        return "Set up AaronTools"
     
     def description(self):
         return self.categoryDescriptions()['ChimAARON']

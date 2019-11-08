@@ -19,46 +19,41 @@
 
 <p>
 Almost all of the functionality added by ChimAARON is based on our AaronTools Python 3 module. 
-In order for ChimAARON to work, Chimera needs to be able to find AaronTools and AaronTools. 
-Additionally, Chimera uses a Python 2 interpreter. 
-Because of this, AaronTools needs to be backported to Python 2. 
-This tutorial will guide you through this process.
+The AaronTools installation that comes with ChimAARON is compatible with Python 2, which is what Chimera uses.
 </p>
 
-<h3>Installing AaronTools for Chimera</h3>
+<h3>Adding the ChimAARON Plugin</h3>
 
 <p>
-The Python 3 implementation of AaronTools can be downloaded from the QChASM GitHub page. 
-Once downloaded, all AaronTools code should be placed in a directory named 'AaronTools' (<i>i.e.</i> AaronTools/geometry.py, AaronTools/atoms.py, <i>etc.</i>).
-<br><br>
 <b>NOTE</b> - you may experience some issues using ChimAARON if AaronTools is installed in a cloud-synced directory, like a Dropbox folder.
-<br><br>
-
 </p>
 
 <p>
-To make Chimera aware of your AaronTools directory, go to <span class="menulike">Tools</span> &rarr; <span class="menulike">Additional Tools</span> &rarr; <span class="menulike">Add third-party plugin location...</span>. 
-This will open a dialog menu, in the bottom half of which you can specify the location of plugin folders. 
-Press <span class="buttonlike">Add...</span> and navigate your way to the directory containing your AaronTools directory (<i>e.g.</i> 'plugins' for /home/CoolUser/plugins/AaronTools).
-Pressing <span class="buttonlike">Open</span> will add that location to the "Third-party plugin locations" box. 
-Check to make sure the location is set correctly (for our CoolUser example, you'd see "plugins - /home/CoolUser" or "/home/CoolUser/plugins/AaronTools" depending on a setting in your <span class="menulike">General Preferences</span>). 
-Make sure to press <span class="buttonlike">Save</span>. 
-Chimera is now able to discover AaronTools. 
-<br><br>
-<b>NOTE</b> - Chimera needs to discover AaronTools before ChimAARON.
-If your AaronTools and ChimAARON installations are in different directories, make sure the directory containing ChimAARON is below the directory containing AaronTools. 
-If ChimAARON is above AaronTools in the plugin location order, <span class="buttonlike">Delete</span> the ChimAARON location and add it again.
-<br><br>
-Now, we just have to make AaronTools work with Chimera's Python interpreter.
+<ol>
+	<li>To add ChimAARON as a Chimera plugin, go to <span class="menulike">Tools</span> &rarr; <span class="menulike">Additional Tools</span> &rarr; <span class="menulike">Add third-party plugin location...</span>
+	<ul><li>This will open a dialog menu, in the bottom half of which you can specify the location of plugin folders</li>
+	</ul>
+	</li>
+	<li>Press <span class="buttonlike">Add...</span> and navigate your way to the directory containing your ChimAARON and AaronTools directories (<i>e.g.</i> 'plugins' for /home/CoolUser/plugins/AaronTools and /home/CoolUser/plugins/ChimAARON)</li>
+	<ul><li>Pressing <span class="buttonlike">Open</span> will add that location to the "Third-party plugin locations" box</li>
+		<li>Check to make sure the location is set correctly (for our CoolUser example, you'd see "&bull; plugins - /home/CoolUser" or "&bull; /home/CoolUser/plugins" depending on a setting in your <span class="menulike">General Preferences</span>)</li>
+		<li>Make sure to press <span class="buttonlike">Save</span></li>
+</ol>
+Chimera is now able to discover AaronTools and ChimAARON. 
+Now, we just need some AaronTools dependencies.
 </p>
 
 <h3>Installing Dependencies</h3>
+
+<p><b>
+If you installed Chimera in a directory that requires administrator/root privileges to modify, you'll need to run Chimera as an administrator/super user for this.
+</b></p>
 
 <p>
 AaronTools uses two Python modules that don't come with Chimera: <code>`cclib`</code> and <code>`future`</code>. 
 If you're comfortable installing those manually, feel free to do so. 
 A simpler option is to go through ChimAARON. 
-If you have ChimAARON installed and ChimAARON has an issue with importing AaronTools, you can go to <span class="menulike">Tools</span> &rarr; <span class="menulike">ChimAARON</span> &rarr; <span class="menulike">Get/backport AaronTools</span>.
+Go to <span class="menulike">Tools</span> &rarr; <span class="menulike">ChimAARON</span> &rarr; <span class="menulike">Set up AaronTools</span>.
 This menu option will go away if ChimAARON does not run into any errors when importing AaronTools.
 </p>
 
@@ -78,6 +73,10 @@ Once you've got pip, press <span class="buttonlike">install dependencies</span> 
 </p>
 
 <h3>Backporting AaronTools</h3>
+
+<p><b>
+If you are using the AaronTools installation that comes with ChimAARON, you should not need to do this
+</b></p>
 
 <p>
 We use the pasteurize script that comes with <code>`future`</code> to fix most of AaronTools' compatibility issues between Python 2 and 3. 
