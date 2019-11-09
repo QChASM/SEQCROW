@@ -875,6 +875,8 @@ def getAARONkw(cmdName, arg_str, perl=True):
 
 def getDynamicBondScript(cmdName, arg_str):
     """return a script for a movie that will make bonds dynamic"""
+    from Movie.prefs import prefs, DICT_NAME
+    
     parser = ArgumentParser()
     parser.addArg('drawMode', nargs=1, default="Stick", kind=str)
     
@@ -883,21 +885,21 @@ def getDynamicBondScript(cmdName, arg_str):
     script = """from chimera import connectMolecule, Bond, OpenModels, makePseudoBondsToMetals
 from chimera.misc import getPseudoBondGroup
 
-mol = mdInfo['mol']
+mol = %s['mol']
 
 for bond in mol.bonds:
     mol.deleteBond(bond)
 
 if mol.id == OpenModels.Default:
-    cat = "coordination complexes of %s " % (mol.name,)
+    cat = "coordination complexes of %%s " %% (mol.name,)
 else:
-    cat = "coordination complexes of %s (%s)" % (mol.name, mol)
+    cat = "coordination complexes of %%s (%%s)" %% (mol.name, mol)
 
 coordination_pb = getPseudoBondGroup(cat, associateWith=[mol])
 coordination_pb.deleteAll()
 
 connectMolecule(mol)
-"""
+""" % prefs[DICT_NAME]
     script += """
 for bond in mol.bonds:
     bond.drawMode = Bond.%s

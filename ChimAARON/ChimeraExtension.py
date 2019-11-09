@@ -11,7 +11,7 @@ try:
     import AaronTools
     import os
     for f in os.listdir(os.path.dirname(AaronTools.__file__)):
-        if f.endswith('.py'):
+        if f.endswith('.py') or f.endswith('.pyc'):
             exec "import AaronTools.%s" % ".".join(f.split('.')[:-1])
             print(f)
         
@@ -20,7 +20,6 @@ try:
     from AaronTools.fileIO import read_types
 except:
     WITH_AARONTOOLS = False
-    print(f)
 
 # -------------
 # Nice-to-haves
@@ -232,5 +231,5 @@ if WITH_AARONTOOLS:
     manager.registerExtension(Frequency_Dialog_EMO(__file__))
     manager.registerExtension(Library_Dialog_EMO(__file__))
     manager.registerExtension(AARON_Input_Dialog_EMO(__file__))
-elif not WITH_AARONTOOLS:
-    manager.registerExtension(GetAaronTools_EMO(__file__))
+
+manager.registerExtension(GetAaronTools_EMO(__file__))
