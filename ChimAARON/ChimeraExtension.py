@@ -1,44 +1,38 @@
 import chimera
 import ChimAARON
+import os
 
 from chimera.extension import EMO, manager
 from Midas.midas_text import addCommand
+from ChimAARON.prefs import ENVIRONMENT
 
-#try to import AaronTools
-#if we fail, only register an extension that will try to install/backport AaronTools
-f = ''
+envPrefs = chimera.preferences.preferences.get('ChimAARON', ENVIRONMENT)
+if 'AARONLIB' in envPrefs:
+    os.environ['AARONLIB'] = envPrefs['AARONLIB']
+
 try:
-    import AaronTools
-    import os
-    for f in os.listdir(os.path.dirname(AaronTools.__file__)):
-        if f.endswith('.py') or f.endswith('.pyc'):
-            exec "import AaronTools.%s" % ".".join(f.split('.')[:-1])
-            print(f)
-        
-    WITH_AARONTOOLS = True
-    
     from AaronTools.fileIO import read_types
-except:
-    WITH_AARONTOOLS = False
-
-# -------------
-# Nice-to-haves
-# -------------
-
-# open AaronTools-readable files
-def openAaronTools(filename):
-    """open a file format that is supported by AaronTools"""
-    from ChimAARON import AaronGeometry2ChimeraMolecule
-    from AaronTools.geometry import Geometry
-    from AaronTools.fileIO import FileReader
     
-    #this doesn't work unless we go through a FileReader first - why?
-    geom = Geometry(FileReader(filename))
-    m = AaronGeometry2ChimeraMolecule(geom)
-    return [m]
+    # -------------
+    # Nice-to-haves
+    # -------------
+    
+    # open AaronTools-readable files
+    def openAaronTools(filename):
+        """open a file format that is supported by AaronTools"""
+        from ChimAARON import AaronGeometry2ChimeraMolecule
+        from AaronTools.geometry import Geometry
+        from AaronTools.fileIO import FileReader
         
-if WITH_AARONTOOLS:
+        #this doesn't work unless we go through a FileReader first - why?
+        geom = Geometry(FileReader(filename))
+        m = AaronGeometry2ChimeraMolecule(geom)
+        return [m]
+            
     chimera.fileInfo.register("AaronTools coordinate", openAaronTools, ['.'+filetype for filetype in read_types], ['AaronTools' for filetype in read_types], category=chimera.FileInfo.STRUCTURE)
+
+except:
+    pass
 
 # --------
 # Commands
@@ -227,9 +221,8 @@ class GetAaronTools_EMO(EMO):
         from ChimAARON.GetAaronTools import GetAaronToolsDialog
         dialog = GetAaronToolsDialog()
 
-if WITH_AARONTOOLS:
-    manager.registerExtension(Frequency_Dialog_EMO(__file__))
-    manager.registerExtension(Library_Dialog_EMO(__file__))
-    manager.registerExtension(AARON_Input_Dialog_EMO(__file__))
+manager.registerExtension(Frequency_Dialog_EMO(__file__))
+manager.registerExtension(Library_Dialog_EMO(__file__))
+manager.registerExtension(AARON_Input_Dialog_EMO(__file__))
 
 manager.registerExtension(GetAaronTools_EMO(__file__))
