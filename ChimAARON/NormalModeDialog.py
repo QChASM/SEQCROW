@@ -2,6 +2,7 @@ import Tkinter
 import Pmw
 import ChimAARON
 
+from chimera.preferences import preferences
 from chimera.baseDialog import ModelessDialog
 from chimera.tkoptions import InputFileOption
 
@@ -17,11 +18,16 @@ class FreqFileLoader(ModelessDialog):
         ModelessDialog.__init__(self)
         
     def fillInUI(self, parent):
-        from ChimAARON.prefs import prefs, INPUT_FILES
-        inputPref = prefs[INPUT_FILES].setdefault('Frequency', {})
+        from ChimAARON.prefs import INPUT_FILES
+        inputPref = preferences.get('ChimAARON', INPUT_FILES)
+
+        if 'Frequency' in inputPref:
+            defaultIn = inputPref['Frequency']
+        else:
+            defaultIn = None
 
         self.frame = InputFileOption(parent, 0,
-        "Frequency File", inputPref,
+        "Frequency File", defaultIn,
         None, title="Choose Frequency File",
         historyID="Frequency File")
                     
@@ -149,7 +155,7 @@ class animateGUI:
                                     text="Animated selected mode", \
                                     command=self._animated_selected_modes)
         
-        self.loadModeButton.grid(row=row, column=0)
+        self.loadModeButton.grid(row=row, column=0, columnspan=2)
         row += 1
 
     def _animated_selected_modes(self):
@@ -198,7 +204,7 @@ class vectorGUI:
                                     command=self._display_mode_vectors)
         
         
-        self.loadModeButton.grid(row=row, column=0)
+        self.loadModeButton.grid(row=row, column=0, columnspan=2)
         row += 1
         
     def _display_mode_vectors(self):

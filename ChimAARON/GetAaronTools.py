@@ -1,9 +1,12 @@
 import Tkinter
+import Tix
 import sys
 import os
 import ChimAARON
+import chimera
 
 from chimera.baseDialog import ModelessDialog
+from tkFileDialog import askdirectory
 
 class GetAaronToolsDialog(ModelessDialog):
     title = "Get or Backport AaronTools"
@@ -67,54 +70,80 @@ class GetAaronToolsDialog(ModelessDialog):
                 self.NEED_PIP = True
     
     def fillInUI(self, parent):
+        from ChimAARON.prefs import ENVIRONMENT
+        
+        envPrefs = chimera.preferences.preferences.get('ChimAARON', ENVIRONMENT)
+        if 'AARONLIB' in envPrefs:
+            arnlib = envPrefs['AARONLIB']
+        else:
+            arnlib = None
+            
+        self.envDisplayArea = Tkinter.LabelFrame(parent, text="AaronTools Environment")
+        self.envDisplayArea.grid(row=0, column=0, sticky='nsew')
+        self.envDisplayArea.rowconfigure(0, weight=1)
+        self.envDisplayArea.columnconfigure(0, weight=1)
         
         row = 0
         
-        self.installPipButton = Tkinter.Button(parent, text="install pip with ensurepip and update pip", command=self.installPip)
+        self.envChanges = Tkinter.Label(self.envDisplayArea, text="You'll have to restart Chimera for environment changes to take effect")
+        self.envChanges.grid(row=row, column=0, sticky='new')
+        
+        row += 1
+        
+        self.AARONLIBButton = Tkinter.Button(self.envDisplayArea, anchor='w', text="set AARONLIB location", command=self.arnlibSelect)
+        self.AARONLIBButton.grid(row=row, column=0, sticky='w')
+
+        
+        self.envLabel = Tkinter.Label(self.envDisplayArea, anchor='w', text="Personal AaronTools Library Location: %s" % arnlib)
+        self.envLabel.grid(row=row, column=1, sticky='ew')
+        
+        row += 1
+        
+        #display backport/setup instructions
+        self.inputDisplayArea = Tkinter.LabelFrame(parent, text="Dependencies")
+        self.inputDisplayArea.grid(row=1, column=0, sticky='nsew')
+        self.inputDisplayArea.rowconfigure(0, weight=1)
+        self.inputDisplayArea.columnconfigure(1, weight=1)
+        
+        row = 0
+        
+        self.installPipButton = Tkinter.Button(self.inputDisplayArea, text="install pip with ensurepip and update pip", command=self.installPip)
         self.installPipButton.grid(row=row, column=0, sticky='sew')
         
         row += 1
         
-        self.installDependenciesButton = Tkinter.Button(parent, text="install dependencies", command=self.installDependencies)
+        self.installDependenciesButton = Tkinter.Button(self.inputDisplayArea, text="install dependencies", command=self.installDependencies)
         self.installDependenciesButton.grid(row=row, column=0, sticky='new')
         
         row += 1
         
-        self.backportButton = Tkinter.Button(parent, text="pasteurize AaronTools", command=self.backportAaronTools)
+        self.backportButton = Tkinter.Button(self.inputDisplayArea, text="pasteurize AaronTools", command=self.backportAaronTools)
         self.backportButton.grid(row=row, column=0, sticky='new')        
         self.backportButton.config(state="disabled")
 
         row += 1
         
-        self.moreBackportsButton = Tkinter.Button(parent, text="fix misc. backporting", command=self.doAdditionalBackports)
+        self.moreBackportsButton = Tkinter.Button(self.inputDisplayArea, text="fix misc. backporting", command=self.doAdditionalBackports)
         self.moreBackportsButton.grid(row=row, column=0, sticky='new')
         self.moreBackportsButton.config(state="disabled")
         
         row += 1
         
-        #display backport/setup instructions
-        self.inputDisplayArea = Tkinter.LabelFrame(parent, text="README")
-        self.inputDisplayArea.grid(row=0, column=1, sticky='nsew', rowspan=row+1)
-        self.inputDisplayArea.rowconfigure(0, weight=1)
-        self.inputDisplayArea.columnconfigure(1, weight=1)
-        
         self.inputDisplay = Tkinter.Text(self.inputDisplayArea, wrap='word')
-        self.inputDisplay.grid(row=0, column=0, sticky='nsew')
+        self.inputDisplay.grid(row=0, column=1, rowspan=row, sticky='nsew')
         self.inputScroll = Tkinter.Scrollbar(self.inputDisplayArea, command=self.inputDisplay.yview)
-        self.inputScroll.grid(row=0, column=1, sticky='nsew')
+        self.inputScroll.grid(row=0, column=2, rowspan=row, sticky='nsew')
         self.inputDisplay.rowconfigure(0, weight=1)
         self.inputDisplay.columnconfigure(0, weight=1)
         self.inputDisplay['yscrollcommand'] = self.inputScroll.set  
         
-        readme = """ChimAARON was unable to load AaronTools. Ensure that the plugin location containing AaronTools is above the plugin location for ChimAARON 
-under Tools -> Additional Tools -> Add third-party plugin location. If AaronTools and ChimAARON are in the same directory, you shouldn't need to worry about the order. 
-If AaronTools is before ChimAARON, then you likely need to install AaronTools dependencies or backport AaronTools. 
-
-If you have installed ChimAARON from the QChASM GitHub alongside the ChimAARON-compatible AaronTools, you do not need to backport AaronTools.
+        readme = """If you have installed ChimAARON from the QChASM GitHub alongside the ChimAARON-compatible AaronTools, you do not need to backport AaronTools.
 
 To install dependencies, you'll have to bootstrap/install pip first. This can be done by pressing the 'install pip with ensurepip and update pip' button to the left. 
 
 Once pip is installed, you will be able to install the AaronTools dependencies (future and cclib) with the 'install dependencies' button. 
+
+
 
 Fresh installations of AaronTools need to be backported to Python 2 for ChimAARON to work. Backporting is a two-step process: first, run the pasteurize script that was installed with `future`, and then fix random things that pasteurize doesn't. Please wait for pasteurize to finish before running 'fix misc. backporting'.
 
@@ -207,5 +236,30 @@ We'll ignore this error and proceed with updating the current version of pip" % 
             with open(utils_init, 'a'):
                 os.utime(utils_init, None)
             
+    def arnlibSelect(self):
+        from ChimAARON.prefs import prefs, ENVIRONMENT
+        from copy import deepcopy
+        from chimera import replyobj
         
+        if 'AARONLIB' in prefs[ENVIRONMENT]:
+            libPref = prefs[ENVIRONMENT]['AARONLIB']
+        else:
+            libPref = None
+        
+        arnlib = askdirectory(initialdir=libPref, title="Select AARONLIB directory")
+        
+        if arnlib:
+            envPrefs = deepcopy(prefs[ENVIRONMENT])
+            envPrefs['AARONLIB'] = arnlib
+            prefs[ENVIRONMENT] = envPrefs
+            
+            libs = ['RingFrags', 'Subs', 'Ligands', 'TS_geoms']
+            
+            for lib in libs:
+                libDir = os.path.join(arnlib, lib)
+                if not os.path.exists(libDir):
+                    os.makedirs(libDir)
+
+            replyobj.status("set AARONLIB to %s and created library directories" % arnlib)
+            self.envLabel.config(text="Personal AaronTools Library Location: %s" % arnlib)
         
