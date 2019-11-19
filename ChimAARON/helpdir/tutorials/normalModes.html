@@ -19,40 +19,47 @@
 
 <p>
 ChimAARON makes it easy to visualize normal vibrational modes in Chimera. 
-In order to load the normal modes of a molecule, ChimAARON requires a Gaussian .log file containing frequency information is required. 
+In order to load the normal modes of a molecule, ChimAARON requires a Gaussian .log file containing frequency information. 
 </p>
 
 <p>
 To load the frequency information, go to the <span class="menulike">Visualize Normal Mode...</span> option under <span class="menulike">Tools</span> &rarr; <span class="menulike">ChimAARON</span>. 
 You will then be prompted to locate your frequency file. 
 Once the file is selected, a dialog menu will open up listing the normal modes. These modes may be sorted by frequency or IR Intensity. 
-A mode can be selected from the table and visualized by pressing the <span class="buttonlike">Display mode</span> button.
+A mode can be selected from the table and visualized by pressing the <span class="buttonlike">Display mode vectors</span> button or <span class="buttonlike">Animate selected mode</span> button.
 </p>
 
 <img src="../images/normalModes.png" alt="Normal Mode Dialog">
 
 <p>
-There are two ways to visualize a normal mode: displacement vectors, and an animation.
-</p>
+There are two ways to visualize a normal mode in this dialog: 
+<ul>
+	<li>displacement vectors</li>
+	<li>animating displacement</li>
+</ul>
 
+<h3>Vectors</h3>
 <p>
 When a normal mode is displayed using vectors, you can change several things about the vectors:
 <ul>
-    <li>Vector scaling - change the length of the longest vector</li>
+    <li>Vector scaling - change the length of the longest vector (changing the sign flips the direction of the arrows)</li>
     <li>Use mass-weighted - whether or not to remove mass-weighting from the vectors</li>
     <li>Vector color - the color of the vectors</li>
 </ul>
 </p>
 
+<h3>Animating</h3>
 <p>
 When loading the mode as an animation, you have different settings:
 <ul>
     <li>Max. displacement - most any atom moves from its equilibrium position</li>
     <li>Number of frames - how long the animation is</li>
 </ul>
+The animation is roundtrip. 
+</p>
 
+<h3>Command Line Options</h3>
 <p>
-These tools can also be accessed through the command line. 
 See the documentation on <a href="../commands/follow.html"><code>follow</code></a> and <a href="../commands/freqvec.html"><code>freqvec</code></a> for details.
 </p>
 

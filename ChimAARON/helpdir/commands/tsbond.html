@@ -31,11 +31,13 @@ These ghost atoms are not displayed (unless <code>show</code> or <code>display</
 <br>
 Alternatively, if two atoms are specified, bonded ghost atoms are placed on top of these and the bond between the selected atoms is deleted (if they are bonded).
 <br><br>
+Ghost atoms are named 'ghost', allowing them to be selected or deselected with the command line specified '<code>@ghost</code>'.
+<br><br>
 The keywords modify the appearance of these bonds:
 <ul>
 	<li>color (default byatom) - color of bonds; may be Chimera named color, r,g,b[,a] tuple, or byatom. 
 	<br><b>NOTE</b> If you don't want to color the bonds byatom, consider coloring the bond and setting its transparency with the <b>color</b> and <b>transparency</b> Chimera commands. 
-	An actual bond will move with the atoms in an animation, and <b>tsbond</b> cylinders will not.</li>
+	There is no benefit to using <code>tsbond</code> with a specified color over the built in Chimera commands.
 	<li>transparency (default 50) - percent transparency of the bonds</li>
 </ul>
 </p>

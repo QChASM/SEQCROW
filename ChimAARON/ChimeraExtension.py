@@ -124,7 +124,7 @@ def cmd_ArnRecord(cmdName, arg_str):
     doArnRecord(cmdName, arg_str)
 
 addCommand("allgeom", cmd_AllGeom, help=("commands/allgeom.html", ChimAARON))
-addCommand("arninp", cmd_ArnRecord)
+addCommand("arninp", cmd_ArnRecord, help=("commands/arninp.html", ChimAARON))
 addCommand("arnscl", cmd_AARON_SCL, help=("commands/arnscl.html", ChimAARON))
 addCommand("closering", cmd_CloseRing, help=("commands/closering.html", ChimAARON))
 addCommand("follow", cmd_Follow, help=("commands/follow.html", ChimAARON))

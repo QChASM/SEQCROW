@@ -72,7 +72,8 @@ class InputManager:
         header = ""
         for kw in basis_kw:
             if kw in kwargs and kwargs[kw]:
-                header += "%s=%s\n" % (kw, kwargs[kw])
+                for val in kwargs[kw]:
+                    header += "%s=%s\n" % (kw, val)
         
         for kw in str_kw:
             if kw in kwargs and kwargs[kw]:

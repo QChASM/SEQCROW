@@ -10,6 +10,8 @@ class InputGenerator_templateSelector(ModelessDialog):
     title = "Select AARON Template"
     buttons = ("Apply", "Close",)
     
+    help = ("tutorials/aaronInput.html", ChimAARON)
+    
     def __init__(self):
         #currently displayed input recording format (from TS template, from loaded strux, resume)
         self.curFormat = None
@@ -152,6 +154,8 @@ class InputGenerator_structureChanges(ModelessDialog):
     provideStatus = True
     buttons = ("Close",)
     title = "AARON Input Recorder"
+    
+    help = ("tutorials/aaronInput.html", ChimAARON)
     
     def __init__(self, model_ids=None, \
                  perl=False, \
@@ -351,8 +355,15 @@ class keyWordGUI:
         self.curFormat = format
 
     def setOptionValue(self):
+        basis_kw, str_kw, float_kw, int_kw, bool_kw = ChimAARON.arnmngr.InputManager.AARONKeyWords()
         value = self.optionGUI[self.curFormat].get()
-        self.origin.kw_dict[self.curFormat] = value
+        if self.curFormat in basis_kw:
+            if self.origin.kw_dict[self.curFormat] is None:
+                self.origin.kw_dict[self.curFormat] = [value]
+            else:
+                self.origin.kw_dict[self.curFormat].append(value)
+        else:
+            self.origin.kw_dict[self.curFormat] = value
 
         self.origin.refresh_text()    
         
