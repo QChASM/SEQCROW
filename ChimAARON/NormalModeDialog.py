@@ -70,6 +70,7 @@ class NormalModeDialog(ModelessDialog):
         
     def fillInUI(self, parent):
         from CGLtk.Table import SortableTable
+        from ttk import Notebook
         
         modes = [i for i in range(0, len(self.fileReader.other['frequency'].data))]
         
@@ -92,37 +93,23 @@ class NormalModeDialog(ModelessDialog):
         
         self.modeOptions = ["Vectors", "Animate"]
         
-        self.animOrVec = Pmw.OptionMenu(parent, initialitem=self.modeOptions[0], \
-                        command=self.showFormat, items=self.modeOptions, labelpos='w', \
-                        label_text='Display option:')
-        
-        self.animOrVec.grid(row=1, sticky='sew')
-        
-        self.curFormat = None
+        self.animOrVec = Notebook(parent)
+                
         self.frames = {}
         self.modeGUIs = {}
         
-        self.frames["Vectors"] = Tkinter.Frame(parent)
+        self.frames["Vectors"] = Tkinter.Frame(self.animOrVec)
         self.modeGUIs["Vectors"] = vectorGUI(self.frames["Vectors"], self.fileReader, self.data, self.table)
         
-        self.frames["Animate"] = Tkinter.Frame(parent)
+        self.frames["Animate"] = Tkinter.Frame(self.animOrVec)
         self.modeGUIs["Animate"] = animateGUI(self.frames["Animate"], self.fileReader, self.data, self.table)
         
-        self.curFormat = "Vectors"
-        self.showFormat("Vectors")
-        parent.columnconfigure(0, weight=1)
-        parent.rowconfigure(0, weight=1)
+        self.animOrVec.add(self.frames["Vectors"], text="Vectors")
+        self.animOrVec.add(self.frames["Animate"], text="Animate")
         
-    def showFormat(self, format):
-        if format not in self.modeOptions:
-            return
+        self.animOrVec.grid(row=1, column=0, sticky='nsew')
         
-        if self.curFormat:
-            self.frames[self.curFormat].grid_forget()
-            
-        self.frames[format].grid(row=2, column=0, sticky='sew')
-        
-        self.curFormat = format
+        parent.pack(fill='both')
 
     def showableModes(self, modes):
         state = "normal"
@@ -155,9 +142,9 @@ class animateGUI:
                                     text="Animated selected mode", \
                                     command=self._animated_selected_modes)
         
-        self.loadModeButton.grid(row=row, column=0, columnspan=2)
+        self.loadModeButton.grid(row=row, column=0, columnspan=2, sticky='ew')
         row += 1
-
+        
     def _animated_selected_modes(self):
         from ChimAARON import Freq2Pathway, Pathway2Ensemble
         from AaronTools.geometry import Geometry
@@ -204,9 +191,9 @@ class vectorGUI:
                                     command=self._display_mode_vectors)
         
         
-        self.loadModeButton.grid(row=row, column=0, columnspan=2)
+        self.loadModeButton.grid(row=row, column=0, columnspan=2, sticky='ew')
         row += 1
-        
+                
     def _display_mode_vectors(self):
         from ChimAARON import Freq2Bild, AaronGeometry2ChimeraMolecule
         from AaronTools.geometry import Geometry

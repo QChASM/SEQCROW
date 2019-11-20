@@ -1,6 +1,7 @@
 import Pmw
 import Tkinter
 import ChimAARON
+import ttk
 
 from chimera.tkoptions import ColorOption
 from chimera.baseDialog import ModelessDialog
@@ -21,45 +22,26 @@ class LibraryDialogMenu(ModelessDialog):
     def fillInUI(self, parent):
         self.libOptions = ['Ligands', 'Substituents', 'Ring Fragments']
         
-        self.libraryMenu = Pmw.OptionMenu(parent, initialitem=self.libOptions[0],
-                                command=self.showFormat, items=self.libOptions, labelpos='w',
-                                label_text='Browse library:')
+        self.libraryMenu = ttk.Notebook(parent)
                                 
-        self.libraryMenu.grid(row=0, column=0, sticky='new')
-        self.libraryMenu.rowconfigure(0, weight=0)
         self.frames = {}
         self.paramGUIs = {}
         
         #switch between ligand, substituent, and ring fragment frames with the OptionMenu
-        self.frames['Ligands'] = Tkinter.Frame(parent)
+        self.frames['Ligands'] = Tkinter.Frame(self.libraryMenu)
         self.paramGUIs['Ligands'] = ligandGUI(self.frames['Ligands'])
         
-        self.frames['Substituents'] = Tkinter.Frame(parent)
+        self.frames['Substituents'] = Tkinter.Frame(self.libraryMenu)
         self.paramGUIs['Substituents'] = substituentGUI(self.frames['Substituents'])
         
-        self.frames['Ring Fragments'] = Tkinter.Frame(parent)
+        self.frames['Ring Fragments'] = Tkinter.Frame(self.libraryMenu)
         self.paramGUIs['Ring Fragments'] = ringFragGUI(self.frames['Ring Fragments'])
-         
-        self.showFormat(self.libOptions[0])
         
-        parent.config(width=3)
-        parent.columnconfigure(0, weight=1)
-        parent.rowconfigure(0, weight=1)
-         
-    def showFormat(self, format):
-        if format not in self.libOptions:
-            return
-        
-        if self.curFormat:
-            self.frames[self.curFormat].grid_forget()
-            
-        self.frames[format].grid(row=1, column=0, sticky='nsew', \
-                            columnspan=self.paramGUIs[format].nCol)
+        self.libraryMenu.add(self.frames['Ligands'], text="Ligands")
+        self.libraryMenu.add(self.frames['Substituents'], text="Substituents")
+        self.libraryMenu.add(self.frames['Ring Fragments'], text="Ring Fragments")
 
-        self.frames[format].rowconfigure(1, weight=1)
-        self.frames[format].columnconfigure(0, weight=1)
-        
-        self.curFormat = format
+        self.libraryMenu.pack(fill='both')
        
 class GeomLoadGUI:
     def _open_geom(self):
@@ -243,6 +225,9 @@ class ligandGUI(GeomLoadGUI):
                                     command=self._open_geom, anchor='s')
         
         self.loadButton.grid(row=3, columnspan=1+self.nCol, sticky='sew')
+        
+        parent.rowconfigure(0, weight=1)
+        parent.columnconfigure(0, weight=1)
     
     @classmethod
     def getLigandTable(cls, parent):
@@ -295,6 +280,10 @@ class substituentGUI(GeomLoadGUI):
         
         self.loadButton.grid(row=3, columnspan=1+self.nCol, sticky='sew')        
 
+        parent.pack()
+        parent.rowconfigure(0, weight=1)
+        parent.columnconfigure(0, weight=1)
+        
     @classmethod
     def getSubstituentTable(cls, parent):
         """returns table with substituent info - name, number of conformers, angle between conformers"""
@@ -355,6 +344,10 @@ class ringFragGUI(GeomLoadGUI):
                                     command=self._open_geom, anchor='s')
         
         self.loadButton.grid(row=3, columnspan=1+self.nCol, sticky='ew')
+        
+        parent.pack()
+        parent.rowconfigure(0, weight=1)
+        parent.columnconfigure(0, weight=1)
         
 class PseudoGeometry:
     """it would take a long ling to create the library dialogs if we actually had to read
