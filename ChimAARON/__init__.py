@@ -493,7 +493,6 @@ def doMapLigand(cmdName, arg_str):
     from chimera import replyobj, selection
     from AaronTools.catalyst import Catalyst
     from AaronTools.component import Component
-    from AaronTools.fileIO import FileWriter
     from Midas import _selectedAtoms
     from Midas.midas_text import getSpecs
     
@@ -531,6 +530,69 @@ def doMapLigand(cmdName, arg_str):
         new_mols.append(new_mol)
         
     return new_mols
+
+def mapLigand(ligand_name, key_atoms):
+    """substitute one ligand for another"""
+    from chimera import replyobj, openModels
+    from chimera.selection import OSLSelection
+    from AaronTools.catalyst import Catalyst
+    from AaronTools.component import Component
+    
+    atoms = OSLSelection(key_atoms).atoms()
+    
+    mol = atoms[0].molecule
+    for atom in atoms:
+        if atom.molecule != mol:
+            raise RuntimeError("Please select atoms on the same molecule")
+    
+    cat = Catalyst(ChimeraMolecule2AaronGeometry(mol))
+    
+    replyobj.status("loading ligand %s..." % ligand_name)
+    lig = Component(ligand_name)
+    
+    arn_targets = cat.find([str(atom.serialNumber) for atom in atoms])
+        
+    replyobj.status("substituting the ligands...")
+    
+    cat.map_ligand(lig, arn_targets)
+    
+    new_mol = AaronGeometry2ChimeraMolecule(cat)
+        
+    return new_mol, mol
+    
+def substitute(sub_name, positions):
+    """substitute one substituent for another"""
+    from chimera import replyobj, openModels
+    from chimera.selection import OSLSelection
+    from AaronTools.geometry import Geometry
+    from AaronTools.substituent import Substituent
+    
+    atoms = OSLSelection(positions).atoms()
+   
+    sub = Substituent(sub_name)
+   
+    known_mols = {}
+    for atom in atoms:
+        if atom.molecule not in known_mols:
+            geom = ChimeraMolecule2AaronGeometry(atom.molecule)
+            known_mols[atom.molecule] = {'geom':geom, 'targets':geom.find(str(atom.serialNumber))}
+            geom = known_mols[atom.molecule]
+        else:
+            geom = known_mols[atom.molecule]['geom']
+            known_mols[atom.molecule]['targets'].append(geom.find(str(atom.serialNumber))[0])
+            
+    new_mols = []
+    for mol in known_mols:
+        geom = known_mols[mol]['geom']
+        targets = known_mols[mol]['targets']
+        for target in targets:
+            geom.substitute(sub, targets)
+        
+        new_mol = AaronGeometry2ChimeraMolecule(geom)
+        new_mol.name = "%s %s => %s" % (mol.name, ", ".join([target.name for target in targets]), sub_name)
+        new_mols.append(new_mol)
+
+    return new_mols, known_mols.keys()
 
 def doRmsdAlign(cmdName, arg_str):
     from chimera import Coord, replyobj, specifier

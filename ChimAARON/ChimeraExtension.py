@@ -221,8 +221,29 @@ class GetAaronTools_EMO(EMO):
         from ChimAARON.GetAaronTools import GetAaronToolsDialog
         dialog = GetAaronToolsDialog()
 
+class StructureModification_EMO(EMO):
+    def name(self):
+        return "Modify structure"
+        
+    def description(self):
+        return self.categoryDescriptions()['ChimAARON']
+        
+    def categories(self):
+        return self.categoryDescriptions().keys
+        
+    def categoryDescriptions(self):
+        return {'ChimAARON':self.name()}
+    
+    def icon(self):
+        return None
+        
+    def activate(self):
+        from ChimAARON.StructureModification import StructureModificationDialog
+        dialog = StructureModificationDialog()
+
 manager.registerExtension(Frequency_Dialog_EMO(__file__))
 manager.registerExtension(Library_Dialog_EMO(__file__))
 manager.registerExtension(AARON_Input_Dialog_EMO(__file__))
+manager.registerExtension(StructureModification_EMO(__file__))
 
 manager.registerExtension(GetAaronTools_EMO(__file__))

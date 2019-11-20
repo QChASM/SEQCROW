@@ -93,7 +93,6 @@ class InputGenerator_templateSelector(ModelessDialog):
             InputGenerator_structureChanges(record_name=record_name, overwrite=False)
             self.destroy()
         
-
 class TsTemplateGUI:
     """frame for selecting a TS template"""
     def __init__(self, parent):
@@ -194,6 +193,7 @@ class InputGenerator_structureChanges(ModelessDialog):
         self.refresh_text()
 
     def fillInUI(self, parent):        
+        from ChimAARON.StructureModification import MapLigandGUI, SubstituteGUI
         row = 0
 
         #mapligand cell
@@ -256,7 +256,7 @@ class InputGenerator_structureChanges(ModelessDialog):
     
         self.refresh_text()
     
-    def substitute(self, substituents, positions):
+    def substitute(self, substituents, positions, replace):
         """substitute going through the AARON Input Manager
         substituents: list of substituent names from the library
         positions: string with OSL identifiers"""
@@ -265,7 +265,7 @@ class InputGenerator_structureChanges(ModelessDialog):
         atoms = OSLSelection(positions).atoms()
                 
         for sub in substituents:
-            ChimAARON.arn_input_manager.subSomething(self.record_name, atoms, sub)
+            ChimAARON.arn_input_manager.subSomething(self.record_name, atoms, sub, replace)
   
         self.refresh_text()
     
@@ -490,138 +490,3 @@ class keyWordGUI:
         else:
             return "tell Tony he forgot about the balloon for %s" % kw
 
-class MapLigandGUI:
-    class LigandSelectorGUI(ModelessDialog):
-        buttons = ("OK", "Close",)
-        title = "Select Ligands"
-        
-        def __init__(self, origin):
-            self.origin = origin
-            ModelessDialog.__init__(self)
-        
-        def fillInUI(self, parent):
-            from LibraryDialog import ligandGUI
-            
-            self.table, nCol = ligandGUI.getLigandTable(parent)
-            self.table.launch()
-            self.table.grid(row=0, column=0, columnspan=nCol, sticky='nsew')
-            
-            parent.rowconfigure(0, weight=1)
-            parent.columnconfigure(0, weight=1)
-
-        def Apply(self):
-            geoms = self.table.selected()
-            if geoms:
-                self.origin.ligandName.set(",".join([geom.name for geom in geoms]))
-        
-    def __init__(self, parent, origin):
-        self.origin = origin
-        
-        row = 0
-        self.ligandName = StringOption(parent, row, "Ligand", "", None, balloon="name of ligands in AaronTools Ligand Library")
-
-        self.selectLigandButton = Tkinter.Button(parent, text="From library...", command=self.openLigandSelectorGUI)
-        self.selectLigandButton.grid(row=row, column=2, sticky='ew')
-    
-        row += 1
-
-        self.atomSelection = StringOption(parent, row, "Key atoms", "", None, balloon="Chimera OSL atom specifiers (space-delimited)")
-        
-        self.currentSelectionButton = Tkinter.Button(parent, text="current selection", command=self.setCurrent)
-        self.currentSelectionButton.grid(row=row, column=2, sticky='ew')
-        
-        row += 1
-        
-        self.doMapButton = Tkinter.Button(parent, text="map ligand", command=self.doMapLigand)
-        self.doMapButton.grid(row=row, column=0, columnspan=3, sticky='ew')
-
-    def openLigandSelectorGUI(self):
-        self.LigandSelectorGUI(self)
-        
-    def setCurrent(self):
-        from chimera.selection import currentAtoms
-        self.atomSelection.set(" ".join([atom.oslIdent() for atom in currentAtoms()]))
-        
-    def doMapLigand(self):
-        ligands = self.ligandName.get().split(',')
-        
-        positions = self.atomSelection.get()
-        
-        if not ligands:
-            raise RuntimeError("No ligand")
-            
-        if not positions:
-            raise RuntimeError("No key atoms")
-                
-        self.origin.mapLigand(ligands, positions)
-
-class SubstituteGUI:
-    class SubstituentSelectorGUI(ModelessDialog):
-        buttons = ("OK", "Close",)
-        title = "Select Substituents"
-        
-        def __init__(self, origin):
-            self.origin = origin
-            ModelessDialog.__init__(self)
-        
-        def fillInUI(self, parent):
-            from LibraryDialog import substituentGUI
-            
-            self.table, nCol = substituentGUI.getSubstituentTable(parent)
-            self.table.launch()
-            self.table.grid(row=0, column=0, columnspan=nCol, sticky='nsew')
-
-            parent.rowconfigure(0, weight=1)
-            parent.columnconfigure(0, weight=1)
-
-        def Apply(self):
-            geoms = self.table.selected()
-            if geoms:
-                self.origin.substituentName.set(",".join([geom.name for geom in geoms]))
-        
-    def __init__(self, parent, origin):
-        self.origin = origin
-        
-        row = 0
-        self.substituentName = StringOption(parent, row, "Substituent", "", None, balloon="name of substituents from the AaronTools Substituent Library")
-
-        self.selectSubstituentButton = Tkinter.Button(parent, text="From library...", command=self.openSubstituentSelectorGUI)
-        self.selectSubstituentButton.grid(row=row, column=2, sticky='ew')
-    
-        row += 1
-
-        self.atomSelection = StringOption(parent, row, "Atom selection", "", None, balloon="Chimera OSL atom specifiers (space-delimited)")
-        
-        self.currentSelectionButton = Tkinter.Button(parent, text="current selection", command=self.setCurrent)
-        self.currentSelectionButton.grid(row=row, column=2, sticky='ew')
-        
-        row += 1
-        
-        self.doSubButton = Tkinter.Button(parent, text="substitute", command=self.doSubstitute)
-        self.doSubButton.grid(row=row, column=0, columnspan=3, sticky='ew')
-
-    def openSubstituentSelectorGUI(self):
-        self.SubstituentSelectorGUI(self)
-        
-    def setCurrent(self):
-        from chimera.selection import currentAtoms
-        self.atomSelection.set(" ".join([atom.oslIdent() for atom in currentAtoms()]))
-        
-    def doSubstitute(self):
-        substituents = self.substituentName.get().split(',')
-        
-        positions = self.atomSelection.get()
-        
-        if not substituents:
-            raise RuntimeError("No substituents")
-            
-        if not positions:
-            raise RuntimeError("Atom selection empty")
-                
-        self.origin.substitute(substituents, positions)
-
-        
-        
-        
-        
-        

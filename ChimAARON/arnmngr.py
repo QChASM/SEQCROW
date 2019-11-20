@@ -1,5 +1,5 @@
 class Record:
-    def __init__(self, name, cat_dict, ligPrefix="Lig", subPrefix="Sub", ligand=None, substitution=None, positions=None, component=None, perl=False):
+    def __init__(self, name, cat_dict, ligPrefix="Lig", subPrefix="Sub", ligand=None, substitution=None, positions=None, component=None, perl=False, hidden=False):
         self.name = name
         self.cats = cat_dict
         self.ligPrefix = ligPrefix
@@ -9,6 +9,7 @@ class Record:
         self.positions = positions
         self.component = component
         self.perl = perl
+        self.hidden = hidden
             
 class InputManager:
     def __init__(self):
@@ -106,14 +107,14 @@ class InputManager:
 
             i = 2
             for record in rec[1:]:
-                if record.ligand is None or record.substitution is not None:
+                if record.ligand is None or record.substitution is not None and not record.hidden:
                     continue
                 
                 out += "%s%i: ligand=%s\n" % (record.ligPrefix, i, record.ligand)
                 i += 1
                 
             for record in rec[1:]:
-                if record.component != "ligand":
+                if record.component != "ligand" or record.hidden:
                     continue
                 
                 if record.ligand is not None:
@@ -130,7 +131,7 @@ class InputManager:
                     
         out += "&\n&Substrates\n"
         
-        for i, sub in enumerate([record for record in rec if record.component != "ligand" and record.substitution is not None]):
+        for i, sub in enumerate([record for record in rec if record.component != "ligand" and record.substitution is not None and not record.hidden]):
             out += "%s%i: " % (sub.subPrefix, i+1)
             for j in range(0, len(sub.substitution)):
                 out += "%s=%s " % (",".join(str(p) for p in sub.positions[j][int(perl)]), sub.substitution[j])
@@ -152,7 +153,7 @@ class InputManager:
         
         return (basis_kw, str_kw, float_kw, int_kw, bool_kw)
     
-    def mapLigand(self, name, chim_atoms, ligand_name, ligPrefix=None):
+    def mapLigand(self, name, chim_atoms, ligand_name, replace, ligPrefix=None):
         from ChimAARON import AaronGeometry2ChimeraMolecule
         from chimera import openModels
 
@@ -197,9 +198,12 @@ class InputManager:
             new_cat_dict[new_mol] = new_cat
             openModels.add([new_mol])
             
-        self.records[name].append(Record(name, new_cat_dict, ligPrefix=ligPrefix, ligand=ligand_name))
+            if replace:
+                openModels.close(key)
+            
+        self.records[name].append(Record(name, new_cat_dict, ligPrefix=ligPrefix, ligand=ligand_name, hidden=replace))
                 
-    def subSomething(self, name, chim_atoms, sub_name, ligPrefix=None, subPrefix=None):
+    def subSomething(self, name, chim_atoms, sub_name, replace, ligPrefix=None, subPrefix=None):
         from ChimAARON import AaronGeometry2ChimeraMolecule
         from chimera import openModels
         
@@ -270,8 +274,12 @@ class InputManager:
                 
             new_mol = AaronGeometry2ChimeraMolecule(new_cat, nameList)
             new_cat_dict[new_mol] = new_cat
+                
             openModels.add([new_mol])
-        
+
+            if replace:
+                openModels.close(key)
+                
         for targ in target_tags:
             info = targ.split('.')
             comp_name = info[0]
@@ -289,10 +297,11 @@ class InputManager:
             ligand = None
         
         self.records[name].append(Record(name, new_cat_dict, \
-                                                      ligPrefix=ligPrefix, \
-                                                      subPrefix=subPrefix, \
-                                                      substitution=substitution, \
-                                                      positions=positions, \
-                                                      component=comp_name, \
-                                                      ligand=ligand))             
+                                               ligPrefix=ligPrefix, \
+                                               subPrefix=subPrefix, \
+                                               substitution=substitution, \
+                                               positions=positions, \
+                                               component=comp_name, \
+                                               ligand=ligand, \
+                                               hidden=replace))             
     
