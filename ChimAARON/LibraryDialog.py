@@ -199,7 +199,7 @@ class ligandGUI(GeomLoadGUI):
         self.table.rowconfigure(0, weight=1)
         self.table.columnconfigure(0, weight=1)
 
-        #turns out, the backbone is everything?
+        #turns out, the backbone is everything
         #self.showBackbone = Tkinter.BooleanVar()
         #self.showBackbone.set(False)
         #self.showBackboneButton = Tkinter.Checkbutton(parent, text="Show backbone", indicatoron=Tkinter.TRUE, relief=Tkinter.FLAT, highlightthickness=0, variable=self.showBackbone)
@@ -306,23 +306,12 @@ class substituentGUI(GeomLoadGUI):
 class ringFragGUI(GeomLoadGUI):
     def __init__(self, parent):
         """ring fragment library frame"""
-        
-        from AaronTools.ringfragment import RingFragment
-        from CGLtk.Table import SortableTable
-        from glob import glob
+
         
         self.nRow = 2
-        self.nCol = 1
         
-        #create table of ring fragments
-        #TODO: make table creation a classmethod like ligands
-        ring_list = glob(RingFragment.AARON_LIBS) + glob(RingFragment.BUILTIN)
-        
-        self.table = SortableTable(parent)
-        nameCol = self.table.addColumn("Name", "name", format="%s")
-        
-        self.table.setData([PseudoGeometry(ring, RingFragment) for ring in ring_list]) 
-        
+        self.table, self.nCol = self.getRingTable(parent)
+
         self.table.launch(browseCmd=self.canOpen)
         self.table.grid(row=0, column=0, columnspan=3, sticky='nsew')
         self.table.rowconfigure(0, weight=1)
@@ -348,6 +337,21 @@ class ringFragGUI(GeomLoadGUI):
         parent.pack()
         parent.rowconfigure(0, weight=1)
         parent.columnconfigure(0, weight=1)
+        
+    @classmethod
+    def getRingTable(cls, parent):
+        from AaronTools.ringfragment import RingFragment
+        from CGLtk.Table import SortableTable
+        from glob import glob        
+        
+        ring_list = glob(RingFragment.AARON_LIBS) + glob(RingFragment.BUILTIN)
+        
+        table = SortableTable(parent)
+        nameCol = table.addColumn("Name", "name", format="%s")
+        
+        table.setData([PseudoGeometry(ring, RingFragment) for ring in ring_list]) 
+        
+        return table, 1
         
 class PseudoGeometry:
     """it would take a long ling to create the library dialogs if we actually had to read

@@ -235,7 +235,7 @@ class StructureModification_EMO(EMO):
         return {'ChimAARON':self.name()}
     
     def icon(self):
-        return None
+        return self.path('Icons/mapLigand.png')
         
     def activate(self):
         from ChimAARON.StructureModification import StructureModificationDialog

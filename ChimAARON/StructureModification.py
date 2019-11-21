@@ -27,7 +27,7 @@ class StructureModificationDialog(ModelessDialog):
         self.modGUIs['Substitute'] = SubstituteGUI(self.frames['Substitute'], self)
         
         self.frames['Close Ring'] = Tkinter.Frame(self.modOptions)
-        self.modGUIs['Close Ring'] = CloseRingGUI(self.frames['Close Ring'])
+        self.modGUIs['Close Ring'] = CloseRingGUI(self.frames['Close Ring'], self)
         
         for k in self.frames:
             self.modOptions.add(self.frames[k], text=k)
@@ -60,10 +60,19 @@ class StructureModificationDialog(ModelessDialog):
             openModels.close(old_mols)
 
         openModels.add(open_mols)
-
-class CloseRingGUI:
-    def __init__(self, parent):
-        pass
+        
+    @classmethod
+    def closeRing(cls, ring_names, positions, replace):
+        """called by CloseRingGUI"""
+        open_mols = []
+        for ring in ring_names:
+            new_mol, old_mol = ChimAARON.closeRing(ring, positions)
+            open_mols.append(new_mol)
+            
+        if replace:
+            openModels.close(old_mol)
+            
+        openModels.add(open_mols)
 
 class MapLigandGUI:
     class LigandSelectorGUI(ModelessDialog):
@@ -156,7 +165,10 @@ class SubstituteGUI:
             self.table, nCol = substituentGUI.getSubstituentTable(parent)
             self.table.launch()
             self.table.grid(row=0, column=0, columnspan=nCol, sticky='nsew')
-
+            
+            parent.rowconfigure(0, weight=1)
+            parent.columnconfigure(0, weight=1)
+            
         def Apply(self):
             geoms = self.table.selected()
             if geoms:
@@ -213,5 +225,81 @@ class SubstituteGUI:
         replace = self.replaceOld.get()
         
         self.origin.substitute(substituents, positions, replace)
+
+class CloseRingGUI:
+    class RingSelectorGUI(ModelessDialog):
+        buttons = ("OK", "Close",)
+        title = "Select Ring Fragments"
+        
+        def __init__(self, origin):
+            self.origin = origin
+            ModelessDialog.__init__(self)
+        
+        def fillInUI(self, parent):
+            from LibraryDialog import ringFragGUI
+            
+            self.table, nCol = ringFragGUI.getRingTable(parent)
+            self.table.launch()
+            self.table.grid(row=0, column=0, columnspan=nCol, sticky='nsew')
+
+            parent.rowconfigure(0, weight=1)
+            parent.columnconfigure(0, weight=1)
+
+        def Apply(self):
+            geoms = self.table.selected()
+            if geoms:
+                self.origin.ringName.set(",".join([geom.name for geom in geoms]))
+        
+    def __init__(self, parent, origin):
+        self.origin = origin
+        
+        row = 0
+        self.ringName = StringOption(parent, row, "Ring fragment", "", None, balloon="name of ring fragments from the AaronTools Ring Fragment Library")
+
+        self.selectRingButton = Tkinter.Button(parent, text="From library...", command=self.openRingFragGUI)
+        self.selectRingButton.grid(row=row, column=2, sticky='ew')
+    
+        row += 1
+
+        self.atomSelection = StringOption(parent, row, "Atom selection", "", None, balloon="Chimera OSL atom specifiers (space-delimited)")
+        
+        self.currentSelectionButton = Tkinter.Button(parent, text="current selection", command=self.setCurrent)
+        self.currentSelectionButton.grid(row=row, column=2, sticky='ew')
+        
+        row += 1
+
+        self.replaceOld = Tkinter.BooleanVar()
+        self.replaceOld.set(False)
+        self.replaceCheck = Tkinter.Checkbutton(parent, indicatoron=Tkinter.TRUE, relief=Tkinter.FLAT, highlightthickness=0, variable=self.replaceOld)
+        self.replaceLabel = Tkinter.Label(parent, text="Replace molecule")
+        self.replaceCheck.grid(row=row, column=1, sticky='w')
+        self.replaceLabel.grid(row=row, column=0, sticky='e')
+        
+        row += 1
+            
+        self.doCloseRingButton = Tkinter.Button(parent, text="close ring", command=self.doCloseRing)
+        self.doCloseRingButton.grid(row=row, column=0, columnspan=3, sticky='ew')
+
+    def openRingFragGUI(self):
+        self.RingSelectorGUI(self)
+        
+    def setCurrent(self):
+        from chimera.selection import currentAtoms
+        self.atomSelection.set(" ".join([atom.oslIdent() for atom in currentAtoms()]))
+        
+    def doCloseRing(self):
+        ringFrags = self.ringName.get().split(',')
+        
+        positions = self.atomSelection.get()
+        
+        if not ringFrags:
+            raise RuntimeError("No ring fragments")
+            
+        if not positions:
+            raise RuntimeError("Atom selection empty")
+        
+        replace = self.replaceOld.get()
+        
+        self.origin.closeRing(ringFrags, positions, replace)
 
         

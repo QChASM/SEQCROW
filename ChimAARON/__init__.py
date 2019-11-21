@@ -406,6 +406,33 @@ def doCloseRing(cmdName, arg_str):
 
     return [new_mol]
 
+def closeRing(ring, positions):
+    from chimera import replyobj
+    from chimera.selection import OSLSelection
+    from AaronTools.ringfragment import RingFragment
+    
+    atoms = OSLSelection(positions).atoms()
+    
+    mol = atoms[0].molecule
+    for atom in atoms:
+        if atom.molecule != mol:
+            raise RuntimeError("Please select atoms on the same molecule")
+    
+    geom = ChimeraMolecule2AaronGeometry(mol)
+    
+    replyobj.status("loading ring %s..." % ring)
+    frag = RingFragment(ring)
+    
+    arn_targets = geom.find([str(atom.serialNumber) for atom in atoms])
+        
+    replyobj.status("closing the ring...")
+    
+    geom.ring_substitute(arn_targets, frag)
+    
+    new_mol = AaronGeometry2ChimeraMolecule(geom)
+        
+    return new_mol, mol    
+
 def doFollow(cmdName, arg_str):
     """make an animation for the normal modes in the specified file"""
     from chimera import replyobj
@@ -533,7 +560,7 @@ def doMapLigand(cmdName, arg_str):
 
 def mapLigand(ligand_name, key_atoms):
     """substitute one ligand for another"""
-    from chimera import replyobj, openModels
+    from chimera import replyobj
     from chimera.selection import OSLSelection
     from AaronTools.catalyst import Catalyst
     from AaronTools.component import Component
@@ -562,9 +589,8 @@ def mapLigand(ligand_name, key_atoms):
     
 def substitute(sub_name, positions):
     """substitute one substituent for another"""
-    from chimera import replyobj, openModels
+    from chimera import replyobj
     from chimera.selection import OSLSelection
-    from AaronTools.geometry import Geometry
     from AaronTools.substituent import Substituent
     
     atoms = OSLSelection(positions).atoms()
@@ -589,7 +615,6 @@ def substitute(sub_name, positions):
             geom.substitute(sub, targets)
         
         new_mol = AaronGeometry2ChimeraMolecule(geom)
-        new_mol.name = "%s %s => %s" % (mol.name, ", ".join([target.name for target in targets]), sub_name)
         new_mols.append(new_mol)
 
     return new_mols, known_mols.keys()
