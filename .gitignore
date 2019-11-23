@@ -1,1 +1,4 @@
-*.pyc
+ChimAARON/*.pyc
+AaronTools/*.py
+AaronTools/bin
+AaronTools/test
