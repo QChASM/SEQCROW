@@ -349,10 +349,8 @@ def doSubstitute(cmdName, arg_str):
     for mol in known_mols:
         geom = known_mols[mol]['geom']
         for target in known_mols[mol]['targets']:
-            geom.substitute(sub, target)
-        
-        if hasattr(geom, "chimera"):
-            delattr(geom, "chimera")
+            copy_sub = sub.copy()
+            geom.substitute(copy_sub, target)
 
         new_mol = AaronGeometry2ChimeraMolecule(geom)    
         
@@ -558,7 +556,7 @@ def doMapLigand(cmdName, arg_str):
         
     return new_mols
 
-def mapLigand(ligand_name, key_atoms):
+def mapLigand(ligand_name, key_atoms, form='from_library'):
     """substitute one ligand for another"""
     from chimera import replyobj
     from chimera.selection import OSLSelection
@@ -567,36 +565,46 @@ def mapLigand(ligand_name, key_atoms):
     
     atoms = OSLSelection(key_atoms).atoms()
     
-    mol = atoms[0].molecule
+    known_mols = {}
     for atom in atoms:
-        if atom.molecule != mol:
-            raise RuntimeError("Please select atoms on the same molecule")
-    
-    cat = Catalyst(ChimeraMolecule2AaronGeometry(mol))
+        if atom.molecule not in known_mols:
+            cat = Catalyst(ChimeraMolecule2AaronGeometry(atom.molecule))
+            targets = cat.find(str(atom.serialNumber))
+            known_mols[atom.molecule] = {'cat':cat, 'key_atoms':targets}
+        else:
+            cat = known_mols[atom.molecule]['cat']
+            targets = known_mols[atom.molecule]['key_atoms']
+            targets.extend(cat.find(str(atom.serialNumber)))
     
     replyobj.status("loading ligand %s..." % ligand_name)
-    lig = Component(ligand_name)
-    
-    arn_targets = cat.find([str(atom.serialNumber) for atom in atoms])
-        
+    if form == 'from_library':
+        lig = Component(ligand_name)
+    else:
+        raise NotImplementedError("ligands must be loaded from the ligand library")
+            
     replyobj.status("substituting the ligands...")
     
-    cat.map_ligand(lig, arn_targets)
-    
-    new_mol = AaronGeometry2ChimeraMolecule(cat)
+    new_mols = []
+    for mol in known_mols:
+        lig_copy = lig.copy()
+        cat = known_mols[mol]['cat']
+        targets = known_mols[mol]['key_atoms']
+        cat.map_ligand(lig_copy, targets)
         
-    return new_mol, mol
+    
+        new_mol = AaronGeometry2ChimeraMolecule(cat)
+        
+        new_mols.append(new_mol)
+        
+    return new_mols, known_mols.keys()
     
 def substitute(sub_name, positions):
     """substitute one substituent for another"""
-    from chimera import replyobj
     from chimera.selection import OSLSelection
     from AaronTools.substituent import Substituent
     
     atoms = OSLSelection(positions).atoms()
-   
-    sub = Substituent(sub_name)
-   
+      
     known_mols = {}
     for atom in atoms:
         if atom.molecule not in known_mols:
@@ -611,8 +619,16 @@ def substitute(sub_name, positions):
     for mol in known_mols:
         geom = known_mols[mol]['geom']
         targets = known_mols[mol]['targets']
+        print(targets)
         for target in targets:
-            geom.substitute(sub, targets)
+            sub = Substituent(sub_name)
+
+            print(target)
+            geom.substitute(sub, target)
+            geom.refresh_connected()
+            print('geom:')
+            print(geom)
+            
         
         new_mol = AaronGeometry2ChimeraMolecule(geom)
         new_mols.append(new_mol)
