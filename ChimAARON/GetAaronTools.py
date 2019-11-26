@@ -85,11 +85,6 @@ class GetAaronToolsDialog(ModelessDialog):
         
         row = 0
         
-        self.envChanges = Tkinter.Label(self.envDisplayArea, text="You'll have to restart Chimera for environment changes to take effect")
-        self.envChanges.grid(row=row, column=0, sticky='new')
-        
-        row += 1
-        
         self.AARONLIBButton = Tkinter.Button(self.envDisplayArea, anchor='w', text="set AARONLIB location", command=self.arnlibSelect)
         self.AARONLIBButton.grid(row=row, column=0, sticky='w')
 
@@ -119,13 +114,13 @@ class GetAaronToolsDialog(ModelessDialog):
         
         self.backportButton = Tkinter.Button(self.inputDisplayArea, text="pasteurize AaronTools", command=self.backportAaronTools)
         self.backportButton.grid(row=row, column=0, sticky='new')        
-        self.backportButton.config(state="disabled")
+        #self.backportButton.config(state="disabled")
 
         row += 1
         
         self.moreBackportsButton = Tkinter.Button(self.inputDisplayArea, text="fix misc. backporting", command=self.doAdditionalBackports)
         self.moreBackportsButton.grid(row=row, column=0, sticky='new')
-        self.moreBackportsButton.config(state="disabled")
+        #self.moreBackportsButton.config(state="disabled")
         
         row += 1
         
@@ -151,6 +146,15 @@ After all of that is complete, ChimAARON tools should function the next time you
         
         self.inputDisplay.delete("1.0", Tkinter.END)
         self.inputDisplay.insert(Tkinter.END, readme)
+        
+        self.testDisplayArea = Tkinter.LabelFrame(parent, text="Tests")
+        self.testDisplayArea.grid(row=2, column=0, sticky='nsew')
+        self.testDisplayArea.rowconfigure(0, weight=1)
+        self.testDisplayArea.columnconfigure(0, weight=1)
+        
+        row = 0
+        self.aaronToolsTestsButton = Tkinter.Button(self.testDisplayArea, text="run AaronTools tests", command=self.runAaronToolsTests)
+        self.aaronToolsTestsButton.grid(row=row, column=0, sticky='w')
         
         parent.rowconfigure(0, weight=1)
         parent.columnconfigure(0, weight=1)
@@ -261,5 +265,45 @@ We'll ignore this error and proceed with updating the current version of pip" % 
                     os.makedirs(libDir)
 
             replyobj.status("set AARONLIB to %s and created library directories" % arnlib)
+            replyobj.status("Restart Chimera for changes to take effect")
             self.envLabel.config(text="Personal AaronTools Library Location: %s" % arnlib)
         
+    def runAaronToolsTests(self):
+        import os
+        import sys
+        import subprocess
+        import AaronTools
+        import chimera
+
+        from ChimAARON.prefs import ENVIRONMENT
+
+        cwd = os.getcwd()
+
+        AaronTools_location = os.path.dirname(AaronTools.__file__)
+        AaronTools_test_dir = os.path.join(AaronTools_location, 'test')
+        
+        envPrefs = chimera.preferences.preferences.get('ChimAARON', ENVIRONMENT)
+        if 'AARONLIB' in envPrefs:
+            os.environ['AARONLIB'] = envPrefs['AARONLIB']
+        
+        os.environ['PYTHONPATH'] = os.path.split(AaronTools_location)[0]
+        
+        print(os.getenv('AARONLIB', 'AARONLIB not set'))
+        print(os.getenv('PYTHONPATH'))
+        
+        chimera.replyobj.status('running AaronTools tests - see reply log for results')
+        print(AaronTools_test_dir)
+        
+        os.chdir(AaronTools_test_dir)
+        
+        for test in os.listdir(AaronTools_test_dir):
+            if test.startswith('test') and test.endswith('.py'):
+                chimera.replyobj.status("running %s..." % test)
+                proc = subprocess.Popen([sys.executable, os.path.join(AaronTools_test_dir, test)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                out = proc.communicate()
+                for x in out:
+                    print(x)
+        
+        os.chdir(cwd)
+        
+        chimera.replyobj.status('finished running tests')   

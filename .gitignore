@@ -1,4 +1,11 @@
 ChimAARON/*.pyc
 AaronTools/*.py
+AaronTools/utils/*.py
+AaronTools/test/*.pyc
+**/tmp.xyz
 AaronTools/bin
-AaronTools/test
+*.bak
+AaronTools/__pycache__
+AaronTools/cache
+AaronTools/**/__pycache__
+ChimAARON/AaronTools Backporting and Compatibility.txt

@@ -81,7 +81,11 @@ def backporter_main(directory):
                 fix_jsondecodeerror(filename)
                 fix_kwarg_order(filename)
                 fix_json_dump(filename)
+                fix_list_copy(filename)
                 #fix_open_encoded_filename(filename) #it turns out this was an issue because I had AaronTools in a Dropbox folder...
+                
+                if 'test' in filename:
+                    fix_unittest_results(filename)
                 
 def split_imports(file_contents):
     """returns a tuple of (list of lines before we stop importing, list of lines after we stop importing)"""
@@ -331,4 +335,58 @@ def fix_json_dump(filename):
             
     with open(filename, 'w') as f:
         f.write(s)
+
+def fix_unittest_results(filename):
+    """unittest changed the names of some things in 3.4"""
+    import re
+    
+    unittest_outcome = re.compile('(.*)_outcome.result(.*)')
+    
+    with open(filename, 'r') as f:
+        lines = f.readlines()
+        
+    s = ''
+    for line in lines:
+        match = unittest_outcome.match(line)
+        if match is not None: 
+            print(filename, match)
+            s += "%s_resultForDoCleanups%s\n" % (match.group(1), match.group(2))
+        else:
+            s += line
             
+    with open(filename, 'w') as f:
+        f.write(s)
+
+def fix_list_copy(filename):
+    """list.copy() was added after python 2.7 - change x = var.copy to
+    if isinstance(var, list):
+        x = var[:]
+    else:
+        x = var.copy()
+    """
+    import re
+    
+    json_dump = re.compile('(\s+?)([\S].*=\s+?[^A-Za-z]?)([A-Za-z]*)\.copy\(\)(.*)')
+    
+    with open(filename, 'r') as f:
+        lines = f.readlines()
+        
+    s = ''
+    for line in lines:
+        match = json_dump.match(line)
+        if match is not None:
+            inden = match.group(1)
+            assign = match.group(2)
+            var = match.group(3)
+            end = match.group(4)
+            
+            s += "%sif isinstance(%s, list):\n" % (inden, var)
+            s += "    %s%s %s[:]%s\n" % (inden, assign, var, end)
+            s += "%selse:\n" % inden
+            s += "    %s" % line            
+            
+        else:
+            s += line
+            
+    with open(filename, 'w') as f:
+        f.write(s)
