@@ -319,6 +319,7 @@ def doSubstitute(cmdName, arg_str):
     parser = ArgumentParser()
     parser.addArg('form', 1, kind=str, default='from_library')
     parser.addArg('selec', 1, kind='selec', default='sel')
+    parser.addArg('replace', 1, kind=bool, default=True)
     
     args = parser.parse_args(arg_str)
     
@@ -328,35 +329,13 @@ def doSubstitute(cmdName, arg_str):
     sub_form = args['form']
     
     atoms = _selectedAtoms(getSpecs(sel))
-    known_mols = {}
-    replyobj.status("finding targets and converting to AaronTools...")
-    for atom in atoms:
-        mol = atom.molecule
-        if mol not in known_mols:
-            geom = ChimeraMolecule2AaronGeometry(mol)
-            known_mols[mol] = {'geom':geom, 'targets':[geom.atoms[atom.serialNumber-1]]}
-        else:
-            known_mols[mol]['targets'].append(known_mols[mol]['geom'].atoms[atom.serialNumber-1])
     
-    replyobj.status("loading substituent %s..." % substituent)
-    if sub_form == 'from_library':
-        sub = Substituent(substituent)
-    else:
-        sub = Substituent.from_string(substituent, form=sub_form)
-        
-    replyobj.status("substituting the substituents...")
-    new_mols = []
-    for mol in known_mols:
-        geom = known_mols[mol]['geom']
-        for target in known_mols[mol]['targets']:
-            copy_sub = sub.copy()
-            geom.substitute(copy_sub, target)
+    new_mols, old_mols = substitute(substituent, atoms, form=form)
 
-        new_mol = AaronGeometry2ChimeraMolecule(geom)    
-        
-        new_mols.append(new_mol)
-        
-    return new_mols
+    if not args['replace']:
+        return new_mols, []
+    else:
+        return new_mols, old_mols
 
 def doCloseRing(cmdName, arg_str):
     from chimera import replyobj, openModels
@@ -367,69 +346,56 @@ def doCloseRing(cmdName, arg_str):
     from Midas.midas_text import getSpecs
     
     parser = ArgumentParser()
+    parser.addArg('form', 1, kind=str, default='from_library')
+    parser.addArg('selec', 1, kind='selec', default='sel')
+    parser.addArg('replace', 1, kind=bool, default=True)
     
-    parser.addArg('form', 1, default='from_library', kind=str)
     args = parser.parse_args(arg_str)
     
-    ring_frag = args['other'][0]
-    form = args['form']
+    ring_name = args['other'][0]
     
     atoms = _selectedAtoms(getSpecs('sel'))
-    if len(atoms) != 2:
-        replyobj.error("must select two atoms for %s (%i selected)" % (cmdName, len(atoms)))
-        return
-    replyobj.status("finding targets and converting to AaronTools...")
     
-    mol = atoms[0].molecule
-    if mol == atoms[1].molecule:
-        geom = ChimeraMolecule2AaronGeometry(mol)
-        targets = [geom.atoms[atom.serialNumber-1] for atom in atoms]
+    new_mols, old_mols = closeRing(ring_name, atoms, form=args['form'])
+        
+    if not args['replace']:
+        return new_mols, []
     else:
-        replyobj.error("atom selection must be on the same molecule")
-        return
-    
-    replyobj.status("fetching ring...")
-    if form == 'from_library':
-        ring_geom = RingFragment(ring_frag)
-    else:
-        path_length = len(geom.short_walk(targets[0], targets[-1])) - 2
-        ring_geom = RingFragment.from_string(ring_frag, end=path_length)
+        return new_mols, old_mols
 
-    replyobj.status("substituting the substituents...")
-    geom.ring_substitute(targets, ring_geom)
-    
-    if hasattr(geom, "chimera"):
-        delattr(geom, "chimera")
-    new_mol = AaronGeometry2ChimeraMolecule(geom)
-
-    return [new_mol]
-
-def closeRing(ring, positions):
+def closeRing(ring_name, atoms, form='from_library'):
     from chimera import replyobj
-    from chimera.selection import OSLSelection
     from AaronTools.ringfragment import RingFragment
-    
-    atoms = OSLSelection(positions).atoms()
-    
-    mol = atoms[0].molecule
+   
+    known_mols = {}
     for atom in atoms:
-        if atom.molecule != mol:
-            raise RuntimeError("Please select atoms on the same molecule")
-    
-    geom = ChimeraMolecule2AaronGeometry(mol)
-    
-    replyobj.status("loading ring %s..." % ring)
-    frag = RingFragment(ring)
-    
-    arn_targets = geom.find([str(atom.serialNumber) for atom in atoms])
+        if atom.molecule not in known_mols:
+            geom = ChimeraMolecule2AaronGeometry(atom.molecule)
+            targets = geom.find(str(atom.serialNumber))
+            known_mols[atom.molecule] = {'geom':geom, 'targets':targets}
+        else:
+            geom = known_mols[atom.molecule]['geom']
+            targets = known_mols[atom.molecule]['targets']
+            targets.extend(geom.find(str(atom.serialNumber)))
         
-    replyobj.status("closing the ring...")
-    
-    geom.ring_substitute(arn_targets, frag)
-    
-    new_mol = AaronGeometry2ChimeraMolecule(geom)
+    new_mols = []
+    for mol in known_mols:
         
-    return new_mol, mol    
+        replyobj.status("loading ring %s..." % ring_name)
+        if form == 'from_library':
+            ring = RingFragment(ring_name)
+        else:
+            ring = RingFragment.from_string(ring_name, form=form)
+            
+        geom = known_mols[mol]['geom']
+        targets = known_mols[mol]['targets']
+        geom.ring_substitute(targets, ring)
+        
+        new_mol = AaronGeometry2ChimeraMolecule(geom)
+        
+        new_mols.append(new_mol)
+        
+    return new_mols, known_mols.keys()   
 
 def doFollow(cmdName, arg_str):
     """make an animation for the normal modes in the specified file"""
@@ -521,50 +487,28 @@ def doMapLigand(cmdName, arg_str):
     from Midas import _selectedAtoms
     from Midas.midas_text import getSpecs
     
-    arg_info = arg_str.split()
-    ligand_name = arg_info[0]
-
-    if len(arg_info) > 1:
-        sel = " ".join(arg_info[1:])
-    else:
-        sel = 'sel'
+    parser = ArgumentParser()
+    parser.addArg('selec', 1, kind='selec', default='sel')
+    parser.addArg('replace', 1, kind=bool, default=True)
+    
+    args = parser.parse_args(arg_str)
+    
+    ligand_name = args['other'][0]
     
     atoms = _selectedAtoms(getSpecs(sel))
-    known_mols = {}
-    replyobj.status("finding targets and converting to AaronTools...")
-    for atom in atoms:
-        mol = atom.molecule
-        if mol not in known_mols:
-            cat = Catalyst(ChimeraMolecule2AaronGeometry(mol))
-            known_mols[mol] = {'cat':cat, 'targets':[cat.find(str(atom.serialNumber))[0]]}
-        else:
-            known_mols[mol]['targets'].append(known_mols[mol]['cat'].find(str(atom.serialNumber))[0])
-    
-    replyobj.status("loading ligand %s..." % ligand_name)
-    lig = Component(ligand_name)
+    new_mols, old_mols = mapLigand(ligand_name, atoms)
         
-    replyobj.status("substituting the ligands...")
-    new_mols = []
-    for mol in known_mols:
-        cat = known_mols[mol]['cat']
-        cat.map_ligand(lig, known_mols[mol]['targets'])
-    
-        if hasattr(cat, "chimera"):
-            delattr(cat, "chimera")
-        new_mol = AaronGeometry2ChimeraMolecule(cat)    
-        new_mols.append(new_mol)
-        
-    return new_mols
+    if not args['replace']:
+        return new_mols, []
+    else:
+        return new_mols, old_mols
 
-def mapLigand(ligand_name, key_atoms, form='from_library'):
+def mapLigand(ligand_name, atoms, form='from_library'):
     """substitute one ligand for another"""
     from chimera import replyobj
-    from chimera.selection import OSLSelection
     from AaronTools.catalyst import Catalyst
     from AaronTools.component import Component
-    
-    atoms = OSLSelection(key_atoms).atoms()
-    
+        
     known_mols = {}
     for atom in atoms:
         if atom.molecule not in known_mols:
@@ -598,13 +542,10 @@ def mapLigand(ligand_name, key_atoms, form='from_library'):
         
     return new_mols, known_mols.keys()
     
-def substitute(sub_name, positions):
+def substitute(sub_name, atoms, form='from_library'):
     """substitute one substituent for another"""
-    from chimera.selection import OSLSelection
     from AaronTools.substituent import Substituent
     
-    atoms = OSLSelection(positions).atoms()
-      
     known_mols = {}
     for atom in atoms:
         if atom.molecule not in known_mols:
@@ -619,15 +560,15 @@ def substitute(sub_name, positions):
     for mol in known_mols:
         geom = known_mols[mol]['geom']
         targets = known_mols[mol]['targets']
-        print(targets)
         for target in targets:
-            sub = Substituent(sub_name)
+            if form == 'from_library':
+                sub = Substituent(sub_name)
+            else:
+                sub = Substituent.from_string(sub_name, form=form)
 
-            print(target)
             geom.substitute(sub, target)
             geom.refresh_connected()
-            print('geom:')
-            print(geom)
+
             
         
         new_mol = AaronGeometry2ChimeraMolecule(geom)

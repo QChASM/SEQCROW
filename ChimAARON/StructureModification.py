@@ -37,9 +37,13 @@ class StructureModificationDialog(ModelessDialog):
     @classmethod
     def mapLigand(cls, ligand_names, key_atoms, replace):
         """called by MapLigandGUI"""                        
+        from chimera.selection import OSLSelection
+        
+        atoms = OSLSelection(key_atoms).atoms()
+        
         open_mols = []
         for ligand in ligand_names:
-            new_mols, oldMols = ChimAARON.mapLigand(ligand, key_atoms)
+            new_mols, oldMols = ChimAARON.mapLigand(ligand, atoms)
             
             open_mols.extend(new_mols)
                         
@@ -52,9 +56,13 @@ class StructureModificationDialog(ModelessDialog):
     @classmethod
     def substitute(cls, substituent_names, positions, replace):
         """called by SubstituteGUI"""
+        from chimera.selection import OSLSelection
+        
+        atoms = OSLSelection(positions).atoms()
+        
         open_mols = []
         for sub in substituent_names:
-            new_mols, old_mols = ChimAARON.substitute(sub, positions)
+            new_mols, old_mols = ChimAARON.substitute(sub, atoms)
             open_mols.extend(new_mols)
             
         if replace:
@@ -66,14 +74,18 @@ class StructureModificationDialog(ModelessDialog):
     @classmethod
     def closeRing(cls, ring_names, positions, replace):
         """called by CloseRingGUI"""
+        from chimera.selection import OSLSelection
+        
+        atoms = OSLSelection(positions).atoms()
+        
         open_mols = []
         for ring in ring_names:
-            new_mol, old_mol = ChimAARON.closeRing(ring, positions)
-            open_mols.append(new_mol)
+            new_mols, old_mols = ChimAARON.closeRing(ring, atoms)
+            open_mols.extend(new_mols)
             
         if replace:
-            openModels.close(old_mol)
-        
+            openModels.close(old_mols)
+
         for mol in open_mols:
             openModels.add([mol])
 
