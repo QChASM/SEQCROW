@@ -153,7 +153,7 @@ class InputManager:
         
         return (basis_kw, str_kw, float_kw, int_kw, bool_kw)
     
-    def mapLigand(self, name, chim_atoms, ligand_name, replace, ligPrefix=None):
+    def mapLigand(self, name, chim_atoms, ligand_name, hiddenEntry, replaceOld, ligPrefix=None):
         from ChimAARON import AaronGeometry2ChimeraMolecule
         from chimera import openModels
 

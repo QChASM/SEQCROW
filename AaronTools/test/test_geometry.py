@@ -504,7 +504,8 @@ class TestGeometry(TestWithTimer):
         original_dihedral = mol.dihedral(*atom_args)
 
         # adjust dihedral by 30 degrees
-        mol.change_dihedral("13", "12", "1", "6", 30, radians=False, adjust=True)
+        test_args = list(atom_args) + [30]
+        mol.change_dihedral(*test_args, radians=False, adjust=True)
         self.assertTrue(
             is_close(
                 mol.dihedral(*atom_args), original_dihedral + np.deg2rad(30)

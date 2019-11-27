@@ -196,9 +196,22 @@ class InputGenerator_structureChanges(ModelessDialog):
         from ChimAARON.StructureModification import MapLigandGUI, SubstituteGUI
         row = 0
 
+
         #mapligand cell
         self.mapLigandFrame = Tkinter.LabelFrame(parent, text='Map Ligand')
-        self.mapLigandGUI = MapLigandGUI(self.mapLigandFrame, self)
+        
+        self.replaceLigandFrame = Tkinter.Frame(self.mapLigandFrame)
+        self.hiddenLigandEntry = Tkinter.BooleanVar()
+        self.hiddenLigandEntry.set(False)
+        self.hiddenLigCheck = Tkinter.Checkbutton(self.replaceLigandFrame, text="Hide entry", indicatoron=Tkinter.TRUE, relief=Tkinter.FLAT, highlightthickness=0, variable=self.hiddenLigandEntry)
+        self.hiddenLigCheck.grid(row=0, column=0, sticky='w')        
+        
+        self.replaceLigand = Tkinter.BooleanVar()
+        self.replaceLigand.set(False)
+        self.replaceLigCheck = Tkinter.Checkbutton(self.replaceLigandFrame, text="Replace previous structure", indicatoron=Tkinter.TRUE, relief=Tkinter.FLAT, highlightthickness=0, variable=self.replaceLigand)
+        self.replaceLigCheck.grid(row=1, column=0, sticky='w')
+        
+        self.mapLigandGUI = MapLigandGUI(self.mapLigandFrame, self, self.replaceLigandFrame)
         self.mapLigandFrame.grid(row=row, column=0, sticky='sew')
         row += 1
 
@@ -250,9 +263,12 @@ class InputGenerator_structureChanges(ModelessDialog):
         from chimera.selection import OSLSelection
         
         atoms = OSLSelection(positions).atoms()
-                
+        
+        hiddenEntry = self.hiddenLigandEntry.get()
+        replaceModel = self.replaceLigand.get()
+        
         for ligand in ligand_names:
-            ChimAARON.arn_input_manager.mapLigand(self.record_name, atoms, ligand)
+            ChimAARON.arn_input_manager.mapLigand(self.record_name, atoms, ligand, hiddenEntry, replaceModel)
     
         self.refresh_text()
     

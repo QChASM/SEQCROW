@@ -199,14 +199,6 @@ class ligandGUI(GeomLoadGUI):
         self.table.rowconfigure(0, weight=1)
         self.table.columnconfigure(0, weight=1)
 
-        #turns out, the backbone is everything
-        #self.showBackbone = Tkinter.BooleanVar()
-        #self.showBackbone.set(False)
-        #self.showBackboneButton = Tkinter.Checkbutton(parent, text="Show backbone", indicatoron=Tkinter.TRUE, relief=Tkinter.FLAT, highlightthickness=0, variable=self.showBackbone)
-        #self.showBackboneButton.grid(row=1, column=2, sticky='sew')
-        
-        #self.ligColor = ColorOption(parent, 1, "Backbone color", tuple((0.1, 0.1, 0.7, 0.5)), None)
-
         #options for highlighting key atoms
         self.showKey = Tkinter.BooleanVar()
         self.showKey.set(True)

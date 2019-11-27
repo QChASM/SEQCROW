@@ -113,7 +113,7 @@ class MapLigandGUI:
             if geoms:
                 self.origin.ligandName.set(",".join([geom.name for geom in geoms]))
         
-    def __init__(self, parent, origin):
+    def __init__(self, parent, origin, extra_frame=None):
         self.origin = origin
         
         row = 0
@@ -131,14 +131,9 @@ class MapLigandGUI:
         
         row += 1
 
-        self.replaceOld = Tkinter.BooleanVar()
-        self.replaceOld.set(False)
-        self.replaceCheck = Tkinter.Checkbutton(parent, indicatoron=Tkinter.TRUE, relief=Tkinter.FLAT, highlightthickness=0, variable=self.replaceOld)
-        self.replaceLabel = Tkinter.Label(parent, text="Replace molecule")
-        self.replaceCheck.grid(row=row, column=1, sticky='w')
-        self.replaceLabel.grid(row=row, column=0, sticky='e')
-        
-        row += 1
+        if extra_frame is not None:
+            extra_frame.grid(row=row, column=0, sticky='e', columnspan=2)
+            row += 1
         
         self.doMapButton = Tkinter.Button(parent, text="map ligand", command=self.doMapLigand)
         self.doMapButton.grid(row=row, column=0, columnspan=3, sticky='ew')
@@ -160,10 +155,8 @@ class MapLigandGUI:
             
         if not positions:
             raise RuntimeError("No key atoms")
-        
-        replace = self.replaceOld.get()
-        
-        self.origin.mapLigand(ligands, positions, replace)
+                
+        self.origin.mapLigand(ligands, positions)
 
 class SubstituteGUI:
     class SubstituentSelectorGUI(ModelessDialog):
@@ -189,7 +182,7 @@ class SubstituteGUI:
             if geoms:
                 self.origin.substituentName.set(",".join([geom.name for geom in geoms]))
         
-    def __init__(self, parent, origin):
+    def __init__(self, parent, origin, extra_frame=None):
         self.origin = origin
         
         row = 0
@@ -204,17 +197,12 @@ class SubstituteGUI:
         
         self.currentSelectionButton = Tkinter.Button(parent, text="current selection", command=self.setCurrent)
         self.currentSelectionButton.grid(row=row, column=2, sticky='ew')
-        
+
         row += 1
 
-        self.replaceOld = Tkinter.BooleanVar()
-        self.replaceOld.set(False)
-        self.replaceCheck = Tkinter.Checkbutton(parent, indicatoron=Tkinter.TRUE, relief=Tkinter.FLAT, highlightthickness=0, variable=self.replaceOld)
-        self.replaceLabel = Tkinter.Label(parent, text="Replace molecule")
-        self.replaceCheck.grid(row=row, column=1, sticky='w')
-        self.replaceLabel.grid(row=row, column=0, sticky='e')
-        
-        row += 1
+        if extra_frame is not None:
+            extra_frame.grid(row=row, column=0, sticky='ew')
+            row += 1
             
         self.doSubButton = Tkinter.Button(parent, text="substitute", command=self.doSubstitute)
         self.doSubButton.grid(row=row, column=0, columnspan=3, sticky='ew')
@@ -265,7 +253,7 @@ class CloseRingGUI:
             if geoms:
                 self.origin.ringName.set(",".join([geom.name for geom in geoms]))
         
-    def __init__(self, parent, origin):
+    def __init__(self, parent, origin, extra_frame=None):
         self.origin = origin
         
         row = 0
@@ -283,14 +271,9 @@ class CloseRingGUI:
         
         row += 1
 
-        self.replaceOld = Tkinter.BooleanVar()
-        self.replaceOld.set(False)
-        self.replaceCheck = Tkinter.Checkbutton(parent, indicatoron=Tkinter.TRUE, relief=Tkinter.FLAT, highlightthickness=0, variable=self.replaceOld)
-        self.replaceLabel = Tkinter.Label(parent, text="Replace molecule")
-        self.replaceCheck.grid(row=row, column=1, sticky='w')
-        self.replaceLabel.grid(row=row, column=0, sticky='e')
-        
-        row += 1
+        if extra_frame is not None:
+            extra_frame.grid(row=row, column=0, sticky='ew')
+            row += 1
             
         self.doCloseRingButton = Tkinter.Button(parent, text="close ring", command=self.doCloseRing)
         self.doCloseRingButton.grid(row=row, column=0, columnspan=3, sticky='ew')
