@@ -22,9 +22,9 @@
 <h2>arninp</h2>
 
 <h3>Usage:<br>
-arninp record <i>name</i> <i>model selection</i><br>
-arninp <i>name</i> mapligand <i>ligand</i> <i>atom selection</i><br>
-arninp <i>name</i> substitute <i>substituent</i> <i>atom selection</i><br>
+arninp record <i>name</i> models <i>model selection</i><br>
+arninp <i>name</i> mapligand <i>ligand</i> <i>model selection</i> [replaceOld true|<b>false</b>] [hiddenEntry true|<b>false</b>]<br>
+arninp <i>name</i> substitute <i>substituent</i> <i>atom selection</i> [replaceOld true|<b>false</b>] [hiddenEntry true|<b>false</b>]<br>
 arninp <i>name</i> write <i>[keyword value</i> <i>[keyword value]]</i><br>
 </h3>
 
@@ -38,6 +38,10 @@ This ligand change is also recorded under <i>name</i>.
 <br><br>
 When <code>substitute</code> is passed, the substituent is added at the position(s) specifed in the atom selection. 
 This is also recorded under <i>name</i>. 
+<br><br>
+The keyword <code>replaceOld</code> controls whether or not the models being modified are closed before the new, modified molecules are opened. 
+<br><br>
+Specifying <code>hiddenEntry true</code> prevents the substitution/ligand swap from appearing in the generated AARON input file. 
 <br><br>
 When <code>write</code> is passed, the specified recording is printed to the reply log. 
 AARON input keywords can also be specified. 

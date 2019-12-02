@@ -1,6 +1,7 @@
 import Tkinter
 import Pmw
 import ChimAARON
+import ttk
 
 from chimera.baseDialog import ModelessDialog
 from chimera.tkoptions import StringOption, EnumOption, BooleanOption, IntOption, FloatOption
@@ -195,10 +196,11 @@ class InputGenerator_structureChanges(ModelessDialog):
     def fillInUI(self, parent):        
         from ChimAARON.StructureModification import MapLigandGUI, SubstituteGUI
         row = 0
-
+        
+        self.libraryMenu = ttk.Notebook(parent)
 
         #mapligand cell
-        self.mapLigandFrame = Tkinter.LabelFrame(parent, text='Map Ligand')
+        self.mapLigandFrame = Tkinter.Frame(parent)
         
         self.replaceLigandFrame = Tkinter.Frame(self.mapLigandFrame)
         self.hiddenLigandEntry = Tkinter.BooleanVar()
@@ -212,20 +214,37 @@ class InputGenerator_structureChanges(ModelessDialog):
         self.replaceLigCheck.grid(row=1, column=0, sticky='w')
         
         self.mapLigandGUI = MapLigandGUI(self.mapLigandFrame, self, self.replaceLigandFrame)
+
+        #mapping ligands with this tool only uses model selections
+        self.mapLigandGUI.atomSelection._label.config(text="Model selection:")
+
         self.mapLigandFrame.grid(row=row, column=0, sticky='sew')
-        row += 1
+
+        self.libraryMenu.add(self.mapLigandFrame, text="Map Ligand")
 
         #substitute cell
-        self.substituteFrame = Tkinter.LabelFrame(parent, text='Substitute')
-        self.substituteGUI = SubstituteGUI(self.substituteFrame, self)
-        self.substituteFrame.grid(row=row, column=0, sticky='new')
-        row += 1
+        self.substituteFrame = Tkinter.Frame(parent)
+        
+        self.replaceSubFrame = Tkinter.Frame(self.substituteFrame)
+        self.hiddenSubstituentEntry = Tkinter.BooleanVar()
+        self.hiddenSubstituentEntry.set(False)
+        self.hiddenSubCheck = Tkinter.Checkbutton(self.replaceSubFrame, text="Hide entry", indicatoron=Tkinter.TRUE, relief=Tkinter.FLAT, highlightthickness=0, variable=self.hiddenSubstituentEntry)
+        self.hiddenSubCheck.grid(row=0, column=0, sticky='w')        
+        
+        self.replaceSubstituent = Tkinter.BooleanVar()
+        self.replaceSubstituent.set(False)
+        self.replaceSubCheck = Tkinter.Checkbutton(self.replaceSubFrame, text="Replace previous structure", indicatoron=Tkinter.TRUE, relief=Tkinter.FLAT, highlightthickness=0, variable=self.replaceSubstituent)
+        self.replaceSubCheck.grid(row=1, column=0, sticky='w')        
+        
+        self.substituteGUI = SubstituteGUI(self.substituteFrame, self, self.replaceSubFrame)
+
+        self.libraryMenu.add(self.substituteFrame, text="Substitute")
         
         #AARON input keywords
-        self.keyWordFrame = Tkinter.LabelFrame(parent, text='Set Input Options')
+        self.keyWordFrame = Tkinter.Frame(parent)
         self.keyWordGUI = keyWordGUI(self.keyWordFrame, self)
-        self.keyWordFrame.grid(row=row, column=0, sticky='new')
-        row += 1
+
+        self.libraryMenu.add(self.keyWordFrame, text="Input Options")
         
         #AARON version option
         if self.perl:
@@ -235,8 +254,11 @@ class InputGenerator_structureChanges(ModelessDialog):
         self.versionOption = Pmw.OptionMenu(parent, initialitem=initialItem, \
                             command=self.setVersion, items=["Perl", "Python"], \
                             labelpos='w', label_text="AARON version:")
-        self.versionOption.grid(row=row, column=0, sticky='nsew')
+        self.versionOption.grid(row=row, column=0, sticky='sew')
+        
         row += 1
+        
+        self.libraryMenu.grid(row=row, column=0, sticky='new')        
         
         #display input file
         #all other buttons and fields should be before this to make setting the rowspan easier
@@ -262,26 +284,29 @@ class InputGenerator_structureChanges(ModelessDialog):
         positions: string with OSL identifiers"""
         from chimera.selection import OSLSelection
         
-        atoms = OSLSelection(positions).atoms()
+        selec = OSLSelection(positions).molecules()
         
         hiddenEntry = self.hiddenLigandEntry.get()
         replaceModel = self.replaceLigand.get()
         
         for ligand in ligand_names:
-            ChimAARON.arn_input_manager.mapLigand(self.record_name, atoms, ligand, hiddenEntry, replaceModel)
+            ChimAARON.arn_input_manager.mapLigand(self.record_name, selec, ligand, hiddenEntry, replaceModel)
     
         self.refresh_text()
     
-    def substitute(self, substituents, positions, replace):
+    def substitute(self, substituents, positions):
         """substitute going through the AARON Input Manager
         substituents: list of substituent names from the library
         positions: string with OSL identifiers"""
         from chimera.selection import OSLSelection
         
         atoms = OSLSelection(positions).atoms()
-                
+        
+        replaceModel = self.replaceSubstituent.get()
+        hiddenEntry = self.hiddenSubstituentEntry.get()
+        
         for sub in substituents:
-            ChimAARON.arn_input_manager.subSomething(self.record_name, atoms, sub, replace)
+            ChimAARON.arn_input_manager.subSomething(self.record_name, atoms, sub, hiddenEntry, replaceModel)
   
         self.refresh_text()
     

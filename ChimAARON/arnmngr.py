@@ -107,7 +107,7 @@ class InputManager:
 
             i = 2
             for record in rec[1:]:
-                if record.ligand is None or record.substitution is not None and not record.hidden:
+                if record.ligand is None or record.substitution is not None or record.hidden:
                     continue
                 
                 out += "%s%i: ligand=%s\n" % (record.ligPrefix, i, record.ligand)
@@ -116,6 +116,8 @@ class InputManager:
             for record in rec[1:]:
                 if record.component != "ligand" or record.hidden:
                     continue
+                
+                print(record.component, record.component == "ligand", record.hidden)
                 
                 if record.ligand is not None:
                     out += "%s%i: ligand=%s " % (record.ligPrefix, i, record.ligand)
@@ -153,17 +155,32 @@ class InputManager:
         
         return (basis_kw, str_kw, float_kw, int_kw, bool_kw)
     
-    def mapLigand(self, name, chim_atoms, ligand_name, hiddenEntry, replaceOld, ligPrefix=None):
+    def mapLigand(self, name, positions, ligand_name, hiddenEntry, replaceOld, ligPrefix=None):
+        """swap the ligand and create a new entry
+        name        - record name (str)
+        positions   - chimera atoms that are key atoms (list(chimera.Atom)) or model selection and let AaronTools figure out the key atoms (list(chimera.Model))
+        ligand_name - name of new ligand
+        hiddenEntry - True to not display entry in input
+        replaceOld  - True to close selected model
+        ligPrefix   - prefix to use for entry in input
+        """
         from ChimAARON import AaronGeometry2ChimeraMolecule
-        from chimera import openModels
+        from chimera import openModels, Atom
 
-        mol = chim_atoms[0].molecule
+       
+        if isinstance(positions[0], Atom):
+            mol = positions[0].molecule
         
-        target_tags = []
-        for atom in chim_atoms:
-            if atom.molecule != mol:
-                raise RuntimeError("Select atoms on one molecule only: %s" % " ".join(target_tags))
-            target_tags.append(atom.tag)
+            target_tags = []
+            for atom in positions:
+                if atom.molecule != mol:
+                    raise RuntimeError("Select atoms on one molecule only: %s" % " ".join(target_tags))
+                target_tags.append(atom.tag)
+                
+        else:
+            mol = positions[0]
+            
+            target_tags = "key"
                 
         specified_rec = None
         for rec in self.records[name]:
@@ -181,7 +198,17 @@ class InputManager:
         new_cat_dict = {}
         for key in cat_dict:
             new_cat = cat_dict[key].copy()
-            new_cat.map_ligand([ligand_name], target_tags)
+            
+            if target_tags == "key":
+                targets = []
+                for lig in cat_dict[key].components['ligand']:
+                    targets.extend(lig.key_atoms) 
+
+                new_cat.map_ligand([ligand_name], targets)
+
+            else:
+                new_cat.map_ligand([ligand_name], target_tags)
+
             for lig in new_cat.components['ligand']:
                 if not all([any([tag.startswith('ligand') for tag in atom.tags]) for atom in lig.atoms]):
                     lignum = new_cat.components['ligand'].index(lig)
@@ -198,12 +225,12 @@ class InputManager:
             new_cat_dict[new_mol] = new_cat
             openModels.add([new_mol])
             
-            if replace:
+            if replaceOld:
                 openModels.close(key)
             
-        self.records[name].append(Record(name, new_cat_dict, ligPrefix=ligPrefix, ligand=ligand_name, hidden=replace))
+        self.records[name].append(Record(name, new_cat_dict, ligPrefix=ligPrefix, ligand=ligand_name, hidden=hiddenEntry))
                 
-    def subSomething(self, name, chim_atoms, sub_name, replace, ligPrefix=None, subPrefix=None):
+    def subSomething(self, name, chim_atoms, sub_name, hiddenEntry, replaceOld, ligPrefix=None, subPrefix=None):
         from ChimAARON import AaronGeometry2ChimeraMolecule
         from chimera import openModels
         
@@ -277,7 +304,7 @@ class InputManager:
                 
             openModels.add([new_mol])
 
-            if replace:
+            if replaceOld:
                 openModels.close(key)
                 
         for targ in target_tags:
@@ -303,5 +330,5 @@ class InputManager:
                                                positions=positions, \
                                                component=comp_name, \
                                                ligand=ligand, \
-                                               hidden=replace))             
+                                               hidden=hiddenEntry))             
     

@@ -20,22 +20,37 @@ class StructureModificationDialog(ModelessDialog):
     
         self.modOptions = Notebook(parent)
         
+        
         self.frames['Map Ligand'] = Tkinter.Frame(self.modOptions)
-        self.modGUIs['Map Ligand'] = MapLigandGUI(self.frames['Map Ligand'], self)
+        self.replaceLigandFrame = Tkinter.Frame(self.frames['Map Ligand'])
+        self.replaceLig = Tkinter.BooleanVar()
+        self.replaceLig.set(True)
+        self.replaceLigCheck = Tkinter.Checkbutton(self.replaceLigandFrame, text="Replace previous structure", indicatoron=Tkinter.TRUE, relief=Tkinter.FLAT, highlightthickness=0, variable=self.replaceLig)
+        self.replaceLigCheck.grid(row=0, column=0, sticky='w')
+        self.modGUIs['Map Ligand'] = MapLigandGUI(self.frames['Map Ligand'], self, self.replaceLigandFrame)
         
         self.frames['Substitute'] = Tkinter.Frame(self.modOptions)
-        self.modGUIs['Substitute'] = SubstituteGUI(self.frames['Substitute'], self)
+        self.replaceSubFrame = Tkinter.Frame(self.frames['Substitute'])
+        self.replaceSub = Tkinter.BooleanVar()
+        self.replaceSub.set(True)
+        self.replaceSubCheck = Tkinter.Checkbutton(self.replaceSubFrame, text="Replace previous structure", indicatoron=Tkinter.TRUE, relief=Tkinter.FLAT, highlightthickness=0, variable=self.replaceSub)
+        self.replaceSubCheck.grid(row=0, column=0, sticky='w')
+        self.modGUIs['Substitute'] = SubstituteGUI(self.frames['Substitute'], self, self.replaceSubFrame)
         
         self.frames['Close Ring'] = Tkinter.Frame(self.modOptions)
-        self.modGUIs['Close Ring'] = CloseRingGUI(self.frames['Close Ring'], self)
+        self.replaceRingFrame = Tkinter.Frame(self.frames['Close Ring'])
+        self.replaceRing = Tkinter.BooleanVar()
+        self.replaceRing.set(True)
+        self.replaceRingCheck = Tkinter.Checkbutton(self.replaceRingFrame, text="Replace previous structure", indicatoron=Tkinter.TRUE, relief=Tkinter.FLAT, highlightthickness=0, variable=self.replaceRing)
+        self.replaceRingCheck.grid(row=0, column=0, sticky='w')
+        self.modGUIs['Close Ring'] = CloseRingGUI(self.frames['Close Ring'], self, self.replaceRingFrame)
         
         for k in self.frames:
             self.modOptions.add(self.frames[k], text=k)
             
         self.modOptions.pack(fill='both')
     
-    @classmethod
-    def mapLigand(cls, ligand_names, key_atoms, replace):
+    def mapLigand(self, ligand_names, key_atoms):
         """called by MapLigandGUI"""                        
         from chimera.selection import OSLSelection
         
@@ -46,15 +61,16 @@ class StructureModificationDialog(ModelessDialog):
             new_mols, oldMols = ChimAARON.mapLigand(ligand, atoms)
             
             open_mols.extend(new_mols)
-                        
+        
+        replace = self.replaceLig.get()
+        
         if replace:
             openModels.close(oldMols)
      
         for mol in open_mols:
             openModels.add([mol])
      
-    @classmethod
-    def substitute(cls, substituent_names, positions, replace):
+    def substitute(self, substituent_names, positions):
         """called by SubstituteGUI"""
         from chimera.selection import OSLSelection
         
@@ -64,19 +80,22 @@ class StructureModificationDialog(ModelessDialog):
         for sub in substituent_names:
             new_mols, old_mols = ChimAARON.substitute(sub, atoms)
             open_mols.extend(new_mols)
-            
+        
+        replace = self.replaceSub.get()
+        
         if replace:
             openModels.close(old_mols)
 
         for mol in open_mols:
             openModels.add([mol])
         
-    @classmethod
-    def closeRing(cls, ring_names, positions, replace):
+    def closeRing(self, ring_names, positions):
         """called by CloseRingGUI"""
         from chimera.selection import OSLSelection
         
         atoms = OSLSelection(positions).atoms()
+        
+        replace = self.replaceRing.get()
         
         open_mols = []
         for ring in ring_names:
@@ -124,7 +143,7 @@ class MapLigandGUI:
     
         row += 1
 
-        self.atomSelection = StringOption(parent, row, "Key atoms", "", None, balloon="Chimera OSL atom specifiers (space-delimited)")
+        self.atomSelection = StringOption(parent, row, "Key atoms", "", None, balloon="Chimera OSL atom or model specifiers (space-delimited)")
         
         self.currentSelectionButton = Tkinter.Button(parent, text="current selection", command=self.setCurrent)
         self.currentSelectionButton.grid(row=row, column=2, sticky='ew')
@@ -132,7 +151,7 @@ class MapLigandGUI:
         row += 1
 
         if extra_frame is not None:
-            extra_frame.grid(row=row, column=0, sticky='e', columnspan=2)
+            extra_frame.grid(row=row, column=0, sticky='ew', columnspan=3)
             row += 1
         
         self.doMapButton = Tkinter.Button(parent, text="map ligand", command=self.doMapLigand)
@@ -201,7 +220,7 @@ class SubstituteGUI:
         row += 1
 
         if extra_frame is not None:
-            extra_frame.grid(row=row, column=0, sticky='ew')
+            extra_frame.grid(row=row, column=0, sticky='ew', columnspan=3)
             row += 1
             
         self.doSubButton = Tkinter.Button(parent, text="substitute", command=self.doSubstitute)
@@ -224,10 +243,8 @@ class SubstituteGUI:
             
         if not positions:
             raise RuntimeError("Atom selection empty")
-        
-        replace = self.replaceOld.get()
-        
-        self.origin.substitute(substituents, positions, replace)
+                
+        self.origin.substitute(substituents, positions)
 
 class CloseRingGUI:
     class RingSelectorGUI(ModelessDialog):
@@ -272,7 +289,7 @@ class CloseRingGUI:
         row += 1
 
         if extra_frame is not None:
-            extra_frame.grid(row=row, column=0, sticky='ew')
+            extra_frame.grid(row=row, column=0, sticky='ew', columnspan=3)
             row += 1
             
         self.doCloseRingButton = Tkinter.Button(parent, text="close ring", command=self.doCloseRing)
@@ -295,9 +312,7 @@ class CloseRingGUI:
             
         if not positions:
             raise RuntimeError("Atom selection empty")
-        
-        replace = self.replaceOld.get()
-        
-        self.origin.closeRing(ringFrags, positions, replace)
+                
+        self.origin.closeRing(ringFrags, positions)
 
         

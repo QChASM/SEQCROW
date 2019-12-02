@@ -15,7 +15,7 @@
 
 <body>
 
-<h2>Creating an AARON Input File</h2>
+<h1>Creating an AARON Input File</h1>
 
 <p>
 Begin by going to <span class="menulike">Tools</span> &rarr; <span class="menulike">ChimAARON</span> &rarr; <span class="menulike">Set up AARON Input...</span>.
@@ -24,7 +24,7 @@ This will open a dialog asking you to select a source for your TS templates.
 
 <img src="../images/aaronInputTemplate.png" alt="TS template selection">
 
-<h3>Selecting TS Template Source</h3>
+<h2>Selecting TS Template Source</h2>
 <p>
 AARON input files require that you specify a TS template. 
 There are three options for loading TS template structures into Chimera:
@@ -34,17 +34,18 @@ There are three options for loading TS template structures into Chimera:
 	<li>resume a previous input from your current session (only available when an input recording has been started)</li>
 </ol>
 
-If you are using structures from your TS library, simply select the <span class="menulike">Reaction type</span> and <span class="menulike">Template</span>.
+If you are using structures from your TS library, simply <s>select the <span class="menulike">Reaction type</span> and <span class="menulike">Template</span></s> code this feature yourself.
 <br><br>
-If you are using structures that are loaded in Chimera, select them on the table so that the table entries are highlighted in blue. 
-You may also enter names for the <span class="menulike">Reaction type</span> and <span class="menulike">Template</span>, but this is not necessary for getting to the next stage.
+If you are using structures that are loaded in Chimera, select your models on the table so that the entries are highlighted. 
+You may also enter names for the <span class="menulike">Reaction type</span> and <span class="menulike">Template</span>, but this is not necessary for getting to the next stage. 
+The <span class="menulike">Reaction type</span> and <span class="menulike">Template</span> can both be set by modifying the corresponding keywords later.
 <br><br>
 You can also choose a name for the AARON input recording, which can be used to resume working on an AARON input file after you close the dialog.
 <br><br>
 Press <span class="buttonlike">Apply</span> to move on to the next stage.
 </p>
 
-<h3>AARON Input Recorder</h3>
+<h2>AARON Input Recorder</h2>
 <p>
 In this dialog, you have options for swapping the ligand, changing substituents, and setting keywords for the AARON input file. 
 On the right side, you can see the contents of the AARON input file. 
@@ -53,24 +54,39 @@ The input file contents will update if you make any changes.
 
 <img src="../images/aaronInputDialog.png" alt="input options">
 
-<h4>Ligand the Swapping</h4>
+<h3>Structure Modification</h3>
 <p>
-For swapping the ligand, you must specify the key atoms on the current ligand. 
-You can type in the Chimera OSL atom selection in the <span class="menulike">Key atoms</span> box. 
-Alternatively, you can select atoms by another means and press <span class="buttonlike">current selection</span> to fill in the <span class="menulike">Key atoms</span> box with the OSL specifiers for your current selection. 
+A list of molecules is associated with each entry in the AARON input file. 
+Changes made to one molecule using this dialog menu or the <a href="../commands/arninp.html"><code>arninp</code></a> command will change all associated molecules.
+A new entry can also be added to the AARON input file. 
+To prevent the entry from being added to the input file, check the <span class="menulike">Hide entry</span> box. 
+<br><br>
+As an example, say you have loaded 10 structures from a TS template library. 
+If you were to swap the ligand by specifying just one of the structures, 10 new structures would be loaded in - one for each of the original template structures, but with the new ligand.
+Suppose you check the <span class="menulike">Hide entry</span> box before swapping the ligand. 
+No new entry would appear under the <span class="menulike">&Ligands</span> section. 
+Then, if you substitute one of the positions on the new ligand, 10 new structures would be opened like before. 
+Suppose you don't check <span class="menulike">Hide entry</span> before substituting on the ligand. 
+A new entry will appear in the <span class="menulike">&Ligands</span> section specifying both the new ligand and the substitution.
+</p>
+
+<h4>Swapping the Ligand</h4>
+<p>
+Although specifying one atom should be enough, you should specify a model when swapping the ligand. 
+Specifying atoms is not very similar to how ligand changes are specified in AARON input files. 
+You can type in the Chimera object selection language (OSL) model selection in the <span class="menulike">Model selection</span> box. 
+Alternatively, you can select a model by some other means and press <span class="buttonlike">current selection</span> to fill in the <span class="menulike">Model selection</span> box with the OSL specifiers for your current selection. 
 <br><br>
 You can specify the new ligand by entering the ligand's libary name in the <span class="menulike">Ligand</span> box. 
 You can also press <span class="buttonlike">From library...</span> to open a dialog that lists the ligands in the library. 
 If you press <span class="buttonlike">OK</span> with ligands selected in the ligand library dialog, the <span class="menulike">Ligand</span> box will be filled in automatically.
 <br><br>
 Pressing <span class="buttonlike">map ligand</span> will swap the current ligand for a new one. 
-You should also see a new entry in the <span class="menulike">&Ligands</span> section of the input file. 
-
 </p>
 
 <h4>Changing Substituents</h4>
 <p>
-For changing a substituent, you must specify the position you're adding a substituent. 
+To change a substituent, you must specify the position you're modifying. 
 You can type in the Chimera OSL atom selection in the <span class="menulike">Atom selection</span> box. 
 Alternatively, you can select atoms by another means and press <span class="buttonlike">current selection</span> to fill in the <span class="menulike">Atom selection</span> box with the OSL specifiers for your current selection. 
 <br><br>
@@ -84,7 +100,7 @@ If the atom selection is on the substrate, you should see a new entry in the <sp
 If the atom selection is on a molecule that has already been substituted, the new entry will contain instructions for both substitutions. 
 </p>
 
-<h4>Input Keywords</h4>
+<h3>Input Keywords</h3>
 <p>
 Select the keyword you'd like to add or modify from the <span class="menulike">Keyword</span> dropdown menu. 
 Fill the value of the keyword into the blank and press <span class="buttonlike">set</span> to add/modify the keyword in the input file, or press <span class="buttonlike">unset</span> to remove the keyword from the input file.
@@ -92,10 +108,10 @@ Fill the value of the keyword into the blank and press <span class="buttonlike">
 See the <a href="https://github.com/QChASM/Aaron/wiki/More-on-AARON-Input-Files">AARON GitHub wiki</a> for more details about input file keywords.
 </p>
 
-<h3>Saving Your Input File</h3>
+<h2>Saving Your Input File</h2>
 <p>
 Currently, there is not option for saving the contents of the AARON input to a file. 
-However, you can copy the <span class="menulike">Input</span> and paste it into a file.
+However, you can copy the <span class="menulike">Input</span> and paste it into a file (<i>e.g.</i> highlight the input and CTRL + C, CTRL + V - or whatever your equivalent is).
 </p>
 
 <img src="../images/aaronInputDialog filled in.png" alt="input options">

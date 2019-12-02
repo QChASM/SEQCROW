@@ -114,13 +114,13 @@ class GetAaronToolsDialog(ModelessDialog):
         
         self.backportButton = Tkinter.Button(self.inputDisplayArea, text="pasteurize AaronTools", command=self.backportAaronTools)
         self.backportButton.grid(row=row, column=0, sticky='new')        
-        #self.backportButton.config(state="disabled")
+        self.backportButton.config(state="disabled")
 
         row += 1
         
         self.moreBackportsButton = Tkinter.Button(self.inputDisplayArea, text="fix misc. backporting", command=self.doAdditionalBackports)
         self.moreBackportsButton.grid(row=row, column=0, sticky='new')
-        #self.moreBackportsButton.config(state="disabled")
+        self.moreBackportsButton.config(state="disabled")
         
         row += 1
         
@@ -146,6 +146,7 @@ After all of that is complete, ChimAARON tools should function the next time you
         
         self.inputDisplay.delete("1.0", Tkinter.END)
         self.inputDisplay.insert(Tkinter.END, readme)
+        self.inputDisplay.config(state='disabled')
         
         self.testDisplayArea = Tkinter.LabelFrame(parent, text="Tests")
         self.testDisplayArea.grid(row=2, column=0, sticky='nsew')

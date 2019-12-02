@@ -330,7 +330,7 @@ def doSubstitute(cmdName, arg_str):
     
     atoms = _selectedAtoms(getSpecs(sel))
     
-    new_mols, old_mols = substitute(substituent, atoms, form=form)
+    new_mols, old_mols = substitute(substituent, atoms, form=sub_form)
 
     if not args['replace']:
         return new_mols, []
@@ -494,6 +494,7 @@ def doMapLigand(cmdName, arg_str):
     args = parser.parse_args(arg_str)
     
     ligand_name = args['other'][0]
+    sel = args['selec']
     
     atoms = _selectedAtoms(getSpecs(sel))
     new_mols, old_mols = mapLigand(ligand_name, atoms)
@@ -811,6 +812,7 @@ def doArnRecord(cmdName, arg_str):
         inp = arn_input_manager.get_input(name, header=aaron_kw, perl=perl)
         print(inp)
         replyobj.status("printed to reply log")
+    
     elif args['record']:
         replyobj.status("setting up record %s..." % name)
         model_ids = args['models']
@@ -832,15 +834,21 @@ def doArnRecord(cmdName, arg_str):
             command_arg_str = args['substitute']
         
         command_parser = ArgumentParser()
-            
+        
+        command_parser.addArg("replaceOld", 1, default=False, kind=bool)
+        command_parser.addArg("hiddenEntry", 1, default=False, kind=bool)
+        
         command_args = command_parser.parse_args(command_arg_str)
 
+        hidden = command_args['hiddenEntry']
+        replace = command_args['replaceOld']
+
         if len(command_args['other']) > 1:
-            osl_str = " ".join(args['other'][1:])
+            osl_str = " ".join(command_args['other'][1:])
             if osl_str.startswith('sel'):
                 sel = currentAtoms()
             else:
-                sel = OSLSelection(" ".join(args['other'][1:])).atoms()
+                sel = OSLSelection(" ".join(command_args['other'][1:])).atoms()
         else:
             sel = currentAtoms()
                 
@@ -849,13 +857,13 @@ def doArnRecord(cmdName, arg_str):
                           
         if args['mapligand'] is not None:
             ligand_name = command_args['other'][0]
-            
-            arn_input_manager.mapLigand(name, sel, ligand_name, ligPrefix)
+
+            arn_input_manager.mapLigand(name, [sel[0].molecule], ligand_name, hidden, replace, ligPrefix)
 
         else:
             sub_name = command_args['other'][0]
-  
-            arn_input_manager.subSomething(name, sel, sub_name, ligPrefix, subPrefix)
+
+            arn_input_manager.subSomething(name, sel, sub_name, hidden, replace, ligPrefix=ligPrefix, subPrefix=subPrefix)
     
     else:
         raise RuntimeWarning("must use 'record', 'mapligand', or 'substitute'")

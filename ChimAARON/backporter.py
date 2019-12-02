@@ -86,6 +86,9 @@ def backporter_main(directory):
                 
                 if 'test' in filename:
                     fix_unittest_results(filename)
+                    
+                if "atoms.py" in filename:
+                    add_def_eq(filename)
                 
 def split_imports(file_contents):
     """returns a tuple of (list of lines before we stop importing, list of lines after we stop importing)"""
@@ -103,7 +106,16 @@ def split_imports(file_contents):
     code = file_contents[i:]
     
     return (imports, code,)
-                
+
+def split_classes(code):
+    classes = [[]]
+    for line in code:
+        if line.startswith('class'):
+            classes.append([])
+        classes[-1].append(line)
+
+    return classes
+
 def fix_isinstance_str(filename):
     """changes isinstance(x, str) to isinstance(x, basestring)"""
     import re
@@ -390,3 +402,33 @@ def fix_list_copy(filename):
             
     with open(filename, 'w') as f:
         f.write(s)
+
+def add_def_eq(filename):
+    """Python 3's __eq__ just works with our object
+    Python 2's __eq__... not so much"""
+    
+    print('add __eq__')
+    
+    with open(filename, 'r') as f:
+        lines = f.readlines()
+        
+    imports, code = split_imports(lines)
+
+    classes = split_classes(code)
+    
+    for c in classes[1:]:
+        if not any(['def __eq__' in line for line in c]) and any(['def __repr__' in line for line in c]):
+            c.append("\n    def __eq__(self, other): return repr(self) == repr(other)\n")
+            
+    s = ''
+    
+    for line in imports:
+        s += line
+        
+    for c in classes:
+        for line in c:
+            s += line
+            
+    with open(filename, 'w') as f:
+        f.write(s)
+    

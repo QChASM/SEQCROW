@@ -35,8 +35,7 @@ class TestCompOutput(TestWithTimer):
         ref += ["Max Force:3.606006/NO  RMS Force:0.254588/NO   Max Disp:1.656082/NO   RMS Disp:0.279091/NO"]
 
         for t, r in zip(test, ref):
-            self.assertTrue(sorted(t.split()) == sorted(r.split()))
-
+            self.assertTrue(t == r)
 
     def test_grab_thermo(self):
         logs = [TestCompOutput.normal,
