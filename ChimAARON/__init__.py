@@ -1,7 +1,7 @@
 import arnmngr
 arn_input_manager = arnmngr.InputManager()
 
-def AaronGeometry2ChimeraMolecule(mol, tagList=False):
+def AaronGeometry2ChimeraMolecule(geom, tagList=False):
     """convert AaronTools Geometry to Chimera Molecule"""
     from chimera import Coord, Molecule, Element, connectMolecule
     from re import search
@@ -10,14 +10,14 @@ def AaronGeometry2ChimeraMolecule(mol, tagList=False):
     m = Molecule()
     r = m.newResidue("UNK", " ", 1, " ")
     #chimera uses the comment line to name molecules
-    if mol.name:
-        m.name = mol.comment
+    if geom.comment:
+        m.name = geom.comment
     else:
         m.name = "molecule"
     
     #convert each atom. assign it a serial number
     atomElements = {}
-    for i, atom in enumerate(mol.atoms):
+    for i, atom in enumerate(geom.atoms):
         if atom.element not in atomElements:
             atomElements[atom.element] = 1
         else:
@@ -33,17 +33,6 @@ def AaronGeometry2ChimeraMolecule(mol, tagList=False):
     
     #connect the graphs and draw bonds
     connectMolecule(m)
-    #delete all bonds - we'll be using the mol's bonds
-#    for bond in m.bonds:
-#        m.deleteBond(bond)
-    
-#    for i, atom1 in enumerate(mol.atoms):
-#        for j, atom2 in enumerate(mol.atoms[:]):
-#            if atom2 in atom1.connected:
-#                if not any([bond.contains(m.atoms[i]) and bond.contains(m.atoms[j]) for bond in m.bonds]):
-#                    m.newBond(m.atoms[i], m.atoms[j])
-            
-#    mol.chimera = m
     
     return m
 
@@ -78,6 +67,148 @@ def ChimeraAtom2AaronAtom(atom):
     
     aaron_atom = Atom(str(atom.element), [x for x in atom.xformCoord()], name = str(atom.serialNumber))
     return aaron_atom
+
+def addRing(ring, name=False, overwrite=False, color=None, showWalk=True):
+    """ring   - AaronTools RingFragment
+    name      - if name is false, load ring into chimera
+              - if name is not false, add the ring to the AaronTools library
+    overwrite - overwrite lig with same name if it already is in the library
+    color     - chimera.MaterialColor: color of walk arrows
+    showWalk  - whether or not to draw walk arrows"""
+    
+    import os
+    
+    from AaronTools.ringfragment import RingFragment
+    from Bld2VRML import openBildString
+    from chimera import openModels, MaterialColor, replyobj, Bond
+    
+    if name:
+        ring_file = os.path.join(os.path.dirname(RingFragment.AARON_LIBS), name + '.xyz')
+        if os.path.exists(ring_file) and not overwrite:
+            replyobj.error("%s already exists" % ring_file)
+        else:
+            ring.write(outfile=ring_file)
+            replyobj.status("%s added to ring fragment library" % name)
+
+    else:
+        ring_mol = AaronGeometry2ChimeraMolecule(ring)
+        openModels.add([ring_mol])
+        if showWalk:
+            if color is None:
+                color = MaterialColor(0.9, 0.4, 0.3, 0.9)
+            #radius for arrows
+            r_bd = ring_mol.bonds[0].radius*ring_mol.stickScale
+            #radius for spheres (used when there's only one end atom)
+            r_sp = 1.1*ring_mol.ballScale
+        
+            s = ''
+            if len(ring.end) == 1:
+                chim_atom = ring_mol.atoms[ring.atoms.index(ring.end[0])]
+                info = tuple(ring.end[0].coords) + (r_sp*chim_atom.radius,)
+                s += ".sphere %f %f %f   %f\n" % info
+            else:
+                for atom1, atom2 in zip(ring.end[:-1], ring.end[1:]):
+                    chim_atom1 = ring_mol.atoms[ring.atoms.index(atom1)]
+                    chim_atom2 = ring_mol.atoms[ring.atoms.index(atom2)]
+                    for bond in chim_atom1.bonds:
+                        if chim_atom1 in bond.atoms and chim_atom2 in bond.atoms:
+                            bond.display = Bond.Never
+                    
+                    v = atom1.bond(atom2)
+                    info = tuple(atom1.coords) + tuple(atom2.coords - r_sp*v) + (r_bd, 1.5*r_bd,)
+                    s += ".arrow %f %f %f   %f %f %f   %f %f 0.7\n" % info
+                    
+            mdls = openBildString(s)
+            for mdl in mdls:
+                mdl.color = color
+                
+            openModels.add(mdls, sameAs=ring_mol)
+
+def addLig(lig, name=False, overwrite=False, color=None, showKey=True):
+    """lig    - AaronTools Component
+    name      - if name is false, load lig into chimera
+              - if name is not false, add the lig to the AaronTools library
+    overwrite - overwrite lig with same name if it already is in the library
+    color     - chimera.MaterialColor: color of key atoms
+    showKey   - whether or not to highlight key atoms"""
+    
+    import os
+    
+    from AaronTools.component import Component
+    from Bld2VRML import openBildString
+    from chimera import openModels, MaterialColor, replyobj
+    
+    if name:
+        lig_file = os.path.join(os.path.dirname(Component.AARON_LIBS), name + '.xyz')
+        if os.path.exists(lig_file) and not overwrite:
+            replyobj.error("%s already exists" % lig_file)
+        else:
+            lig.write(outfile=lig_file)
+            replyobj.status("%s added to ligand library" % name)
+    else:
+        lig_mol = AaronGeometry2ChimeraMolecule(lig)
+        openModels.add([lig_mol])
+        if showKey:
+            if color is None:
+                color = MaterialColor(0.2, 0.5, 0.8, 0.5)
+
+            r = 1.1*lig_mol.ballScale
+
+            s = ''
+
+            for atom in lig.key_atoms:
+                #scale sphere radius to be slightly larger than the ball radius for b&s representation
+                chim_atom = lig_mol.atoms[lig.atoms.index(atom)] 
+                info = tuple(atom.coords) + (r*chim_atom.radius,)
+                s += ".sphere %f %f %f   %f\n" % info
+
+            mdls = openBildString(s)
+            for mdl in mdls:
+                mdl.color = color
+                
+            openModels.add(mdls, sameAs=lig_mol)
+
+def addSub(sub, name=False, overwrite=False, color=None, showAttach=True):
+    """sub    - AaronTools Substituent
+    name      - if name is false, load sub into chimera
+              - if name is not false, add the sub to the AaronTools library
+    overwrite - overwrite sub with same name if it already is in the library
+    color     - chimera.MaterialColor: color of key atoms
+    showKey   - whether or not to highlight key atoms"""
+    
+    import os
+    
+    from AaronTools.substituent import Substituent
+    from Bld2VRML import openBildString
+    from chimera import openModels, MaterialColor, replyobj
+           
+    if name:
+        sub_file = os.path.join(os.path.dirname(Substituent.AARON_LIBS), name + '.xyz')
+        if os.path.exists(sub_file) and not overwrite:
+            replyobj.error("%s already exists" % sub_file)
+        else:
+            sub.write(outfile=sub_file)
+            replyobj.status("%s added to substituent library" % name)
+    else:
+        sub_mol = AaronGeometry2ChimeraMolecule(sub)
+        openModels.add([sub_mol])
+        if showAttach:
+            if color is None:
+                color = MaterialColor(0.60784, 0.145098, 0.70196, 0.5)
+            
+            if len(sub_mol.bonds) > 0:
+                r = sub_mol.bonds[0].radius*sub_mol.stickScale
+            else:
+                r = 0.2
+                    
+            s = ".sphere 0 0 0  %f\n" % r
+            s += ".cylinder 0 0 0   %f 0 0   %f open\n" % (sub.atoms[0].coords[0], r)
+            
+            mdls = openBildString(s)
+            for mdl in mdls:
+                mdl.color = color
+            
+            openModels.add(mdls, sameAs=sub_mol)
 
 def parse_Aaron_comment(mol):
     """parse mol's comment line and return a dictionary with the atom numbers that are

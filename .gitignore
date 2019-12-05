@@ -9,3 +9,4 @@ AaronTools/__pycache__
 AaronTools/cache
 AaronTools/**/__pycache__
 ChimAARON/AaronTools Backporting and Compatibility.txt
+*.pxd

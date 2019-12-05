@@ -141,10 +141,31 @@ class StructureModification_EMO(EMO):
         from ChimAARON.StructureModification import StructureModificationDialog
         dialog = StructureModificationDialog()
 
+class LibAdd_EMO(EMO):
+    def name(self):
+        return "Add to AaronTools Library"
+        
+    def description(self):
+        return self.categoryDescriptions()['ChimAARON']
+        
+    def categories(self):
+        return self.categoryDescriptions().keys
+        
+    def categoryDescriptions(self):
+        return {'ChimAARON':self.name()}
+    
+    def icon(self):
+        return self.path('Icons/addToLib.png')
+        
+    def activate(self):
+        from ChimAARON.LibraryDialog import LibAddDialog
+        dialog = LibAddDialog()
+
 manager.registerExtension(Frequency_Dialog_EMO(__file__))
 manager.registerExtension(Library_Dialog_EMO(__file__))
 manager.registerExtension(AARON_Input_Dialog_EMO(__file__))
 manager.registerExtension(StructureModification_EMO(__file__))
+manager.registerExtension(LibAdd_EMO(__file__))
 
 manager.registerExtension(GetAaronTools_EMO(__file__))
 
