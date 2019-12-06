@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<meta charset="UTF-8">
+<title>ChimAARON Help</title>
+<meta http-equiv="Content-Type" content="text/html">
+<link rel="icon" href="../images/AARON_tiny.png" type="image/png">
+<link rel="stylesheet" href="../ChimAARONStyle.css">
+</head>
+
+<div class="head">
+<object data="../ribbon.html" class="head"></object>
+</div>
+
+<body>
+
+<h1>Adding to Your Personal Library <img src="../../Icons/addToLib.png" class="buttonlike"></h1>
+
+<p>
+AaronTools is packaged with a number of ring fragments, ligands, and substituents in its built-in library. 
+These ligands, substituents, and rings power AaronTools'/ChimAARON's structure modification tools, like <a href="../commands/substitute.html"><code>substitute</code></a> and <span class="menulike">Modify Structure</span>.
+If AaronTools doesn't have a ligand or substituent you use frequently, simply add it to your personal library.
+Here, you'll find information about adding more items to your personal AaronTools library. 
+<br><br>
+Structures in your personal library are stored locally. 
+For information on specifying the location of your personal library directory, see <a href="setupGuide.html">tutorial on setting up AaronTools</a>.
+<br><br>
+The tool for adding structures to your personal library can be opened under <span class="menulike">Tools</span> &rarr; <span class="menulike">ChimAARON</span> &rarr; <span class="menulike">Add to AaronTools Library</span>.
+</p>
+
+<h2>Adding a Ligand</h2>
+<img src="../images/libaddLig.png" alt="add ligand dialog">
+
+<p>
+To add a ligand, open a molecule with that ligand already on it. 
+Select the molecule from the table. 
+Without entering a name, press <span class="buttonlike">Add to library</span>. 
+This will open the ligand in a new model. 
+The ligand's key atoms (the ones that coordinate a transition metal) should be outlined in blue. 
+<br><br>
+If the ligand looks fine, go back to the tool and enter a name for the ligand (select the full molecule, not the model that is just the ligand).
+<br><br>
+To replace a ligand with the same name, check the <span class="menulike">Overwrite existsing</span> box.
+</p>
+
+<h2>Adding a Ring Fragment</h2>
+<img src="../images/libaddRing.png" alt="add ring dialog">
+
+<p>
+To add a ring fragment, open a full structure for that ring (<i>e.g.</i> benzene, pyridine, furan). 
+The <span class="menulike">Walk atoms</span> define the direction AaronTools goes around the ring when it is adding the ring to a structure. 
+Without entering a name, press <span class="buttonlike">Add to library</span>. 
+This will open the ring in a new model. 
+Arrows will point from one 'walk' atom to the next. 
+<br><br>
+If the ring looks fine, enter a name and press <span class="buttonlike">Add to library</span> again.
+</p>
+
+<h2>Adding a Substituent</h2>
+<img src="../images/libaddSub.png" alt="add ring dialog">
+<p>
+To add a substituent, open a molecule with that substituent. 
+Select all of the atoms on that substituent and press <span class="buttonlike">current selection</span>.
+Enter the conformer information for the substituent. 
+Without entering a name, press <span class="buttonlike">Add to library</span>. 
+This will open a new model with just the substituent. 
+In this new model, the bond connecting the substituent to the rest of the molecule should be represented with a semi-transparent cylinder. 
+<br><br>
+If the substituent looks fine, enter a name and press <span class="buttonlike">Add to library</span> again.
+</p>
+
+</body>
+
+</html>
