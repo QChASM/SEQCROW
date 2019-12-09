@@ -326,6 +326,7 @@ class PseudoGeometry:
 class LibAddDialog(ModelessDialog):
     title = "Add to Personal Library"
     buttons = ("Close",)
+    help = ("tutorials/libadd.html", ChimAARON)
     
     def __init__(self, notebookTab=None):
         ModelessDialog.__init__(self)
@@ -389,7 +390,7 @@ class LibAddSubGUI:
         row += 1
 
         self.libAddButton = Tkinter.Button(parent, pady=0, text="Add to library", command=self.libaddSub)
-        self.libAddButton.grid(row=row, column=0, columnspan=2, sticky='new')
+        self.libAddButton.grid(row=row, column=0, columnspan=3, sticky='new')
         
         row += 1
 
@@ -558,7 +559,7 @@ class LibAddRingGUI:
         row += 1
 
         self.libAddButton = Tkinter.Button(parent, pady=0, text="Add to library", command=self.libaddRing)
-        self.libAddButton.grid(row=row, column=0, columnspan=2, sticky='new')
+        self.libAddButton.grid(row=row, column=0, columnspan=3, sticky='new')
         
         row += 1
         

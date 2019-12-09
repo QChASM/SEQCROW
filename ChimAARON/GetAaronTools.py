@@ -77,6 +77,15 @@ class GetAaronToolsDialog(ModelessDialog):
             arnlib = envPrefs['AARONLIB']
         else:
             arnlib = None
+            
+        if 'HOME' in envPrefs:
+            home = envPrefs['HOME']
+        elif os.getenv('HOME', False):
+            home = os.getenv('HOME', False)
+        elif os.getenv('USERPROFILE', False):
+            home = os.getenv('USERPROFILE', False)
+        else:
+            home = None
 
         self.envDisplayArea = Tkinter.LabelFrame(parent, text="AaronTools Environment")
         self.envDisplayArea.grid(row=0, column=0, sticky='nsew')
@@ -85,11 +94,19 @@ class GetAaronToolsDialog(ModelessDialog):
 
         row = 0
 
-        self.AARONLIBButton = Tkinter.Button(self.envDisplayArea, anchor='w', text="set AARONLIB location", command=self.arnlibSelect)
+        self.AARONLIBButton = Tkinter.Button(self.envDisplayArea, anchor='w', text="set AARONLIB location", command=self.arnlibSelect, pady=0)
         self.AARONLIBButton.grid(row=row, column=0, sticky='w')
 
         self.envLabel = Tkinter.Label(self.envDisplayArea, anchor='w', text="Personal AaronTools Library Location: %s" % arnlib)
         self.envLabel.grid(row=row, column=1, sticky='ew')
+
+        row += 1        
+        
+        self.homeButton = Tkinter.Button(self.envDisplayArea, anchor='w', text="set home directory", command=self.homeSelect, pady=0)
+        self.homeButton.grid(row=row, column=0, sticky='w')
+
+        self.homeLabel = Tkinter.Label(self.envDisplayArea, anchor='w', text="home directory: %s" % home)
+        self.homeLabel.grid(row=row, column=1, sticky='ew')
 
         row += 1
 
@@ -101,24 +118,23 @@ class GetAaronToolsDialog(ModelessDialog):
 
         row = 0
 
-        self.installPipButton = Tkinter.Button(self.inputDisplayArea, text="install pip with ensurepip and update pip", command=self.installPip)
+        self.installPipButton = Tkinter.Button(self.inputDisplayArea, text="install pip with ensurepip and update pip", command=self.installPip, pady=0)
         self.installPipButton.grid(row=row, column=0, sticky='sew')
 
         row += 1
 
-        self.installDependenciesButton = Tkinter.Button(self.inputDisplayArea, text="install dependencies", command=self.installDependencies)
+        self.installDependenciesButton = Tkinter.Button(self.inputDisplayArea, text="install dependencies", command=self.installDependencies, pady=0)
         self.installDependenciesButton.grid(row=row, column=0, sticky='new')
 
         row += 1
 
-        self.backportButton = Tkinter.Button(self.inputDisplayArea, text="pasteurize AaronTools", command=self.backportAaronTools)
+        self.backportButton = Tkinter.Button(self.inputDisplayArea, text="pasteurize AaronTools", command=self.backportAaronTools, pady=0)
         self.backportButton.grid(row=row, column=0, sticky='new')
-
         self.backportButton.config(state="disabled")
 
         row += 1
 
-        self.moreBackportsButton = Tkinter.Button(self.inputDisplayArea, text="fix misc. backporting", command=self.doAdditionalBackports)
+        self.moreBackportsButton = Tkinter.Button(self.inputDisplayArea, text="fix misc. backporting", command=self.doAdditionalBackports, pady=0)
         self.moreBackportsButton.grid(row=row, column=0, sticky='new')
         self.moreBackportsButton.config(state="disabled")
 
@@ -152,7 +168,7 @@ After all of that is complete, ChimAARON tools should function the next time you
         self.testDisplayArea.columnconfigure(0, weight=1)
 
         row = 0
-        self.aaronToolsTestsButton = Tkinter.Button(self.testDisplayArea, text="run AaronTools tests", command=AaronToolsTestSelection)
+        self.aaronToolsTestsButton = Tkinter.Button(self.testDisplayArea, text="run AaronTools tests", command=AaronToolsTestSelection, pady=0)
         self.aaronToolsTestsButton.grid(row=row, column=0, sticky='w')
 
         parent.rowconfigure(0, weight=1)
@@ -266,6 +282,30 @@ We'll ignore this error and proceed with updating the current version of pip" % 
             replyobj.status("set AARONLIB to %s and created library directories" % arnlib)
             replyobj.status("Restart Chimera for changes to take effect")
             self.envLabel.config(text="Personal AaronTools Library Location: %s" % arnlib)
+    
+    def homeSelect(self):
+        from ChimAARON.prefs import prefs, ENVIRONMENT
+        from copy import deepcopy
+        from chimera import replyobj
+
+        if 'HOME' in prefs[ENVIRONMENT]:
+            libPref = prefs[ENVIRONMENT]['HOME']
+        elif os.getenv('HOME', False):
+            libPref = os.getenv('HOME', False)
+        elif os.getenv('USERPROFILE', False):
+            libPref = os.getenv('USERPROFILE', False)
+        else:
+            libPref = None
+
+        home = askdirectory(initialdir=libPref, title="Select home directory")
+
+        if home:
+            envPrefs = deepcopy(prefs[ENVIRONMENT])
+            envPrefs['HOME'] = home
+            prefs[ENVIRONMENT] = envPrefs
+
+            replyobj.status("set HOME to %s" % home)
+            self.homeLabel.config(text="Home directory: %s" % home)
 
 class AaronToolsTestSelection(ModelessDialog):
     title = "select AaronTools tests"

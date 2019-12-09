@@ -138,14 +138,14 @@ class MapLigandGUI:
         row = 0
         self.ligandName = StringOption(parent, row, "Ligand", "", None, balloon="name of ligands in AaronTools Ligand Library")
 
-        self.selectLigandButton = Tkinter.Button(parent, text="From library...", command=self.openLigandSelectorGUI)
+        self.selectLigandButton = Tkinter.Button(parent, text="from library...", command=self.openLigandSelectorGUI, pady=0)
         self.selectLigandButton.grid(row=row, column=2, sticky='ew')
 
         row += 1
 
         self.atomSelection = StringOption(parent, row, "Key atoms", "", None, balloon="Chimera OSL atom or model specifiers (space-delimited)")
 
-        self.currentSelectionButton = Tkinter.Button(parent, text="current selection", command=self.setCurrent)
+        self.currentSelectionButton = Tkinter.Button(parent, text="current selection", command=self.setCurrent, pady=0)
         self.currentSelectionButton.grid(row=row, column=2, sticky='ew')
 
         row += 1
@@ -154,7 +154,7 @@ class MapLigandGUI:
             extra_frame.grid(row=row, column=0, sticky='ew', columnspan=3)
             row += 1
 
-        self.doMapButton = Tkinter.Button(parent, text="map ligand", command=self.doMapLigand)
+        self.doMapButton = Tkinter.Button(parent, text="map ligand", command=self.doMapLigand, pady=0)
         self.doMapButton.grid(row=row, column=0, columnspan=3, sticky='ew')
 
     def openLigandSelectorGUI(self):
@@ -207,14 +207,14 @@ class SubstituteGUI:
         row = 0
         self.substituentName = StringOption(parent, row, "Substituent", "", None, balloon="name of substituents from the AaronTools Substituent Library")
 
-        self.selectSubstituentButton = Tkinter.Button(parent, text="From library...", command=self.openSubstituentSelectorGUI)
+        self.selectSubstituentButton = Tkinter.Button(parent, text="from library...", command=self.openSubstituentSelectorGUI, pady=0)
         self.selectSubstituentButton.grid(row=row, column=2, sticky='ew')
 
         row += 1
 
         self.atomSelection = StringOption(parent, row, "Atom selection", "", None, balloon="Chimera OSL atom specifiers (space-delimited)")
 
-        self.currentSelectionButton = Tkinter.Button(parent, text="current selection", command=self.setCurrent)
+        self.currentSelectionButton = Tkinter.Button(parent, text="current selection", command=self.setCurrent, pady=0)
         self.currentSelectionButton.grid(row=row, column=2, sticky='ew')
 
         row += 1
@@ -223,7 +223,7 @@ class SubstituteGUI:
             extra_frame.grid(row=row, column=0, sticky='ew', columnspan=3)
             row += 1
 
-        self.doSubButton = Tkinter.Button(parent, text="substitute", command=self.doSubstitute)
+        self.doSubButton = Tkinter.Button(parent, text="substitute", command=self.doSubstitute, pady=0)
         self.doSubButton.grid(row=row, column=0, columnspan=3, sticky='ew')
 
     def openSubstituentSelectorGUI(self):
@@ -276,14 +276,14 @@ class CloseRingGUI:
         row = 0
         self.ringName = StringOption(parent, row, "Ring fragment", "", None, balloon="name of ring fragments from the AaronTools Ring Fragment Library")
 
-        self.selectRingButton = Tkinter.Button(parent, text="From library...", command=self.openRingFragGUI)
+        self.selectRingButton = Tkinter.Button(parent, text="from library...", command=self.openRingFragGUI, pady=0)
         self.selectRingButton.grid(row=row, column=2, sticky='ew')
 
         row += 1
 
         self.atomSelection = StringOption(parent, row, "Atom selection", "", None, balloon="Chimera OSL atom specifiers (space-delimited)")
 
-        self.currentSelectionButton = Tkinter.Button(parent, text="current selection", command=self.setCurrent)
+        self.currentSelectionButton = Tkinter.Button(parent, text="current selection", command=self.setCurrent, pady=0)
         self.currentSelectionButton.grid(row=row, column=2, sticky='ew')
 
         row += 1
@@ -292,7 +292,7 @@ class CloseRingGUI:
             extra_frame.grid(row=row, column=0, sticky='ew', columnspan=3)
             row += 1
 
-        self.doCloseRingButton = Tkinter.Button(parent, text="close ring", command=self.doCloseRing)
+        self.doCloseRingButton = Tkinter.Button(parent, text="close ring", command=self.doCloseRing, pady=0)
         self.doCloseRingButton.grid(row=row, column=0, columnspan=3, sticky='ew')
 
     def openRingFragGUI(self):

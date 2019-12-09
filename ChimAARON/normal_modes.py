@@ -132,10 +132,10 @@ class animateGUI:
 
         row = 0
     
-        self.scaleOption = FloatOption(parent, row, "Max. displacement", 0.2, None, width=6)
+        self.scaleOption = FloatOption(parent, row, "Max. displacement", 0.2, None, width=6, balloon="most any atoms moves from its equilibrium position")
         row += 1
         
-        self.nFrameOption = IntOption(parent, row, "Number of frames", 101, None, width=6)
+        self.nFrameOption = IntOption(parent, row, "Number of frames", 101, None, width=6, balloon="length of animation")
         row += 1
         
         self.loadModeButton = Tkinter.Button(parent, state="disabled", pady=0, \
@@ -177,10 +177,17 @@ class vectorGUI:
         
         row = 0
         
-        self.scaleOption = FloatOption(parent, row, "Vector scaling", 1.5, None, width=6)
+        self.scaleOption = FloatOption(parent, row, "Vector scaling", 1.5, None, width=6, balloon="length of the longest vector")
         row += 1
         
-        self.massWeightOption = BooleanOption(parent, row, "Use mass-weighted", 0, None)
+        self.massWeightOption = Tkinter.BooleanVar()
+        self.massWeightOption.set(False)
+        self.massWeightCheck = Tkinter.Checkbutton(parent, indicatoron=Tkinter.TRUE, relief=Tkinter.FLAT, highlightthickness=0, variable=self.massWeightOption)
+        self.massWeightLabel = Tkinter.Label(parent, text="Use mass-weighted:")
+        
+        self.massWeightLabel.grid(row=row, column=0, sticky='e')
+        self.massWeightCheck.grid(row=row, column=1, sticky='w')
+        
         row += 1
         
         self.colorSelect = ColorOption(parent, row, "Vector color", tuple((0, 1, 0)), None)

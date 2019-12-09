@@ -3,8 +3,10 @@ import Pmw
 import ChimAARON
 import ttk
 
+from ChimAARON import arn_input_manager
 from chimera.baseDialog import ModelessDialog
 from chimera.tkoptions import StringOption, EnumOption, BooleanOption, IntOption, FloatOption
+from tkFileDialog import asksaveasfilename
 
 class InputGenerator_templateSelector(ModelessDialog):
     """dialog prompting the user to select a ts template or resume and input recording"""
@@ -112,7 +114,7 @@ class TsRestartGUI:
         if not recordNames:
             recordNames = [None]
 
-        self.recordOption = EnumOption(parent, 0, "Record name", recordNames[0], None, balloon = "name of AARON Input Recorder session")
+        self.recordOption = EnumOption(parent, 0, "Record name", recordNames[0], None, balloon="name of AARON Input Recorder session")
         self.recordOption.values = recordNames
 
         self.warn_about_kw = Tkinter.Label(parent, text="Note: keywords are not saved with input recordings")
@@ -128,7 +130,7 @@ class TsCustomGUI:
         self.rxn_type_option = StringOption(parent, row, "Reaction type", "", None, balloon=keyWordGUI.getBallon('reaction_type'))
         row += 1
 
-        self.template_option = StringOption(parent, row, "Template", "", None, balloon=keyWordGUI.getBallon(''))
+        self.template_option = StringOption(parent, row, "Template", "", None, balloon=keyWordGUI.getBallon('template'))
         row += 1
 
         self.modelSelection = SortableTable(parent)
@@ -145,18 +147,18 @@ class TsCustomGUI:
 
         row += 1
 
-        self.recordNameOption = StringOption(parent, row, "Record Name", "new record", None, balloon = "name of AARON Input Recorder session")
+        self.recordNameOption = StringOption(parent, row, "Record Name", "new record", None, balloon="name of AARON Input Recorder session")
         row += 1
 
 class InputGenerator_structureChanges(ModelessDialog):
     """dialog for recording substitutions, ligand mappings, input keywords"""
     oneshot = True
     provideStatus = True
-    buttons = ("Close",)
+    buttons = ("Save", "Close",)
     title = "AARON Input Recorder"
 
     help = ("tutorials/aaronInput.html", ChimAARON)
-
+    
     def __init__(self, model_ids=None, \
                  perl=False, \
                  record_name="new record", \
@@ -261,6 +263,8 @@ class InputGenerator_structureChanges(ModelessDialog):
 
         self.libraryMenu.grid(row=row, column=0, sticky='new')
 
+        row += 1
+
         #display input file
         #all other buttons and fields should be before this to make setting the rowspan easier
         self.inputDisplayArea = Tkinter.LabelFrame(parent, text="Input")
@@ -274,7 +278,7 @@ class InputGenerator_structureChanges(ModelessDialog):
         self.inputScroll.grid(row=0, column=1, sticky='nsew')
         self.inputDisplay.rowconfigure(0, weight=1)
         self.inputDisplay.columnconfigure(0, weight=1)
-        self.inputDisplay['yscrollcommand'] = self.inputScroll.set
+        self.inputDisplay['yscrollcommand'] = self.inputScroll.set      
 
         parent.rowconfigure(0, weight=1)
         parent.columnconfigure(0, weight=1)
@@ -328,9 +332,62 @@ class InputGenerator_structureChanges(ModelessDialog):
         self.inputDisplay.delete("1.0", Tkinter.END)
         self.inputDisplay.insert(Tkinter.END, input)
 
+    def Save(self):
+        SaveAARONInputGUI(self)
+
 class keyWordGUI:
     """selector for AARON input keywords"""
+    class SaveCustomDialog(ModelessDialog):
+        buttons = ("Save", "Close")
+        title = "Save AARON keywords"
+        help = "https://github.com/QChASM/Aaron/wiki/More-on-AARON-Input-Files#custom-defaults"
+        
+        def __init__(self, origin):
+            self.origin = origin
+            ModelessDialog.__init__(self)
+            
+        def fillInUI(self, parent):
+            self.customName = StringOption(parent, 0, "Name of custom", "NewCustom", None, balloon="name to refer to the AARON keyword preset")
 
+        def Save(self):
+            import os
+            
+            from AaronTools.const import HOME
+            
+            aaronrc_file = os.path.join(HOME, ".aaronrc")
+            
+            customName = self.customName.get()
+            
+            header = arn_input_manager.get_header(**self.origin.origin.kw_dict)
+        
+            options = [line for line in header.split('\n') if line]
+
+            customs = read_custom_kw()
+            if customName in customs:
+                del customs[customName]
+                
+            customs[customName] = {}
+            for opt in options:
+                kw = opt.split('=')[0]
+                val = opt.split('=')[1]
+                if kw not in customs[customName]:
+                    customs[customName][kw] = [val]
+                else:
+                    customs[customName][kw].append(val)
+                        
+            s = ''
+            for key in customs:
+                s += "%s\n" % key
+                for kw in customs[key]:
+                    s += "    %s=%s\n" % (kw, " ".join([str(val) for val in customs[key][kw]]))
+
+            with open(aaronrc_file, 'w') as f:
+                f.write(s)
+            
+            self.origin.optionGUI['custom'].setitems([custom for custom in customs if '=' not in custom])
+            
+            self.Close()
+    
     def __init__(self, parent, origin):
         """ origin should be the InputGenerator_structureChanges that created this"""
         self.origin = origin
@@ -341,7 +398,7 @@ class keyWordGUI:
         self.all_kw = sorted(basis_kw + str_kw + float_kw + int_kw + bool_kw)
 
         #keyword selector dropdown menu
-        self.kwSelector = Pmw.OptionMenu(parent, initialitem=self.all_kw[0], \
+        self.kwSelector = Pmw.OptionMenu(parent, initialitem='custom', \
                                 command=self.showOptionGUI, items=self.all_kw, \
                                 labelpos='w', label_text="Keyword:")
 
@@ -370,18 +427,79 @@ class keyWordGUI:
             self.optionFrame[kw] = Tkinter.Frame(parent)
             self.optionGUI[kw] = BooleanOption(self.optionFrame[kw], 0, kw, 0, None, balloon=self.getBallon(kw))
 
+        # special dropdown menu for custom keyword
+        customs = [key for key in read_custom_kw().keys() if '=' not in key]
+        self.optionGUI['custom'] = Pmw.OptionMenu(self.optionFrame['custom'], initialitem=customs[0], \
+                                items=customs, \
+                                labelpos='w', label_text="custom:")
+        
+        # OptionMenu has no get()
+        self.optionGUI['custom'].get = self.optionGUI['custom'].getvalue
+        
+        self.optionGUI['custom'].grid(row=0, column=0, columnspan=2, sticky='ew')
+                
         self.curFormat = None
-        self.showOptionGUI(self.all_kw[0])
+        self.showOptionGUI('custom')
 
         row += 1
 
         #set and unset buttons to add or remove a keyword from the input file
-        self.optionSet = Tkinter.Button(parent, text="set", command=self.setOptionValue)
+        self.optionSet = Tkinter.Button(parent, text="set", command=self.setOptionValue, pady=0)
         self.optionSet.grid(row=row, column=0, sticky='ew')
-        self.optionUnset = Tkinter.Button(parent, text="unset", command=self.unsetOptionValue)
+        self.optionUnset = Tkinter.Button(parent, text="unset", command=self.unsetOptionValue, pady=0)
         self.optionUnset.grid(row=row, column=1, sticky='ew')
 
         row += 1
+        
+        self.expandCustom = Tkinter.Button(parent, text="Expand custom", pady=0, command=self.expandCustom)
+        self.expandCustom.grid(row=row, column=0, sticky='ew', columnspan=2)
+        
+        row += 1
+        
+        self.saveKeywords = Tkinter.Button(parent, text="Save to .aaronrc", pady=0, command=lambda: self.SaveCustomDialog(self))
+        self.saveKeywords.grid(row=row, column=0, sticky='ew', columnspan=2)
+        
+        row += 1
+
+    def expandCustom(self):
+        """expand the custom keyword to whatever is set in the .aaronrc file"""
+        import os
+
+        from AaronTools.const import HOME
+
+        basis_kw, str_kw, float_kw, int_kw, bool_kw = ChimAARON.managers.InputManager.AARONKeyWords()
+
+        custom_name = self.origin.kw_dict['custom']
+
+        if custom_name is not None:
+            customs = read_custom_kw()
+            my_custom = customs[custom_name]
+            for key in my_custom:
+                if self.origin.kw_dict[key] is None:
+                    if key in basis_kw:
+                        self.origin.kw_dict[key] = my_custom[key]
+                    else:
+                        if key in float_kw:
+                            self.origin.kw_dict[key] = float(my_custom[key][0])
+                        
+                        elif key in int_kw:
+                            self.origin.kw_dict[key] = int(my_custom[key][0])
+                        
+                        elif key in bool_kw:
+                            if my_custom[key][0].lower() in ['true', '1']:
+                                self.origin.kw_dict[key] = True                            
+                            elif my_custom[key][0].lower() in ['false', '0']:
+                                self.origin.kw_dict[key] = False
+                            else:
+                                raise RuntimeError("expected one of %s for %s, got %s" % (", ".join(['true', '1', 'false', '0']), key, my_custom[key][0]))
+                        
+                        else:
+                            self.origin.kw_dict[key] = my_custom[key][0]
+
+            self.origin.kw_dict['custom'] = None
+            self.origin.refresh_text()
+        else:
+            raise RuntimeWarning("'custom' keyword is not set")
 
     def showOptionGUI(self, format):
         """change the keyword that is displayed"""
@@ -400,18 +518,87 @@ class keyWordGUI:
     def setOptionValue(self):
         basis_kw, str_kw, float_kw, int_kw, bool_kw = ChimAARON.managers.InputManager.AARONKeyWords()
         value = self.optionGUI[self.curFormat].get()
+        # basis keywords can have multiple values because different elements can use different basis sets
         if self.curFormat in basis_kw:
             if self.origin.kw_dict[self.curFormat] is None:
                 self.origin.kw_dict[self.curFormat] = [value]
             else:
+                element_and_basis = value.split()
+                if len(element_and_basis) > 1:
+                    basis = element_and_basis[-1]
+                    elements = element_and_basis[:-1]
+                    for i, val in enumerate(self.origin.kw_dict[self.curFormat]):
+                        previous_ele_and_basis = val.split()
+                        if len(previous_ele_and_basis) > 1:
+                            prev_basis = previous_ele_and_basis[-1]
+                            prev_ele = previous_ele_and_basis[:-1]
+                            for element in elements:
+                                if any([element == ele for ele in prev_ele]):
+                                    prev_ele.remove(element)
+ 
+                            if len(prev_ele) == 0:
+                                del self.origin.kw_dict[self.curFormat][i]
+                            elif prev_basis == basis:
+                                del self.origin.kw_dict[self.curFormat][i]
+                                value = "%s %s" % (" ".join(prev_ele), value)
+                            else:
+                                self.origin.kw_dict[self.curFormat][i] = "%s %s" % (" ".join(prev_ele), prev_basis)
+
+                else:
+                    for i, val in enumerate(self.origin.kw_dict[self.curFormat]):
+                        if val.split()[-1] == value:
+                            del self.origin.kw_dict[self.curFormat][i]
+                        
+                        elif len(val.split()) == 1:
+                            del self.origin.kw_dict[self.curFormat][i]
+
                 self.origin.kw_dict[self.curFormat].append(value)
+
         else:
             self.origin.kw_dict[self.curFormat] = value
 
         self.origin.refresh_text()
 
     def unsetOptionValue(self):
-        self.origin.kw_dict[self.curFormat] = None
+        basis_kw, str_kw, float_kw, int_kw, bool_kw = ChimAARON.managers.InputManager.AARONKeyWords()
+        
+        #basis kw get unset differently - can unset elements or basis set
+        if self.curFormat in basis_kw:
+            value = self.optionGUI[self.curFormat].get()
+            if value:
+                vals = value.split()
+                for i, basis in enumerate(self.origin.kw_dict[self.curFormat]):
+                    ele_and_basis = basis.split()
+                    if len(ele_and_basis) > 1:
+                        prev_basis = ele_and_basis[-1]
+                        prev_ele = ele_and_basis[:-1]
+
+                        #just a basis is being unset - delete any entries with that basis set
+                        if len(vals) == 1 and prev_basis in vals:
+                            del self.origin.kw_dict[self.curFormat][i]
+                            continue
+
+                        #check to see if any elements are being unset
+                        for val in vals:
+                            if any([val == ele for ele in prev_ele]):
+                                prev_ele.remove(val)
+                        
+                        #if all elements have been removed for one basis set, delete that entry
+                        if len(prev_ele) == 0:
+                            del self.origin.kw_dict[self.curFormat][i]
+                        #if any elements have been removed, remake that entry
+                        else:
+                            self.origin.kw_dict[self.curFormat][i] = "%s %s" % (" ".join(prev_ele), prev_basis)
+
+                    else:
+                        print(basis, vals)
+                        if basis.endswith(value):
+                            del self.origin.kw_dict[self.curFormat][i]
+            
+            else:
+                self.origin.kw_dict[self.curFormat] = None
+        else:        
+            self.origin.kw_dict[self.curFormat] = None
 
         self.origin.refresh_text()
 
@@ -534,6 +721,42 @@ class keyWordGUI:
 
         else:
             return "tell Tony he forgot about the balloon for %s" % kw
+
+class SaveAARONInputGUI(ModelessDialog):
+    title = "Save AARON Input File"
+    buttons = ('Save', 'Close')
+    help = ("tutorials/aaronInput.html", ChimAARON)
+
+    
+    def __init__(self, origin):
+        self.origin = origin
+        
+        ModelessDialog.__init__(self)
+        
+    def fillInUI(self, parent):
+        import os
+        self.fileNameOption = StringOption(parent, 0, "AARON input location", os.path.join(os.getcwd(), self.origin.record_name + ".in"), None, balloon="name of AARON Input file")
+        
+        self.browseButton = Tkinter.Button(parent, text="Browse", pady=0, command=self.openFileBrowser)
+        self.browseButton.grid(row=0, column=2)
+    
+    def openFileBrowser(self):
+        import os
+        outfile = asksaveasfilename(initialdir=os.getcwd(), initialfile=self.origin.record_name + ".in")
+        
+        if outfile:
+            self.fileNameOption.set(outfile)
+    
+    def Save(self):        
+        filename = self.fileNameOption.get()
+        
+        if filename:
+            s = self.origin.inputDisplay.get("1.0", Tkinter.END)
+            
+            with open(filename, 'w') as f:
+                f.write(s.strip())
+                
+        self.Close()
 
 def doArnRecord(cmdName, arg_str):
     from chimera import openModels, replyobj
@@ -679,3 +902,42 @@ def getAARONkw(cmdName, arg_str, perl=False):
                 header += "%s=false\n" % (kw)
 
     return header
+
+def read_custom_kw():
+    """reads .aaronrc and returns a dictionary with all of the custom names
+    replace with whatever the python AARON version is"""
+    import os
+    from AaronTools.const import HOME
+    
+    aaronrc_file = os.path.join(HOME, ".aaronrc")
+    
+    with open(aaronrc_file, 'r') as f:
+        lines = f.readlines()
+        
+    lines = [line.rstrip() for line in lines]
+    
+    customs = {}
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if not line.startswith(' '):
+            customs[line] = {}
+            for opt in lines[i+1:]:
+                i += 1
+                if opt.startswith(' ') and opt.strip() != '' and '=' in opt:
+                    kw = opt.strip().split('=')[0].lower()
+                    val = opt.strip().split('=')[1]
+                    if kw not in customs[line]:
+                        customs[line][kw] = [val]
+                    else:
+                        customs[line][kw].append(val)
+                else:
+                    break
+        else:
+            i += 1
+    
+    for custom in customs:
+        print('custom', custom)
+    
+    return customs

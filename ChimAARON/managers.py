@@ -90,9 +90,9 @@ class InputManager:
         for kw in bool_kw:
             if kw in kwargs:
                 if kwargs[kw]:
-                    header += "%s=true\n" % (kw)
+                    header += "%s=1\n" % (kw)
                 elif not kwargs[kw] and kwargs[kw] is not None:
-                    header += "%s=false\n" % (kw)
+                    header += "%s=0\n" % (kw)
 
         return header
 
@@ -129,19 +129,22 @@ class InputManager:
                 out += "\n"
 
                 i += 1
-
-        out += "&\n&Substrates\n"
-
-        for i, sub in enumerate([record for record in rec if record.component != "ligand" and record.substitution is not None and not record.hidden]):
-            out += "%s%i: " % (sub.subPrefix, i+1)
-            for j in range(0, len(sub.substitution)):
-                out += "%s=%s " % (",".join(str(p) for p in sub.positions[j][int(perl)]), sub.substitution[j])
-
-            out += "\n"
-
+    
         out += "&\n"
+    
+        if len([record for record in rec if record.component != "ligand" and record.substitution is not None and not record.hidden]) > 0:
+            out += "&Substrates\n"
+    
+            for i, sub in enumerate([record for record in rec if record.component != "ligand" and record.substitution is not None and not record.hidden]):
+                out += "%s%i: " % (sub.subPrefix, i+1)
+                for j in range(0, len(sub.substitution)):
+                    out += "%s=%s" % (",".join(str(p) for p in sub.positions[j][int(perl)]), sub.substitution[j])
+    
+                out += "\n"
+    
+            out += "&\n"
 
-        return out
+        return out.strip()
 
     @classmethod
     def AARONKeyWords(cls):

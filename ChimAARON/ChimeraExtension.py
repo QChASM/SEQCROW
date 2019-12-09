@@ -7,6 +7,10 @@ from Midas.midas_text import addCommand
 from ChimAARON.prefs import ENVIRONMENT
 
 envPrefs = chimera.preferences.preferences.get('ChimAARON', ENVIRONMENT)
+
+if 'HOME' in envPrefs:
+    os.environ['HOME'] = envPrefs['HOME']
+
 if 'AARONLIB' in envPrefs:
     os.environ['AARONLIB'] = envPrefs['AARONLIB']
 
@@ -121,7 +125,7 @@ class GetAaronTools_EMO(EMO):
 
 class StructureModification_EMO(EMO):
     def name(self):
-        return "Modify structure"
+        return "Modify Structure"
 
     def description(self):
         return self.categoryDescriptions()['ChimAARON']
