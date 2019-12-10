@@ -7,6 +7,7 @@ from ChimAARON import arn_input_manager
 from chimera.baseDialog import ModelessDialog
 from chimera.tkoptions import StringOption, EnumOption, BooleanOption, IntOption, FloatOption
 from tkFileDialog import asksaveasfilename
+from tkMessageBox import askyesno
 
 class InputGenerator_templateSelector(ModelessDialog):
     """dialog prompting the user to select a ts template or resume and input recording"""
@@ -368,13 +369,22 @@ class keyWordGUI:
             
             customName = self.customName.get()
             
+            if '=' in customName:
+                raise RuntimeError("'=' cannot be in custom name: %s" % customName)
+                
+            if customName.lstrip() != customName:
+                raise RuntimeError("custom name cannot start with whitespace: %s" % customName)
+            
             header = arn_input_manager.get_header(**self.origin.origin.kw_dict)
         
             options = [line for line in header.split('\n') if line]
 
             customs = read_custom_kw()
             if customName in customs:
-                del customs[customName]
+                if askyesno("Overwrite custom", "%s already exists in %s, overwrite?" % (customName, aaronrc_file)):
+                    del customs[customName]
+                else:
+                    return
                 
             customs[customName] = {}
             for opt in options:
@@ -389,7 +399,8 @@ class keyWordGUI:
             for key in customs:
                 s += "%s\n" % key
                 for kw in customs[key]:
-                    s += "    %s=%s\n" % (kw, " ".join([str(val) for val in customs[key][kw]]))
+                    for val in customs[key][kw]:
+                        s += "    %s=%s\n" % (kw, val)
                 
                 s += "\n"
 
@@ -414,9 +425,8 @@ class keyWordGUI:
                                 command=self.showOptionGUI, items=self.all_kw, \
                                 labelpos='w', label_text="Keyword:")
 
-        self.kwSelector.grid(row=row, column=0, sticky='ew')
-        self.kwSelector.rowconfigure(row, weight=1)
-        self.kwSelector.columnconfigure(0, weight=0)
+        self.kwSelector.grid(row=row, column=0, sticky='w', columnspan=2)
+        self.kwSelector.columnconfigure(0, weight=1)
 
         row += 1
 
@@ -441,7 +451,7 @@ class keyWordGUI:
 
         # special dropdown menu for custom keyword
         customs = [key for key in read_custom_kw().keys() if '=' not in key]
-        self.customDropdown = Pmw.OptionMenu(self.optionFrame['custom'], initialitem=customs[0], \
+        self.customDropdown = Pmw.OptionMenu(self.optionFrame['custom'], initialitem=None if len(customs) == 0 else customs[0], \
                                 items=customs, \
                                 command=self.optionGUI['custom'].set, \
                                 labelpos='w')
@@ -463,7 +473,7 @@ class keyWordGUI:
         
         self.optionUnset = Tkinter.Button(parent, text="unset", command=self.unsetOptionValue, pady=0)
         self.optionUnset.grid(row=row, column=1, sticky='ew')
-        self.optionUnset.columnconfigure(0, weight=1)
+        self.optionUnset.columnconfigure(1, weight=1)
         
         row += 1
         
@@ -535,6 +545,9 @@ class keyWordGUI:
         basis_kw, str_kw, float_kw, int_kw, bool_kw = ChimAARON.managers.InputManager.AARONKeyWords()
         value = self.optionGUI[self.curFormat].get()
         # basis keywords can have multiple values because different elements can use different basis sets
+        if isinstance(value, basestring) and len(value) == 0:
+            return 
+            
         if self.curFormat in basis_kw:
             if self.origin.kw_dict[self.curFormat] is None:
                 self.origin.kw_dict[self.curFormat] = [value]
@@ -933,13 +946,16 @@ def read_custom_kw():
     
     aaronrc_file = os.path.join(HOME, ".aaronrc")
     
+    customs = {}
+    
+    if not os.path.exists(aaronrc_file):
+        return customs
+    
     with open(aaronrc_file, 'r') as f:
         lines = f.readlines()
         
     lines = [line.rstrip() for line in lines]
     
-    customs = {}
-
     i = 0
     while i < len(lines):
         line = lines[i]
@@ -958,8 +974,5 @@ def read_custom_kw():
                     break
         else:
             i += 1
-    
-    for custom in customs:
-        print('custom', custom)
     
     return customs

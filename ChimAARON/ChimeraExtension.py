@@ -5,6 +5,7 @@ import os
 from chimera.extension import EMO, manager
 from Midas.midas_text import addCommand
 from ChimAARON.prefs import ENVIRONMENT
+from ChimAARON.saveFile import SaveXYZ_Dialog
 
 envPrefs = chimera.preferences.preferences.get('ChimAARON', ENVIRONMENT)
 
@@ -151,7 +152,7 @@ class LibAdd_EMO(EMO):
         return self.categoryDescriptions()['ChimAARON']
 
     def categories(self):
-        return self.categoryDescriptions().keys
+        return self.categoryDescriptions().keys()
 
     def categoryDescriptions(self):
         return {'ChimAARON':self.name()}
@@ -170,6 +171,9 @@ manager.registerExtension(StructureModification_EMO(__file__))
 manager.registerExtension(LibAdd_EMO(__file__))
 
 manager.registerExtension(GetAaronTools_EMO(__file__))
+
+chimera.tkgui.fileMenu.add_separator()
+chimera.tkgui.fileMenu.add_command(command=SaveXYZ_Dialog, label="Save XYZ...")
 
 # --------
 # Commands

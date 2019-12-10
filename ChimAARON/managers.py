@@ -71,27 +71,27 @@ class InputManager:
 
         header = ""
         for kw in basis_kw:
-            if kw in kwargs and kwargs[kw]:
+            if kw in kwargs and kwargs[kw] is not None:
                 for val in kwargs[kw]:
                     header += "%s=%s\n" % (kw, val)
 
         for kw in str_kw:
-            if kw in kwargs and kwargs[kw]:
+            if kw in kwargs and kwargs[kw] is not None:
                 header += "%s=%s\n" % (kw, kwargs[kw])
 
         for kw in float_kw:
-            if kw in kwargs and kwargs[kw]:
+            if kw in kwargs and kwargs[kw] is not None:
                 header+= "%s=%.2f\n" % (kw, kwargs[kw])
 
         for kw in int_kw:
-            if kw in kwargs and kwargs[kw]:
+            if kw in kwargs and kwargs[kw] is not None:
                 header += "%s=%i\n" % (kw, kwargs[kw])
 
         for kw in bool_kw:
             if kw in kwargs:
                 if kwargs[kw]:
                     header += "%s=1\n" % (kw)
-                elif not kwargs[kw] and kwargs[kw] is not None:
+                elif kwargs[kw] is False:
                     header += "%s=0\n" % (kw)
 
         return header

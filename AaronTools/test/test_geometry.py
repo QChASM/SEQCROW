@@ -203,10 +203,7 @@ class TestGeometry(TestWithTimer):
         if isinstance(geom, list):
             test =  geom[:]
         else:
-            if isinstance(geom, list):
-                test =  geom[:]
-            else:
-                test = geom.copy()
+            test = geom.copy()
         test.freeze()
         for a in test.atoms:
             self.assertTrue(a.flag)
@@ -215,10 +212,7 @@ class TestGeometry(TestWithTimer):
         if isinstance(geom, list):
             test =  geom[:]
         else:
-            if isinstance(geom, list):
-                test =  geom[:]
-            else:
-                test = geom.copy()
+            test = geom.copy()
         test.freeze("C")
         for a in test.atoms:
             if a.element == "C":
@@ -231,10 +225,7 @@ class TestGeometry(TestWithTimer):
         if isinstance(geom, list):
             test =  geom[:]
         else:
-            if isinstance(geom, list):
-                test =  geom[:]
-            else:
-                test = geom.copy()
+            test = geom.copy()
         test.relax()
         for a in test.atoms:
             self.assertFalse(a.flag)
@@ -243,10 +234,7 @@ class TestGeometry(TestWithTimer):
         if isinstance(geom, list):
             test =  geom[:]
         else:
-            if isinstance(geom, list):
-                test =  geom[:]
-            else:
-                test = geom.copy()
+            test = geom.copy()
         test.relax("C")
         for a in test.atoms:
             if a.element == "C":
@@ -261,10 +249,7 @@ class TestGeometry(TestWithTimer):
         if isinstance(test, list):
             ref =  test[:]
         else:
-            if isinstance(test, list):
-                ref =  test[:]
-            else:
-                ref = test.copy()
+            ref = test.copy()
         ref.coord_shift([-10, 0, 0])
         tmp = test._stack_coords()
         for t in tmp:
@@ -322,10 +307,7 @@ class TestGeometry(TestWithTimer):
         if isinstance(ref, list):
             other =  ref[:]
         else:
-            if isinstance(ref, list):
-                other =  ref[:]
-            else:
-                other = ref.copy()
+            other = ref.copy()
         self.assertTrue(ref.RMSD(other) < rmsd_tol(ref, superTight=True))
         # if they are out of order, sorting should help
         res = ref.RMSD(other, longsort=True)
@@ -335,10 +317,7 @@ class TestGeometry(TestWithTimer):
         if isinstance(ref, list):
             other =  ref[:]
         else:
-            if isinstance(ref, list):
-                other =  ref[:]
-            else:
-                other = ref.copy()
+            other = ref.copy()
         other.coord_shift([1, 2, 3])
         self.assertTrue(ref.RMSD(other) < rmsd_tol(ref, superTight=True))
 
@@ -346,10 +325,7 @@ class TestGeometry(TestWithTimer):
         if isinstance(ref, list):
             other =  ref[:]
         else:
-            if isinstance(ref, list):
-                other =  ref[:]
-            else:
-                other = ref.copy()
+            other = ref.copy()
         other.rotate([1, 2, 3], 2.8)
         other.write("tmp")
         self.assertTrue(ref.RMSD(other) < rmsd_tol(ref))
@@ -504,8 +480,7 @@ class TestGeometry(TestWithTimer):
         original_dihedral = mol.dihedral(*atom_args)
 
         # adjust dihedral by 30 degrees
-        test_args = list(atom_args) + [30]
-        mol.change_dihedral(*test_args, radians=False, adjust=True)
+        mol.change_dihedral(*atom_args, 30, radians=False, adjust=True)
         self.assertTrue(
             is_close(
                 mol.dihedral(*atom_args), original_dihedral + np.deg2rad(30)
@@ -516,7 +491,7 @@ class TestGeometry(TestWithTimer):
         )
 
         # set dihedral to 60 deg
-        mol.change_dihedral("13", "12", "1", "6", 60, radians=False)
+        mol.change_dihedral(*atom_args, 60, radians=False)
         self.assertTrue(is_close(mol.dihedral(*atom_args), np.deg2rad(60)))
 
         # adjust using just two atoms
@@ -534,17 +509,14 @@ class TestGeometry(TestWithTimer):
         rmsd = mol.RMSD(ref, align=True)
         self.assertTrue(rmsd < rmsd_tol(ref))
     
-    def test_close_ring_approx(self):
+    def test_close_ring(self):
         mol = Geometry(TestGeometry.benzene)
         
         ref1 = Geometry(TestGeometry.naphthalene)
         if isinstance(mol, list):
             mol1 =  mol[:]
         else:
-            if isinstance(mol, list):
-                mol1 =  mol[:]
-            else:
-                mol1 = mol.copy()
+            mol1 = mol.copy()
         mol1.ring_substitute(['7', '8'], RingFragment('benzene'))
         rmsd = mol1.RMSD(ref1, align=True)
         self.assertTrue(rmsd < rmsd_tol(ref1))
@@ -553,23 +525,19 @@ class TestGeometry(TestWithTimer):
         if isinstance(mol, list):
             mol2 =  mol[:]
         else:
-            if isinstance(mol, list):
-                mol2 =  mol[:]
-            else:
-                mol2 = mol.copy()
+            mol2 = mol.copy()
         mol2.ring_substitute(['7', '8'], RingFragment('cyclohexane-chair.1'))
         rmsd = mol2.RMSD(ref2, align=True)
         self.assertTrue(rmsd < rmsd_tol(ref2))
 
-    def test_close_ring_rmsd(self):
-        mol = Geometry(TestGeometry.naphthalene)
-        ref = Geometry(TestGeometry.pyrene)
-        targets1 = mol.find(['9', '15'])
-        targets2 = mol.find(['10', '16'])
-        mol.ring_substitute(targets1, RingFragment('benzene'))
-        mol.ring_substitute(targets2, RingFragment('benzene'))
-        rmsd = mol.RMSD(ref, align=True)
-        self.assertTrue(rmsd < rmsd_tol(ref))
+        mol3 = Geometry(TestGeometry.naphthalene)
+        ref3 = Geometry(TestGeometry.pyrene)
+        targets1 = mol3.find(['9', '15'])
+        targets2 = mol3.find(['10', '16'])
+        mol3.ring_substitute(targets1, RingFragment('benzene'))
+        mol3.ring_substitute(targets2, RingFragment('benzene'))
+        rmsd = mol3.RMSD(ref3, align=True)
+        self.assertTrue(rmsd < rmsd_tol(ref3, superLoose=True))
 
 if __name__ == "__main__":
     unittest.main()
