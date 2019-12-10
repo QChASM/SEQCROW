@@ -246,6 +246,15 @@ class InputGenerator_structureChanges(ModelessDialog):
         #AARON input keywords
         self.keyWordFrame = Tkinter.Frame(parent)
         self.keyWordGUI = keyWordGUI(self.keyWordFrame, self)
+        
+        self.keyWordFrame.columnconfigure(0, weight=1)
+        self.keyWordFrame.rowconfigure(1, weight=0)  
+        
+        self.substituteFrame.columnconfigure(0, weight=1)
+        self.substituteFrame.rowconfigure(1, weight=0)  
+        
+        self.replaceLigandFrame.columnconfigure(0, weight=1)
+        self.replaceLigandFrame.rowconfigure(1, weight=0)
 
         self.libraryMenu.add(self.keyWordFrame, text="Input Options")
 
@@ -258,10 +267,13 @@ class InputGenerator_structureChanges(ModelessDialog):
                             command=self.setVersion, items=["Perl", "Python"], \
                             labelpos='w', label_text="AARON version:")
         self.versionOption.grid(row=row, column=0, sticky='sew')
+        self.versionOption.rowconfigure(0, weight=0)
 
         row += 1
 
         self.libraryMenu.grid(row=row, column=0, sticky='new')
+        self.libraryMenu.rowconfigure(1, weight=1)
+        self.libraryMenu.columnconfigure(0, weight=0)
 
         row += 1
 
@@ -269,19 +281,17 @@ class InputGenerator_structureChanges(ModelessDialog):
         #all other buttons and fields should be before this to make setting the rowspan easier
         self.inputDisplayArea = Tkinter.LabelFrame(parent, text="Input")
         self.inputDisplayArea.grid(row=0, column=1, sticky='nsew', rowspan=row+1)
+        self.inputDisplayArea.columnconfigure(0, weight=1)
         self.inputDisplayArea.rowconfigure(0, weight=1)
-        self.inputDisplayArea.columnconfigure(1, weight=1)
 
         self.inputDisplay = Tkinter.Text(self.inputDisplayArea)
         self.inputDisplay.grid(row=0, column=0, sticky='nsew')
         self.inputScroll = Tkinter.Scrollbar(self.inputDisplayArea, command=self.inputDisplay.yview)
         self.inputScroll.grid(row=0, column=1, sticky='nsew')
-        self.inputDisplay.rowconfigure(0, weight=1)
-        self.inputDisplay.columnconfigure(0, weight=1)
         self.inputDisplay['yscrollcommand'] = self.inputScroll.set      
 
+        parent.columnconfigure(1, weight=1)
         parent.rowconfigure(0, weight=1)
-        parent.columnconfigure(0, weight=1)
 
     def mapLigand(self, ligand_names, positions):
         """map ligands going through the AARON Input Manager
@@ -380,11 +390,13 @@ class keyWordGUI:
                 s += "%s\n" % key
                 for kw in customs[key]:
                     s += "    %s=%s\n" % (kw, " ".join([str(val) for val in customs[key][kw]]))
+                
+                s += "\n"
 
             with open(aaronrc_file, 'w') as f:
-                f.write(s)
+                f.write(s.strip())
             
-            self.origin.optionGUI['custom'].setitems([custom for custom in customs if '=' not in custom])
+            self.origin.customDropdown.setitems([custom for custom in customs if '=' not in custom])
             
             self.Close()
     
@@ -429,14 +441,15 @@ class keyWordGUI:
 
         # special dropdown menu for custom keyword
         customs = [key for key in read_custom_kw().keys() if '=' not in key]
-        self.optionGUI['custom'] = Pmw.OptionMenu(self.optionFrame['custom'], initialitem=customs[0], \
+        self.customDropdown = Pmw.OptionMenu(self.optionFrame['custom'], initialitem=customs[0], \
                                 items=customs, \
-                                labelpos='w', label_text="custom:")
+                                command=self.optionGUI['custom'].set, \
+                                labelpos='w')
         
-        # OptionMenu has no get()
-        self.optionGUI['custom'].get = self.optionGUI['custom'].getvalue
+        self.expandCustom = Tkinter.Button(self.optionFrame['custom'], text="Expand custom", pady=0, command=self.expandCustom)
+        self.expandCustom.grid(row=1, column=0, sticky='ew', columnspan=3)
         
-        self.optionGUI['custom'].grid(row=0, column=0, columnspan=2, sticky='ew')
+        self.customDropdown.grid(row=0, column=2, sticky='ew')
                 
         self.curFormat = None
         self.showOptionGUI('custom')
@@ -446,18 +459,21 @@ class keyWordGUI:
         #set and unset buttons to add or remove a keyword from the input file
         self.optionSet = Tkinter.Button(parent, text="set", command=self.setOptionValue, pady=0)
         self.optionSet.grid(row=row, column=0, sticky='ew')
+        self.optionSet.columnconfigure(0, weight=1)
+        
         self.optionUnset = Tkinter.Button(parent, text="unset", command=self.unsetOptionValue, pady=0)
         self.optionUnset.grid(row=row, column=1, sticky='ew')
-
-        row += 1
-        
-        self.expandCustom = Tkinter.Button(parent, text="Expand custom", pady=0, command=self.expandCustom)
-        self.expandCustom.grid(row=row, column=0, sticky='ew', columnspan=2)
+        self.optionUnset.columnconfigure(0, weight=1)
         
         row += 1
         
         self.saveKeywords = Tkinter.Button(parent, text="Save to .aaronrc", pady=0, command=lambda: self.SaveCustomDialog(self))
         self.saveKeywords.grid(row=row, column=0, sticky='ew', columnspan=2)
+        
+        row += 1
+        
+        self.unsetAllButton = Tkinter.Button(parent, text="Unset all keywords", pady=0, command=self.unsetAll)
+        self.unsetAllButton.grid(row=row, column=0, sticky='ew', columnspan=2)
         
         row += 1
 
@@ -509,7 +525,7 @@ class keyWordGUI:
         if self.curFormat:
             self.optionFrame[self.curFormat].grid_forget()
 
-        self.optionFrame[format].grid(row=1, column=0, columnspan=2, sticky='nsew')
+        self.optionFrame[format].grid(row=1, column=0, columnspan=2, sticky='ew')
         self.optionFrame[format].rowconfigure(1, weight=1)
         self.optionFrame[format].columnconfigure(0, weight=1)
 
@@ -599,6 +615,12 @@ class keyWordGUI:
                 self.origin.kw_dict[self.curFormat] = None
         else:        
             self.origin.kw_dict[self.curFormat] = None
+
+        self.origin.refresh_text()
+
+    def unsetAll(self):
+        for kw in self.origin.kw_dict:
+            self.origin.kw_dict[kw] = None
 
         self.origin.refresh_text()
 
@@ -921,11 +943,11 @@ def read_custom_kw():
     i = 0
     while i < len(lines):
         line = lines[i]
-        if not line.startswith(' '):
+        if line.lstrip() == line and line.strip() != '':
             customs[line] = {}
             for opt in lines[i+1:]:
                 i += 1
-                if opt.startswith(' ') and opt.strip() != '' and '=' in opt:
+                if opt.lstrip() != opt and opt.strip() != '' and '=' in opt:
                     kw = opt.strip().split('=')[0].lower()
                     val = opt.strip().split('=')[1]
                     if kw not in customs[line]:
