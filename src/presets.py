@@ -12,7 +12,7 @@ def preset1(session):
     for geom in geoms:
         for bond in geom.bonds:
             bond.halfbond = True
-            bond.radius = 0.2
+            bond.radius = 0.15
             bond.hide = False
             
         for atom in geom.atoms:
@@ -22,7 +22,7 @@ def preset1(session):
             
             if ele in RADII:
                 #AaronTools has bonding radii, maybe I should use vdw?
-                atom.radius = 1.7*RADII[ele]
+                atom.radius = 1.5*RADII[ele]
             
             if ele != 'H':
                 atom.draw_mode = Atom.BALL_STYLE

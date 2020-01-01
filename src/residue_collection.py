@@ -4,7 +4,7 @@ from AaronTools.atoms import Atom
 from AaronTools.catalyst import Catalyst
 from AaronTools.const import TMETAL
 from AaronTools.geometry import Geometry
-from chimerax.atomic.structure import AtomicStructure
+from chimerax.atomic import AtomicStructure
 
 class ResidueCollection(Geometry):
     """geometry object used for ChimAARON to easily convert to AaronTools but keep residue info"""

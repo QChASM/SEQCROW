@@ -45,5 +45,12 @@ class _MyAPI(BundleAPI):
         elif format_name == "XYZ":
             return save_aarontools(session, path, format_name, models, atoms, skip_atoms)
         
+    @staticmethod
+    def register_selector(bundle_info, selector_info, logger):
+        """select all transition metals with one easy `select` command!
+        XML_TAG ChimeraX :: Selector :: tm :: Transition metals
+        """
+        from .selectors import register_selectors
+        register_selectors(logger)
 
 bundle_api = _MyAPI()
