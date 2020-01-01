@@ -12,7 +12,7 @@ def open_aarontools(session, path, format_name=None, trajectory=False):
     else:
         fmt = path.split('.')[-1]
             
-    f = FileReader(path, just_geom=False, get_all=trajectory)
+    f = FileReader((path, fmt, None), just_geom=False, get_all=trajectory)
 
     geom = Geometry(f)
 

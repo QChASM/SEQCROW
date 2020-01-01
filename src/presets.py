@@ -1,4 +1,6 @@
-def preset1(session):
+import numpy as np
+
+def chimaaron_bse(session):
     """non-H atoms are displayed with B&S
     H atoms are displayed with S
     atoms colored by Jmol colors"""
@@ -7,6 +9,10 @@ def preset1(session):
     from chimerax.atomic import AtomicStructure, Atom, Bond
     from chimerax.atomic.colors import element_color
     
+    view = session.main_view
+    view.background_color = [1., 1., 1., 0]
+    view.redraw_needed = True    
+
     geoms = session.models.list(type=AtomicStructure)
     
     for geom in geoms:
@@ -28,4 +34,108 @@ def preset1(session):
                 atom.draw_mode = Atom.BALL_STYLE
             else:
                 atom.draw_mode = Atom.STICK_STYLE
-            
+
+def blue_filter1(session):
+    import numpy as np
+    filter = np.array([252./255, 236./255, 217./255, 1.])
+    
+    apply_filter(filter, session)
+
+def blue_filter2(session):
+    filter = np.array([252./255., 217./255., 179./255., 1.])
+    
+    apply_filter(filter, session)
+
+def protanopia(session):
+    filter = np.array([[0.567, 0.433, 0.000, 0.0], \
+                        [0.558, 0.442, 0.000, 0.0], \
+                        [0.000, 0.242, 0.758, 0.0], \
+                        [0.000, 0.000, 0.000, 1.0]])
+                        
+    apply_filter(filter, session)
+    
+def protanomaly(session):
+    filter = np.array([[0.817, 0.183, 0.000, 0.0], \
+                        [0.333, 0.667, 0.000, 0.0], \
+                        [0.000, 0.125, 0.875, 0.0],
+                        [0.000, 0.000, 0.000, 1.0]])
+
+    apply_filter(filter, session)
+    
+def deuteranopia(session):
+    filter = np.array([[0.625, 0.375, 0.000, 0.0], \
+                        [0.700, 0.300, 0.000, 0.0], \
+                        [0.000, 0.300, 0.700, 0.0], \
+                        [0.000, 0.000, 0.000, 1.0]])
+
+    apply_filter(filter, session)
+    
+def deuteranomaly(session):
+    filter = np.array([[0.800, 0.200, 0.000, 0.0], \
+                        [0.258, 0.742, 0.000, 0.0], \
+                        [0.000, 0.142 ,0.858, 0.0], \
+                        [0.000, 0.000, 0.000, 1.0]])
+
+    apply_filter(filter, session)
+    
+def tritanopia(session):
+    filter = np.array([[0.950, 0.050, 0.000, 0.0], \
+                        [0.000, 0.433, 0.567, 0.0], \
+                        [0.000, 0.475 ,0.525, 0.0], \
+                        [0.000, 0.000, 0.000, 1.0]])
+
+    apply_filter(filter, session)
+    
+def tritanomaly(session):
+    filter = np.array([[0.967, 0.033, 0.000, 0.0], \
+                        [0.000, 0.733, 0.267, 0.0], \
+                        [0.000, 0.183, 0.817, 0.0], \
+                        [0.000, 0.000, 0.000, 1.0]])
+
+    apply_filter(filter, session)
+    
+def achromatopsia(session):
+    filter = np.array([[0.299, 0.587, 0.114, 0.0], \
+                        [0.299, 0.587, 0.114, 0.0], \
+                        [0.299, 0.587 ,0.114, 0.0], \
+                        [0.000, 0.000, 0.000, 1.0]])
+
+    apply_filter(filter, session)
+    
+def achromatomaly(session):
+    filter = np.array([[0.618, 0.320, 0.062, 0.0], \
+                        [0.163, 0.775, 0.062, 0.0], \
+                        [0.163, 0.320 ,0.516, 0.0], \
+                        [0.000, 0.000, 0.000, 1.0]])
+
+    apply_filter(filter, session)
+
+def get_new_color(color, filter, kind=int):   
+    old_color = np.array(color)
+    if filter.shape == (4,): 
+        new_color = tuple([kind(x) for x in np.multiply(filter, old_color)])
+    elif filter.shape == (4,4,):
+        new_color = tuple([kind(x) for x in np.dot(filter, old_color)])
+    else:
+        raise RuntimeError("color filter should be of shape (4,) or (4,4)")
+    
+    return new_color
+                
+def apply_filter(filter, session):
+    view = session.main_view
+    new_color = get_new_color(view.background_color, filter, kind=float)
+    view.background_color = new_color
+    view.redraw_needed = True
+   
+    for m in session.models.list():
+        if hasattr(m, "color"):
+            if m.color is not None:
+                new_color = get_new_color(m.color, filter)
+                m.color = new_color
+                
+        if hasattr(m, 'atoms'):
+            for atom in m.atoms:
+                if hasattr(atom, "color"):
+                    if atom.color is not None:
+                        new_color = get_new_color(atom.color, filter)
+                        atom.color = new_color
