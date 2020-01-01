@@ -1,3 +1,5 @@
+import numpy as np
+
 from AaronTools.atoms import Atom
 from AaronTools.catalyst import Catalyst
 from AaronTools.const import TMETAL
@@ -97,11 +99,17 @@ class ResidueCollection(Geometry):
         return out
 
     @staticmethod
-    def get_chimera(session, geom):
+    def get_chimera(session, geom, coordsets=False, filereader=None):
         """returns a chimerax equivalent of an AaronTools Geometry
         supported geometry subclasses include:
             Catalyst - adds residues or ligand, substrate, and center; adds atom tags for substituents
         """
+        
+        #a list of geometries can translate to a trajectory
+        if isinstance(geom, list):
+            geom_list = geom
+            geom = geom_list[0]
+            
         if isinstance(geom, Catalyst):
             i = 1
             for component in geom.components:
@@ -200,5 +208,32 @@ class ResidueCollection(Geometry):
                     pbg = struc.pseudobond_group(struc.PBG_METAL_COORDINATION, create_type='normal') 
                     pbg.new_pseudobond(atom1, atom2)
                     new_bond.display = False
+
+        if coordsets:
+            #make a trajectory
+            if filereader is None:
+                #list of geometries was given
+                #each geometry is a different frame in the trajectory
+                coordsets = np.zeros((len(geom_list), len(geom.atoms), 3))
+                for i, g in geom_list:
+                    coordsets[i] = g.coords()
+                    
+            else:
+                #filereader was given
+                #each list of atoms in filereader.all_geom is a frame in the trajectory
+                coordsets = np.zeros((len(filereader.all_geom), len(geom.atoms), 3))
+                for i, all_geom in enumerate(filereader.all_geom):
+                    if not all([isinstance(a, Atom) for a in all_geom]):
+                        atom_list = [l for l in all_geom if all([isinstance(a, Atom) for a in l])][0]
+                    else:
+                        atom_list = all_geom
+                    for j, atom in enumerate(atom_list):
+                        coordsets[i][j] = atom.coords
+            
+            #replace previous coordinates
+            #this matters when a filereader is given because the
+            #geometry created from a filereader (which was probably passed as geom)
+            #is the last geometry in the log or xyz file
+            struc.add_coordsets(coordsets, replace=True)
 
         return struc

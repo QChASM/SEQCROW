@@ -2,39 +2,32 @@ def open_aarontools(session, path, format_name=None, trajectory=False):
     from AaronTools.fileIO import FileReader
     from AaronTools.geometry import Geometry
     from ChimAARON.residue_collection import ResidueCollection
-    
-
-    if trajectory:
-        #load movie
-        all_geom = True
-        if format_name == "Gaussian output trajectory":
-            fmt = "log"
-        elif format_name == "XYZ trajectory":
-            fmt = "xyz"
+        
+    if format_name == "Gaussian input file":
+        fmt = "com"
+    elif format_name == "Gaussian output file":
+        fmt = "log"
+    elif format_name == "XYZ":
+        fmt = "xyz"
     else:
-        #load structure
-        all_geom = False
-        if format_name == "Gaussian input file":
-            fmt = "com"
-        elif format_name == "Gaussian output file":
-            fmt = "log"
-        elif format_name == "XYZ":
-            fmt = "xyz"
-        else:
-            fmt = path.split('.')[-1]
+        fmt = path.split('.')[-1]
             
-    with open(path, 'r') as x:
-        f = FileReader((path, fmt, x), just_geom=False, get_all=all_geom)
-    
+    f = FileReader(path, just_geom=False, get_all=trajectory)
+
     geom = Geometry(f)
-    
-    structures = [ResidueCollection.get_chimera(session, geom)]
+
+    structures = [ResidueCollection.get_chimera(session, geom, coordsets=trajectory, filereader=f)]
 
     #associate the AaronTools FileReader with each structure
     for res_coll in structures:
         res_coll.aarontools_filereader = f
 
-    status = "Opened file"
+    if trajectory:
+        from chimerax.std_commands.coordset_gui import CoordinateSetSlider
+        for structure in structures:
+            CoordinateSetSlider(session, structure)
+
+    status = "Opened %s as a %s %s" % (path, fmt, "trajectory" if trajectory else "file")
 
     return structures, status
 

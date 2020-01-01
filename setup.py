@@ -1,9 +1,34 @@
+
+"""
+python3 setup.py sdist bdist_wheel
+cp dist/ChimAARON-0.1-py3-none-any.whl $desktop/
+"""
+
 from setuptools import setup, Extension
-import os, os.path, sys
+import os
 
 description = """
 ChimAARON but for ChimeraX
 """
+
+# ChimeraX classifiers are put in the code as comments
+# go find those comments so I don't have to remember to update setup.py
+chimerax_classifiers = []
+d = os.path.dirname(os.path.realpath(__file__))
+src_dir = "src"
+src_path = os.path.join(d, src_dir)
+for root, dirs, files in os.walk(src_path, topdown=False):
+    for f in files:
+        file_path = os.path.join(root, f)
+        with open(file_path, 'r') as x:
+            lines = [line.strip() for line in x.readlines()]
+            
+        for line in lines:
+            if line.startswith('XML_TAG'):
+                chimerax_classifiers.append(line.replace('XML_TAG', '').strip())
+
+for c in chimerax_classifiers:
+    print(c)
 
 ext_mods = []
 #pure python hopefully works everywhere
@@ -27,7 +52,7 @@ setup(
     url="https://github.com/QChASM",
     python_requires=">= 3.5",
     package_dir={
-        "ChimAARON": "src",
+        "ChimAARON": src_dir,
     },
     packages=[
         "ChimAARON",
@@ -47,17 +72,7 @@ setup(
         "Programming Language :: Python :: 3",
         "Topic :: Scientific/Engineering :: Visualization",
         "Topic :: Scientific/Engineering :: Chemistry",
-        "ChimeraX :: Bundle :: General :: 1,1 :: ChimAARON :: ChimAARON :: ",
-        "ChimeraX :: DataFormat :: XYZ :: XYZ :: Molecular structure :: .xyz :: :: :: :: :: XYZ Format :: utf-8",
-        "ChimeraX :: DataFormat :: XYZ trajectory :: XYZ trajectory :: Molecular trajectory :: .xyz :: :: :: :: :: XYZ trajectory :: utf-8",
-        "ChimeraX :: DataFormat :: COM :: Gaussian input file :: Molecular structure :: .com,.gjf :: :: :: :: :: Gaussian input file :: utf-8",
-#        "ChimeraX :: DataFormat :: LOG :: Gaussian output file :: Molecular structure :: .log :: :: :: :: :: Gaussian output file :: utf-8",
-        "ChimeraX :: DataFormat :: LOG trajectory :: Gaussian output trajectory :: Molecular trajectory :: .log :: :: :: :: :: Gaussian output file :: utf-8",
-        "ChimeraX :: Open :: XYZ :: AaronTools ::",
-#        "ChimeraX :: Open :: XYZ trajectory :: AaronTools :: :: coordsets:Bool",
-        "ChimeraX :: Save :: XYZ :: AaronTools ::",
-#        "ChimeraX :: Open :: LOG :: Gaussian output file ::",
-        "ChimeraX :: Open :: LOG trajectory :: Gaussian output trajectory :: :: coordsets:Bool",
-        "ChimeraX :: Open :: COM :: Gaussian input file ::",
+        "ChimeraX :: Bundle :: General :: 1,1 :: ChimAARON :: ChimAARON :: true ",
+        *chimerax_classifiers
     ] + environments,
 )
