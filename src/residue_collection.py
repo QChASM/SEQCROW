@@ -34,6 +34,7 @@ class ResidueCollection(Geometry):
                         aaron_atom.resnum = i
                         aaron_atom.add_tag(atom.name)
                         aaron_atom.add_tag(str(atom.atomspec))
+                        aaron_atom.atomspec = str(atom.atomspec)
                         aaron_atom.add_tag(resname)
                         
                         aaron_atoms.append(aaron_atom)
@@ -77,7 +78,7 @@ class ResidueCollection(Geometry):
         if targets is None and ignore_atoms is None:
             try:
                 ignore_atoms = self.find('ghost')
-            except:
+            except LookupError:
                 ignore_atoms = []
             atoms = [atom for atom in self.atoms if atom not in ignore_atoms]
         elif targets is not None and ignore_atoms is None:
@@ -85,7 +86,7 @@ class ResidueCollection(Geometry):
         elif targets is None and ignore_atoms is not None:
             try:
                 ignore_atoms = self.file(ignore_atoms)
-            except:
+            except LookupError:
                 ignore_atoms = []
             atoms = [atom for atom in self.atoms if atom not in ignore_atoms]
         else:

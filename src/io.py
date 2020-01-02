@@ -31,21 +31,39 @@ def open_aarontools(session, path, format_name=None, trajectory=False):
 
     return structures, status
 
-def save_aarontools(session, path, format_name, models=None, atoms=None, skip_atoms=None):
+def save_aarontools(session, path, format_name, **kwargs):
+    """ 
+    save XYZ file using AaronTools
+    kwargs may be:
+        comment - str
+    """
+    #XML: ChimeraX :: Save -> extra_keywords=comment:String
+    #XML: ChimeraX :: Save -> extra_keywords=models:Models
+    #^ this doesn't do anything b/c save doesn't expect a 'comment' keyword
     from ChimAARON.residue_collection import ResidueCollection
     from chimerax.atomic import AtomicStructure
     
-    if models is None and atoms is None:
+    accepted_kwargs = ['comment', 'models']
+    unknown_kwargs = [kw for kw in kwargs if kw not in accepted_kwargs]
+    if len(unknown_kwargs) > 0:
+        raise RuntimeWarning("unrecognized keyword%s %s?" % ("s" if len(unknown_kwargs) > 1 else "", ", ".join(unknown_kwargs)))
+    
+    if 'models' in kwargs:
+        models = kwargs['models']
+    else:
+        models = None
+    
+    if models is None:
         models = session.models.list(type=AtomicStructure)
-    elif models is None and atoms is not None:
-        models = session.models.list(type=AtomicStructure)
-        targets = [atom.atomspec for atom in atoms]
-    elif models is None and skip_atoms is not None:
-        models = session.models.list(type=AtomicStructure)
-        skip_atoms = [atom.atomspec for atom in skip_atoms]
-    elif not isinstance(models, AtomicStructure):
-        raise NotImplementedError("models must be chimerax AtomicStructure")
+
+    models = [m for m in models if isinstance(m, AtomicStructure)]
+    
+    if len(models) < 1:
+        raise RuntimeError('nothing to save')
     
     res_coll = ResidueCollection(models)
     
-    res_coll.write(targets=atoms, ignore_atoms=skip_atoms, outfile=path)
+    if 'comment' in kwargs:
+        res_coll.comment = kwargs[comment]
+    
+    res_coll.write(outfile=path)

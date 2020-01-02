@@ -1,7 +1,7 @@
 from chimerax.core.toolshed import BundleAPI
 
 
-class _MyAPI(BundleAPI):
+class _QChaSM_API(BundleAPI):
 
     api_version = 1
     
@@ -9,20 +9,22 @@ class _MyAPI(BundleAPI):
     def initialize(session, bundle_info):
         """add some presets"""
         #TODO set AaronTools environment variables
-        from .presets import chimaaron_bse, blue_filter1, blue_filter2, protanopia, protanomaly, \
-            deuteranopia, deuteranomaly, tritanopia, tritanomaly, achromatopsia, achromatomaly
+        from .presets import chimaaron_bse, chimaaron_s\
+            ,blue_filter1, blue_filter2 \
+            #,protanopia, protanomaly, deuteranopia, deuteranomaly, tritanopia, tritanomaly, achromatopsia, achromatomaly
                 
         session.presets.add_presets("ChimAARON", {"ChimAARON BSE":lambda p=chimaaron_bse: p(session)})
+        session.presets.add_presets("ChimAARON", {"ChimAARON S":lambda p=chimaaron_s: p(session)})
         session.presets.add_presets("Filters", {"blue filter 1":lambda p=blue_filter1: p(session)})
         session.presets.add_presets("Filters", {"blue filter 2":lambda p=blue_filter2: p(session)})
-        session.presets.add_presets("Filters", {"protanopia":lambda p=protanopia: p(session)})
-        session.presets.add_presets("Filters", {"protanomaly":lambda p=protanomaly: p(session)})
-        session.presets.add_presets("Filters", {"deuteranopia":lambda p=deuteranopia: p(session)})
-        session.presets.add_presets("Filters", {"deuteranomaly":lambda p=deuteranomaly: p(session)})
-        session.presets.add_presets("Filters", {"tritanopia":lambda p=tritanopia: p(session)})
-        session.presets.add_presets("Filters", {"tritanomaly":lambda p=tritanomaly: p(session)})
-        session.presets.add_presets("Filters", {"achromatopsia":lambda p=achromatopsia: p(session)})
-        session.presets.add_presets("Filters", {"achromatomaly":lambda p=achromatomaly: p(session)})
+       #session.presets.add_presets("Filters", {"protanopia":lambda p=protanopia: p(session)})
+       #session.presets.add_presets("Filters", {"protanomaly":lambda p=protanomaly: p(session)})
+       #session.presets.add_presets("Filters", {"deuteranopia":lambda p=deuteranopia: p(session)})
+       #session.presets.add_presets("Filters", {"deuteranomaly":lambda p=deuteranomaly: p(session)})
+       #session.presets.add_presets("Filters", {"tritanopia":lambda p=tritanopia: p(session)})
+       #session.presets.add_presets("Filters", {"tritanomaly":lambda p=tritanomaly: p(session)})
+       #session.presets.add_presets("Filters", {"achromatopsia":lambda p=achromatopsia: p(session)})
+       #session.presets.add_presets("Filters", {"achromatomaly":lambda p=achromatomaly: p(session)})
 
     @staticmethod
     def open_file(session, path, format_name, coordsets=False):
@@ -31,37 +33,34 @@ class _MyAPI(BundleAPI):
         session     - chimerax Session 
         path        - str, path to file
         format_name - str, file format (see setup.py)
-        if coordsets is true, this might open a trajectory?
-        XML_TAG ChimeraX :: DataFormat :: XYZ :: XYZ :: Molecular structure :: .xyz :: :: :: :: :: XYZ Format :: utf-8
-        XML_TAG ChimeraX :: Open :: XYZ :: AaronTools :: :: coordsets:Bool
-        XML_TAG ChimeraX :: DataFormat :: COM :: Gaussian input file :: Molecular structure :: .com,.gjf :: :: :: :: :: Gaussian input file :: utf-8
-        XML_TAG ChimeraX :: Open :: COM :: Gaussian input file ::
-        XML_TAG ChimeraX :: DataFormat :: LOG :: Gaussian output file :: Molecular structure :: .log :: :: :: :: :: Gaussian output file :: utf-8
-        XML_TAG ChimeraX :: Open :: LOG :: Gaussian output file :: :: coordsets:Bool
-        """
+        coordsets   - bool, load as trajectory"""
+        #XML_TAG ChimeraX :: DataFormat :: XYZ :: XYZ :: Molecular structure :: .xyz :: :: :: :: :: XYZ Format :: utf-8
+        #XML_TAG ChimeraX :: Open :: XYZ :: AaronTools :: false :: coordsets:Bool
+        #XML_TAG ChimeraX :: DataFormat :: COM :: Gaussian input file :: Molecular structure :: .com,.gjf :: :: :: :: :: Gaussian input file :: utf-8
+        #XML_TAG ChimeraX :: Open :: COM :: Gaussian input file ::
+        #XML_TAG ChimeraX :: DataFormat :: LOG :: Gaussian output file :: Molecular structure :: .log :: :: :: :: :: Gaussian output file :: utf-8
+        #XML_TAG ChimeraX :: Open :: LOG :: Gaussian output file :: false :: coordsets:Bool
         from .io import open_aarontools
 
         return open_aarontools(session, path, format_name=format_name, trajectory=coordsets)
 
 
     @staticmethod
-    def save_file(session, path, format_name, models=None, atoms=None, skip_atoms=None):
-        """
-        XML_TAG ChimeraX :: Save :: XYZ :: AaronTools ::
-        """
+    def save_file(session, path, format_name, **kw):
+        #XML_TAG ChimeraX :: Save :: XYZ :: AaronTools :: false :: extra_keywords
         from .io import save_aarontools
         if format_name != "XYZ":
             raise NotImplementedError("ChimAARON can only save XYZ files, not %s files" % format_name)
             
         elif format_name == "XYZ":
-            return save_aarontools(session, path, format_name, models, atoms, skip_atoms)
+            return save_aarontools(session, path, format_name, **kw)
         
     @staticmethod
     def register_selector(bundle_info, selector_info, logger):
-        """select all transition metals with one easy `select` command!
-        XML_TAG ChimeraX :: Selector :: tm :: Transition metals
-        """
+        """select all transition metals with one easy `select` command!"""
+        #XML_TAG ChimeraX :: Selector :: tm :: Transition metals
+        
         from .selectors import register_selectors
         register_selectors(logger)
 
-bundle_api = _MyAPI()
+bundle_api = _QChaSM_API()

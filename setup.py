@@ -14,6 +14,7 @@ ChimAARON but for ChimeraX
 # ChimeraX classifiers are put in the code as comments
 # go find those comments so I don't have to remember to update setup.py
 chimerax_classifiers = []
+xml_mods = {}
 d = os.path.dirname(os.path.realpath(__file__))
 src_dir = "src"
 src_path = os.path.join(d, src_dir)
@@ -21,11 +22,34 @@ for root, dirs, files in os.walk(src_path, topdown=False):
     for f in files:
         file_path = os.path.join(root, f)
         with open(file_path, 'r') as x:
-            lines = [line.strip() for line in x.readlines()]
+            lines = [line.strip().lstrip('#').strip() for line in x.readlines()]
             
         for line in lines:
             if line.startswith('XML_TAG'):
+                #this is a full XML tag
                 chimerax_classifiers.append(line.replace('XML_TAG', '').strip())
+
+            elif line.startswith('XML:'):
+                #this is a modification to an XML tag
+                modification = line.replace('XML:', '').strip()
+                classifier, change = [s.strip() for s in modification.split('->')]
+                replace_phrase, value = [s.strip() for s in change.split('=')]
+                if classifier not in xml_mods:
+                    xml_mods[classifier] = {}
+                
+                if replace_phrase in xml_mods[classifier]:
+                    xml_mods[classifier][replace_phrase].append(value)
+                else:
+                    xml_mods[classifier][replace_phrase] = [value]
+
+#make modifications to XML tags
+for classifier in xml_mods:
+    mod = xml_mods[classifier]
+    print(classifier, mod)
+    for i, c in enumerate(chimerax_classifiers):
+        if c.startswith(classifier):
+            for change in mod:
+                chimerax_classifiers[i] = c.replace(change, ','.join(mod[change]))
 
 for c in chimerax_classifiers:
     print(c)
@@ -72,7 +96,7 @@ setup(
         "Programming Language :: Python :: 3",
         "Topic :: Scientific/Engineering :: Visualization",
         "Topic :: Scientific/Engineering :: Chemistry",
-        "ChimeraX :: Bundle :: General :: 1,1 :: ChimAARON :: ChimAARON :: true ",
+        "ChimeraX :: Bundle :: General,Input/Output,Structure Editing :: 1,1 :: ChimAARON :: ChimAARON :: true ",
         *chimerax_classifiers
     ] + environments,
 )
