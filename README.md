@@ -1,2 +1,2 @@
 # ChimAARON
-AaronTools plug-in for Chimera
+QChASM plug-in for ChimeraX
