@@ -34,12 +34,6 @@ class _QChaSM_API(BundleAPI):
         path        - str, path to file
         format_name - str, file format (see setup.py)
         coordsets   - bool, load as trajectory"""
-        #XML_TAG ChimeraX :: DataFormat :: XYZ :: XYZ :: Molecular structure :: .xyz :: :: :: :: :: XYZ Format :: utf-8
-        #XML_TAG ChimeraX :: Open :: XYZ :: AaronTools :: false :: coordsets:Bool
-        #XML_TAG ChimeraX :: DataFormat :: COM :: Gaussian input file :: Molecular structure :: .com,.gjf :: :: :: :: :: Gaussian input file :: utf-8
-        #XML_TAG ChimeraX :: Open :: COM :: Gaussian input file ::
-        #XML_TAG ChimeraX :: DataFormat :: LOG :: Gaussian output file :: Molecular structure :: .log :: :: :: :: :: Gaussian output file :: utf-8
-        #XML_TAG ChimeraX :: Open :: LOG :: Gaussian output file :: false :: coordsets:Bool
         from .io import open_aarontools
 
         return open_aarontools(session, path, format_name=format_name, trajectory=coordsets)
@@ -62,5 +56,14 @@ class _QChaSM_API(BundleAPI):
         
         from .selectors import register_selectors
         register_selectors(logger)
+        
+    @staticmethod
+    def start_tool(session, bi, ti):
+        if ti.name == "Browse AaronTools Libraries":
+            from .tools import AaronTools_Library
+            tool = AaronTools_Library(session, ti.name)
+            return tool
+        else:
+            raise RuntimeError("tool named '%s' is unknown to ChimAARON" % tool.name)
 
 bundle_api = _QChaSM_API()
