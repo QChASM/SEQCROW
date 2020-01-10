@@ -11,6 +11,7 @@ def chimaaron_bse(session):
     
     view = session.main_view
     view.set_background_color([1., 1., 1., 0])
+    view.silhouette.enabled = True
     
     lighting_profile = view.lighting
     
@@ -60,7 +61,8 @@ def chimaaron_s(session):
     
     view = session.main_view
     view.set_background_color([1., 1., 1., 0])
-    
+    view.silhouette.enabled = True
+
     lighting_profile = view.lighting
     
     lighting_profile.shadows = False

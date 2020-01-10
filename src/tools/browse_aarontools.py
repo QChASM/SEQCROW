@@ -1,12 +1,22 @@
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.widgets import ColorButton
+from chimerax.bild.bild import read_bild
+from chimerax.atomic import Atom
+from chimerax.core.models import MODEL_DISPLAY_CHANGED
+
+from io import BytesIO
+
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtWidgets import QLabel, QLineEdit, QGridLayout, QPushButton, QCheckBox, QTabWidget, QWidget, QVBoxLayout
+
 from AaronTools.component import Component
 from AaronTools.ringfragment import RingFragment
 from AaronTools.substituent import Substituent
 
-from .libraries import LigandTable, SubstituentTable, RingTable
+from ..libraries import LigandTable, SubstituentTable, RingTable
+from ..residue_collection import ResidueCollection
+
+# TODO: change decorations to use ChimeraX atom/bond defaults
 
 class AaronTools_Library(ToolInstance):
     #XML_TAG ChimeraX :: Tool :: Browse AaronTools Libraries :: AaronTools :: Browse the AaronTools ligand, substituent, and ring libraries
@@ -117,11 +127,34 @@ class AaronTools_Library(ToolInstance):
 
     def open_ligands(self):
         for row in self.lig_table.selectionModel().selectedRows():
-            print(type(row.data()))
+            lig_name = row.data()
+            ligand = Component(lig_name)
+            ligand.name = lig_name
+            chimera_ligand = ResidueCollection.get_chimera(self.session, ligand)
+
+            self.session.models.add([chimera_ligand])
+
+            if self.showLigKeyBool:
+                color = self.lig_color.get_color()
+                
+                color = [c/255. for c in color]
+                
+                #make a bild file and just have chimerax parse that
+                s = ".color %f %f %f\n" % tuple(color[:-1])
+                s += ".transparency %f\n" % (1. - color[-1])
+                for atom in ligand.key_atoms:
+                    if hasattr(atom, "_radii"):
+                        
+                        r = 0.6*atom._radii
+                    else:
+                        r = 0.5
+                    
+                    s += ".sphere %f %f %f   %f\n" % (*atom.coords, r)
+                    
+                stream = BytesIO(bytes(s, 'utf-8'))
+                bild_obj, status = read_bild(self.session, stream, "highlighting %s's key atoms" % lig_name)
             
-        self.session
-        
-        print('self has session property')
+                self.session.models.add(bild_obj, parent=chimera_ligand)
         
     def showGhostConnection(self, state):
         if state == QtCore.Qt.Checked:
@@ -130,7 +163,29 @@ class AaronTools_Library(ToolInstance):
             self.showSubGhostBool = False
 
     def open_substituents(self):
-        print('poosh but on')
+        for row in self.sub_table.selectionModel().selectedRows():
+            sub_name = row.data()
+            substituent = Substituent(sub_name)
+            substituent.name = sub_name
+            chimera_substituent = ResidueCollection.get_chimera(self.session, substituent)
+
+            self.session.models.add([chimera_substituent])
+
+            if self.showSubGhostBool:
+                color = self.sub_color.get_color()
+                
+                color = [c/255. for c in color]
+                
+                #make a bild file and just have chimerax parse that
+                s = ".color %f %f %f\n" % tuple(color[:-1])
+                s += ".transparency %f\n" % (1. - color[-1])
+                s += ".sphere 0 0 0  %f\n" % 0.15
+                s += ".cylinder 0 0 0   %f 0 0   %f open\n" % (substituent.atoms[0].coords[0], 0.15)
+                    
+                stream = BytesIO(bytes(s, 'utf-8'))
+                bild_obj, status = read_bild(self.session, stream, "ghost connection for %s" % sub_name)
+            
+                self.session.models.add(bild_obj, parent=chimera_substituent)
         
     def showRingWalk(self, state):
         if state == QtCore.Qt.Checked:
@@ -139,4 +194,50 @@ class AaronTools_Library(ToolInstance):
             self.showRingWalkBool = False
 
     def open_rings(self):
-        print('poosh but on')
+        for row in self.ring_table.selectionModel().selectedRows():
+            ring_name = row.data()
+            ring = RingFragment(ring_name)
+            ring.name = ring_name
+            chimera_ring = ResidueCollection.get_chimera(self.session, ring)
+
+            self.session.models.add([chimera_ring])
+
+            if self.showRingWalkBool:
+                color = self.ring_color.get_color()
+                
+                color = [c/255. for c in color]
+                
+                #make a bild file and just have chimerax parse that
+                s = ".color %f %f %f\n" % tuple(color[:-1])
+                s += ".transparency %f\n" % (1. - color[-1])
+                if len(ring.end) == 1:
+                    if hasattr(ring.end[0], "_radii"):
+                        r = 0.6*ring.end[0]._radii
+                    else:
+                        r = 1
+                    
+                    info = tuple(ring.end[0].coords) + (r,)
+                    s += ".sphere %f %f %f   %f\n" % info
+                else:
+                    r_bd = 0.16
+                    for atom1, atom2 in zip(ring.end[:-1], ring.end[1:]):                       
+                        v = atom1.bond(atom2)
+                        
+                        if hasattr(atom2, "_radii"):
+                            r_sp = 0.4*atom2._radii
+                        else:
+                            r_sp = 0.4
+                        
+                        info = tuple(atom1.coords) + tuple(atom2.coords - r_sp*v) + (r_bd, 1.5*r_bd,)
+                        s += ".arrow %f %f %f   %f %f %f   %f %f 0.7\n" % info
+                    
+                        for bond in chimera_ring.bonds:
+                            bond_atoms = [chimera_ring.atoms.index(atom) for atom in bond.atoms]
+                            if ring.atoms.index(atom1) in bond_atoms and ring.atoms.index(atom2) in bond_atoms:
+                                bond.display  = False
+                                break
+                                    
+                stream = BytesIO(bytes(s, 'utf-8'))
+                bild_obj, status = read_bild(self.session, stream, "walk direction for %s" % ring_name)
+            
+                self.session.models.add(bild_obj, parent=chimera_ring)

@@ -104,6 +104,8 @@ class ResidueCollection(Geometry):
         """returns a chimerax equivalent of an AaronTools Geometry
         supported geometry subclasses include:
             Catalyst - adds residues or ligand, substrate, and center; adds atom tags for substituents
+            
+        atoms will have resnum and resname attributes added to help preserve chimera structure info
         """
         
         #a list of geometries can translate to a trajectory
