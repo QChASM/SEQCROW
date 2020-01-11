@@ -4,7 +4,7 @@ python3 setup.py sdist bdist_wheel
 cp dist/ChimAARON-0.1-py3-none-any.whl $desktop/
 """
 
-from setuptools import setup, Extension
+from setuptools import setup, find_packages
 import os
 
 description = """
@@ -80,6 +80,7 @@ setup(
     },
     packages=[
         "ChimAARON",
+        "ChimAARON.tools",
     ],
     ext_modules=ext_mods,
     install_requires=[
