@@ -81,6 +81,7 @@ setup(
     packages=[
         "ChimAARON",
         "ChimAARON.tools",
+        "ChimAARON.managers", 
     ],
     ext_modules=ext_mods,
     install_requires=[

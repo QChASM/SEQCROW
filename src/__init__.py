@@ -56,14 +56,26 @@ class _QChaSM_API(BundleAPI):
         
         from .selectors import register_selectors
         register_selectors(logger)
-        
+
+    @staticmethod
+    def init_manager(session, bundle_info, name, **kw):
+        """Initialize frequency_file manager"""
+        if name == "chimaaron_frequency_file_manager":
+            from .managers import FrequencyFileManager
+            session.chimaaron_frequency_file_manager = FrequencyFileManager(session)
+            return session.presets
+  
     @staticmethod
     def start_tool(session, bi, ti):
         if ti.name == "Browse AaronTools Libraries":
             from .tools import AaronTools_Library
             tool = AaronTools_Library(session, ti.name)
+            return tool        
+        elif ti.name == "Visualize normal modes":
+            from .tools import NormalModes
+            tool = NormalModes(session, ti.name)
             return tool
         else:
-            raise RuntimeError("tool named '%s' is unknown to ChimAARON" % tool.name)
+            raise RuntimeError("tool named '%s' is unknown to ChimAARON" % ti.name)
 
 bundle_api = _QChaSM_API()

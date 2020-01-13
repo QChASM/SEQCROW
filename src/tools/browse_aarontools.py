@@ -7,7 +7,7 @@ from chimerax.core.models import MODEL_DISPLAY_CHANGED
 from io import BytesIO
 
 from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtWidgets import QLabel, QLineEdit, QGridLayout, QPushButton, QCheckBox, QTabWidget, QWidget, QVBoxLayout
+from PyQt5.QtWidgets import QGridLayout, QPushButton, QCheckBox, QTabWidget, QWidget, QVBoxLayout
 
 from AaronTools.component import Component
 from AaronTools.ringfragment import RingFragment
