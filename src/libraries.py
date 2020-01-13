@@ -1,4 +1,5 @@
 from PyQt5.QtWidgets import QTableWidgetItem
+from PyQt5.QtCore import Qt
 from PyQt5 import QtWidgets
 from glob import glob
 
@@ -86,7 +87,12 @@ class LigandTable(QtWidgets.QTableWidget):
             row = self.rowCount()
             self.insertRow(row)
             self.setItem(row, 0, QTableWidgetItem(lig.name))
-            self.setItem(row, 1, QTableWidgetItem(str(len(lig.key_elements))))
+            
+            #this is an integer, so I need to initialize it then set the data
+            denticity = QTableWidgetItem()
+            denticity.setData(Qt.DisplayRole, len(lig.key_elements))
+            self.setItem(row, 1, denticity)
+            
             self.setItem(row, 2, QTableWidgetItem(", ".join(sorted(lig.key_elements))))
     
         self.ligand_list = lig_list
@@ -114,8 +120,15 @@ class SubstituentTable(QtWidgets.QTableWidget):
             row = self.rowCount()
             self.insertRow(row)
             self.setItem(row, 0, QTableWidgetItem(sub.name))
-            self.setItem(row, 1, QTableWidgetItem(str(sub.conf_num)))
-            self.setItem(row, 2, QTableWidgetItem(str(sub.conf_angle)))
+            
+            #the next two items are integers - need to initialize then setData so they sort and display correctly
+            conf_num = QTableWidgetItem()
+            conf_num.setData(Qt.DisplayRole, sub.conf_num)
+            self.setItem(row, 1, conf_num)
+            
+            conf_angle = QTableWidgetItem()
+            conf_angle.setData(Qt.DisplayRole, sub.conf_angle)
+            self.setItem(row, 2, conf_angle)
 
         self.substituent_list = sub_list
 
