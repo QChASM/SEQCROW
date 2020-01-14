@@ -73,6 +73,10 @@ class _QChaSM_API(BundleAPI):
         elif ti.name == "Visualize normal modes":
             from .tools import NormalModes
             tool = NormalModes(session, ti.name)
+            return tool        
+        elif ti.name == "AAlchemy":
+            from .tools import EditStructure
+            tool = EditStructure(session, ti.name)
             return tool
         else:
             raise RuntimeError("tool named '%s' is unknown to ChimAARON" % ti.name)

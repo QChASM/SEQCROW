@@ -12,7 +12,7 @@ from AaronTools.trajectory import Pathway
 from io import BytesIO
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QLabel, QLineEdit, QGridLayout, QPushButton, QTabWidget, QComboBox, QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, QFormLayout, QCheckBox
+from PyQt5.QtWidgets import QLineEdit, QGridLayout, QPushButton, QTabWidget, QComboBox, QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, QFormLayout, QCheckBox
 
 from ..managers import FREQ_FILE_CHANGE
 
@@ -167,6 +167,7 @@ class NormalModes(ToolInstance):
                 self.model_selector.addItem(model.name, model)
 
     def change_mw_option(self, state):
+        """toggle bool associated with mass-weighting option"""
         if state == Qt.Checked:
             self.vec_mw_bool = True
         else:
@@ -237,6 +238,7 @@ class NormalModes(ToolInstance):
         self.session.models.add(bild_obj, parent=model)
 
     def show_anim(self):
+        """play selected modes as an animation"""
         model = self.models_with_freq[self.model_selector.currentIndex()]
         modes = self.table.selectedItems()
         if len([mode for mode in modes if mode.column() == 0]) != 1:
@@ -285,5 +287,6 @@ class NormalModes(ToolInstance):
         model.chimaaron_freq_slider.play_cb()
 
     def delete(self):
+        """overload delete"""
         self.session.chimaaron_frequency_file_manager.triggers.remove_handler(self._refresh_handler)
         super().delete()

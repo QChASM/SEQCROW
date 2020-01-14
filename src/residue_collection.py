@@ -63,6 +63,8 @@ class ResidueCollection(Geometry):
                     
                 aaron_atom1.connected.add(aaron_atom2)
                 aaron_atom2.connected.add(aaron_atom1)
+        
+        self.session = molecules[0].session
     
     def __repr__(self):
         s = ""
@@ -98,6 +100,25 @@ class ResidueCollection(Geometry):
         out = temp.write(*args, **kwargs)
         
         return out
+
+    def substitute(self, sub, targets, *args, **kwargs):
+        """substitute and add resname and resnum attributes to new atoms"""
+        targets = self.find(targets)
+        super().substitute(sub, targets, *args, **kwargs)
+        
+        while not all([hasattr(atom, "resnum") for atom in self.atoms]):
+            for atom in self.atoms:
+                if not hasattr(atom, "resnum"):
+                    for atom2 in atom.connected:
+                        if hasattr(atom2, "resnum"):
+                            atom.resnum = atom2.resnum
+                            atom.resname = atom2.resname
+                            break
+
+    @property
+    def atomic_structure(self):
+        """chimerax equivalent of the Geometry"""
+        return self.get_chimera(self.session, self)
 
     @staticmethod
     def get_chimera(session, geom, coordsets=False, filereader=None):
@@ -138,8 +159,8 @@ class ResidueCollection(Geometry):
                 atom.resname = "CENT"
                 atom.resnum = i
 
-        elif isinstance(geom, Geometry):
-            if not any(hasattr(atom, "resname") for atom in geom.atoms):
+        else:
+            if not all(hasattr(atom, "resname") for atom in geom.atoms):
                 atoms_with_resname = [atom for atom in geom.atoms if hasattr(atom, "resname")]
                 if any(atom.resname == "UNK" for atom in atoms_with_resname):
                     i = atoms_with_resname[0].resnum
