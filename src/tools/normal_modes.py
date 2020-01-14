@@ -236,7 +236,11 @@ class NormalModes(ToolInstance):
         bild_obj, status = read_bild(self.session, stream, "%.2f cm^-1" % model.aarontools_filereader.other['frequency'].data[mode].frequency)
 
         self.session.models.add(bild_obj, parent=model)
-
+        
+        if hasattr(model, "chimaaron_freq_slider") and model.chimaaron_freq_slider.structure is not None:
+            #close animation slider
+            model.chimaaron_freq_slider.delete()
+    
     def show_anim(self):
         """play selected modes as an animation"""
         model = self.models_with_freq[self.model_selector.currentIndex()]
