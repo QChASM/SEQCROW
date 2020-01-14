@@ -1,1 +1,1 @@
-from .freqfile_manager import FrequencyFileManager
+from .freqfile_manager import *

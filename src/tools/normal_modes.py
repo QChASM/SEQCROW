@@ -14,6 +14,8 @@ from io import BytesIO
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QLabel, QLineEdit, QGridLayout, QPushButton, QTabWidget, QComboBox, QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, QFormLayout, QCheckBox
 
+from ..managers import FREQ_FILE_CHANGE
+
 class NormalModes(ToolInstance):
     #XML_TAG ChimeraX :: Tool :: Visualize normal modes :: AaronTools :: Visualize normal modes from a Gaussian output file as displacement vectors or as an animation
     SESSION_ENDURING = False
@@ -24,24 +26,24 @@ class NormalModes(ToolInstance):
         super().__init__(session, name)
         
         from chimerax.ui import MainToolWindow
-        self.tool_window = MainToolWindow(self)
-        
-        self.refresh_models()
+        self.tool_window = MainToolWindow(self)        
         
         self.vec_mw_bool = False
         
+        self.models_with_freq = self.session.chimaaron_frequency_file_manager.frequency_models
+
         self._build_ui()
 
+        self.refresh_models()
+
+        self._refresh_handler = self.session.chimaaron_frequency_file_manager.triggers.add_handler(FREQ_FILE_CHANGE, self.refresh_models)
+
     def _build_ui(self):
-        #TODO: make only the table resize up and down
         layout = QGridLayout()
         
         #select which molecule's frequencies to visualize
         model_selector = QComboBox()
-        for model in self.models_with_freq:
-            print(model)
-            model_selector.addItem(model.name, model)
-        
+                
         model_selector.currentIndexChanged.connect(self.create_freq_table)
         self.model_selector = model_selector
         layout.addWidget(model_selector)
@@ -112,18 +114,28 @@ class NormalModes(ToolInstance):
         
         layout.addWidget(self.display_tabs)
         
+        #only the table can stretch
+        layout.setRowStretch(0, 0)
+        layout.setRowStretch(1, 1)
+        layout.setRowStretch(2, 0)
+        
         self.tool_window.ui_area.setLayout(layout)
 
         if len(self.models_with_freq) > 0:
             self.create_freq_table(0)
 
-        self.tool_window.manage('side')
+        self.tool_window.manage(None)
         
     def create_freq_table(self, state):
         """populate the table with frequencies from self.models_with_freq[state]"""
-        model = self.models_with_freq[state]
         
         self.table.setRowCount(0)
+
+        if state == -1:
+            # early return if no frequency models
+            return
+            
+        model = self.models_with_freq[state]
         
         freq_data = model.aarontools_filereader.other['frequency'].data
         self.rows = []
@@ -142,15 +154,23 @@ class NormalModes(ToolInstance):
                 intensity.setData(Qt.DisplayRole, round(mode.intensity, 2))
             self.table.setItem(row, 1, intensity)
     
-    def refresh_models(self):
+    def refresh_models(self, *args, **kwargs):
+        """refresh the list of models with frequency data and add or remove items from the combobox"""
         self.models_with_freq = self.session.chimaaron_frequency_file_manager.frequency_models
+            
+        for i in range(0, self.model_selector.count()):
+            if self.model_selector.itemData(i) not in self.models_with_freq:
+                self.model_selector.removeItem(i)
+                
+        for model in self.models_with_freq:
+            if self.model_selector.findData(model) == -1:
+                self.model_selector.addItem(model.name, model)
 
     def change_mw_option(self, state):
         if state == Qt.Checked:
             self.vec_mw_bool = True
         else:
             self.vec_mw_bool = False
-
         
     def _get_coord_change(self, geom, vector, scaling):
         """determine displacement given scaling and vector"""
@@ -258,4 +278,12 @@ class NormalModes(ToolInstance):
             
         model.add_coordsets(coordsets, replace=True)
         
-        CoordinateSetSlider(self.session, model)
+        if hasattr(model, "chimaaron_freq_slider") and model.chimaaron_freq_slider.structure is not None:
+            model.chimaaron_freq_slider.delete()
+            
+        model.chimaaron_freq_slider = CoordinateSetSlider(self.session, model)
+        model.chimaaron_freq_slider.play_cb()
+
+    def delete(self):
+        self.session.chimaaron_frequency_file_manager.triggers.remove_handler(self._refresh_handler)
+        super().delete()
