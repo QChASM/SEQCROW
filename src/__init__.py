@@ -7,7 +7,6 @@ class _QChaSM_API(BundleAPI):
     
     @staticmethod
     def initialize(session, bundle_info):
-        """add some presets"""
         #TODO set AaronTools environment variables
         from .presets import chimaaron_bse, chimaaron_s\
             ,blue_filter1, blue_filter2 \
@@ -63,7 +62,7 @@ class _QChaSM_API(BundleAPI):
         if name == "chimaaron_frequency_file_manager":
             from .managers import FrequencyFileManager
             session.chimaaron_frequency_file_manager = FrequencyFileManager(session)
-            return session.presets
+            return session.chimaaron_frequency_file_manager
   
     @staticmethod
     def start_tool(session, bi, ti):

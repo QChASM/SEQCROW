@@ -21,12 +21,6 @@ class FrequencyFileManager(ProviderManager):
         for model in self._session.models:
             if hasattr(model, "aarontools_filereader") and 'frequency' in model.aarontools_filereader.other:
                 self.frequency_models.append(model)
-                print("model %s has filereader" % model.name)
-            
-            else:
-                print("model %s does not have filereader" % model.name)
-                
-        print("there are %i models with frequency info" % len(self.frequency_models))
-        
+
     def add_provider(self, bundle_info, name, **kw):
         self.frequency_models = self.frequency_models
