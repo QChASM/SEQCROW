@@ -6,6 +6,7 @@ from chimerax.bild.bild import read_bild
 from chimerax.core.models import MODEL_DISPLAY_CHANGED
 from chimerax.std_commands.coordset_gui import CoordinateSetSlider
 
+from AaronTools.atoms import Atom
 from AaronTools.geometry import Geometry
 from AaronTools.trajectory import Pathway
 
@@ -271,9 +272,10 @@ class NormalModes(ToolInstance):
 
         dX = self._get_coord_change(geom, vector, scale)
         
-        geom_forward = geom.copy()
+        #atoms can't be deep copied for some reason
+        geom_forward = Geometry([Atom(atom.element, atom.coords) for atom in geom.atoms], refresh_connected=False)
         geom_forward.update_geometry(geom.coords() + dX)
-        geom_reverse = geom.copy()
+        geom_reverse =Geometry([Atom(atom.element, atom.coords) for atom in geom.atoms], refresh_connected=False)
         geom_reverse.update_geometry(geom.coords() - dX)
         
         S = Pathway([geom_forward, geom, geom_reverse, geom, geom_forward])

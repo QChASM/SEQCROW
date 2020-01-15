@@ -6,246 +6,265 @@ from AaronTools.const import TMETAL
 from AaronTools.geometry import Geometry
 from chimerax.atomic import AtomicStructure
 
+class Residue(Geometry):
+    def __init__(self, geom, resnum=None, resname="UNK", **kwargs):
+        super().__init__(geom, **kwargs)
+        self.resnum = resnum
+        self.resname = resname
+
+    def get_element_count(self):
+        out = {}
+        for atom in self.atoms:
+            if atom.element not in out:
+                out[atom.element] = 1
+            else:
+                out[atom.element] += 1
+                
+        return out
+
 class ResidueCollection(Geometry):
     """geometry object used for ChimAARON to easily convert to AaronTools but keep residue info"""
-    def __init__(self, molecule):
-        """molecule     - chimerax AtomicStructure or [AtomicStructure]"""
-        if not isinstance(molecule, AtomicStructure) and not hasattr(molecule, "__iter__"):
+    def __init__(self, molecule, refresh_connected=False, **kwargs):
+        """molecule     - chimerax AtomicStructure or [AtomicStructure] or AaronTools Geometry (for easy compatibility stuff)"""
+        if isinstance(molecule, Catalyst):
+            super().__init__(molecule, refresh_connected=refresh_connected, **kwargs)
+            self.residues = []
+            i = 1
+            for key in molecule.components:
+                for comp in molecule.components[key]:
+                    if key == 'ligand':
+                        resname = "LIG"
+                    else:
+                        resname = "SUB"
+                    
+                    self.residues.append(Residue(comp, refresh_connected=refresh_connected, resnum=i, resname=resname))
+                    i += 1
+                    
+            self.residues.append(Residue(molecule.center, refresh_connected=refresh_connected, resnum=i, resname="CENT"))
+        
+        elif isinstance(molecule, Geometry):
+            super().__init__(molecule, refresh_connected=refresh_connected, **kwargs)
+            self.residues = [Residue(self, molecule, refresh_connected=refresh_connected, name="UNK")]
+            self.session = None
+            return
+        
+        if not isinstance(molecule, AtomicStructure):
             raise NotImplementedError("molecule must be a chimerax AtomicStructure or a list of AtomicStructures")
-        
-        elif isinstance(molecule, AtomicStructure):
-            molecules = [molecule]
-        else:
-            molecules = molecule
-        
-        for molecule in molecules:
-            #convert chimerax stuff to AaronTools
-            aaron_atoms = []
-            for i, residue in enumerate(molecule.residues):
-                resname = residue.name
-                for atom in residue.atoms:
-                    if not atom.deleted:
-                        element = str(atom.element)
-                        coords = atom.coord
-                        name = atom.name
-                        
-                        aaron_atom = Atom(name=str(atom.serial_number + 1), element=element, coords=coords)
-                        aaron_atom.resname = resname
-                        aaron_atom.resnum = i
-                        aaron_atom.add_tag(atom.name)
-                        aaron_atom.add_tag(str(atom.atomspec))
-                        aaron_atom.atomspec = str(atom.atomspec)
-                        aaron_atom.add_tag(resname)
-                        
-                        aaron_atoms.append(aaron_atom)
 
-        super().__init__(structure=aaron_atoms, name=molecule.name, comment=molecule.comment, refresh_connected=False)
+        self.residues = []
+        
+        #convert chimerax stuff to AaronTools
+        aaron_atoms = []
+        for i, residue in enumerate(molecule.residues):
+            resname = residue.name
+            for atom in residue.atoms:
+                if not atom.deleted:
+                    element = str(atom.element)
+                    coords = atom.coord
+                    name = atom.name
+                    
+                    aaron_atom = Atom(name=name, element=element, coords=coords)
+                    aaron_atom.add_tag(str(atom.atomspec))
+                    aaron_atom.atomspec = str(atom.atomspec)
+                    aaron_atom.add_tag(resname)
+                    aaron_atom.chix_atom = atom
+                    
+                    aaron_atoms.append(aaron_atom)
 
-        for molecule in molecules:
-            #update bonding to match that of the chimerax molecule
-            for bond in molecule.bonds:
-                atom1 = bond.atoms[0]
-                atom2 = bond.atoms[1]
+            self.residues.append(Residue(aaron_atoms, \
+                                    name=resname, \
+                                    comment=molecule.comment if hasattr(molecule, "comment") else "", \
+                                    refresh_connected=False))
+
+        #update bonding to match that of the chimerax molecule
+        for bond in molecule.bonds:
+            atom1 = bond.atoms[0]
+            atom2 = bond.atoms[1]
+            
+            aaron_atom1 = self.find(atom1.atomspec)
+            if len(aaron_atom1) > 1:
+                raise RuntimeError("multiple atoms might have the same atomspec: %s" % \
+                    " ".join([str(atom) for atom in aaron_atom1]))
+            else:
+                aaron_atom1 = aaron_atom1[0]
                 
-                aaron_atom1 = self.find(atom1.atomspec)
-                if len(aaron_atom1) > 1:
-                    raise RuntimeError("multiple atoms might have the same atomspec: %s" % \
-                        " ".join([str(atom) for atom in aaron_atom1]))
-                else:
-                    aaron_atom1 = aaron_atom1[0]
-                    
-                aaron_atom2 = self.find(atom2.atomspec)
-                if len(aaron_atom2) != 1:
-                    raise RuntimeError("multiple atoms might have the same atomspec: %s" % \
-                        " ".join([str(atom) for atom in aaron_atom2]))
-                else:
-                    aaron_atom2 = aaron_atom2[0]
-                    
-                aaron_atom1.connected.add(aaron_atom2)
-                aaron_atom2.connected.add(aaron_atom1)
-        
-        self.session = molecules[0].session
+            aaron_atom2 = self.find(atom2.atomspec)
+            if len(aaron_atom2) != 1:
+                raise RuntimeError("multiple atoms might have the same atomspec: %s" % \
+                    " ".join([str(atom) for atom in aaron_atom2]))
+            else:
+                aaron_atom2 = aaron_atom2[0]
+                
+            aaron_atom1.connected.add(aaron_atom2)
+            aaron_atom2.connected.add(aaron_atom1)
+    
+        self.session = molecule.session
     
     def __repr__(self):
         s = ""
         for atom in self.atoms:
-            s += "%s   %s\n" % (repr(atom), atom.atomspec)
+            s += "%s   %s\n" % (repr(atom), atom.atomspec if hasattr(atom, "atomspec") else None)
             
         return s.strip()
-    
-    def write(self, *args, targets=None, ignore_atoms=None, **kwargs):
-        """write geometry to file
-        targets         - [Atom] atoms to write, default is all non-ghost atoms
-        ignore_atoms    - [Atom] atoms to ignore, default is ghost atoms (False will write ghost atoms)"""
-        if targets is None and ignore_atoms is None:
-            try:
-                ignore_atoms = self.find('ghost')
-            except LookupError:
-                ignore_atoms = []
-            atoms = [atom for atom in self.atoms if atom not in ignore_atoms]
-        elif targets is not None and ignore_atoms is None:
-            atoms = self.find(targets)
-        elif targets is None and ignore_atoms is not None:
-            try:
-                ignore_atoms = self.file(ignore_atoms)
-            except LookupError:
-                ignore_atoms = []
-            atoms = [atom for atom in self.atoms if atom not in ignore_atoms]
-        else:
-            raise NotImplementedError("targets and ignore_atoms combination is not allowed")
-        
-        #create a scratch geometry with only the requested atoms
-        temp = Geometry(atoms, comment=self.comment, name=self.name)
-            
-        out = temp.write(*args, **kwargs)
-        
-        return out
 
-    def substitute(self, sub, targets, *args, **kwargs):
+    def copy(self):
+        rv = super().copy()
+        rv = ResidueCollection(rv)
+        return rv
+
+    def substitute(self, sub, target, *args, update_residues=True, **kwargs):
         """substitute and add resname and resnum attributes to new atoms"""
-        targets = self.find(targets)
-        super().substitute(sub, targets, *args, **kwargs)
+        for residue in self.residues:
+            try:
+                target = residue.find_exact(target)
+            except LookupError:
+                continue
+            
+            atom_dict = residue.get_element_count()
+            
+            residue.substitute(sub, targets, *args, **kwargs)
+
+    def find_residue(self, target):
+        atom = self.find(target)
+        if len(atom) != 1:
+            raise LookupError("multiple or no atoms found for %s" % target)
+        else:
+            atom = atom[0]
+            
+        return [residue for residue in self.residues if atom in residue.atoms]
+
+    def difference(self, atomic_structure):
+        """returns {'geom missing':[chimerax.atomic.Atom], 'chix missing':[AaronTools.atoms.Atom]} 
+        'geom missing' are atoms that are missing from self but are on the ChimeraX AtomicStructure
+        'chix missing' are atoms that are on self but not on the ChimeraX AtomicStructure"""
         
-        while not all([hasattr(atom, "resnum") for atom in self.atoms]):
-            for atom in self.atoms:
-                if not hasattr(atom, "resnum"):
-                    for atom2 in atom.connected:
-                        if hasattr(atom2, "resnum"):
-                            atom.resnum = atom2.resnum
-                            atom.resname = atom2.resname
-                            break
+        geom_missing = []
+        chix_missing = []
+        
+        for atom in self.atoms:
+            if not hasattr(atom, "chix_atom") or atom.chix_atoms not in atomic_structure.atoms:
+                chix_missing.append(atom)
+               
+        for atom in atomic_structure.atoms:
+            if not any([atom == aaron_atom.chix_atom for aaron_atom in self.atoms if hasattr(aaron_atom, "chix_atom")]):
+                geom_missing.append(atomic_structure.atoms[i])
+                
+        return {'geom missing': geom_missing, 'chix missing': chix_missing}
+    
+    def update_chix(self, atomic_structure):
+        """update chimerax atomic structure to match self"""
+        differences = self.difference(atomic_structure)
+        
+        for atom in differences['geom missing']:
+            atom.delete()
+        
+        for residue in self.residues:
+            atom_dict = {}
+            for atom in atomic_structure.atoms:
+                if str(atom.element) not in atom_dict:
+                    atom_dict[str(atom.element)] = 1
+                else:
+                    atom_dict[str(atom.element)] += 1
+                    
+                atom.name = "%s%i" % (str(atom.element), atom_dict[str(atom.element)])
+
+            for atom in differences['chix missing']:
+                if atom.element not in atom_dict:
+                    atom_dict[atom.element] = 1
+                else:
+                    atom_dict[atom.element] += 1
+                    
+                self_res = self.find_residue(atom)
+                if len(self_res) != 1:
+                    raise LookupError("multiple or no residues found for %s" % atom)
+                else:
+                    self_res = self_res[0]
+                
+                try:
+                    res = atomic_structure.residues[self.residues.index(self_res)]
+                except IndexError:
+                    res = atomic_structure.new_residue(self_res.resname, "a", 1)
+                    
+                new_atom = atomic_structure.new_atom("%s%i" % (atom.element, atom_dict[atom.element]), atom.element)
+                new_atom.coord = atom.coords
+    
+                atom.chix_atom = new_atom
+    
+                res.add_atom(new_atom)
+
+        self.refresh_chix_connected(atomic_structure, sanity_check=False)
+    
+    def refresh_chix_connected(self, atomic_structure, sanity_check=True):
+        """updates atomic_structure's bonds to match self's connectivity
+        sanity_check - bool; check to make sure atomic_structure corresponds to self"""
+        if sanity_check:
+            diff = self.difference(atomic_structure)
+            for key in diff:
+                if len(diff[key]) != 0:
+                    raise Exception("ResidueCollection does not correspond to AtomicStructure: \n%s\n\n%s" % \
+                        (repr(self), repr(ResidueCollection(atomic_structure))))
+                    
+        for bond in atomic_structure.bonds:
+            bond.delete()
+            
+        known_bonds = []
+        for i, aaron_atom1 in enumerate(self.atoms):
+            atom1 = [atom for atom in atomic_structure.atoms if aaron_atom1.chix_atom == atom][0]
+            for aaron_atom2 in aaron_atom1.connected:
+                if sorted((aaron_atom1, aaron_atom2,)) in known_bonds:
+                    continue
+                
+                known_bonds.append(sorted((aaron_atom1, aaron_atom2,)))
+
+                atom2 = [atom for atom in atomic_structure.atoms if atom == aaron_atom2.chix_atom][0]
+
+                ##this doesn't work for some reason?
+                #if any([atom2 in bond.atoms for bond in atom1.bonds]):
+                #    continue
+                
+                try:
+                    new_bond = atomic_structure.new_bond(atom1, atom2)
+                                        
+                    if any([aaron_atom.element in TMETAL for aaron_atom in [aaron_atom1, aaron_atom2]]):
+                        #TODO:
+                        #figure out what the create_type parameter does
+                        pbg = atomic_structure.pseudobond_group(atomic_structure.PBG_METAL_COORDINATION, create_type='normal') 
+                        pbg.new_pseudobond(atom1, atom2)
+                        new_bond.display = False        
+                except:
+                    pass
+
+        atomic_structure.add_coordsets(np.array([self.coords()]), replace=True)
 
     @property
     def atomic_structure(self):
         """chimerax equivalent of the Geometry"""
         return self.get_chimera(self.session, self)
 
-    @staticmethod
-    def get_chimera(session, geom, coordsets=False, filereader=None):
-        """returns a chimerax equivalent of an AaronTools Geometry
-        supported geometry subclasses include:
-            Catalyst - adds residues or ligand, substrate, and center; adds atom tags for substituents
-            
-        atoms will have resnum and resname attributes added to help preserve chimera structure info
-        """
+    def get_chimera(self, session, coordsets=False, filereader=None):
+        """returns a chimerax equivalent of self"""
         
-        #a list of geometries can translate to a trajectory
-        if isinstance(geom, list):
-            geom_list = geom
-            geom = geom_list[0]
-            
-        if isinstance(geom, Catalyst):
-            i = 1
-            for component in geom.components:
-                for part in geom.components[component]:
-                    for atom in part.atoms:
-                        if component == 'ligand':
-                            atom.resname = "LIG"
-                        elif component == 'substrate':
-                            atom.resname = "SUB"
-                        
-                        atom.resnum = i
-                    
-                    if hasattr(part, "substituents"):
-                        for sub in part.substituents:
-                            for atom in sub.atoms:
-                                atom.substituent = sub.name
-                            
-                            sub.end.end = sub.name
-
-                    i += 1
-
-            for atom in geom.center:
-                atom.resname = "CENT"
-                atom.resnum = i
-
-        else:
-            if not all(hasattr(atom, "resname") for atom in geom.atoms):
-                atoms_with_resname = [atom for atom in geom.atoms if hasattr(atom, "resname")]
-                if any(atom.resname == "UNK" for atom in atoms_with_resname):
-                    i = atoms_with_resname[0].resnum
-                else:
-                    i = 1
-                    atoms_with_resnum = [atom for atom in geom.atoms if hasattr(atom, "resnum")]
-                    while any(atom.resnum == i for atom in atoms_with_resnum):
-                        i += 1
-    
-                for atom in geom.atoms:
-                    if not hasattr(atom, "resname"):
-                        atom.resnum = i
-                        atom.resname = "UNK"
+        struc = AtomicStructure(session, name=self.name)
+        struc.comment = self.comment
         
-        struc = AtomicStructure(session, name=geom.name)
-        struc.comment = geom.comment
-        
-        residue = None
-        resnum = None
-        for aaron_atom in geom.atoms:           
-            #add all the new residues
-            if residue is None or aaron_atom.resnum != resnum:
-                residue = struc.new_residue(aaron_atom.resname, 'aarontools', 1)
-                elements = {}
-                resnum = aaron_atom.resnum
-            
-            if aaron_atom.element not in elements:
-                elements[aaron_atom.element] = 1
-            else:
-                elements[aaron_atom.element] += 1
-            
+        self.update_chix(struc)
 
-            atom = struc.new_atom("%s%i" % (aaron_atom.element, elements[aaron_atom.element]), aaron_atom.element)
-            atom.coord = aaron_atom.coords
-            aaron_atom.add_tag(atom.name)
-
-            #transfer some more AaronTools info that might be present
-            if hasattr(aaron_atom, "substituent"):
-                atom.substituent = aaron_atom.substituent
-                
-            if hasattr(aaron_atom, "end"):
-                atom.end = aaron_atom.end
-            
-            atom.serial_number = geom.atoms.index(aaron_atom) + 1
-            
-            residue.add_atom(atom)
-        
         #keep bonding consistent with AaronTools
-        known_bonds = []
-        for i, aaron_atom1 in enumerate(geom.atoms):
-            atom1 = struc.atoms[i]
-            for aaron_atom2 in aaron_atom1.connected:
-                if sorted((aaron_atom1, aaron_atom2,)) in known_bonds:
-                    continue
-                
-                known_bonds.append(sorted((aaron_atom1, aaron_atom2,)))
-                                
-                atom2 = struc.atoms[geom.atoms.index(aaron_atom2)]
-
-                ##this doesn't work for some reason?
-                #if any([atom2 in bond.atoms for bond in atom1.bonds]):
-                #    continue
-
-                new_bond = struc.new_bond(atom1, atom2)
-                                    
-                if any([aaron_atom.element in TMETAL for aaron_atom in [aaron_atom1, aaron_atom2]]):
-                    #TODO:
-                    #figure out what the create_type parameter does
-                    pbg = struc.pseudobond_group(struc.PBG_METAL_COORDINATION, create_type='normal') 
-                    pbg.new_pseudobond(atom1, atom2)
-                    new_bond.display = False
+        #self.refresh_chix_connected(struc, sanity_check=False)
 
         if coordsets:
             #make a trajectory
             if filereader is None:
                 #list of geometries was given
                 #each geometry is a different frame in the trajectory
-                coordsets = np.zeros((len(geom_list), len(geom.atoms), 3))
+                coordsets = np.zeros((len(geom_list), len(self.atoms), 3))
                 for i, g in geom_list:
                     coordsets[i] = g.coords()
                     
             else:
                 #filereader was given
                 #each list of atoms in filereader.all_geom is a frame in the trajectory
-                coordsets = np.zeros((len(filereader.all_geom), len(geom.atoms), 3))
+                coordsets = np.zeros((len(filereader.all_geom), len(self.atoms), 3))
                 for i, all_geom in enumerate(filereader.all_geom):
                     if not all([isinstance(a, Atom) for a in all_geom]):
                         atom_list = [l for l in all_geom if all([isinstance(a, Atom) for a in l])][0]

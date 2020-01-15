@@ -19,9 +19,9 @@ def open_aarontools(session, path, format_name=None, trajectory=False):
             
     f = FileReader((path, fmt, None), just_geom=False, get_all=trajectory)
 
-    geom = Geometry(f)
+    geom = ResidueCollection(Geometry(f))
 
-    structures = [ResidueCollection.get_chimera(session, geom, coordsets=trajectory, filereader=f)]
+    structures = [geom.get_chimera(session, coordsets=trajectory, filereader=f)]
 
     #associate the AaronTools FileReader with each structure
     for res_coll in structures:

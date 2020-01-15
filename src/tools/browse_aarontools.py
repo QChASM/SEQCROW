@@ -128,9 +128,8 @@ class AaronTools_Library(ToolInstance):
     def open_ligands(self):
         for row in self.lig_table.selectionModel().selectedRows():
             lig_name = row.data()
-            ligand = Component(lig_name)
-            ligand.name = lig_name
-            chimera_ligand = ResidueCollection.get_chimera(self.session, ligand)
+            ligand = Component(lig_name, name=lig_name)
+            chimera_ligand = ResidueCollection(ligand).get_chimera(self.session)
 
             self.session.models.add([chimera_ligand])
 
@@ -165,9 +164,8 @@ class AaronTools_Library(ToolInstance):
     def open_substituents(self):
         for row in self.sub_table.selectionModel().selectedRows():
             sub_name = row.data()
-            substituent = Substituent(sub_name)
-            substituent.name = sub_name
-            chimera_substituent = ResidueCollection.get_chimera(self.session, substituent)
+            substituent = Substituent(sub_name, name=sub_name)
+            chimera_substituent = ResidueCollection(substituent).get_chimera(self.session)
 
             self.session.models.add([chimera_substituent])
 
@@ -196,9 +194,8 @@ class AaronTools_Library(ToolInstance):
     def open_rings(self):
         for row in self.ring_table.selectionModel().selectedRows():
             ring_name = row.data()
-            ring = RingFragment(ring_name)
-            ring.name = ring_name
-            chimera_ring = ResidueCollection.get_chimera(self.session, ring)
+            ring = RingFragment(ring_name, name=ring_name)
+            chimera_ring = ResidueCollection(ring).get_chimera(self.session)
 
             self.session.models.add([chimera_ring])
 

@@ -94,23 +94,30 @@ class EditStructure(ToolInstance):
             else:
                 models[atom.structure].append(atom.structure.atoms.index(atom))
         
+        i = 0
         new_structures = []
         for subname in subnames.split(','):
             subname = subname.strip()
             sub = Substituent(subname)
             for model in models:
-                rescol = ResidueCollection(model)
+                model_copy = model.copy()
+                rescol = ResidueCollection(model_copy)
                 targets = [rescol.atoms[i] for i in models[model]]
-                rescol.substitute(sub, targets)
+                for target in targets:
+                    rescol.substitute(sub, target)
                 
+                if self.close_previous_bool and i == 0:
+                    rescol.update_chix(model)
+                elif self.close_previous_bool and i != 0:
+                    raise RuntimeError("can only replace one at a time")
+            
                 struc = rescol.atomic_structure
                 new_structures.append(struc)
+            
+            i += 1
         
-        if self.close_previous_bool:
-            for model in models:
-                model.delete()
-        
-        self.session.models.add(new_structures)
+        if not self.close_previous_bool:
+            self.session.models.add(new_structures)
         
     def open_sub_selector(self):
         self.tool_window.create_child_window("select substituents", window_class=SubstituentSelection, textBox=self.subname)
