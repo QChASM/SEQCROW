@@ -46,6 +46,7 @@ def save_aarontools(session, path, format_name, **kwargs):
     #XML: ChimeraX :: Save -> extra_keywords=models:Models
     #^ this doesn't do anything b/c save doesn't expect a 'comment' keyword
     from ChimAARON.residue_collection import ResidueCollection
+    from AaronTools.geometry import Geometry
     from chimerax.atomic import AtomicStructure
     
     accepted_kwargs = ['comment', 'models']
@@ -66,9 +67,14 @@ def save_aarontools(session, path, format_name, **kwargs):
     if len(models) < 1:
         raise RuntimeError('nothing to save')
     
-    res_coll = ResidueCollection(models)
+    res_cols = [ResidueCollection(model) for model in models]
+    atoms = []
+    for res in res_cols:
+        atoms.extend(res.atoms)
+        
+    geom = Geometry(atoms)
     
     if 'comment' in kwargs:
-        res_coll.comment = kwargs[comment]
+        geom.comment = kwargs[comment]
     
-    res_coll.write(outfile=path)
+    geom.write(outfile=path)

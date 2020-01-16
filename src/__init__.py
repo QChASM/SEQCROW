@@ -12,8 +12,8 @@ class _QChaSM_API(BundleAPI):
             ,blue_filter1, blue_filter2 \
             #,protanopia, protanomaly, deuteranopia, deuteranomaly, tritanopia, tritanomaly, achromatopsia, achromatomaly
                 
-        session.presets.add_presets("ChimAARON", {"ChimAARON BSE":lambda p=chimaaron_bse: p(session)})
-        session.presets.add_presets("ChimAARON", {"ChimAARON S":lambda p=chimaaron_s: p(session)})
+        session.presets.add_presets("ChimAARON", {"ball-stick-endcap":lambda p=chimaaron_bse: p(session)})
+        session.presets.add_presets("ChimAARON", {"sticks":lambda p=chimaaron_s: p(session)})
         session.presets.add_presets("Filters", {"blue filter 1":lambda p=blue_filter1: p(session)})
         session.presets.add_presets("Filters", {"blue filter 2":lambda p=blue_filter2: p(session)})
        #session.presets.add_presets("Filters", {"protanopia":lambda p=protanopia: p(session)})
@@ -70,11 +70,11 @@ class _QChaSM_API(BundleAPI):
             from .tools import AaronTools_Library
             tool = AaronTools_Library(session, ti.name)
             return tool        
-        elif ti.name == "Visualize normal modes":
+        elif ti.name == "Visualize Normal Modes":
             from .tools import NormalModes
             tool = NormalModes(session, ti.name)
             return tool        
-        elif ti.name == "AAlchemy":
+        elif ti.name == "Structure Modification":
             from .tools import EditStructure
             tool = EditStructure(session, ti.name)
             return tool

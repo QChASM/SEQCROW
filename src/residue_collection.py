@@ -1,5 +1,7 @@
 import numpy as np
 
+import re
+
 from AaronTools.atoms import Atom
 from AaronTools.catalyst import Catalyst
 from AaronTools.const import TMETAL
@@ -60,8 +62,13 @@ class ChimAtom(Atom):
             return a > b
 
 
-        a = self.name.lstrip(self.element).split(".")
-        b = other.name.lstrip(other.element).split(".")
+        #sometimes the name has a different element in it
+        a = re.sub(r'[A-Za-z]', '', self.name).split(".")
+        b = re.sub(r'[A-Za-z]', '', other.name).split(".")
+        while '' in b:
+            b.remove('')        
+        while '' in a:
+            a.remove('')
         while len(a) < len(b):
             a += ["0"]
         while len(b) < len(a):
@@ -73,12 +80,26 @@ class ChimAtom(Atom):
         else:
             return True
 
+    def __repr__(self):
+        return "%s    %f %f %f    %s    %s" % (self.name, *self.coords, self.element, self.atomspec)
+
+    def __float__(self):
+        """
+        converts self.name from a string to a floating point number
+        """
+        rv = re.sub(r'[A-Za-z]', '', self.name).split(".")
+        if len(rv) == 0:
+            return float(0)
+        if len(rv) == 1:
+            return float(rv[0])
+        rv = "{}.{}".format(rv[0], rv[1])
+        return float(rv)
+        
 
 class Residue(Geometry):
-    def __init__(self, geom, resnum=None, resname="UNK", **kwargs):
-        super().__init__(geom, **kwargs)
+    def __init__(self, geom, resnum=None, name="UNK", **kwargs):
+        super().__init__(geom, name=name, **kwargs)
         self.resnum = resnum
-        self.resname = resname
 
     def get_element_count(self):
         out = {}
@@ -107,10 +128,10 @@ class ResidueCollection(Geometry):
                     else:
                         resname = "SUB"
                     
-                    self.residues.append(Residue(comp, refresh_connected=refresh_connected, resnum=i, resname=resname))
+                    self.residues.append(Residue(comp, refresh_connected=refresh_connected, resnum=i, name=resname))
                     i += 1
                     
-            self.residues.append(Residue(molecule.center, refresh_connected=refresh_connected, resnum=i, resname="CENT"))
+            self.residues.append(Residue(molecule.center, refresh_connected=refresh_connected, resnum=i, name="CENT"))
             self.session = None
             self._atom_update()
             return
@@ -118,7 +139,7 @@ class ResidueCollection(Geometry):
         elif isinstance(molecule, Geometry):
             super().__init__(molecule, refresh_connected=refresh_connected, **kwargs)
                 
-            self.residues = [Residue(self, molecule, refresh_connected=refresh_connected, name="UNK")]
+            self.residues = [Residue(molecule, resnum=1, name="UNK", refresh_connected=refresh_connected)]
             self.session = None
             self._atom_update()
             return
@@ -132,20 +153,20 @@ class ResidueCollection(Geometry):
             all_atoms = []
             for i, residue in enumerate(molecule.residues):
                 aaron_atoms = []
-                resname = residue.name
                 for atom in residue.atoms:
                     if not atom.deleted:                      
                         aaron_atom = ChimAtom(atom=atom)
                         aaron_atoms.append(aaron_atom)
     
                 self.residues.append(Residue(aaron_atoms, \
-                                        name=resname, \
+                                        name=residue.name, \
+                                        resnum=residue.number, \
                                         comment=molecule.comment if hasattr(molecule, "comment") else "", \
                                         refresh_connected=False))
                 
                 all_atoms.extend(aaron_atoms)
             
-            super().__init__(all_atoms, refresh_connected=refresh_connected, **kwargs)
+            super().__init__(all_atoms, name=molecule.name, refresh_connected=refresh_connected, **kwargs)
         
             #update bonding to match that of the chimerax molecule
             for bond in molecule.bonds:
@@ -176,57 +197,63 @@ class ResidueCollection(Geometry):
         
             self.session = molecule.session
     
-    def __repr__(self):
-        s = ""
-        for atom in self.atoms:
-            s += "%s   %s\n" % (repr(atom), atom.atomspec if hasattr(atom, "atomspec") else None)
-            
-        return s.strip()
-
     def _atom_update(self):
         """convert all atoms to ChimAtoms and make sure all atoms have the proper connectivity"""
+        if hasattr(self, "residues"):
+            self.atoms = []
+            for residue in self.residues:
+                self.atoms.extend(residue.atoms)
+        
         connectivity_index = []
         for atom in self.atoms:
             connectivity_index.append([])
             for atom2 in atom.connected:
-                connectivity_index[-1].append(self.atoms.index(atom2))
-                
+                if atom2 in self.atoms:
+                    connectivity_index[-1].append(self.atoms.index(atom2))
+
+        chim_atoms = {}
         for i in range(0, len(self.atoms)):
             if not isinstance(self.atoms[i], ChimAtom):
-                chim_atom = ChimAtom(atom=self.atoms[i])
+                chim_atoms[self.atoms[i]] = ChimAtom(atom=self.atoms[i])
                 
-                if hasattr(self, "find_residue") and callable(self.find_residue):
-                    residues = self.find_residue(self.atoms[i])
-                    for res in residues:
-                        res.atoms[res.atoms.index(self.atoms[i])] = chim_atom
-                
-                self.atoms[i] = chim_atom
+        if hasattr(self, "residues"):
+            for residue in self.residues:
+                for i, atom in enumerate(residue.atoms):
+                    if not isinstance(atom, ChimAtom):
+                        residue.atoms[i] = chim_atoms[atom]
+                    
+            self.atoms = []
+            for residue in self.residues:
+                self.atoms.extend(residue.atoms)
+        else:
+            for i, atom in enumerate(self.atoms):
+                if not isinstance(atom, ChimAtom):
+                    self.atoms[i] = chim_atoms[atom]
                 
         for i in range(0, len(self.atoms)):
             self.atoms[i].connected = set([])
             for j in connectivity_index[i]:
                 self.atoms[i].connected.add(self.atoms[j])
+        
+    def substitute(self, sub, target, *args, **kwargs):
+        """find the residue that target is on and substitute it for sub"""
+        target = self.find(target)
+        if len(target) != 1:
+            raise RuntimeError("substitute can only apply to one target at a time: %s" % ", ".join(str(t) for t in target))
+        else:
+            target = target[0]
+            
+        residue = self.find_residue(target)
+        if len(residue) != 1:
+            raise RuntimeError("multiple or no residues found containing %s" % str(target))
+        else:
+            residue = residue[0]
 
-    def copy(self):
-        rv = super().copy()
-        rv = ResidueCollection(rv)
-        return rv
+        ResidueCollection._atom_update(sub)
+        
+        residue.substitute(sub, target, *args, **kwargs)
 
-    def substitute(self, sub, target, *args, update_residues=True, **kwargs):
-        """substitute and add resname and resnum attributes to new atoms"""
-        for residue in self.residues:
-            try:
-                target = residue.find_exact(target)
-            except LookupError:
-                continue
-            
-            print(isinstance(target, ChimAtom))
-            
-            atom_dict = residue.get_element_count()
-            
-            ResidueCollection._atom_update(sub)
-            
-            residue.substitute(sub, target, *args, **kwargs)
+        self._atom_update()
 
     def find_residue(self, target):
         atom = self.find(target)
@@ -234,8 +261,13 @@ class ResidueCollection(Geometry):
             raise LookupError("multiple or no atoms found for %s" % target)
         else:
             atom = atom[0]
-            
-        return [residue for residue in self.residues if atom in residue.atoms]
+        
+        out = []
+        for residue in self.residues:
+            if target in residue.atoms:
+                out.append(residue)
+                
+        return out
 
     def difference(self, atomic_structure):
         """returns {'geom missing':[chimerax.atomic.Atom], 'chix missing':[ChimAtom]} 
@@ -253,7 +285,8 @@ class ResidueCollection(Geometry):
             if not any([atom == aaron_atom.chix_atom for aaron_atom in self.atoms if hasattr(aaron_atom, "chix_atom")]):
                 geom_missing.append(atom)
                 
-        return {'geom missing': geom_missing, 'chix missing': chix_missing}
+        out = {'geom missing': geom_missing, 'chix missing': chix_missing}
+        return out
     
     def update_chix(self, atomic_structure):
         """update chimerax atomic structure to match self"""
@@ -262,41 +295,44 @@ class ResidueCollection(Geometry):
         for atom in differences['geom missing']:
             atom.delete()
         
-        for residue in self.residues:
-            atom_dict = {}
-            for atom in atomic_structure.atoms:
-                if str(atom.element) not in atom_dict:
-                    atom_dict[str(atom.element)] = 1
-                else:
-                    atom_dict[str(atom.element)] += 1
-                    
-                atom.name = "%s%i" % (str(atom.element), atom_dict[str(atom.element)])
-
-            for atom in differences['chix missing']:
-                if atom.element not in atom_dict:
-                    atom_dict[atom.element] = 1
-                else:
-                    atom_dict[atom.element] += 1
-                    
-                self_res = self.find_residue(atom)
-                if len(self_res) != 1:
-                    print(self_res)
-                    raise LookupError("multiple or no residues found for %s" % atom)
-                else:
-                    self_res = self_res[0]
+        atom_dict = {}
+        for atom in atomic_structure.atoms:
+            if str(atom.element) not in atom_dict:
+                atom_dict[str(atom.element)] = 1
+            else:
+                atom_dict[str(atom.element)] += 1
                 
-                try:
-                    res = atomic_structure.residues[self.residues.index(self_res)]
-                except IndexError:
-                    res = atomic_structure.new_residue(self_res.resname, "a", 1)
-                    
-                new_atom = atomic_structure.new_atom("%s%i" % (atom.element, atom_dict[atom.element]), atom.element)
-                new_atom.coord = atom.coords
-    
-                atom.chix_atom = new_atom
-    
-                res.add_atom(new_atom)
+            atom.name = "%s%i" % (str(atom.element), atom_dict[str(atom.element)])
 
+        for atom in differences['chix missing']:
+            if atom.element not in atom_dict:
+                atom_dict[atom.element] = 1
+            else:
+                atom_dict[atom.element] += 1
+                
+            self_res = self.find_residue(atom)
+
+            if len(self_res) != 1:
+                raise LookupError("multiple or no residues found for %s" % atom)
+            else:
+                self_res = self_res[0]
+            
+            res = [residue for residue in atomic_structure.residues if residue.number == self_res.resnum and residue.name == self_res.name]
+            if len(res) != 1:
+                res = atomic_structure.new_residue(self_res.name, "a", 1)
+            else:
+                res = res[0]
+                
+            new_atom = atomic_structure.new_atom("%s%i" % (atom.element, atom_dict[atom.element]), atom.element)
+            new_atom.coord = atom.coords
+
+            atom.chix_atom = new_atom
+
+            res.add_atom(new_atom)
+        
+        for atom in self.atoms:
+            atom.chix_atom.coord = atom.coords
+        
         self.refresh_chix_connected(atomic_structure, sanity_check=False)
     
     def refresh_chix_connected(self, atomic_structure, sanity_check=True):
@@ -339,12 +375,6 @@ class ResidueCollection(Geometry):
                 except:
                     pass
 
-        atomic_structure.add_coordsets(np.array([self.coords()]), replace=True)
-
-    @property
-    def atomic_structure(self):
-        """chimerax equivalent of the Geometry"""
-        return self.get_chimera(self.session, self)
 
     def get_chimera(self, session, coordsets=False, filereader=None):
         """returns a chimerax equivalent of self"""

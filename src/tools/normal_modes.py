@@ -18,7 +18,7 @@ from PyQt5.QtWidgets import QLineEdit, QGridLayout, QPushButton, QTabWidget, QCo
 from ..managers import FREQ_FILE_CHANGE
 
 class NormalModes(ToolInstance):
-    #XML_TAG ChimeraX :: Tool :: Visualize normal modes :: AaronTools :: Visualize normal modes from a Gaussian output file as displacement vectors or as an animation
+    #XML_TAG ChimeraX :: Tool :: Visualize Normal Modes :: AaronTools :: Visualize normal modes from a Gaussian output file as displacement vectors or as an animation
     SESSION_ENDURING = False
     SESSION_SAVE = False         
     display_name = "Visualize normal modes"
@@ -275,7 +275,7 @@ class NormalModes(ToolInstance):
         #atoms can't be deep copied for some reason
         geom_forward = Geometry([Atom(atom.element, atom.coords) for atom in geom.atoms], refresh_connected=False)
         geom_forward.update_geometry(geom.coords() + dX)
-        geom_reverse =Geometry([Atom(atom.element, atom.coords) for atom in geom.atoms], refresh_connected=False)
+        geom_reverse = Geometry([Atom(atom.element, atom.coords) for atom in geom.atoms], refresh_connected=False)
         geom_reverse.update_geometry(geom.coords() - dX)
         
         S = Pathway([geom_forward, geom, geom_reverse, geom, geom_forward])

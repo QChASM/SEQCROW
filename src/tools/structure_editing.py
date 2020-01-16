@@ -15,10 +15,10 @@ from ..residue_collection import ResidueCollection
 from ..libraries import SubstituentTable
 
 class EditStructure(ToolInstance):
-    #XML_TAG ChimeraX :: Tool :: AAlchemy :: AaronTools :: Modify substituents, swap ligands, abd close rings, all for the one-time fee of an arm and a leg!
+    #XML_TAG ChimeraX :: Tool :: Structure Modification :: AaronTools :: Modify substituents, swap ligands, abd close rings, all for the one-time fee of an arm and a leg!
     SESSION_ENDURING = False
     SESSION_SAVE = False         
-    display_name = "Full Transition Metal Alchemist"
+    display_name = "The Alchemist"
     
     def __init__(self, session, name):       
         super().__init__(session, name)
@@ -49,8 +49,8 @@ class EditStructure(ToolInstance):
         open_sub_lib.clicked.connect(self.open_sub_selector)
         self.substitute_layout.addWidget(open_sub_lib, 0, 2)        
         
-        close_previous = QCheckBox("close previous structure")
-        close_previous.setToolTip("selected structure will be closed before new structures are loaded")
+        close_previous = QCheckBox("modify selected structure")
+        close_previous.setToolTip("checked: selected structure will be modified\nunchecked: new model will be created for the modified structure")
         close_previous.toggle()
         close_previous.stateChanged.connect(self.close_previous_change)
         self.substitute_layout.addWidget(close_previous, 1, 0, 1, 3)
@@ -90,10 +90,10 @@ class EditStructure(ToolInstance):
         models = {}
         for atom in selection:
             if atom.structure not in models:
-                models[atom.structure] = [atom.structure.atoms.index(atom)]
+                models[atom.structure] = [str(atom.atomspec)]
             else:
-                models[atom.structure].append(atom.structure.atoms.index(atom))
-        
+                models[atom.structure].append(str(atom.atomspec))
+                
         first_pass = True
         new_structures = []
         for subname in subnames.split(','):
@@ -102,9 +102,8 @@ class EditStructure(ToolInstance):
             for model in models:
                 if self.close_previous_bool and first_pass:
                     rescol = ResidueCollection(model)
-                    targets = [rescol.atoms[i] for i in models[model]]
-                    for target in targets:
-                        rescol.substitute(sub, target)
+                    for target in models[model]:
+                        rescol.substitute(sub.copy(), target)
                     
                     rescol.update_chix(model)
                     
@@ -113,12 +112,9 @@ class EditStructure(ToolInstance):
                 else:
                     model_copy = model.copy()
                     rescol = ResidueCollection(model_copy)
-                    targets = [rescol.atoms[i] for i in models[model]]
-                    for target in targets:
-                        rescol.substitute(sub, target)
-                
-                    print(rescol)
-                
+                    for target in models[model]:
+                        rescol.substitute(sub.copy(), target)
+                                
                     struc = rescol.get_chimera(self.session)
                     new_structures.append(struc)
             
