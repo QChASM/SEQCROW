@@ -94,27 +94,35 @@ class EditStructure(ToolInstance):
             else:
                 models[atom.structure].append(atom.structure.atoms.index(atom))
         
-        i = 0
+        first_pass = True
         new_structures = []
         for subname in subnames.split(','):
             subname = subname.strip()
             sub = Substituent(subname)
             for model in models:
-                model_copy = model.copy()
-                rescol = ResidueCollection(model_copy)
-                targets = [rescol.atoms[i] for i in models[model]]
-                for target in targets:
-                    rescol.substitute(sub, target)
-                
-                if self.close_previous_bool and i == 0:
+                if self.close_previous_bool and first_pass:
+                    rescol = ResidueCollection(model)
+                    targets = [rescol.atoms[i] for i in models[model]]
+                    for target in targets:
+                        rescol.substitute(sub, target)
+                    
                     rescol.update_chix(model)
-                elif self.close_previous_bool and i != 0:
-                    raise RuntimeError("can only replace one at a time")
+                    
+                elif self.close_previous_bool and not first_pass:
+                    raise RuntimeError("only the first model can be replaced")
+                else:
+                    model_copy = model.copy()
+                    rescol = ResidueCollection(model_copy)
+                    targets = [rescol.atoms[i] for i in models[model]]
+                    for target in targets:
+                        rescol.substitute(sub, target)
+                
+                    print(rescol)
+                
+                    struc = rescol.get_chimera(self.session)
+                    new_structures.append(struc)
             
-                struc = rescol.atomic_structure
-                new_structures.append(struc)
-            
-            i += 1
+            first_pass = False
         
         if not self.close_previous_bool:
             self.session.models.add(new_structures)
