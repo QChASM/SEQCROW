@@ -3,17 +3,22 @@ from chimerax.core.models import REMOVE_MODELS, ADD_MODELS
 from chimerax.core.triggerset import TriggerSet
 
 FREQ_FILE_CHANGE = "frequency file opened or closed"
+FREQ_FILE_REMOVED = "frequency file closed"
+FREQ_FILE_ADDED = "frequency file opened"
 
 class FrequencyFileManager(ProviderManager):
     """keeps track of frequency files that have been opened"""
     # XML_TAG ChimeraX :: Manager :: chimaaron_frequency_file_manager
     def __init__(self, session):
-        
         self.triggers = TriggerSet()
         self.triggers.add_trigger(FREQ_FILE_CHANGE)
+        self.triggers.add_trigger(FREQ_FILE_ADDED)
+        self.triggers.add_trigger(FREQ_FILE_REMOVED)
                 
         session.triggers.add_handler(REMOVE_MODELS, self.remove_models)
-        session.triggers.add_handler(ADD_MODELS, self.add_models)
+        session.triggers.add_handler(ADD_MODELS, self.add_models)        
+        self.triggers.add_handler(FREQ_FILE_REMOVED, self.remove_models)
+        self.triggers.add_handler(FREQ_FILE_ADDED, self.add_models)
                 
         #list of models with an associated FileReader object
         self.frequency_models = []
@@ -24,6 +29,7 @@ class FrequencyFileManager(ProviderManager):
             if hasattr(model, "aarontools_filereader") and 'frequency' in model.aarontools_filereader.other:
                 self.frequency_models.append(model)
                 self.triggers.activate_trigger(FREQ_FILE_CHANGE, self)
+
                 
     def remove_models(self, trigger_name, models):
         """remove models with frequency data from out list when they are closed"""
@@ -33,4 +39,5 @@ class FrequencyFileManager(ProviderManager):
                 self.triggers.activate_trigger(FREQ_FILE_CHANGE, self)
 
     def add_provider(self, bundle_info, name, **kw):
+        #*buzz lightyear* ah yes, the frequency models are frequency_models
         self.frequency_models = self.frequency_models

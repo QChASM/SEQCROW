@@ -195,7 +195,7 @@ class AaronTools_Library(ToolInstance):
         for row in self.ring_table.selectionModel().selectedRows():
             ring_name = row.data()
             ring = RingFragment(ring_name, name=ring_name)
-            chimera_ring = ResidueCollection(ring).get_chimera(self.session)
+            chimera_ring = ResidueCollection(ring.copy()).get_chimera(self.session)
 
             self.session.models.add([chimera_ring])
 

@@ -9,16 +9,18 @@ from AaronTools.geometry import Geometry
 
 from chimerax.atomic import AtomicStructure
 from chimerax.atomic import Atom as ChixAtom
+from chimerax.atomic.colors import element_color
+
+from .managers.freqfile_manager import FREQ_FILE_REMOVED
 
 class ChimAtom(Atom):
+    """ChimAtom object allows for easy conversion between chimerax atoms and AaronTools Atoms
+    several overloaded functions are different from AaronTools Atoms because 
+    ChimAtom names can contain letters"""
     def __init__(self, atom=None, *args, serial_number=None, atomspec=None, **kwargs):
         """atom to go between chimerax Atom and AaronTools Atom"""
-        if isinstance(atom, ChixAtom):
-            element = str(atom.element)
-            coords = atom.coord
-            name = atom.name
-            
-            super().__init__(*args, name=atom.name, element=element, coords=coords, **kwargs)
+        if isinstance(atom, ChixAtom):          
+            super().__init__(*args, name=atom.name, element=str(atom.element), coords=atom.coord, **kwargs)
             
             self.add_tag(str(atom.atomspec))
             self.atomspec = str(atom.atomspec)
@@ -97,11 +99,18 @@ class ChimAtom(Atom):
         
 
 class Residue(Geometry):
+    """Residue is an intermediary between chimerax Residues and AaronTools Geometrys
+    Residue has the following attributes:
+    resnum      - same as chimerax Residue.number
+    name        - same as chimerax Residue.name
+    """
     def __init__(self, geom, resnum=None, name="UNK", **kwargs):
         super().__init__(geom, name=name, **kwargs)
         self.resnum = resnum
 
     def get_element_count(self):
+        """returns a dictionary with element symbols as keys and values corresponding to the
+        occurences of an element in self's atoms"""
         out = {}
         for atom in self.atoms:
             if atom.element not in out:
@@ -136,17 +145,7 @@ class ResidueCollection(Geometry):
             self._atom_update()
             return
         
-        elif isinstance(molecule, Geometry):
-            super().__init__(molecule, refresh_connected=refresh_connected, **kwargs)
-                
-            self.residues = [Residue(molecule, resnum=1, name="UNK", refresh_connected=refresh_connected)]
-            self.session = None
-            self._atom_update()
-            return
-        
-        if not isinstance(molecule, AtomicStructure):
-            raise NotImplementedError("molecule must be a chimerax AtomicStructure or a list of AtomicStructures")
-        else:
+        elif isinstance(molecule, AtomicStructure):
             self.residues = []
             
             #convert chimerax stuff to AaronTools
@@ -194,9 +193,28 @@ class ResidueCollection(Geometry):
                 for atom2 in atom.connected:
                     if not isinstance(atom2, ChimAtom):
                         atom.connected.remove(atom2)
+            
+            #add bonds to metals
+            tm_bonds = molecule.pseudobond_group(molecule.PBG_METAL_COORDINATION, create_type=None)
+            if tm_bonds is not None:
+                for pseudobond in tm_bonds.pseudobonds:
+                    atom1, atom2 = pseudobond.atoms
+                    aaron_atom1 = self.find(atom1.atomspec)[0]
+                    aaron_atom2 = self.find(atom2.atomspec)[0]
+                    aaron_atom1.connected.add(aaron_atom2)
+                    aaron_atom2.connected.add(aaron_atom1)
         
             self.session = molecule.session
-    
+            
+        else:
+            #assume whatever we got is something AaronTools can turn into a Geometry
+            super().__init__(molecule, refresh_connected=refresh_connected, **kwargs)
+                
+            self.residues = [Residue(molecule, resnum=1, name="UNK", refresh_connected=refresh_connected)]
+            self.session = None
+            self._atom_update()
+            return
+                
     def _atom_update(self):
         """convert all atoms to ChimAtoms and make sure all atoms have the proper connectivity"""
         if hasattr(self, "residues"):
@@ -212,9 +230,9 @@ class ResidueCollection(Geometry):
                     connectivity_index[-1].append(self.atoms.index(atom2))
 
         chim_atoms = {}
-        for i in range(0, len(self.atoms)):
-            if not isinstance(self.atoms[i], ChimAtom):
-                chim_atoms[self.atoms[i]] = ChimAtom(atom=self.atoms[i])
+        for i, atom in enumerate(self.atoms):
+            if not isinstance(atom, ChimAtom):
+                chim_atoms[atom] = ChimAtom(atom=atom)
                 
         if hasattr(self, "residues"):
             for residue in self.residues:
@@ -256,6 +274,7 @@ class ResidueCollection(Geometry):
         self._atom_update()
 
     def find_residue(self, target):
+        """returns a list of residues containing the specified target"""
         atom = self.find(target)
         if len(atom) != 1:
             raise LookupError("multiple or no atoms found for %s" % target)
@@ -294,22 +313,8 @@ class ResidueCollection(Geometry):
         
         for atom in differences['geom missing']:
             atom.delete()
-        
-        atom_dict = {}
-        for atom in atomic_structure.atoms:
-            if str(atom.element) not in atom_dict:
-                atom_dict[str(atom.element)] = 1
-            else:
-                atom_dict[str(atom.element)] += 1
-                
-            atom.name = "%s%i" % (str(atom.element), atom_dict[str(atom.element)])
 
         for atom in differences['chix missing']:
-            if atom.element not in atom_dict:
-                atom_dict[atom.element] = 1
-            else:
-                atom_dict[atom.element] += 1
-                
             self_res = self.find_residue(atom)
 
             if len(self_res) != 1:
@@ -322,9 +327,16 @@ class ResidueCollection(Geometry):
                 res = atomic_structure.new_residue(self_res.name, "a", 1)
             else:
                 res = res[0]
-                
-            new_atom = atomic_structure.new_atom("%s%i" % (atom.element, atom_dict[atom.element]), atom.element)
+            i = 1
+            atom_name = "%s%i" % (atom.element, i)
+            while any([chix_atom.name == "%s%i" % (atom.element, i) for chix_atom in res.atoms]):
+                i += 1
+                atom_name = "%s%i" % (atom.element, i)
+            
+            new_atom = atomic_structure.new_atom(atom_name, atom.element)
             new_atom.coord = atom.coords
+            new_atom.draw_mode = ChixAtom.STICK_STYLE
+            new_atom.color = element_color(new_atom.element.number)
 
             atom.chix_atom = new_atom
 
@@ -334,6 +346,11 @@ class ResidueCollection(Geometry):
             atom.chix_atom.coord = atom.coords
         
         self.refresh_chix_connected(atomic_structure, sanity_check=False)
+        
+        #remove atomic_structure's filereaderZ
+        if hasattr(atomic_structure, "aarontools_filereader"):
+            del atomic_structure.aarontools_filereader
+            atomic_structure.session.chimaaron_frequency_file_manager.triggers.activate_trigger(FREQ_FILE_REMOVED, [atomic_structure])
     
     def refresh_chix_connected(self, atomic_structure, sanity_check=True):
         """updates atomic_structure's bonds to match self's connectivity
@@ -367,25 +384,18 @@ class ResidueCollection(Geometry):
                     new_bond = atomic_structure.new_bond(atom1, atom2)
                                         
                     if any([aaron_atom.element in TMETAL for aaron_atom in [aaron_atom1, aaron_atom2]]):
-                        #TODO:
-                        #figure out what the create_type parameter does
                         pbg = atomic_structure.pseudobond_group(atomic_structure.PBG_METAL_COORDINATION, create_type='normal') 
                         pbg.new_pseudobond(atom1, atom2)
                         new_bond.display = False        
                 except:
                     pass
 
-
     def get_chimera(self, session, coordsets=False, filereader=None):
         """returns a chimerax equivalent of self"""
-        
         struc = AtomicStructure(session, name=self.name)
         struc.comment = self.comment
         
         self.update_chix(struc)
-
-        #keep bonding consistent with AaronTools
-        #self.refresh_chix_connected(struc, sanity_check=False)
 
         if coordsets:
             #make a trajectory

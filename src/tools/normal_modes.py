@@ -273,9 +273,9 @@ class NormalModes(ToolInstance):
         dX = self._get_coord_change(geom, vector, scale)
         
         #atoms can't be deep copied for some reason
-        geom_forward = Geometry([Atom(atom.element, atom.coords) for atom in geom.atoms], refresh_connected=False)
+        geom_forward = geom.copy()
         geom_forward.update_geometry(geom.coords() + dX)
-        geom_reverse = Geometry([Atom(atom.element, atom.coords) for atom in geom.atoms], refresh_connected=False)
+        geom_reverse = geom.copy()
         geom_reverse.update_geometry(geom.coords() - dX)
         
         S = Pathway([geom_forward, geom, geom_reverse, geom, geom_forward])

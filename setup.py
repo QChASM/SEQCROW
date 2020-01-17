@@ -87,6 +87,7 @@ setup(
     install_requires=[
         #TODO: add AaronTools
         "ChimeraX-Core >= 0.1",
+        "scipy",
     ],
     classifiers=[
         # https://pypi.python.org/pypi?%3Aaction=list_classifiers
@@ -98,7 +99,7 @@ setup(
         "Programming Language :: Python :: 3",
         "Topic :: Scientific/Engineering :: Visualization",
         "Topic :: Scientific/Engineering :: Chemistry",
-        "ChimeraX :: Bundle :: General,Input/Output,Structure Editing :: 1,1 :: ChimAARON :: ChimAARON :: true ",
+        "ChimeraX :: Bundle :: General,Input/Output,Structure Editing,External Program :: 1,1 :: ChimAARON :: ChimAARON :: true ",
         *chimerax_classifiers
     ] + environments,
 )

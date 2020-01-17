@@ -87,6 +87,9 @@ class EditStructure(ToolInstance):
         subnames = self.subname.text()
         selection = selected_atoms(self.session)
         
+        if len(selection) < 1:
+            raise RuntimeWarning("nothing selected")
+        
         models = {}
         for atom in selection:
             if atom.structure not in models:

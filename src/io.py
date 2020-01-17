@@ -19,7 +19,7 @@ def open_aarontools(session, path, format_name=None, trajectory=False):
             
     f = FileReader((path, fmt, None), just_geom=False, get_all=trajectory)
 
-    geom = ResidueCollection(Geometry(f))
+    geom = ResidueCollection(Geometry(f).copy())
 
     structures = [geom.get_chimera(session, coordsets=trajectory, filereader=f)]
 

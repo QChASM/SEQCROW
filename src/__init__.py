@@ -37,7 +37,6 @@ class _QChaSM_API(BundleAPI):
 
         return open_aarontools(session, path, format_name=format_name, trajectory=coordsets)
 
-
     @staticmethod
     def save_file(session, path, format_name, **kw):
         #XML_TAG ChimeraX :: Save :: XYZ :: AaronTools :: false :: extra_keywords
