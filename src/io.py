@@ -42,7 +42,6 @@ def save_aarontools(session, path, format_name, **kwargs):
     kwargs may be:
         comment - str
     """
-    #XML: ChimeraX :: Save -> extra_keywords=comment:String
     #XML: ChimeraX :: Save -> extra_keywords=models:Models
     #^ this doesn't do anything b/c save doesn't expect a 'comment' keyword
     from ChimAARON.residue_collection import ResidueCollection

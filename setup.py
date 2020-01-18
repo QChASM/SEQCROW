@@ -7,8 +7,25 @@ cp dist/ChimAARON-0.1-py3-none-any.whl $desktop/
 from setuptools import setup, find_packages
 import os
 
+synopsis = "Structure editing and visualization with a focus on small molecules, QM, and organometallic catalysts"
+
 description = """
-ChimAARON but for ChimeraX
+ChimAARON extends ChimeraX:
+I/O:
+    read XYZ, Gaussian COM, and Gaussian LOG files
+    save models to XYZ files
+
+tools:
+    Browse AaronTools        - browse substituents, ligands, and rings in the AaronTools library
+    Structure Modification   - modify your structure using pieces from the AaronTools library
+    Visualize Normal Modes   - display normal modes from Gaussian LOG files as vectors or an animation
+
+selectors:
+    tm  - select all transition metals
+
+presets:
+    ball-stick-endcap       - all non-H atoms are represented as balls and sticks; H atoms are represented as sticks/endcaps
+    sticks                  - all atoms are represented as sticks/endcaps
 """
 
 # ChimeraX classifiers are put in the code as comments
@@ -69,7 +86,7 @@ environments = [
 setup(
     name="ChimAARON",
     version="0.1",  
-    description="Use useful things from QChASM in ChimeraX!",  
+    description=synopsis,  
     long_description=description,
     author="QChASM",
     author_email="catalysttrends@uga.edu",
@@ -85,9 +102,10 @@ setup(
     ],
     ext_modules=ext_mods,
     install_requires=[
-        #TODO: add AaronTools
+        #TODO: add AaronTools (AaronTools should require scipy)
         "ChimeraX-Core >= 0.1",
         "scipy",
+        "numpy", 
     ],
     classifiers=[
         # https://pypi.python.org/pypi?%3Aaction=list_classifiers

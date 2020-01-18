@@ -20,7 +20,7 @@ class ChimAtom(Atom):
     def __init__(self, atom=None, *args, serial_number=None, atomspec=None, **kwargs):
         """atom to go between chimerax Atom and AaronTools Atom"""
         if isinstance(atom, ChixAtom):          
-            super().__init__(*args, name=atom.name, element=str(atom.element), coords=atom.coord, **kwargs)
+            super().__init__(*args, name=atom.name, element=str(atom.element), coords=atom.scene_coord, **kwargs)
             
             self.add_tag(str(atom.atomspec))
             self.atomspec = str(atom.atomspec)
@@ -362,8 +362,8 @@ class ResidueCollection(Geometry):
                     raise Exception("ResidueCollection does not correspond to AtomicStructure: \n%s\n\n%s" % \
                         (repr(self), repr(ResidueCollection(atomic_structure))))
                     
-        for bond in atomic_structure.bonds:
-            bond.delete()
+        #for bond in atomic_structure.bonds:
+        #    bond.delete()
             
         known_bonds = []
         for i, aaron_atom1 in enumerate(self.atoms):
