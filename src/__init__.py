@@ -9,11 +9,13 @@ class _QChaSM_API(BundleAPI):
     def initialize(session, bundle_info):
         #TODO set AaronTools environment variables
         from .presets import chimaaron_bse, chimaaron_s\
+            ,indexLabel \
             ,blue_filter1, blue_filter2 \
             #,protanopia, protanomaly, deuteranopia, deuteranomaly, tritanopia, tritanomaly, achromatopsia, achromatomaly
                 
         session.presets.add_presets("ChimAARON", {"ball-stick-endcap":lambda p=chimaaron_bse: p(session)})
         session.presets.add_presets("ChimAARON", {"sticks":lambda p=chimaaron_s: p(session)})
+        session.presets.add_presets("ChimAARON", {"index labels":lambda p=indexLabel: p(session)})
         session.presets.add_presets("Filters", {"blue filter 1":lambda p=blue_filter1: p(session)})
         session.presets.add_presets("Filters", {"blue filter 2":lambda p=blue_filter2: p(session)})
        #session.presets.add_presets("Filters", {"protanopia":lambda p=protanopia: p(session)})

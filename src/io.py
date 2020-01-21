@@ -2,6 +2,7 @@ def open_aarontools(session, path, format_name=None, trajectory=False):
     from AaronTools.fileIO import FileReader
     from AaronTools.geometry import Geometry
     from ChimAARON.residue_collection import ResidueCollection
+    from os.path import split as path_split
     #XML_TAG ChimeraX :: DataFormat :: XYZ :: XYZ :: Molecular structure :: .xyz :: :: :: :: :: XYZ Format :: utf-8
     #XML_TAG ChimeraX :: Open :: XYZ :: AaronTools :: false :: coordsets:Bool
     #XML_TAG ChimeraX :: DataFormat :: COM :: Gaussian input file :: Molecular structure :: .com,.gjf :: :: :: :: :: Gaussian input file :: utf-8
@@ -20,6 +21,7 @@ def open_aarontools(session, path, format_name=None, trajectory=False):
     f = FileReader((path, fmt, None), just_geom=False, get_all=trajectory)
 
     geom = ResidueCollection(Geometry(f).copy())
+    geom.name = path_split(path)[-1]
 
     structures = [geom.get_chimera(session, coordsets=trajectory, filereader=f)]
 

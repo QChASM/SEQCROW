@@ -1,8 +1,10 @@
 import numpy as np
 
 from AaronTools.substituent import Substituent
+from AaronTools.component import Component
+from AaronTools.catalyst import Catalyst
 
-from chimerax.atomic import selected_atoms
+from chimerax.atomic import selected_atoms, selected_residues
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 
@@ -11,8 +13,8 @@ from io import BytesIO
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QLabel, QLineEdit, QGridLayout, QPushButton, QTabWidget, QComboBox, QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, QFormLayout, QCheckBox
 
-from ..residue_collection import ResidueCollection
-from ..libraries import SubstituentTable
+from ChimAARON.residue_collection import ResidueCollection
+from ChimAARON.libraries import SubstituentTable, LigandTable
 
 class EditStructure(ToolInstance):
     #XML_TAG ChimeraX :: Tool :: Structure Modification :: AaronTools :: Modify substituents, swap ligands, abd close rings, all for the one-time fee of an arm and a leg!
@@ -49,11 +51,11 @@ class EditStructure(ToolInstance):
         open_sub_lib.clicked.connect(self.open_sub_selector)
         self.substitute_layout.addWidget(open_sub_lib, 0, 2)        
         
-        close_previous = QCheckBox("modify selected structure")
-        close_previous.setToolTip("checked: selected structure will be modified\nunchecked: new model will be created for the modified structure")
-        close_previous.toggle()
-        close_previous.stateChanged.connect(self.close_previous_change)
-        self.substitute_layout.addWidget(close_previous, 1, 0, 1, 3)
+        self.close_previous_sub = QCheckBox("modify selected structure")
+        self.close_previous_sub.setToolTip("checked: selected structure will be modified\nunchecked: new model will be created for the modified structure")
+        self.close_previous_sub.toggle()
+        self.close_previous_sub.stateChanged.connect(self.close_previous_change)
+        self.substitute_layout.addWidget(self.close_previous_sub, 1, 0, 1, 3)
         
         substitute_button = QPushButton("substitute current selection")
         substitute_button.clicked.connect(self.do_substitute)
@@ -62,6 +64,27 @@ class EditStructure(ToolInstance):
         #map ligand
         self.maplig_tab = QWidget()
         self.maplig_layout = QGridLayout(self.maplig_tab)
+        
+        liglabel = QLabel("ligand name:")
+        self.maplig_layout.addWidget(liglabel, 0, 0)
+        
+        self.ligname = QLineEdit()
+        self.ligname.setToolTip("name of ligand in AaronTools library")
+        self.maplig_layout.addWidget(self.ligname, 0, 1)
+        
+        open_lig_lib = QPushButton("from library...")
+        open_lig_lib.clicked.connect(self.open_lig_selector)
+        self.maplig_layout.addWidget(open_lig_lib, 0, 2)        
+        
+        self.close_previous_lig = QCheckBox("modify selected structure")
+        self.close_previous_lig.setToolTip("checked: selected structure will be modified\nunchecked: new model will be created for the modified structure")
+        self.close_previous_lig.toggle()
+        self.close_previous_lig.stateChanged.connect(self.close_previous_change)
+        self.maplig_layout.addWidget(self.close_previous_lig, 1, 0, 1, 3)
+        
+        maplig_button = QPushButton("swap ligand of current selection")
+        maplig_button.clicked.connect(self.do_maplig)
+        self.maplig_layout.addWidget(maplig_button, 2, 0, 1, 3)
         
         #close ring
         self.closering_tab = QWidget()
@@ -79,8 +102,12 @@ class EditStructure(ToolInstance):
     
     def close_previous_change(self, state):
         if state == Qt.Checked:
+            for checkbox in [self.close_previous_lig, self.close_previous_sub]:
+                checkbox.setChecked(True)
             self.close_previous_bool = True
         else:
+            for checkbox in [self.close_previous_lig, self.close_previous_sub]:
+                checkbox.setChecked(False)
             self.close_previous_bool = False
     
     def do_substitute(self):
@@ -128,7 +155,88 @@ class EditStructure(ToolInstance):
         
     def open_sub_selector(self):
         self.tool_window.create_child_window("select substituents", window_class=SubstituentSelection, textBox=self.subname)
+
+    def do_maplig(self):
+        lignames = self.ligname.text()
+        selection = selected_atoms(self.session)
         
+        if len(selection) < 1:
+            raise RuntimeWarning("nothing selected")
+        
+        models = {}
+        for atom in selection:
+            if atom.structure not in models:
+                models[atom.structure] = [str(atom.atomspec)]
+            else:
+                models[atom.structure].append(str(atom.atomspec))        
+        
+        first_pass = True
+        new_structures = []
+        for ligname in lignames.split(','):
+            ligname = ligname.strip()
+            lig = Component(ligname)
+            ResidueCollection._atom_update(lig)
+            for model in models:
+                if self.close_previous_bool and first_pass:
+                    rescol = ResidueCollection(model)
+                    
+                    try:
+                        cat = Catalyst(structure=rescol)                   
+                    except IOError:
+                        cat = Catalyst(structure=rescol, comment=rescol.comment) 
+                        
+                    target = cat.find("key", models[model])
+                    if len(target) % len(lig.key_atoms) == 0:
+                        k = 0
+                        ligands = []
+                        while k != len(target):
+                            ligands.append(lig.copy())
+                            k += len(lig.key_atoms)
+                    else:
+                        raise RuntimeError("number of key atoms no not match: %i now, new ligand has %i" % (len(target), len(lig.key_atoms)))
+                    
+                    cat.map_ligand(ligands, target)
+                    new_rescol = ResidueCollection(cat)
+                    new_rescol.update_chix(model)
+                    
+                elif self.close_previous_bool and not first_pass:
+                    raise RuntimeError("only the first model can be replaced")
+                else:
+                    model_copy = model.copy()
+                    rescol = ResidueCollection(model_copy)
+                    
+                    try:
+                        cat = Catalyst(structure=rescol)                   
+                    except IOError:
+                        cat = Catalyst(structure=rescol, comment=model.comment)                     
+                    except KeyError:
+                        cat = Catalyst(structure=rescol, comment=model.comment) 
+                    
+                    target = cat.find("key", models[model])
+                    if len(target) % len(lig.key_atoms) == 0:
+                        k = 0
+                        ligands = []
+                        while k != len(target):
+                            ligands.append(lig.copy())
+                            k += len(lig.key_atoms)
+                    else:
+                        raise RuntimeError("number of key atoms no not match: %i now, new ligand has %i" % (len(target), len(lig.key_atoms)))
+                    
+                    cat.map_ligand(ligands, target)
+                    new_rescol = ResidueCollection(cat)
+                                
+                    struc = new_rescol.get_chimera(self.session)
+                    new_structures.append(struc)
+            
+            first_pass = False
+        
+        if not self.close_previous_bool:
+            self.session.models.add(new_structures)
+                    
+    def open_lig_selector(self):
+        self.tool_window.create_child_window("select ligands", window_class=LigandSelection, textBox=self.ligname)
+    
+    
 class SubstituentSelection(ChildToolWindow):
     def __init__(self, tool_instance, title, textBox=None, **kwargs):
         super().__init__(tool_instance, title, **kwargs)
@@ -141,6 +249,33 @@ class SubstituentSelection(ChildToolWindow):
         layout = QGridLayout()
         
         self.sub_table = SubstituentTable()
+        self.sub_table.itemSelectionChanged.connect(self.refresh_selection)
+        layout.addWidget(self.sub_table)
+        
+        self.ui_area.setLayout(layout)
+        
+        self.manage(None)
+        
+    def refresh_selection(self):
+        sub_names = []
+        for row in self.sub_table.selectionModel().selectedRows():
+            sub_names.append(row.data())
+            
+        self.textBox.setText(",".join(sub_names))  
+
+        
+class LigandSelection(ChildToolWindow):
+    def __init__(self, tool_instance, title, textBox=None, **kwargs):
+        super().__init__(tool_instance, title, **kwargs)
+        
+        self.textBox = textBox
+        
+        self._build_ui()
+        
+    def _build_ui(self):
+        layout = QGridLayout()
+        
+        self.sub_table = LigandTable()
         self.sub_table.itemSelectionChanged.connect(self.refresh_selection)
         layout.addWidget(self.sub_table)
         

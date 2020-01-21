@@ -65,8 +65,16 @@ class ChimAtom(Atom):
 
 
         #sometimes the name has a different element in it
-        a = re.sub(r'[A-Za-z]', '', self.name).split(".")
-        b = re.sub(r'[A-Za-z]', '', other.name).split(".")
+        if re.match(r'[A-Za-z]', self.name):
+            a = [str(self.serial_number)] + self.name.split(".")[1:]
+        else:
+            a = self.name.split('.')
+            
+        if re.match(r'[A-Za-z]', other.name):
+            b = [str(other.serial_number)] + other.name.split(".")[1:]
+        else:
+            b = other.name.split('.')
+            
         while '' in b:
             b.remove('')        
         while '' in a:
@@ -89,7 +97,11 @@ class ChimAtom(Atom):
         """
         converts self.name from a string to a floating point number
         """
-        rv = re.sub(r'[A-Za-z]', '', self.name).split(".")
+        if re.match(r'[A-Za-z]', self.name):
+            rv = [str(self.serial_number)] + self.name.split(".")[1:]
+        else:
+            rv = self.name.split('.')
+
         if len(rv) == 0:
             return float(0)
         if len(rv) == 1:
@@ -126,7 +138,7 @@ class ResidueCollection(Geometry):
     def __init__(self, molecule, refresh_connected=False, **kwargs):
         """molecule     - chimerax AtomicStructure or [AtomicStructure] or AaronTools Geometry (for easy compatibility stuff)"""
         if isinstance(molecule, Catalyst):
-            super().__init__(molecule, refresh_connected=refresh_connected, **kwargs)
+            super().__init__(molecule, refresh_connected=refresh_connected, comment=molecule.comment, **kwargs)
                 
             self.residues = []
             i = 1
@@ -165,7 +177,7 @@ class ResidueCollection(Geometry):
                 
                 all_atoms.extend(aaron_atoms)
             
-            super().__init__(all_atoms, name=molecule.name, refresh_connected=refresh_connected, **kwargs)
+            super().__init__(all_atoms, name=molecule.name, refresh_connected=refresh_connected, comment=molecule.comment if hasattr(molecule, "comment") else "", **kwargs)
         
             #update bonding to match that of the chimerax molecule
             for bond in molecule.bonds:
@@ -209,8 +221,12 @@ class ResidueCollection(Geometry):
         else:
             #assume whatever we got is something AaronTools can turn into a Geometry
             super().__init__(molecule, refresh_connected=refresh_connected, **kwargs)
-                
-            self.residues = [Residue(molecule, resnum=1, name="UNK", refresh_connected=refresh_connected)]
+            if "comment" in kwargs:
+                self.residues = [Residue(molecule, resnum=1, name="UNK", refresh_connected=refresh_connected, comment=kwargs['comment'])]
+            if hasattr(molecule, "comment"):
+                self.residues = [Residue(molecule, resnum=1, name="UNK", refresh_connected=refresh_connected, comment=molecule.comment)]
+            else:
+                self.residues = [Residue(molecule, resnum=1, name="UNK", refresh_connected=refresh_connected)]
             self.session = None
             self._atom_update()
             return
@@ -232,7 +248,7 @@ class ResidueCollection(Geometry):
         chim_atoms = {}
         for i, atom in enumerate(self.atoms):
             if not isinstance(atom, ChimAtom):
-                chim_atoms[atom] = ChimAtom(atom=atom)
+                chim_atoms[atom] = ChimAtom(atom=atom, serial_number=self.atoms.index(atom)+1)
                 
         if hasattr(self, "residues"):
             for residue in self.residues:

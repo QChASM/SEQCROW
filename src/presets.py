@@ -95,6 +95,17 @@ def chimaaron_s(session):
             
             atom.draw_mode = Atom.STICK_STYLE
 
+def indexLabel(session):
+    from chimerax.core.objects import Objects
+    from chimerax.atomic import AtomicStructure, Atoms
+    from chimerax.label.label3d import label
+    
+    for m in session.models.list(type=AtomicStructure):
+        for i, atom in enumerate(m.atoms):
+            l = str(i+1)
+            label(session, objects=Objects(atoms=Atoms([atom])), object_type='atoms', \
+                text=l, offset=(-0.2,-0.2,-0.2), height=0.4, on_top=True)
+
 def blue_filter1(session):
     import numpy as np
     filter = np.array([252./255, 236./255, 217./255, 1.])
