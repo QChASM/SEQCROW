@@ -175,54 +175,44 @@ class EditStructure(ToolInstance):
         for ligname in lignames.split(','):
             ligname = ligname.strip()
             lig = Component(ligname)
-            ResidueCollection._atom_update(lig)
             for model in models:
                 if self.close_previous_bool and first_pass:
                     rescol = ResidueCollection(model)
-                    
-                    try:
-                        cat = Catalyst(structure=rescol)                   
-                    except IOError:
-                        cat = Catalyst(structure=rescol, comment=rescol.comment) 
-                        
-                    target = cat.find("key", models[model])
-                    if len(target) % len(lig.key_atoms) == 0:
-                        k = 0
-                        ligands = []
-                        while k != len(target):
-                            ligands.append(lig.copy())
-                            k += len(lig.key_atoms)
-                    else:
-                        raise RuntimeError("number of key atoms no not match: %i now, new ligand has %i" % (len(target), len(lig.key_atoms)))
-                    
-                    cat.map_ligand(ligands, target)
-                    new_rescol = ResidueCollection(cat)
-                    new_rescol.update_chix(model)
-                    
                 elif self.close_previous_bool and not first_pass:
                     raise RuntimeError("only the first model can be replaced")
                 else:
                     model_copy = model.copy()
                     rescol = ResidueCollection(model_copy)
                     
-                    try:
-                        cat = Catalyst(structure=rescol)                   
-                    except IOError:
-                        cat = Catalyst(structure=rescol, comment=model.comment)                     
-                    except KeyError:
-                        cat = Catalyst(structure=rescol, comment=model.comment) 
-                    
-                    target = cat.find("key", models[model])
-                    if len(target) % len(lig.key_atoms) == 0:
-                        k = 0
-                        ligands = []
-                        while k != len(target):
-                            ligands.append(lig.copy())
-                            k += len(lig.key_atoms)
-                    else:
-                        raise RuntimeError("number of key atoms no not match: %i now, new ligand has %i" % (len(target), len(lig.key_atoms)))
-                    
-                    cat.map_ligand(ligands, target)
+                try:
+                    cat = Catalyst(structure=rescol)                   
+                except IOError:
+                    cat = Catalyst(structure=rescol, comment=model.comment)                     
+                except KeyError:
+                    cat = Catalyst(structure=rescol, comment=model.comment) 
+                
+                target = cat.find("key", models[model])
+                if len(target) % len(lig.key_atoms) == 0:
+                    k = 0
+                    ligands = []
+                    while k != len(target):
+                        res_lig = ResidueCollection(lig.copy(), comment=lig.comment)
+                        res_lig.parse_comment()
+                        res_lig = Component(res_lig, key_atoms = ",".join([str(k + 1) for k in res_lig.other["key_atoms"]]))
+                        for i, atom in enumerate(res_lig.atoms):
+                            print("%2i %s %s" % (i, atom, "k" if atom in res_lig.key_atoms else ""))
+                        print(res_lig.key_atoms)
+                        ligands.append(res_lig)
+                        k += len(lig.key_atoms)
+                else:
+                    raise RuntimeError("number of key atoms no not match: %i now, new ligand has %i" % (len(target), len(lig.key_atoms)))
+                
+                cat.map_ligand(ligands, target)
+                
+                if self.close_previous_bool:                    
+                    new_rescol = ResidueCollection(cat)
+                    new_rescol.update_chix(model)
+                else:
                     new_rescol = ResidueCollection(cat)
                                 
                     struc = new_rescol.get_chimera(self.session)

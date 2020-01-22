@@ -260,6 +260,7 @@ class ResidueCollection(Geometry):
             for residue in self.residues:
                 self.atoms.extend(residue.atoms)
         else:
+            #structure is not a ResidueCollection
             for i, atom in enumerate(self.atoms):
                 if not isinstance(atom, ChimAtom):
                     self.atoms[i] = chim_atoms[atom]
