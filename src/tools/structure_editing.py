@@ -3,6 +3,7 @@ import numpy as np
 from AaronTools.substituent import Substituent
 from AaronTools.component import Component
 from AaronTools.catalyst import Catalyst
+from AaronTools.ring import Ring
 
 from chimerax.atomic import selected_atoms, selected_residues
 from chimerax.core.tools import ToolInstance
@@ -14,10 +15,10 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QLabel, QLineEdit, QGridLayout, QPushButton, QTabWidget, QComboBox, QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, QFormLayout, QCheckBox
 
 from ChimAARON.residue_collection import ResidueCollection
-from ChimAARON.libraries import SubstituentTable, LigandTable
+from ChimAARON.libraries import SubstituentTable, LigandTable, RingTable
 
 class EditStructure(ToolInstance):
-    #XML_TAG ChimeraX :: Tool :: Structure Modification :: AaronTools :: Modify substituents, swap ligands, abd close rings, all for the one-time fee of an arm and a leg!
+    #XML_TAG ChimeraX :: Tool :: Structure Modification :: AaronTools :: Modify substituents, swap ligands, and close rings, all for the one-time fee of an arm and a leg!
     SESSION_ENDURING = False
     SESSION_SAVE = False         
     display_name = "The Alchemist"
@@ -90,6 +91,27 @@ class EditStructure(ToolInstance):
         self.closering_tab = QWidget()
         self.closering_layout = QGridLayout(self.closering_tab)
         
+        ringlabel = QLabel("ring name:")
+        self.closering_layout.addWidget(ringlabel, 0, 0)
+        
+        self.ringname = QLineEdit()
+        self.ringname.setToolTip("name of ring in AaronTools library")
+        self.closering_layout.addWidget(self.ringname, 0, 1)
+        
+        open_ring_lib = QPushButton("from library...")
+        open_ring_lib.clicked.connect(self.open_ring_selector)
+        self.closering_layout.addWidget(open_ring_lib, 0, 2)        
+        
+        self.close_previous_ring = QCheckBox("modify selected structure")
+        self.close_previous_ring.setToolTip("checked: selected structure will be modified\nunchecked: new model will be created for the modified structure")
+        self.close_previous_ring.toggle()
+        self.close_previous_ring.stateChanged.connect(self.close_previous_change)
+        self.closering_layout.addWidget(self.close_previous_ring, 1, 0, 1, 3)
+        
+        closering_button = QPushButton("put a ring on current selection")
+        closering_button.clicked.connect(self.do_closering)
+        self.closering_layout.addWidget(closering_button, 2, 0, 1, 3)
+        
         self.alchemy_tabs.addTab(self.substitute_tab, "substitute")
         self.alchemy_tabs.addTab(self.maplig_tab, "swap ligand")
         self.alchemy_tabs.addTab(self.closering_tab, "close ring")
@@ -102,11 +124,11 @@ class EditStructure(ToolInstance):
     
     def close_previous_change(self, state):
         if state == Qt.Checked:
-            for checkbox in [self.close_previous_lig, self.close_previous_sub]:
+            for checkbox in [self.close_previous_lig, self.close_previous_sub, self.close_previous_ring]:
                 checkbox.setChecked(True)
             self.close_previous_bool = True
         else:
-            for checkbox in [self.close_previous_lig, self.close_previous_sub]:
+            for checkbox in [self.close_previous_lig, self.close_previous_sub, self.close_previous_ring]:
                 checkbox.setChecked(False)
             self.close_previous_bool = False
     
@@ -142,6 +164,10 @@ class EditStructure(ToolInstance):
                 else:
                     model_copy = model.copy()
                     rescol = ResidueCollection(model_copy)
+                    for i, atom in enumerate(model.atoms):
+                        rescol.atoms[i].atomspec = atom.atomspec
+                        rescol.atoms[i].add_tag(atom.atomspec)
+                        
                     for target in models[model]:
                         rescol.substitute(sub.copy(), target)
                                 
@@ -183,7 +209,10 @@ class EditStructure(ToolInstance):
                 else:
                     model_copy = model.copy()
                     rescol = ResidueCollection(model_copy)
-                    
+                    for i, atom in enumerate(model.atoms):
+                        rescol.atoms[i].atomspec = atom.atomspec
+                        rescol.atoms[i].add_tag(atom.atomspec)
+                        
                 try:
                     cat = Catalyst(structure=rescol)                   
                 except IOError:
@@ -199,9 +228,6 @@ class EditStructure(ToolInstance):
                         res_lig = ResidueCollection(lig.copy(), comment=lig.comment)
                         res_lig.parse_comment()
                         res_lig = Component(res_lig, key_atoms = ",".join([str(k + 1) for k in res_lig.other["key_atoms"]]))
-                        for i, atom in enumerate(res_lig.atoms):
-                            print("%2i %s %s" % (i, atom, "k" if atom in res_lig.key_atoms else ""))
-                        print(res_lig.key_atoms)
                         ligands.append(res_lig)
                         k += len(lig.key_atoms)
                 else:
@@ -225,6 +251,59 @@ class EditStructure(ToolInstance):
                     
     def open_lig_selector(self):
         self.tool_window.create_child_window("select ligands", window_class=LigandSelection, textBox=self.ligname)
+    
+    def do_closering(self):
+        ringnames = self.ringname.text()
+        selection = selected_atoms(self.session)
+        
+        if len(selection) < 2:
+            raise RuntimeWarning("two atoms must be selected per molecule")
+        
+        models = {}
+        for atom in selection:
+            if atom.structure not in models:
+                models[atom.structure] = [atom.atomspec]
+            else:
+                models[atom.structure].append(atom.atomspec)
+        
+            if len(models[atom.structure]) > 2:
+                raise RuntimeError("only two atoms can be selected on any model")
+        
+        first_pass = True
+        new_structures = []
+        for ringname in ringnames.split(','):
+            ringname = ringname.strip()
+            
+            for model in models:
+                if self.close_previous_bool and first_pass:
+                    rescol = ResidueCollection(model)
+                elif self.close_previous_bool and not first_pass:
+                    raise RuntimeError("only the first model can be replaced")
+                else:
+                    model_copy = model.copy()
+                    rescol = ResidueCollection(model_copy)
+                    for i, atom in enumerate(model.atoms):
+                        rescol.atoms[i].atomspec = atom.atomspec
+                        rescol.atoms[i].add_tag(atom.atomspec)
+                
+                target = rescol.find(models[model])
+                print(target)
+                                
+                rescol.ring_substitute(target, ringname)
+                
+                if self.close_previous_bool:                    
+                    rescol.update_chix(model)
+                else:
+                    struc = rescol.get_chimera(self.session)
+                    new_structures.append(struc)
+            
+            first_pass = False
+        
+        if not self.close_previous_bool:
+            self.session.models.add(new_structures)
+                    
+    def open_ring_selector(self):
+        self.tool_window.create_child_window("select rings", window_class=RingSelection, textBox=self.ringname)
     
     
 class SubstituentSelection(ChildToolWindow):
@@ -265,18 +344,45 @@ class LigandSelection(ChildToolWindow):
     def _build_ui(self):
         layout = QGridLayout()
         
-        self.sub_table = LigandTable()
-        self.sub_table.itemSelectionChanged.connect(self.refresh_selection)
-        layout.addWidget(self.sub_table)
+        self.lig_table = LigandTable()
+        self.lig_table.itemSelectionChanged.connect(self.refresh_selection)
+        layout.addWidget(self.lig_table)
         
         self.ui_area.setLayout(layout)
         
         self.manage(None)
         
     def refresh_selection(self):
-        sub_names = []
-        for row in self.sub_table.selectionModel().selectedRows():
-            sub_names.append(row.data())
+        lig_names = []
+        for row in self.lig_table.selectionModel().selectedRows():
+            lig_names.append(row.data())
             
-        self.textBox.setText(",".join(sub_names))
+        self.textBox.setText(",".join(lig_names))   
+
+        
+class RingSelection(ChildToolWindow):
+    def __init__(self, tool_instance, title, textBox=None, **kwargs):
+        super().__init__(tool_instance, title, **kwargs)
+        
+        self.textBox = textBox
+        
+        self._build_ui()
+        
+    def _build_ui(self):
+        layout = QGridLayout()
+        
+        self.ring_table = RingTable()
+        self.ring_table.itemSelectionChanged.connect(self.refresh_selection)
+        layout.addWidget(self.ring_table)
+        
+        self.ui_area.setLayout(layout)
+        
+        self.manage(None)
+        
+    def refresh_selection(self):
+        ring_names = []
+        for row in self.ring_table.selectionModel().selectedRows():
+            ring_names.append(row.data())
+            
+        self.textBox.setText(",".join(ring_names))
         

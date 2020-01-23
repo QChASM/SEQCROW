@@ -8,16 +8,16 @@ class _PseudoGeometry:
     the entire file for all of the ligands, figure out their key atoms, then read all of the substituents,
     figure out their conformer info, then read all of the ring fragments...
     PseudoGeometry speeds up this process by only reading the relevant info from the file and 
-    storing the method we should use to create the AaronTools Geometry (i.e. Component, Substituent, RingFragment)"""
+    storing the method we should use to create the AaronTools Geometry (i.e. Component, Substituent, Ring)"""
     def __init__(self, filename, method):
         """filename - path to file containing a structure
-        method - Substituent, Component, or RingFragment classes from AaronTools"""
+        method - Substituent, Component, or Ring classes from AaronTools"""
         import os
         import re
 
         from linecache import getline, clearcache
         from AaronTools.substituent import Substituent
-        from AaronTools.ringfragment import RingFragment
+        from AaronTools.ring import Ring
         from AaronTools.component import Component
         
         self.name = os.path.split(filename)[-1].replace('.xyz', '')
@@ -147,9 +147,9 @@ class RingTable(QtWidgets.QTableWidget):
         self.setEditTriggers(QtWidgets.QTableWidget.NoEditTriggers)
         
     def add_rings(self):
-        from AaronTools.ringfragment import RingFragment
+        from AaronTools.ring import Ring
         
-        rings = [_PseudoGeometry(ring, RingFragment) for ring in glob(RingFragment.AARON_LIBS) + glob(RingFragment.BUILTIN)]
+        rings = [_PseudoGeometry(ring, Ring) for ring in glob(Ring.AARON_LIBS) + glob(Ring.BUILTIN)]
         
         for ring in rings:
             row = self.rowCount()

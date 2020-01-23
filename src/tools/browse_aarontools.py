@@ -10,7 +10,7 @@ from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtWidgets import QGridLayout, QPushButton, QCheckBox, QTabWidget, QWidget, QVBoxLayout
 
 from AaronTools.component import Component
-from AaronTools.ringfragment import RingFragment
+from AaronTools.ring import Ring
 from AaronTools.substituent import Substituent
 
 from ..libraries import LigandTable, SubstituentTable, RingTable
@@ -194,7 +194,7 @@ class AaronTools_Library(ToolInstance):
     def open_rings(self):
         for row in self.ring_table.selectionModel().selectedRows():
             ring_name = row.data()
-            ring = RingFragment(ring_name, name=ring_name)
+            ring = Ring(ring_name, name=ring_name)
             chimera_ring = ResidueCollection(ring.copy()).get_chimera(self.session)
 
             self.session.models.add([chimera_ring])

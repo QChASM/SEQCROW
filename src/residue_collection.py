@@ -6,6 +6,7 @@ from AaronTools.atoms import Atom
 from AaronTools.catalyst import Catalyst
 from AaronTools.const import TMETAL
 from AaronTools.geometry import Geometry
+from AaronTools.ring import Ring
 
 from chimerax.atomic import AtomicStructure
 from chimerax.atomic import Atom as ChixAtom
@@ -22,8 +23,8 @@ class ChimAtom(Atom):
         if isinstance(atom, ChixAtom):          
             super().__init__(*args, name=atom.name, element=str(atom.element), coords=atom.scene_coord, **kwargs)
             
-            self.add_tag(str(atom.atomspec))
-            self.atomspec = str(atom.atomspec)
+            self.add_tag(atom.atomspec)
+            self.atomspec = atom.atomspec
             self.serial_number = atom.serial_number
             self.chix_atom = atom
         
@@ -290,6 +291,42 @@ class ResidueCollection(Geometry):
 
         self._atom_update()
 
+    def ring_substitute(self, target, ring, *args, **kwargs):
+        """put a ring on the given targets"""
+        target = self.find(target)
+        if not isinstance(ring, Ring):
+            ring = Ring(ring)
+            
+        if len(target) != 2:
+            raise RuntimeError("can only specify two targets")
+            
+        residue_1 = self.find_residue(target[0])[0]
+        residue_2 = self.find_residue(target[1])[0]
+        
+        #turn atoms into ChixAtoms
+        ResidueCollection._atom_update(ring)
+        
+        #update ring end
+        ring.end = ring.find(",".join(atom.name for atom in ring.end)) 
+        
+        if residue_1 is not residue_2:
+            temp_res = Residue(residue_1.atoms + residue_2.atoms)
+            temp_res.ring_substitute(target, ring, *args, **kwargs)
+            
+            for atom in temp_res.atoms:
+                if atom not in residue_1.atoms and atom not in residue_2.atoms:
+                    residue_1.atoms.append(atom)
+                    
+            for atom in residue_1.atoms + residue_2.atoms:
+                if atom not in temp_res.atoms:
+                    res = self.find_residue(atom)[0]
+                    res -= atom
+        
+        else:
+            residue_1.ring_substitute(target, ring, *args, **kwargs)   
+                    
+        self._atom_update()
+
     def find_residue(self, target):
         """returns a list of residues containing the specified target"""
         atom = self.find(target)
@@ -341,7 +378,7 @@ class ResidueCollection(Geometry):
             
             res = [residue for residue in atomic_structure.residues if residue.number == self_res.resnum and residue.name == self_res.name]
             if len(res) != 1:
-                res = atomic_structure.new_residue(self_res.name, "a", 1)
+                res = atomic_structure.new_residue(self_res.name, "a", self_res.resnum)
             else:
                 res = res[0]
             i = 1
