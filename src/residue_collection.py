@@ -21,7 +21,7 @@ class ChimAtom(Atom):
     def __init__(self, atom=None, *args, serial_number=None, atomspec=None, **kwargs):
         """atom to go between chimerax Atom and AaronTools Atom"""
         if isinstance(atom, ChixAtom):          
-            super().__init__(*args, name=atom.name, element=str(atom.element), coords=atom.scene_coord, **kwargs)
+            super().__init__(*args, name=atom.name, element=str(atom.element), coords=atom.coord, **kwargs)
             
             self.add_tag(atom.atomspec)
             self.atomspec = atom.atomspec
@@ -117,9 +117,10 @@ class Residue(Geometry):
     resnum      - same as chimerax Residue.number
     name        - same as chimerax Residue.name
     """
-    def __init__(self, geom, resnum=None, name="UNK", **kwargs):
+    def __init__(self, geom, resnum=None, atomspec=None, name="UNK", **kwargs):
         super().__init__(geom, name=name, **kwargs)
         self.resnum = resnum
+        self.atomspec = atomspec
 
     def get_element_count(self):
         """returns a dictionary with element symbols as keys and values corresponding to the
@@ -173,6 +174,7 @@ class ResidueCollection(Geometry):
                 self.residues.append(Residue(aaron_atoms, \
                                         name=residue.name, \
                                         resnum=residue.number, \
+                                        atomspec=residue.atomspec, \
                                         comment=molecule.comment if hasattr(molecule, "comment") else "", \
                                         refresh_connected=False))
                 
@@ -362,7 +364,8 @@ class ResidueCollection(Geometry):
         return out
     
     def update_chix(self, atomic_structure):
-        """update chimerax atomic structure to match self"""
+        """update chimerax atomic structure to match self
+        may also change residue numbers for self"""
         differences = self.difference(atomic_structure)
         
         for atom in differences['geom missing']:
@@ -378,7 +381,16 @@ class ResidueCollection(Geometry):
             
             res = [residue for residue in atomic_structure.residues if residue.number == self_res.resnum and residue.name == self_res.name]
             if len(res) != 1:
-                res = atomic_structure.new_residue(self_res.name, "a", self_res.resnum)
+                if len(atomic_structure.residues) < 1:
+                    resnum = 1
+                else:
+                    resnum = max([residue.number for residue in atomic_structure.residues]) + 1
+                res = atomic_structure.new_residue(self_res.name, "a", resnum)
+                self_res.resnum = resnum
+                for i, res in self.residues:
+                    if res.resnum == resnum and res is not self_res:
+                        for k in range(i, len(self.residues)):
+                            self.residues[k].resnum += 1
             else:
                 res = res[0]
             i = 1
