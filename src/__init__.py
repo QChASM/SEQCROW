@@ -8,24 +8,25 @@ class _QChaSM_API(BundleAPI):
     @staticmethod
     def initialize(session, bundle_info):
         #TODO set AaronTools environment variables
-        from .presets import chimaaron_bse, chimaaron_s\
-            ,indexLabel \
-            ,blue_filter1, blue_filter2 \
-            #,protanopia, protanomaly, deuteranopia, deuteranomaly, tritanopia, tritanomaly, achromatopsia, achromatomaly
-                
-        session.presets.add_presets("ChimAARON", {"ball-stick-endcap":lambda p=chimaaron_bse: p(session)})
-        session.presets.add_presets("ChimAARON", {"sticks":lambda p=chimaaron_s: p(session)})
-        session.presets.add_presets("ChimAARON", {"index labels":lambda p=indexLabel: p(session)})
-        session.presets.add_presets("Filters", {"blue filter 1":lambda p=blue_filter1: p(session)})
-        session.presets.add_presets("Filters", {"blue filter 2":lambda p=blue_filter2: p(session)})
-       #session.presets.add_presets("Filters", {"protanopia":lambda p=protanopia: p(session)})
-       #session.presets.add_presets("Filters", {"protanomaly":lambda p=protanomaly: p(session)})
-       #session.presets.add_presets("Filters", {"deuteranopia":lambda p=deuteranopia: p(session)})
-       #session.presets.add_presets("Filters", {"deuteranomaly":lambda p=deuteranomaly: p(session)})
-       #session.presets.add_presets("Filters", {"tritanopia":lambda p=tritanopia: p(session)})
-       #session.presets.add_presets("Filters", {"tritanomaly":lambda p=tritanomaly: p(session)})
-       #session.presets.add_presets("Filters", {"achromatopsia":lambda p=achromatopsia: p(session)})
-       #session.presets.add_presets("Filters", {"achromatomaly":lambda p=achromatomaly: p(session)})
+        if session.ui.is_gui:
+            from .presets import chimaaron_bse, chimaaron_s\
+                ,indexLabel \
+                ,blue_filter1, blue_filter2 \
+                #,protanopia, protanomaly, deuteranopia, deuteranomaly, tritanopia, tritanomaly, achromatopsia, achromatomaly
+                    
+            session.presets.add_presets("ChimAARON", {"ball-stick-endcap":lambda p=chimaaron_bse: p(session)})
+            session.presets.add_presets("ChimAARON", {"sticks":lambda p=chimaaron_s: p(session)})
+            session.presets.add_presets("ChimAARON", {"index labels":lambda p=indexLabel: p(session)})
+            session.presets.add_presets("Filters", {"blue filter 1":lambda p=blue_filter1: p(session)})
+            session.presets.add_presets("Filters", {"blue filter 2":lambda p=blue_filter2: p(session)})
+            #session.presets.add_presets("Filters", {"protanopia":lambda p=protanopia: p(session)})
+            #session.presets.add_presets("Filters", {"protanomaly":lambda p=protanomaly: p(session)})
+            #session.presets.add_presets("Filters", {"deuteranopia":lambda p=deuteranopia: p(session)})
+            #session.presets.add_presets("Filters", {"deuteranomaly":lambda p=deuteranomaly: p(session)})
+            #session.presets.add_presets("Filters", {"tritanopia":lambda p=tritanopia: p(session)})
+            #session.presets.add_presets("Filters", {"tritanomaly":lambda p=tritanomaly: p(session)})
+            #session.presets.add_presets("Filters", {"achromatopsia":lambda p=achromatopsia: p(session)})
+            #session.presets.add_presets("Filters", {"achromatomaly":lambda p=achromatomaly: p(session)})
 
     @staticmethod
     def open_file(session, path, format_name, coordsets=False):
@@ -64,6 +65,12 @@ class _QChaSM_API(BundleAPI):
             from .managers import FrequencyFileManager
             session.chimaaron_frequency_file_manager = FrequencyFileManager(session)
             return session.chimaaron_frequency_file_manager
+        elif name == "chimaaron_environment_manager":
+            from .managers import ChimAARONEnvironmentManager
+            session.chimaaron_environment = ChimAARONEnvironmentManager(session)
+            return session.chimaaron_environment
+        else:
+            raise RuntimeError("manager named '%s' is unknown to ChimAARON" % name)
   
     @staticmethod
     def start_tool(session, bi, ti):
@@ -78,6 +85,10 @@ class _QChaSM_API(BundleAPI):
         elif ti.name == "Structure Modification":
             from .tools import EditStructure
             tool = EditStructure(session, ti.name)
+            return tool        
+        elif ti.name == "Environment Setup":
+            from .tools import EnvironmentSetup
+            tool = EnvironmentSetup(session, ti.name)
             return tool
         else:
             raise RuntimeError("tool named '%s' is unknown to ChimAARON" % ti.name)

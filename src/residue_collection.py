@@ -387,8 +387,8 @@ class ResidueCollection(Geometry):
                     resnum = max([residue.number for residue in atomic_structure.residues]) + 1
                 res = atomic_structure.new_residue(self_res.name, "a", resnum)
                 self_res.resnum = resnum
-                for i, res in self.residues:
-                    if res.resnum == resnum and res is not self_res:
+                for i, chimaaron_res in enumerate(self.residues):
+                    if chimaaron_res.resnum == resnum and chimaaron_res is not self_res:
                         for k in range(i, len(self.residues)):
                             self.residues[k].resnum += 1
             else:

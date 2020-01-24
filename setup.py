@@ -96,8 +96,8 @@ setup(
         "ChimAARON": src_dir,
     },
     packages=[
-        "ChimAARON",
-        "ChimAARON.tools",
+        "ChimAARON", 
+        "ChimAARON.tools", 
         "ChimAARON.managers", 
     ],
     ext_modules=ext_mods,
