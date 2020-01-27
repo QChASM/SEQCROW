@@ -1,4 +1,5 @@
 from chimerax.core.toolshed import BundleAPI
+import os
 
 
 class _QChaSM_API(BundleAPI):
@@ -8,6 +9,8 @@ class _QChaSM_API(BundleAPI):
     @staticmethod
     def initialize(session, bundle_info):
         #TODO set AaronTools environment variables
+        from . import settings
+        settings.settings = settings._ChimAARONSettings(session, "ChimAARON")
         if session.ui.is_gui:
             from .presets import chimaaron_bse, chimaaron_s\
                 ,indexLabel \
@@ -27,6 +30,13 @@ class _QChaSM_API(BundleAPI):
             #session.presets.add_presets("Filters", {"tritanomaly":lambda p=tritanomaly: p(session)})
             #session.presets.add_presets("Filters", {"achromatopsia":lambda p=achromatopsia: p(session)})
             #session.presets.add_presets("Filters", {"achromatomaly":lambda p=achromatomaly: p(session)})
+
+            session.ui.triggers.add_handler('ready',
+                lambda *args, ses=session: settings.register_settings_options(ses))
+        
+        #apply AARONLIB setting
+        if settings.settings.AARONLIB is not None:
+            os.environ['AARONLIB'] = settings.settings.AARONLIB
 
     @staticmethod
     def open_file(session, path, format_name, coordsets=False):
@@ -65,10 +75,6 @@ class _QChaSM_API(BundleAPI):
             from .managers import FrequencyFileManager
             session.chimaaron_frequency_file_manager = FrequencyFileManager(session)
             return session.chimaaron_frequency_file_manager
-        elif name == "chimaaron_environment_manager":
-            from .managers import ChimAARONEnvironmentManager
-            session.chimaaron_environment = ChimAARONEnvironmentManager(session)
-            return session.chimaaron_environment
         else:
             raise RuntimeError("manager named '%s' is unknown to ChimAARON" % name)
   
