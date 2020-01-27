@@ -13,7 +13,7 @@ def register_settings_options(session):
         'AARONLIB': (
             "Personal AaronTools library folder",
             InputFolderOption,
-            "asdf"),
+            "Directory containing your substituents (/Subs), ligands (/Ligands), rings (/Rings), and AARON templates (/TS_geoms)\nYou will need to restart ChimeraX for changes to take effect"),
     }
     for setting, setting_info in settings_info.items():
         opt_name, opt_class, balloon = setting_info

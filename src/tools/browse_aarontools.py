@@ -128,8 +128,8 @@ class AaronTools_Library(ToolInstance):
     def open_ligands(self):
         for row in self.lig_table.selectionModel().selectedRows():
             lig_name = row.data()
-            ligand = Component(lig_name, name=lig_name)
-            chimera_ligand = ResidueCollection(ligand).get_chimera(self.session)
+            ligand = Component(lig_name)
+            chimera_ligand = ResidueCollection(ligand, name=lig_name).get_chimera(self.session)
 
             self.session.models.add([chimera_ligand])
 
@@ -147,6 +147,9 @@ class AaronTools_Library(ToolInstance):
                         r = 0.6*atom._radii
                     else:
                         r = 0.5
+                        
+                    if atom.element == 'H':
+                        r *= 1.5
                     
                     s += ".sphere %f %f %f   %f\n" % (*atom.coords, r)
                     

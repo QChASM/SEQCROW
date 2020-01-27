@@ -92,9 +92,9 @@ class _QChaSM_API(BundleAPI):
             from .tools import EditStructure
             tool = EditStructure(session, ti.name)
             return tool        
-        elif ti.name == "Environment Setup":
-            from .tools import EnvironmentSetup
-            tool = EnvironmentSetup(session, ti.name)
+        elif ti.name == "Add to Personal Library":
+            from .tools import LibAdd
+            tool = LibAdd(session, ti.name)
             return tool
         else:
             raise RuntimeError("tool named '%s' is unknown to ChimAARON" % ti.name)
