@@ -138,26 +138,10 @@ class AaronTools_Library(ToolInstance):
                 
                 color = [c/255. for c in color]
                 
-                #make a bild file and just have chimerax parse that
-                s = ".color %f %f %f\n" % tuple(color[:-1])
-                s += ".transparency %f\n" % (1. - color[-1])
-                for atom in ligand.key_atoms:
-                    if hasattr(atom, "_radii"):
-                        
-                        r = 0.6*atom._radii
-                    else:
-                        r = 0.5
-                        
-                    if atom.element == 'H':
-                        r *= 1.5
-                    
-                    s += ".sphere %f %f %f   %f\n" % (*atom.coords, r)
-                    
-                stream = BytesIO(bytes(s, 'utf-8'))
-                bild_obj, status = read_bild(self.session, stream, "highlighting %s's key atoms" % lig_name)
+                bild_obj = key_atom_highlight(ligand, color, self.session)
             
                 self.session.models.add(bild_obj, parent=chimera_ligand)
-        
+
     def showGhostConnection(self, state):
         if state == QtCore.Qt.Checked:
             self.showSubGhostBool = True
@@ -177,14 +161,7 @@ class AaronTools_Library(ToolInstance):
                 
                 color = [c/255. for c in color]
                 
-                #make a bild file and just have chimerax parse that
-                s = ".color %f %f %f\n" % tuple(color[:-1])
-                s += ".transparency %f\n" % (1. - color[-1])
-                s += ".sphere 0 0 0  %f\n" % 0.15
-                s += ".cylinder 0 0 0   %f 0 0   %f open\n" % (substituent.atoms[0].coords[0], 0.15)
-                    
-                stream = BytesIO(bytes(s, 'utf-8'))
-                bild_obj, status = read_bild(self.session, stream, "ghost connection for %s" % sub_name)
+                bild_obj = ghost_connection_highlight(substituent, color, self.session)
             
                 self.session.models.add(bild_obj, parent=chimera_substituent)
         
@@ -207,37 +184,79 @@ class AaronTools_Library(ToolInstance):
                 
                 color = [c/255. for c in color]
                 
-                #make a bild file and just have chimerax parse that
-                s = ".color %f %f %f\n" % tuple(color[:-1])
-                s += ".transparency %f\n" % (1. - color[-1])
-                if len(ring.end) == 1:
-                    if hasattr(ring.end[0], "_radii"):
-                        r = 0.6*ring.end[0]._radii
-                    else:
-                        r = 1
-                    
-                    info = tuple(ring.end[0].coords) + (r,)
-                    s += ".sphere %f %f %f   %f\n" % info
-                else:
-                    r_bd = 0.16
-                    for atom1, atom2 in zip(ring.end[:-1], ring.end[1:]):                       
-                        v = atom1.bond(atom2)
-                        
-                        if hasattr(atom2, "_radii"):
-                            r_sp = 0.4*atom2._radii
-                        else:
-                            r_sp = 0.4
-                        
-                        info = tuple(atom1.coords) + tuple(atom2.coords - r_sp*v) + (r_bd, 1.5*r_bd,)
-                        s += ".arrow %f %f %f   %f %f %f   %f %f 0.7\n" % info
-                    
-                        for bond in chimera_ring.bonds:
-                            bond_atoms = [chimera_ring.atoms.index(atom) for atom in bond.atoms]
-                            if ring.atoms.index(atom1) in bond_atoms and ring.atoms.index(atom2) in bond_atoms:
-                                bond.display  = False
-                                break
-                                    
-                stream = BytesIO(bytes(s, 'utf-8'))
-                bild_obj, status = read_bild(self.session, stream, "walk direction for %s" % ring_name)
+                bild_obj = show_walk_highlight(ring, chimera_ring, color, self.session)
             
                 self.session.models.add(bild_obj, parent=chimera_ring)
+    
+    
+def key_atom_highlight(ligand, color, session):
+    """returns a bild object with spheres on top on ligand's key atoms"""
+    s = ".color %f %f %f\n" % tuple(color[:-1])
+    s += ".transparency %f\n" % (1. - color[-1])
+    for atom in ligand.key_atoms:
+        if hasattr(atom, "_radii"):
+            
+            r = 0.6*atom._radii
+        else:
+            r = 0.5
+            
+        if atom.element == 'H':
+            r *= 1.5
+        
+        s += ".sphere %f %f %f   %f\n" % (*atom.coords, r)
+        
+    stream = BytesIO(bytes(s, 'utf-8'))
+    bild_obj, status = read_bild(session, stream, "highlighting %s's key atoms" % ligand.name)
+        
+    return bild_obj
+    
+def ghost_connection_highlight(substituent, color, session):            
+    """returns a bild object with a cylinder pointing along the 
+    x axis towards the substituent and a sphere at the origin"""
+    s = ".color %f %f %f\n" % tuple(color[:-1])
+    s += ".transparency %f\n" % (1. - color[-1])
+    s += ".sphere 0 0 0  %f\n" % 0.15
+    s += ".cylinder 0 0 0   %f 0 0   %f open\n" % (substituent.atoms[0].coords[0], 0.15)
+        
+    stream = BytesIO(bytes(s, 'utf-8'))
+    bild_obj, status = read_bild(session, stream, "ghost connection for %s" % substituent.name)
+    
+    return bild_obj
+    
+def show_walk_highlight(ring, chimera_ring, color, session):            
+    """returns a bild sphere on the walk atom if there is only one walk atom
+    returns a set of bild arrows showing the walk direction if there are multiple walk atoms
+        will also hide any bonds on chimera_ring that are under/over the arrows"""
+    s = ".color %f %f %f\n" % tuple(color[:-1])
+    s += ".transparency %f\n" % (1. - color[-1])
+    if len(ring.end) == 1:
+        if hasattr(ring.end[0], "_radii"):
+            r = 0.6*ring.end[0]._radii
+        else:
+            r = 1
+        
+        info = tuple(ring.end[0].coords) + (r,)
+        s += ".sphere %f %f %f   %f\n" % info
+    else:
+        r_bd = 0.16
+        for atom1, atom2 in zip(ring.end[:-1], ring.end[1:]):                       
+            v = atom1.bond(atom2)
+            
+            if hasattr(atom2, "_radii"):
+                r_sp = 0.4*atom2._radii
+            else:
+                r_sp = 0.4
+            
+            info = tuple(atom1.coords) + tuple(atom2.coords - r_sp*v) + (r_bd, 1.5*r_bd,)
+            s += ".arrow %f %f %f   %f %f %f   %f %f 0.7\n" % info
+        
+            for bond in chimera_ring.bonds:
+                bond_atoms = [chimera_ring.atoms.index(atom) for atom in bond.atoms]
+                if ring.atoms.index(atom1) in bond_atoms and ring.atoms.index(atom2) in bond_atoms:
+                    bond.display  = False
+                    break
+                        
+    stream = BytesIO(bytes(s, 'utf-8'))
+    bild_obj, status = read_bild(session, stream, "walk direction for %s" % ring.name)
+    
+    return bild_obj
