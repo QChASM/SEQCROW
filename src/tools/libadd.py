@@ -78,7 +78,7 @@ class LibAdd(ToolInstance):
         
         self.sub_angle = QSpinBox()
         self.sub_angle.setRange(0, 180)
-        self.sub_angle.setSingleStep(15)
+        self.sub_angle.setSingleStep(30)
         sub_info.addRow("angle between conformers:", self.sub_angle)
         
         sub_layout.addWidget(sub_info_form)
@@ -94,11 +94,12 @@ class LibAdd(ToolInstance):
         ring_name_label = QLabel("ring name:")
         ring_layout.addWidget(ring_name_label, 0, 0)
         self.ring_name = QLineEdit()
-        self.ring_name.setText("placeholder; not functional")
+        self.ring_name.setText("")
         self.ring_name.setToolTip("name of ring you are adding to your ring library\nleave blank to open a new model with just the ring")
         ring_layout.addWidget(self.ring_name, 0, 1)
         
         libadd_ring = QPushButton("add ring with selected walk to library")
+        libadd_ring.clicked.connect(self.libadd_ring)
         ring_layout.addWidget(libadd_ring, 1, 0, 1, 2)
         
         
@@ -141,16 +142,14 @@ class LibAdd(ToolInstance):
                         key_atoms.add(atom)
                         
         else:
-            key_atoms = [atom for atom in rescol.atoms if atom.chix_atom in key_chix_atoms]
-            
-        print(key_atoms)
-            
+            key_atoms = rescol.find(",".join([atom.atomspec for atom in key_chix_atoms]))
+                        
         if len(key_atoms) < 1:
             raise RuntimeError("no key atoms could be determined")
         
         lig_name = self.ligand_name.text()
-        comment = "K:%s" % ",".join([str(ligand_atoms.index(atom) + 1) for atom in key_atoms])
-        ligand = Component(ligand_atoms, name=lig_name, comment=comment, key_atoms=key_atoms)
+        ligand = Component(ligand_atoms, name=lig_name, key_atoms=key_atoms)
+        ligand.comment = "K:%s" % ",".join([str(ligand.atoms.index(atom) + 1) for atom in key_atoms])
         
         if len(lig_name) == 0:
             chimerax_ligand = ResidueCollection(ligand).get_chimera(self.session)
@@ -179,6 +178,51 @@ class LibAdd(ToolInstance):
             else:
                 ligand.write(outfile=filename)
                 self.tool_window.status("%s added to ligand library" % lig_name)        
+        
+    def libadd_ring(self):
+        """add ring to library or open it in a new model"""
+        selection = self.session.chimaaron_ordered_selection_manager.selection
+        
+        if not selection.single_structure:
+            raise RuntimeError("selected atoms must be on the same model")
+          
+        rescol = ResidueCollection(selection[0].structure)
+        walk_atoms = rescol.find(",".join([atom.atomspec for atom in selection]))
+                        
+        if len(walk_atoms) < 1:
+            raise RuntimeError("no walk direction could be determined")
+        
+        ring_name = self.ring_name.text()
+        ring = Ring(rescol, name=ring_name, end=walk_atoms)
+        ring.comment = "E:%s" % ",".join([str(rescol.atoms.index(atom) + 1) for atom in walk_atoms])
+        
+        if len(ring_name) == 0:
+            chimerax_ring = ResidueCollection(ring).get_chimera(self.session)
+            chimerax_ring.name = "ring preview"
+            self.session.models.add([chimerax_ring])
+            bild_obj = show_walk_highlight(ring, chimerax_ring, [0.9, 0.4, 0.3, 0.9], self.session)
+            self.session.models.add(bild_obj, parent=chimerax_ring)
+            
+        else:
+            check_aaronlib_dir()
+            filename = os.path.join(AARONLIB, "Rings", ring_name + ".xyz")
+            if os.path.exists(filename):
+                exists_warning = QMessageBox()
+                exists_warning.setIcon(QMessageBox.Warning)
+                exists_warning.setText("%s already exists.\nWould you like to overwrite?" % filename)
+                exists_warning.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+                
+                rv = exists_warning.exec_()
+                if rv == QMessageBox.Yes:
+                    ring.write(outfile=filename)
+                    self.tool_window.status("%s added to ring library" % ring_name)
+                
+                else:
+                    self.tool_window.status("%s has not been added to ring library" % ring_name)
+
+            else:
+                ring.write(outfile=filename)
+                self.tool_window.status("%s added to ring library" % ring_name)        
     
     def libadd_substituent(self):
         """add ligand to library or open it in a new model"""

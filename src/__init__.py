@@ -75,6 +75,10 @@ class _QChaSM_API(BundleAPI):
             from .managers import FrequencyFileManager
             session.chimaaron_frequency_file_manager = FrequencyFileManager(session)
             return session.chimaaron_frequency_file_manager
+        elif name == "chimaaron_ordered_selection_manager":
+            from ChimAARON.managers import OrderedSelectionManager
+            session.chimaaron_ordered_selection_manager = OrderedSelectionManager(session)
+            return session.chimaaron_ordered_selection_manager
         else:
             raise RuntimeError("manager named '%s' is unknown to ChimAARON" % name)
   

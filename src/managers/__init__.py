@@ -1,2 +1,2 @@
 from .freqfile_manager import *
-from .environment_manager import *
+from .ordered_selection import OrderedSelectionManager

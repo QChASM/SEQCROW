@@ -184,7 +184,7 @@ class EditStructure(ToolInstance):
 
     def do_maplig(self):
         lignames = self.ligname.text()
-        selection = selected_atoms(self.session)
+        selection = self.session.chimaaron_ordered_selection_manager.selection
         
         if len(selection) < 1:
             raise RuntimeWarning("nothing selected")
@@ -220,7 +220,9 @@ class EditStructure(ToolInstance):
                 except KeyError:
                     cat = Catalyst(structure=rescol, comment=model.comment) 
                 
-                target = cat.find("key", models[model])
+                target = cat.find(models[model])
+                for atom in target:
+                    print(atom)
                 if len(target) % len(lig.key_atoms) == 0:
                     k = 0
                     ligands = []
@@ -254,7 +256,7 @@ class EditStructure(ToolInstance):
     
     def do_closering(self):
         ringnames = self.ringname.text()
-        selection = selected_atoms(self.session)
+        selection = self.session.chimaaron_ordered_selection_manager.selection
         
         if len(selection) < 2:
             raise RuntimeWarning("two atoms must be selected per molecule")
