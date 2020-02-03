@@ -70,11 +70,11 @@ class _QChaSM_API(BundleAPI):
 
     @staticmethod
     def init_manager(session, bundle_info, name, **kw):
-        """Initialize frequency_file manager"""
-        if name == "chimaaron_frequency_file_manager":
-            from .managers import FrequencyFileManager
-            session.chimaaron_frequency_file_manager = FrequencyFileManager(session)
-            return session.chimaaron_frequency_file_manager
+        """Initialize filereader and ordered atom selection managers"""
+        if name == "filereader_manager":
+            from .managers import FileReaderManager
+            session.filereader_manager = FileReaderManager(session)
+            return session.filereader_manager
         elif name == "chimaaron_ordered_selection_manager":
             from ChimAARON.managers import OrderedSelectionManager
             session.chimaaron_ordered_selection_manager = OrderedSelectionManager(session)
@@ -99,6 +99,10 @@ class _QChaSM_API(BundleAPI):
         elif ti.name == "Add to Personal Library":
             from .tools import LibAdd
             tool = LibAdd(session, ti.name)
+            return tool
+        elif ti.name == "FileReader Panel":
+            from .tools import FileReaderPanel
+            tool = FileReaderPanel(session, ti.name)
             return tool
         else:
             raise RuntimeError("tool named '%s' is unknown to ChimAARON" % ti.name)

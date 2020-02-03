@@ -12,8 +12,6 @@ from chimerax.atomic import AtomicStructure
 from chimerax.atomic import Atom as ChixAtom
 from chimerax.atomic.colors import element_color
 
-from .managers.freqfile_manager import FREQ_FILE_REMOVED
-
 class ChimAtom(Atom):
     """ChimAtom object allows for easy conversion between chimerax atoms and AaronTools Atoms
     several overloaded functions are different from AaronTools Atoms because 
@@ -412,11 +410,6 @@ class ResidueCollection(Geometry):
             atom.chix_atom.coord = atom.coords
         
         self.refresh_chix_connected(atomic_structure, sanity_check=False)
-        
-        #remove atomic_structure's filereaderZ
-        if hasattr(atomic_structure, "aarontools_filereader"):
-            del atomic_structure.aarontools_filereader
-            atomic_structure.session.chimaaron_frequency_file_manager.triggers.activate_trigger(FREQ_FILE_REMOVED, [atomic_structure])
     
     def refresh_chix_connected(self, atomic_structure, sanity_check=True):
         """updates atomic_structure's bonds to match self's connectivity

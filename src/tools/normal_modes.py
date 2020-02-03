@@ -15,7 +15,7 @@ from io import BytesIO
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QLineEdit, QGridLayout, QPushButton, QTabWidget, QComboBox, QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, QFormLayout, QCheckBox
 
-from ..managers import FREQ_FILE_CHANGE
+from ..managers import FILEREADER_CHANGE
 
 class NormalModes(ToolInstance):
     #XML_TAG ChimeraX :: Tool :: Visualize Normal Modes :: AaronTools :: Visualize normal modes from a Gaussian output file as displacement vectors or as an animation
@@ -31,13 +31,13 @@ class NormalModes(ToolInstance):
         
         self.vec_mw_bool = False
         
-        self.models_with_freq = self.session.chimaaron_frequency_file_manager.frequency_models
+        self.models_with_freq = self.session.filereader_manager.frequency_models
 
         self._build_ui()
 
         self.refresh_models()
 
-        self._refresh_handler = self.session.chimaaron_frequency_file_manager.triggers.add_handler(FREQ_FILE_CHANGE, self.refresh_models)
+        self._refresh_handler = self.session.filereader_manager.triggers.add_handler(FILEREADER_CHANGE, self.refresh_models)
 
     def _build_ui(self):
         layout = QGridLayout()
@@ -157,7 +157,7 @@ class NormalModes(ToolInstance):
     
     def refresh_models(self, *args, **kwargs):
         """refresh the list of models with frequency data and add or remove items from the combobox"""
-        self.models_with_freq = self.session.chimaaron_frequency_file_manager.frequency_models
+        self.models_with_freq = self.session.filereader_manager.frequency_models
             
         for i in range(0, self.model_selector.count()):
             if self.model_selector.itemData(i) not in self.models_with_freq:
@@ -294,5 +294,5 @@ class NormalModes(ToolInstance):
 
     def delete(self):
         """overload delete"""
-        self.session.chimaaron_frequency_file_manager.triggers.remove_handler(self._refresh_handler)
+        self.session.filereader_manager.triggers.remove_handler(self._refresh_handler)
         super().delete()
