@@ -103,6 +103,10 @@ class _QChaSM_API(BundleAPI):
         elif ti.name == "FileReader Panel":
             from .tools import FileReaderPanel
             tool = FileReaderPanel(session, ti.name)
+            return tool        
+        elif ti.name == "Process Thermochemistry":
+            from .tools import Thermochem
+            tool = Thermochem(session, ti.name)
             return tool
         else:
             raise RuntimeError("tool named '%s' is unknown to ChimAARON" % ti.name)

@@ -165,7 +165,7 @@ class NormalModes(ToolInstance):
                 
         for model in self.models_with_freq:
             if self.model_selector.findData(model) == -1:
-                self.model_selector.addItem(model.name, model)
+                self.model_selector.addItem("%s (%s)" % (model.name, model.atomspec), model)
 
     def change_mw_option(self, state):
         """toggle bool associated with mass-weighting option"""

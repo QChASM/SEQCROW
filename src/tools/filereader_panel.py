@@ -1,6 +1,6 @@
 from chimerax.atomic import selected_atoms, selected_residues
 from chimerax.core.tools import ToolInstance
-from chimerax.ui.gui import MainToolWindow, ChildToolWindow
+from chimerax.ui.gui import MainToolWindow
 from chimerax.core.models import MODEL_ID_CHANGED, MODEL_NAME_CHANGED
             
 from io import BytesIO
@@ -41,11 +41,11 @@ class FileReaderPanel(ToolInstance):
         self.tree.setHeaderLabels(["Name", "ID"])
         self.tree.setUniformRowHeights(True)
         
-        self.session.filereader_manager.triggers.add_handler(FILEREADER_CHANGE,
+        self._fr_change = self.session.filereader_manager.triggers.add_handler(FILEREADER_CHANGE,
             lambda *args: self.fill_tree(*args))
-        self.session.triggers.add_handler(MODEL_ID_CHANGED,
+        self._molid_change = self.session.triggers.add_handler(MODEL_ID_CHANGED,
             lambda *args: self.fill_tree(*args))
-        self.session.triggers.add_handler(MODEL_NAME_CHANGED,
+        self._molname_change = self.session.triggers.add_handler(MODEL_NAME_CHANGED,
             lambda *args: self.fill_tree(*args))
 
         self.tool_window.ui_area.setLayout(layout)
@@ -72,3 +72,9 @@ class FileReaderPanel(ToolInstance):
     
             self.tree.expandItem(item)
     
+    def delete(self):
+        """overload delete"""
+        self.session.filereader_manager.triggers.remove_handler(self._fr_change)
+        self.session.triggers.remove_handler(self._molid_change)
+        self.session.triggers.remove_handler(self._molname_change)
+        super().delete()
