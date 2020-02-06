@@ -122,6 +122,16 @@ class Thermochem(ToolInstance):
         self.qrrho_g_line.setReadOnly(True)
         self.thermo_layout.addWidget(self.qrrho_g_line, row, 1, 1, 1, Qt.AlignTop)
         
+        self.thermo_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)        
+        
+        row += 1
+        
+        self.thermo_layout.addWidget(QLabel("𝛿G<sub>Quasi-Harmonic</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        
+        self.qharm_g_line = QLineEdit()
+        self.qharm_g_line.setReadOnly(True)
+        self.thermo_layout.addWidget(self.qharm_g_line, row, 1, 1, 1, Qt.AlignTop)
+        
         self.thermo_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)
 
         self.thermo_layout.setColumnStretch(0, 0)
@@ -133,43 +143,60 @@ class Thermochem(ToolInstance):
         therm_area_widget.setFrameStyle(QFrame.StyledPanel)
         
         
+        row = 0
         # for for total
         sum_area_widget = QFrame()
         self.sum_layout = QGridLayout(sum_area_widget)
         sum_area_widget.setFrameStyle(QFrame.StyledPanel)
         
         total_label = QLabel("Thermochemistry")
-        self.sum_layout.addWidget(total_label, 0, 0, 1, 3, Qt.AlignHCenter | Qt.AlignTop)
+        self.sum_layout.addWidget(total_label, row, 0, 1, 3, Qt.AlignHCenter | Qt.AlignTop)
         
-        self.sum_layout.addWidget(QLabel("H ="), 1, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        row += 1
+        
+        self.sum_layout.addWidget(QLabel("H ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
         
         self.h_sum_line = QLineEdit()
         self.h_sum_line.setReadOnly(True)
-        self.sum_layout.addWidget(self.h_sum_line, 1, 1, 1, 1, Qt.AlignTop)
+        self.sum_layout.addWidget(self.h_sum_line, row, 1, 1, 1, Qt.AlignTop)
         
-        self.sum_layout.addWidget(QLabel("E<sub>h</sub>"), 1, 2, 1, 1, Qt.AlignTop)      
+        self.sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)      
         
-        self.sum_layout.addWidget(QLabel("G<sub>RRHO</sub> ="), 2, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        row += 1
+        
+        self.sum_layout.addWidget(QLabel("G<sub>RRHO</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
         
         self.rrho_g_sum_line = QLineEdit()
         self.rrho_g_sum_line.setReadOnly(True)
-        self.sum_layout.addWidget(self.rrho_g_sum_line, 2, 1, 1, 1, Qt.AlignTop)
+        self.sum_layout.addWidget(self.rrho_g_sum_line, row, 1, 1, 1, Qt.AlignTop)
         
-        self.sum_layout.addWidget(QLabel("E<sub>h</sub>"), 2, 2, 1, 1, Qt.AlignTop)        
+        self.sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)        
         
-        self.sum_layout.addWidget(QLabel("G<sub>Quasi-RRHO</sub> ="), 3, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        row += 1
+        
+        self.sum_layout.addWidget(QLabel("G<sub>Quasi-RRHO</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
         
         self.qrrho_g_sum_line = QLineEdit()
         self.qrrho_g_sum_line.setReadOnly(True)
-        self.sum_layout.addWidget(self.qrrho_g_sum_line, 3, 1, 1, 1, Qt.AlignTop)
+        self.sum_layout.addWidget(self.qrrho_g_sum_line, row, 1, 1, 1, Qt.AlignTop)
         
-        self.sum_layout.addWidget(QLabel("E<sub>h</sub>"), 3, 2, 1, 1, Qt.AlignTop)
+        self.sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)  
+        
+        row += 1
+        
+        self.sum_layout.addWidget(QLabel("G<sub>Quasi-Harmonic</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        
+        self.qharm_g_sum_line = QLineEdit()
+        self.qharm_g_sum_line.setReadOnly(True)
+        self.sum_layout.addWidget(self.qharm_g_sum_line, row, 1, 1, 1, Qt.AlignTop)
+        
+        self.sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)
         
         self.sum_layout.setColumnStretch(0, 0)
-        self.sum_layout.setRowStretch(0, 0)
-        self.sum_layout.setRowStretch(1, 0)
-        self.sum_layout.setRowStretch(2, 0)
-        self.sum_layout.setRowStretch(3, 1)
+        for i in range(0, row-1):
+            self.sum_layout.setRowStretch(i, 0)
+
+        self.sum_layout.setRowStretch(row, 1)
         
         splitter = QSplitter(Qt.Horizontal)
         splitter.setChildrenCollapsible(False)
@@ -242,16 +269,19 @@ class Thermochem(ToolInstance):
                 return
             
             dE, dH, s = co.therm_corr(temperature=T)
-            rrho_dg = co.calc_Grimme_G_corr(v0=0, temperature=T)
-            qrrho_dg = co.calc_Grimme_G_corr(v0=v0, temperature=T)
+            rrho_dg = co.calc_G_corr(v0=0, temperature=T)
+            qrrho_dg = co.calc_G_corr(v0=v0, temperature=T, quasi_harmonic=False)
+            qharm_dg = co.calc_G_corr(v0=v0, temperature=T, quasi_harmonic=True)
             
             self.enthalpy_line.setText(repr(dH))
             self.rrho_g_line.setText(repr(rrho_dg))
             self.qrrho_g_line.setText(repr(qrrho_dg))
+            self.qharm_g_line.setText(repr(qharm_dg))
         else:
             self.enthalpy_line.setText("")
             self.rrho_g_line.setText("")
             self.qrrho_g_line.setText("")
+            self.qharm_g_line.setText("")
         
         self.update_sum()
         
@@ -259,6 +289,7 @@ class Thermochem(ToolInstance):
         dH = self.enthalpy_line.text()
         dG = self.rrho_g_line.text()
         dG_qrrho = self.qrrho_g_line.text()
+        dG_qharm = self.qharm_g_line.text()
         
         nrg = self.sp_nrg_line.text()
         
@@ -266,21 +297,25 @@ class Thermochem(ToolInstance):
             self.h_sum_line.setText("")
             self.rrho_g_sum_line.setText("")
             self.qrrho_g_sum_line.setText("")
+            self.qharm_g_sum_line.setText("")
             return
         else:
             dH = float(dH)
             dG = float(dG)
             dG_qrrho = float(dG_qrrho)
+            dG_qharm = float(dG_qharm)
             
             nrg = float(nrg)
             
             enthalpy = nrg + dH
             rrho_g = nrg + dG
             qrrho_g = nrg + dG_qrrho
+            qharm_g = nrg + dG_qharm
             
             self.h_sum_line.setText(repr(enthalpy))
             self.rrho_g_sum_line.setText(repr(rrho_g))
             self.qrrho_g_sum_line.setText(repr(qrrho_g))
+            self.qharm_g_sum_line.setText(repr(qharm_g))
         
     def delete(self):
         """overload delete"""
