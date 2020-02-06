@@ -52,7 +52,7 @@ class NormalModes(ToolInstance):
         #table that lists frequencies
         table = QTableWidget()
         table.setColumnCount(2)
-        table.setHorizontalHeaderLabels(['Frequency (cm^-1)', 'IR intensity'])
+        table.setHorizontalHeaderLabels(['Frequency (cm\u207b\u00b9)', 'IR intensity'])
         table.setSortingEnabled(True)
         table.setSelectionBehavior(QTableView.SelectRows)
         table.setSelectionMode(QTableView.SingleSelection)
