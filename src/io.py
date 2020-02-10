@@ -31,8 +31,10 @@ def open_aarontools(session, path, format_name=None, trajectory=False):
 
     if trajectory:
         from chimerax.std_commands.coordset_gui import CoordinateSetSlider
+        from ChimAARON.tools import EnergyPlot
         for structure in structures:
             CoordinateSetSlider(session, structure)
+            EnergyPlot(session, structure)
 
     status = "Opened %s as a %s %s" % (path, fmt, "trajectory" if trajectory else "file")
 
