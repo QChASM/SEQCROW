@@ -1,6 +1,7 @@
 import numpy as np
 
 from chimerax.core.tools import ToolInstance
+from chimerax.core.models import REMOVE_MODELS
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QGridLayout, QWidget, QToolBar
@@ -20,7 +21,7 @@ class EnergyPlot(ToolInstance):
         from chimerax.ui import MainToolWindow
         self.tool_window = MainToolWindow(self)    
         
-        self._model = model
+        self.structure = model
 
         self.display_name = "Thing per iteration for %s" % model.name     
 
@@ -30,6 +31,11 @@ class EnergyPlot(ToolInstance):
         self._drag_mode = None
 
         self._build_ui()
+        self.press = None
+        self.drag_prev = None
+        self.dragging = False
+        
+        self.session.triggers.add_handler(REMOVE_MODELS, self.check_closed_models)
         
     def _build_ui(self):
         layout = QGridLayout()
@@ -39,16 +45,25 @@ class EnergyPlot(ToolInstance):
         
         ax = self.figure.add_subplot(111)
 
-        data = [i for i in range(0, self._model.num_coordsets)]
+        data = []
+        for step in self.structure.aarontools_filereader.all_geom:
+            info = [item for item in step if isinstance(item, dict) and "energy" in item][0]
+            data.append(info["energy"])
+
+        se = np.ptp(data)
     
-        ax.plot(data, marker='o', c='black')
+        ax.plot(self.structure.coordset_ids, data, marker='o', c='black')
+        ax.set_xlabel('iteration')
+        ax.set_ylabel('test')
+        ax.set_title('test vs. iteration')
+        ax.set_ylim(bottom=(min(data) - se/10), top=(max(data) + se/10))
     
         self.canvas.draw()
-
+        
+        self.canvas.mpl_connect('button_press_event', self.onclick)
+        self.canvas.mpl_connect('button_release_event', self.unclick)
+        self.canvas.mpl_connect('motion_notify_event', self.drag)
         self.canvas.wheelEvent = self._wheel_event
-        self.canvas.mousePressEvent = self._mouse_press
-        self.canvas.mouseMoveEvent = self._mouse_move
-        self.canvas.mouseReleaseEvent = self._mouse_release
 
         layout.addWidget(self.canvas)
         
@@ -74,18 +89,19 @@ class EnergyPlot(ToolInstance):
         a.set_ylim(ny0, ny1)
         self.canvas.draw()    
     
-    def move(self, delta_x, delta_y):
+    def move(self, dx, dy):
         '''Move plot objects by delta values in window pixels.'''
+
         win = self.tool_window.ui_area
         w,h = win.width(), win.height()
         if w == 0 or h == 0:
             return
         a = self.figure.gca()
         x0, x1 = a.get_xlim()
-        xs = delta_x/w * (x1-x0)
+        xs = dx/w * (x1-x0)
         nx0, nx1 = x0-xs, x1-xs
         y0, y1 = a.get_ylim()
-        ys = delta_y/h * (y1-y0)
+        ys = dy/h * (y1-y0)
         ny0, ny1 = y0-ys, y1-ys
         a.set_xlim(nx0, nx1)
         a.set_ylim(ny0, ny1)
@@ -98,78 +114,59 @@ class EnergyPlot(ToolInstance):
         factor = exp(delta / 1200)
         self.zoom(factor)
 
-    def _mouse_press(self, event):
-        self._last_mouse_xy = (event.x(), event.y())
-        self._dragged = False
-        b = event.button()
-        from PyQt5.QtCore import Qt
-        if b == Qt.LeftButton:
-            if self.is_alt_key_pressed(event) or self.is_command_key_pressed(event):
-                drag_mode = 'translate'
-            else:
-                drag_mode = 'select'
-        elif b == Qt.MiddleButton:
-            drag_mode = 'translate'
-        elif b == Qt.RightButton:
-            if self.is_ctrl_key_pressed(event):
-                drag_mode = 'select'	# Click on object (same as ctrl-left)
-            else:
-                drag_mode = 'translate'
-        else:
-            drag_mode = None
-
-        self._drag_mode = drag_mode
+    def onclick(self, event):
+        #print('%s click: button=%d, x=%d, y=%d, xdata=%f, ydata=%f' %
+        #    ('double' if event.dblclick else 'single', event.button,
+        #    event.x, event.y, event.xdata, event.ydata))
         
-    def _mouse_move(self, event):
-        if self._last_mouse_xy is None:
-            self._mouse_press(event)
-            return 	# Did not get mouse down
+        self.press = event.x, event.y, event.xdata, event.ydata
+        
+        if event.dblclick and event.button == 2:
+            a = self.figure.gca()
+            a.autoscale()
+            self.canvas.draw()
 
-        x, y = event.x(), event.y()
-        lx, ly = self._last_mouse_xy
-        dx, dy = x-lx, y-ly
-        if abs(dx) < self._min_drag and abs(dy) < self._min_drag:
+    def unclick(self, event):
+        if not self.dragging and event.button == 1:
+            self.change_coordset(event)
+                    
+        self.press = None
+        self.drag_prev = None
+        self.dragging = False
+
+    def change_coordset(self, event):
+        if event.xdata is not None:
+            x = int(round(event.xdata))
+            if x > self.structure.num_coordsets:
+                self.structure.active_coordset_id = self.structure.num_coordsets
+            elif x < 1:
+                self.structure.active_coordset_id = 1
+            else:
+                self.structure.active_coordset_id = x
+
+    def drag(self, event):
+        if event.button == 1:
+            return self.change_coordset(event)
+        elif event.button != 2:
             return
-        self._last_mouse_xy = (x,y)
-        self._dragged = True
 
-        mode = self._drag_mode
-        if mode == 'zoom':
-            # Zoom
-            h = self.tool_window.ui_area.height()
-            from math import exp
-            factor = exp(3*dy/h)
-            self.zoom(factor)
-        elif mode == 'translate':
-            # Translate plot
-            self.move(dx, -dy)
-    
-    def _mouse_release(self, event):
-        if not self._dragged and self._drag_mode == 'select':
-            pass
-            #item = self._clicked_item(event.x(), event.y())
-            #self.mouse_click(item, event)
-
-        self._last_mouse_xy = None
-        self._dragged = False
-        self._drag_mode = None
-        
-    def is_alt_key_pressed(self, event):
-        from PyQt5.QtCore import Qt
-        return event.modifiers() & Qt.AltModifier
-
-    def is_command_key_pressed(self, event):
-        from PyQt5.QtCore import Qt
-        import sys
-        if sys.platform == 'darwin':
-            # Mac command-key gives Qt control modifier.
-            return event.modifiers() & Qt.ControlModifier
-        return False
-
-    def is_ctrl_key_pressed(self, event):
-        from PyQt5.QtCore import Qt
-        import sys
-        if sys.platform == 'darwin':
-            # Mac ctrl-key gives Qt meta modifier and Mac Command key gives Qt ctrl modifier.
-            return event.modifiers() & Qt.MetaModifier
-        return event.modifiers() & Qt.ControlModifier
+        if self.press is None:
+            return
+            
+        x, y, xpress, ypress = self.press
+        dx = event.x - x
+        dy = event.y - y
+        drag_dist = np.linalg.norm([dx, dy])
+        if self.dragging or drag_dist >= self._min_drag or event.button == 2:
+            self.dragging = True
+            if self.drag_prev is not None:
+                x, y, xpress, ypress = self.drag_prev
+                dx = event.x - x
+                dy = event.y - y
+            
+            self.drag_prev = event.x, event.y, event.xdata, event.ydata
+            self.move(dx, dy)
+            
+    def check_closed_models(self, name, models):
+        if self.structure in models:
+            self.delete()

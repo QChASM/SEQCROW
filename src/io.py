@@ -34,7 +34,8 @@ def open_aarontools(session, path, format_name=None, trajectory=False):
         from ChimAARON.tools import EnergyPlot
         for structure in structures:
             CoordinateSetSlider(session, structure)
-            EnergyPlot(session, structure)
+            if "energy" in structure.aarontools_filereader.other:
+                EnergyPlot(session, structure)
 
     status = "Opened %s as a %s %s" % (path, fmt, "trajectory" if trajectory else "file")
 
