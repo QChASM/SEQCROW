@@ -7,6 +7,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QGridLayout, QWidget, QToolBar
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
@@ -43,7 +44,7 @@ class EnergyPlot(ToolInstance):
         self.figure = Figure(figsize=(2,2))
         self.canvas = Canvas(self.figure)
         
-        ax = self.figure.add_subplot(111)
+        ax = self.figure.add_axes((0.22, 0.22, 0.66, 0.66))
 
         data = []
         for step in self.structure.aarontools_filereader.all_geom:
@@ -54,10 +55,15 @@ class EnergyPlot(ToolInstance):
     
         ax.plot(self.structure.coordset_ids, data, marker='o', c='black')
         ax.set_xlabel('iteration')
-        ax.set_ylabel('test')
-        ax.set_title('test vs. iteration')
+        ax.set_ylabel(r'energy ($E_h$)')
         ax.set_ylim(bottom=(min(data) - se/10), top=(max(data) + se/10))
+        
+        ax.hlines(min(data), 1, self.structure.num_coordsets, colors='blue', linestyles='dashed')
+        ax.hlines(max(data), 1, self.structure.num_coordsets, colors='red', linestyles='dashed')
     
+        ax.ticklabel_format(axis='y', style='sci', scilimits=(0,0), useOffset=True)
+        ax.ticklabel_format(axis='x', style='plain', useOffset=False)
+        
         self.canvas.draw()
         
         self.canvas.mpl_connect('button_press_event', self.onclick)
@@ -67,6 +73,12 @@ class EnergyPlot(ToolInstance):
 
         layout.addWidget(self.canvas)
         
+        toolbar_widget = QWidget()
+        toolbar = NavigationToolbar(self.canvas, toolbar_widget)
+        toolbar.setMaximumHeight(24)
+        self.toolbar = toolbar
+        layout.addWidget(toolbar)
+                
         self.tool_window.ui_area.setLayout(layout)
         
         self.tool_window.manage(None)
@@ -118,15 +130,19 @@ class EnergyPlot(ToolInstance):
         #print('%s click: button=%d, x=%d, y=%d, xdata=%f, ydata=%f' %
         #    ('double' if event.dblclick else 'single', event.button,
         #    event.x, event.y, event.xdata, event.ydata))
-        
+        if self.toolbar.mode != "":
+            return
         self.press = event.x, event.y, event.xdata, event.ydata
         
         if event.dblclick and event.button == 2:
             a = self.figure.gca()
             a.autoscale()
             self.canvas.draw()
-
+            
     def unclick(self, event):
+        if self.toolbar.mode != "":
+            return
+            
         if not self.dragging and event.button == 1:
             self.change_coordset(event)
                     
@@ -145,7 +161,9 @@ class EnergyPlot(ToolInstance):
                 self.structure.active_coordset_id = x
 
     def drag(self, event):
-        if event.button == 1:
+        if self.toolbar.mode != "":
+            return
+        elif event.button == 1:
             return self.change_coordset(event)
         elif event.button != 2:
             return
