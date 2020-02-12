@@ -4,6 +4,7 @@ from chimerax.core.tools import ToolInstance
 from chimerax.core.models import REMOVE_MODELS
 
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QGridLayout, QWidget, QToolBar
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
@@ -39,6 +40,8 @@ class EnergyPlot(ToolInstance):
         self.session.triggers.add_handler(REMOVE_MODELS, self.check_closed_models)
         
     def _build_ui(self):
+        font = self.tool_window.ui_area.font()
+        font_name = QFont.family(font)
         layout = QGridLayout()
         
         self.figure = Figure(figsize=(2,2))
@@ -51,11 +54,14 @@ class EnergyPlot(ToolInstance):
             info = [item for item in step if isinstance(item, dict) and "energy" in item][0]
             data.append(info["energy"])
 
+        self.ys = data
+
         se = np.ptp(data)
     
-        ax.plot(self.structure.coordset_ids, data, marker='o', c='black')
-        ax.set_xlabel('iteration')
-        ax.set_ylabel(r'energy ($E_h$)')
+        self.nrg_plot = ax.plot(self.structure.coordset_ids, data, marker='o', c='gray')
+        self.nrg_plot = self.nrg_plot[0]
+        ax.set_xlabel('iteration', fontfamily=font_name)
+        ax.set_ylabel(r'energy ($E_h$)', fontfamily=font_name)
         ax.set_ylim(bottom=(min(data) - se/10), top=(max(data) + se/10))
         
         ax.hlines(min(data), 1, self.structure.num_coordsets, colors='blue', linestyles='dashed')
@@ -70,6 +76,9 @@ class EnergyPlot(ToolInstance):
         self.canvas.mpl_connect('button_release_event', self.unclick)
         self.canvas.mpl_connect('motion_notify_event', self.drag)
         self.canvas.wheelEvent = self._wheel_event
+
+        self.annotation = ax.annotate("", xy=(0,0), xytext=(0, 10), textcoords="offset points", fontfamily=font_name)
+        self.annotation.set_visible(False)
 
         layout.addWidget(self.canvas)
         
@@ -160,15 +169,28 @@ class EnergyPlot(ToolInstance):
             else:
                 self.structure.active_coordset_id = x
 
+    def update_label(self, ndx):
+        self.annotation.xy = (self.structure.coordset_ids[ndx], self.ys[ndx])
+        self.annotation.set_text(repr(self.ys[ndx]))
+    
     def drag(self, event):
         if self.toolbar.mode != "":
             return
         elif event.button == 1:
             return self.change_coordset(event)
-        elif event.button != 2:
+        elif self.press is None:
+            vis = self.annotation.get_visible()
+            on_item, ndx = self.nrg_plot.contains(event)
+            if on_item:
+                self.update_label(ndx['ind'][0])
+                self.annotation.set_visible(True)
+                self.canvas.draw()
+            else:
+                if vis:
+                    self.annotation.set_visible(False)
+                    self.canvas.draw()
             return
-
-        if self.press is None:
+        elif event.button != 2:
             return
             
         x, y, xpress, ypress = self.press
