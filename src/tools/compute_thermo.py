@@ -45,6 +45,7 @@ class Thermochem(ToolInstance):
         
         self.sp_nrg_line = QLineEdit()
         self.sp_nrg_line.setReadOnly(True)
+        self.sp_nrg_line.setToolTip("electronic energy")
         self.sp_layout.addWidget(self.sp_nrg_line, 1, 1, 1, 1, Qt.AlignTop)
         
         self.sp_layout.addWidget(QLabel("E<sub>h</sub>"), 1, 2, 1, 1, Qt.AlignTop)
@@ -92,14 +93,27 @@ class Thermochem(ToolInstance):
         self.v0_edit.setSuffix(" cm\u207b\u00b9")
         self.v0_edit.valueChanged.connect(self.set_thermo)
         self.v0_edit.setMinimum(0)
+        self.v0_edit.setToolTip("frequency paramter for quasi treatments of entropy")
         self.thermo_layout.addWidget(self.v0_edit, row, 1, 1, 2, Qt.AlignTop)
         
         row += 1
+    
+        self.thermo_layout.addWidget(QLabel("𝛿ZPE ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
 
-        self.thermo_layout.addWidget(QLabel("𝛿H ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        self.zpe_line = QLineEdit()
+        self.zpe_line.setReadOnly(True)
+        self.zpe_line.setToolTip("zero-point energy correction")
+        self.thermo_layout.addWidget(self.zpe_line, row, 1, 1, 1, Qt.AlignTop)
+        
+        self.thermo_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)  
+        
+        row += 1
+
+        self.thermo_layout.addWidget(QLabel("𝛿H<sub>RRHO</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
 
         self.enthalpy_line = QLineEdit()
         self.enthalpy_line.setReadOnly(True)
+        self.enthalpy_line.setToolTip("RRHO enthalpy correction")
         self.thermo_layout.addWidget(self.enthalpy_line, row, 1, 1, 1, Qt.AlignTop)
         
         self.thermo_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)        
@@ -110,6 +124,7 @@ class Thermochem(ToolInstance):
 
         self.rrho_g_line = QLineEdit()
         self.rrho_g_line.setReadOnly(True)
+        self.rrho_g_line.setToolTip("""RRHO free energy correction""")
         self.thermo_layout.addWidget(self.rrho_g_line, row, 1, 1, 1, Qt.AlignTop)
         
         self.thermo_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)        
@@ -120,6 +135,9 @@ class Thermochem(ToolInstance):
         
         self.qrrho_g_line = QLineEdit()
         self.qrrho_g_line.setReadOnly(True)
+        self.qrrho_g_line.setToolTip("Quasi-RRHO free energy correction\n" + \
+        "Vibrational entropy of each mode is weighted and complemented with rotational entropy\n" + \
+        "The weighting is much lower for modes with frequencies less than 𝜔\u2080")        
         self.thermo_layout.addWidget(self.qrrho_g_line, row, 1, 1, 1, Qt.AlignTop)
         
         self.thermo_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)        
@@ -130,6 +148,8 @@ class Thermochem(ToolInstance):
         
         self.qharm_g_line = QLineEdit()
         self.qharm_g_line.setReadOnly(True)
+        self.qharm_g_line.setToolTip("Quasi-hamonic free energy correction\n" + \
+        "For entropy, real vibrational modes lower than 𝜔\u2080 are treated as 𝜔\u2080")
         self.thermo_layout.addWidget(self.qharm_g_line, row, 1, 1, 1, Qt.AlignTop)
         
         self.thermo_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)
@@ -154,10 +174,22 @@ class Thermochem(ToolInstance):
         
         row += 1
         
-        self.sum_layout.addWidget(QLabel("H ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        self.sum_layout.addWidget(QLabel("ZPE ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        
+        self.zpe_sum_line = QLineEdit()
+        self.zpe_sum_line.setReadOnly(True)
+        self.zpe_sum_line.setToolTip("sum of electronic energy and ZPE correction")
+        self.sum_layout.addWidget(self.zpe_sum_line, row, 1, 1, 1, Qt.AlignTop)
+        
+        self.sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)      
+        
+        row += 1
+                
+        self.sum_layout.addWidget(QLabel("H<sub>RRHO</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
         
         self.h_sum_line = QLineEdit()
         self.h_sum_line.setReadOnly(True)
+        self.h_sum_line.setToolTip("sum of electronic energy and RRHO enthalpy correction")
         self.sum_layout.addWidget(self.h_sum_line, row, 1, 1, 1, Qt.AlignTop)
         
         self.sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)      
@@ -168,6 +200,7 @@ class Thermochem(ToolInstance):
         
         self.rrho_g_sum_line = QLineEdit()
         self.rrho_g_sum_line.setReadOnly(True)
+        self.rrho_g_sum_line.setToolTip("sum of electronic energy and RRHO free energy correction")
         self.sum_layout.addWidget(self.rrho_g_sum_line, row, 1, 1, 1, Qt.AlignTop)
         
         self.sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)        
@@ -178,6 +211,9 @@ class Thermochem(ToolInstance):
         
         self.qrrho_g_sum_line = QLineEdit()
         self.qrrho_g_sum_line.setReadOnly(True)
+        self.qrrho_g_sum_line.setToolTip("Sum of electronic energy and quasi-RRHO free energy correction\n" + \
+        "Vibrational entropy of each mode is weighted and complemented with rotational entropy\n" + \
+        "The weighting is much lower for modes with frequencies less than 𝜔\u2080")
         self.sum_layout.addWidget(self.qrrho_g_sum_line, row, 1, 1, 1, Qt.AlignTop)
         
         self.sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)  
@@ -188,6 +224,8 @@ class Thermochem(ToolInstance):
         
         self.qharm_g_sum_line = QLineEdit()
         self.qharm_g_sum_line.setReadOnly(True)
+        self.qharm_g_sum_line.setToolTip("Sum of electronic energy and quasi-harmonic free energy correction\n" + \
+        "For entropy, real vibrational modes lower than 𝜔\u2080 are treated as 𝜔\u2080")
         self.sum_layout.addWidget(self.qharm_g_sum_line, row, 1, 1, 1, Qt.AlignTop)
         
         self.sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)
@@ -268,16 +306,19 @@ class Thermochem(ToolInstance):
             if not T:
                 return
             
+            dZPE = co.ZPVE
             dE, dH, s = co.therm_corr(temperature=T)
             rrho_dg = co.calc_G_corr(v0=0, temperature=T)
             qrrho_dg = co.calc_G_corr(v0=v0, temperature=T, quasi_harmonic=False)
             qharm_dg = co.calc_G_corr(v0=v0, temperature=T, quasi_harmonic=True)
             
+            self.zpe_line.setText(repr(dZPE))
             self.enthalpy_line.setText(repr(dH))
             self.rrho_g_line.setText(repr(rrho_dg))
             self.qrrho_g_line.setText(repr(qrrho_dg))
             self.qharm_g_line.setText(repr(qharm_dg))
         else:
+            self.zpe_line.setText("")
             self.enthalpy_line.setText("")
             self.rrho_g_line.setText("")
             self.qrrho_g_line.setText("")
@@ -286,6 +327,7 @@ class Thermochem(ToolInstance):
         self.update_sum()
         
     def update_sum(self):
+        dZPE = self.zpe_line.text()
         dH = self.enthalpy_line.text()
         dG = self.rrho_g_line.text()
         dG_qrrho = self.qrrho_g_line.text()
@@ -294,12 +336,14 @@ class Thermochem(ToolInstance):
         nrg = self.sp_nrg_line.text()
         
         if len(dH) == 0 or len(nrg) == 0:
+            self.zpe_sum_line.setText("")
             self.h_sum_line.setText("")
             self.rrho_g_sum_line.setText("")
             self.qrrho_g_sum_line.setText("")
             self.qharm_g_sum_line.setText("")
             return
         else:
+            dZPE = float(dZPE)
             dH = float(dH)
             dG = float(dG)
             dG_qrrho = float(dG_qrrho)
@@ -307,11 +351,13 @@ class Thermochem(ToolInstance):
             
             nrg = float(nrg)
             
+            zpe = nrg + dZPE
             enthalpy = nrg + dH
             rrho_g = nrg + dG
             qrrho_g = nrg + dG_qrrho
             qharm_g = nrg + dG_qharm
             
+            self.zpe_sum_line.setText(repr(zpe))
             self.h_sum_line.setText(repr(enthalpy))
             self.rrho_g_sum_line.setText(repr(rrho_g))
             self.qrrho_g_sum_line.setText(repr(qrrho_g))

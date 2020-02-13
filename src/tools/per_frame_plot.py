@@ -58,14 +58,20 @@ class EnergyPlot(ToolInstance):
 
         se = np.ptp(data)
     
-        self.nrg_plot = ax.plot(self.structure.coordset_ids, data, marker='o', c='gray')
+        self.nrg_plot = ax.plot(self.structure.coordset_ids, data, marker='o', c='gray', markersize=3)
         self.nrg_plot = self.nrg_plot[0]
         ax.set_xlabel('iteration', fontfamily=font_name)
         ax.set_ylabel(r'energy ($E_h$)', fontfamily=font_name)
         ax.set_ylim(bottom=(min(data) - se/10), top=(max(data) + se/10))
         
-        ax.hlines(min(data), 1, self.structure.num_coordsets, colors='blue', linestyles='dashed')
-        ax.hlines(max(data), 1, self.structure.num_coordsets, colors='red', linestyles='dashed')
+        minlocs = [self.structure.coordset_ids[i] for i in range(0, self.structure.num_coordsets) if data[i] == min(data)]
+        mins = [min(data) for m in minlocs]        
+        
+        maxlocs = [self.structure.coordset_ids[i] for i in range(0, self.structure.num_coordsets) if data[i] == max(data)]
+        maxs = [max(data) for m in minlocs]
+    
+        ax.plot(minlocs, mins, marker='*', c='blue', markersize=5)
+        ax.plot(maxlocs, maxs, marker='*', c='red', markersize=5)
     
         ax.ticklabel_format(axis='y', style='sci', scilimits=(0,0), useOffset=True)
         ax.ticklabel_format(axis='x', style='plain', useOffset=False)
@@ -171,7 +177,12 @@ class EnergyPlot(ToolInstance):
 
     def update_label(self, ndx):
         self.annotation.xy = (self.structure.coordset_ids[ndx], self.ys[ndx])
-        self.annotation.set_text(repr(self.ys[ndx]))
+        if self.ys[ndx] == max(self.ys):
+            self.annotation.set_text("%s (maxima)" % repr(self.ys[ndx]))
+        elif self.ys[ndx] == min(self.ys):
+            self.annotation.set_text("%s (minima)" % repr(self.ys[ndx]))
+        else:
+            self.annotation.set_text(repr(self.ys[ndx]))
     
     def drag(self, event):
         if self.toolbar.mode != "":
