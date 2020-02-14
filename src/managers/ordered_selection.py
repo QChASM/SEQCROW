@@ -19,13 +19,16 @@ class OrderedSelectionManager(ProviderManager):
     def selection_changed(self, *args):
         selection = selected_atoms(self.session)
         
-        for atom in selection:
-            if atom not in self._selection:
-                self._selection.append(atom)
-                
-        for atom in self._selection:
-            if atom not in selection:
-                self._selection.remove(atom)
+        new_atoms = [atom for atom in selection if atom not in self._selection]
+        if len(new_atoms) > 1:
+            self._selection = []
+            
+        else:
+            for atom in self._selection:
+                if atom not in selection:
+                    self._selection.remove(atom)
+
+            self._selection.extend(new_atoms)
         
     def add_provider(self, bundle_info, name, **kw):
         self._selection = self._selection
