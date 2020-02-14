@@ -1,6 +1,7 @@
-from chimerax.core.toolshed import BundleAPI
 import os
 
+from chimerax.core.toolshed import BundleAPI
+from chimerax.core.toolshed.info import SelectorInfo
 
 class _QChaSM_API(BundleAPI):
 
@@ -38,6 +39,13 @@ class _QChaSM_API(BundleAPI):
         if settings.settings.AARONLIB is not None:
             os.environ['AARONLIB'] = settings.settings.AARONLIB
 
+        #register selectors from the user's personal library
+        from AaronTools.substituent import Substituent
+        for sub in Substituent.list():  
+            if not any([selector.name == sub for selector in bundle_info.selectors]):
+                si = SelectorInfo(sub, atomic=True, synopsis="%s substituent" % sub)
+                bundle_info.selectors.append(si)
+
     @staticmethod
     def open_file(session, path, format_name, coordsets=False):
         """
@@ -64,6 +72,8 @@ class _QChaSM_API(BundleAPI):
     def register_selector(bundle_info, selector_info, logger):
         """select all transition metals with one easy `select` command!"""
         #XML_TAG ChimeraX :: Selector :: tm :: Transition metals
+        
+        print(bundle_info.selectors)
         
         from .selectors import register_selectors
         register_selectors(logger)

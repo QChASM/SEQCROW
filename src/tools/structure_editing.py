@@ -212,6 +212,7 @@ class EditStructure(ToolInstance):
                     for i, atom in enumerate(model.atoms):
                         rescol.atoms[i].atomspec = atom.atomspec
                         rescol.atoms[i].add_tag(atom.atomspec)
+                        rescol.atoms[i].chix_atom = atom
                         
                 try:
                     cat = Catalyst(structure=rescol)                   
@@ -221,8 +222,6 @@ class EditStructure(ToolInstance):
                     cat = Catalyst(structure=rescol, comment=model.comment) 
                 
                 target = cat.find(models[model])
-                for atom in target:
-                    print(atom)
                 if len(target) % len(lig.key_atoms) == 0:
                     k = 0
                     ligands = []
@@ -237,7 +236,7 @@ class EditStructure(ToolInstance):
                 
                 cat.map_ligand(ligands, target)
                 
-                if self.close_previous_bool:                    
+                if self.close_previous_bool:    
                     new_rescol = ResidueCollection(cat)
                     new_rescol.update_chix(model)
                 else:
@@ -289,7 +288,6 @@ class EditStructure(ToolInstance):
                         rescol.atoms[i].add_tag(atom.atomspec)
                 
                 target = rescol.find(models[model])
-                print(target)
                                 
                 rescol.ring_substitute(target, ringname)
                 

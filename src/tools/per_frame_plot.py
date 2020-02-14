@@ -4,7 +4,6 @@ from chimerax.core.tools import ToolInstance
 from chimerax.core.models import REMOVE_MODELS
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QGridLayout, QWidget, QToolBar
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
@@ -40,8 +39,6 @@ class EnergyPlot(ToolInstance):
         self.session.triggers.add_handler(REMOVE_MODELS, self.check_closed_models)
         
     def _build_ui(self):
-        font = self.tool_window.ui_area.font()
-        font_name = QFont.family(font)
         layout = QGridLayout()
         
         self.figure = Figure(figsize=(2,2))
@@ -60,8 +57,8 @@ class EnergyPlot(ToolInstance):
     
         self.nrg_plot = ax.plot(self.structure.coordset_ids, data, marker='o', c='gray', markersize=3)
         self.nrg_plot = self.nrg_plot[0]
-        ax.set_xlabel('iteration', fontfamily=font_name)
-        ax.set_ylabel(r'energy ($E_h$)', fontfamily=font_name)
+        ax.set_xlabel('iteration', fontfamily='Arial')
+        ax.set_ylabel(r'energy ($E_h$)', fontfamily='Arial')
         ax.set_ylim(bottom=(min(data) - se/10), top=(max(data) + se/10))
         
         minlocs = [self.structure.coordset_ids[i] for i in range(0, self.structure.num_coordsets) if data[i] == min(data)]
@@ -83,7 +80,7 @@ class EnergyPlot(ToolInstance):
         self.canvas.mpl_connect('motion_notify_event', self.drag)
         self.canvas.wheelEvent = self._wheel_event
 
-        self.annotation = ax.annotate("", xy=(0,0), xytext=(0, 10), textcoords="offset points", fontfamily=font_name)
+        self.annotation = ax.annotate("", xy=(0,0), xytext=(0, 10), textcoords="offset points", fontfamily='Arial')
         self.annotation.set_visible(False)
 
         layout.addWidget(self.canvas)

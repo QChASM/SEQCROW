@@ -1,8 +1,10 @@
 from chimerax.core.settings import Settings
 
+from os import getenv
+
 class _ChimAARONSettings(Settings):
     EXPLICIT_SAVE = {
-        'AARONLIB': None,
+        'AARONLIB': getenv('AARONLIB', None),
     }
 
 # 'settings' module attribute will be set by manager initialization
@@ -20,12 +22,15 @@ def register_settings_options(session):
         
         def _opt_cb(opt, ses=session):
             import os
+            from warnings import warn
             setting = opt.attr_name
             val = opt.value
             if setting == "AARONLIB":
                 opt.settings.AARONLIB = val
                 
             os.environ[setting] = val
+            
+            warn("Environment variable has been set for ChimeraX. Please restart ChimeraX for changes to take effect.")
             
         opt = opt_class(opt_name, getattr(settings, setting), _opt_cb,
             attr_name=setting, settings=settings, balloon=balloon, auto_set_attr=False)
