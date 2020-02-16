@@ -174,7 +174,7 @@ class EnergyPlot(ToolInstance):
         #matplotlib's mouse event never sets the 'key' attribute for me
         #That's fine.
         #I'll just get my key presses from pyqt5.
-        if modifiers != Qt.NoModifier and event.button == 2:
+        if modifiers != Qt.NoModifier and event.button == 1:
             a = self.figure.gca()
             a.autoscale()
             self.canvas.draw()        
@@ -206,7 +206,13 @@ class EnergyPlot(ToolInstance):
             self.annotation.set_text(repr(self.ys[ndx]))
     
     def drag(self, event):
+        modifiers = keyboardModifiers()
         if self.toolbar.mode != "":
+            return
+        #matplotlib's mouse event never sets the 'key' attribute for me
+        #That's fine.
+        #I'll just get my key presses from pyqt5.
+        elif modifiers != Qt.NoModifier:
             return
         elif event.button == 1:
             return self.change_coordset(event)
