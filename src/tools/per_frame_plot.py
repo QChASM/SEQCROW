@@ -4,13 +4,33 @@ from chimerax.core.tools import ToolInstance
 from chimerax.core.models import REMOVE_MODELS
 
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QGuiApplication
 from PyQt5.QtWidgets import QGridLayout, QWidget, QToolBar
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
+from matplotlib.backend_bases import MouseEvent
 
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
+
+keyboardModifiers = QGuiApplication.keyboardModifiers
+
+#matplotlib doesn't keep track of changes made with my mouse controls
+#i could figure out how to do better mouse controls...
+#or i could just disable the undo/redo buttons on the navbar
+#i do this by making a new class because for some reason the 
+#NavigationToolbar2QT.toolitems attribute is not instance-specific
+class NavigationToolbar(NavigationToolbar2QT):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+    toolitems = list(NavigationToolbar2QT.toolitems)
+    for i in range(0, len(toolitems)):
+        if toolitems[i][0] in ['Back', 'Forward', 'Home', 'Subplots', 'Edit']:
+            toolitems[i] = None
+    
+    toolitems = tuple(ti for ti in toolitems if ti is not None and ti != (None, None, None, None))
 
 class EnergyPlot(ToolInstance):
     SESSION_ENDURING = False
@@ -75,8 +95,8 @@ class EnergyPlot(ToolInstance):
         
         self.canvas.draw()
         
-        self.canvas.mpl_connect('button_press_event', self.onclick)
         self.canvas.mpl_connect('button_release_event', self.unclick)
+        self.canvas.mpl_connect('button_press_event', self.onclick)
         self.canvas.mpl_connect('motion_notify_event', self.drag)
         self.canvas.wheelEvent = self._wheel_event
 
@@ -87,6 +107,7 @@ class EnergyPlot(ToolInstance):
         
         toolbar_widget = QWidget()
         toolbar = NavigationToolbar(self.canvas, toolbar_widget)
+
         toolbar.setMaximumHeight(24)
         self.toolbar = toolbar
         layout.addWidget(toolbar)
@@ -139,25 +160,28 @@ class EnergyPlot(ToolInstance):
         self.zoom(factor)
 
     def onclick(self, event):
-        #print('%s click: button=%d, x=%d, y=%d, xdata=%f, ydata=%f' %
-        #    ('double' if event.dblclick else 'single', event.button,
-        #    event.x, event.y, event.xdata, event.ydata))
         if self.toolbar.mode != "":
             return
-        self.press = event.x, event.y, event.xdata, event.ydata
-        
-        if event.dblclick and event.button == 2:
-            a = self.figure.gca()
-            a.autoscale()
-            self.canvas.draw()
+
             
+        self.press = event.x, event.y, event.xdata, event.ydata
+
     def unclick(self, event):
         if self.toolbar.mode != "":
             return
-            
-        if not self.dragging and event.button == 1:
+
+        modifiers = keyboardModifiers()
+        #matplotlib's mouse event never sets the 'key' attribute for me
+        #That's fine.
+        #I'll just get my key presses from pyqt5.
+        if modifiers != Qt.NoModifier and event.button == 2:
+            a = self.figure.gca()
+            a.autoscale()
+            self.canvas.draw()        
+
+        elif not self.dragging and event.button == 1 and event.key is None:
             self.change_coordset(event)
-                    
+            
         self.press = None
         self.drag_prev = None
         self.dragging = False
