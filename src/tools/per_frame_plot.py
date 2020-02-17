@@ -5,7 +5,7 @@ from chimerax.core.models import REMOVE_MODELS
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QGuiApplication
-from PyQt5.QtWidgets import QGridLayout, QWidget, QToolBar
+from PyQt5.QtWidgets import QGridLayout, QWidget, QMenuBar, QAction, QFileDialog
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
@@ -111,11 +111,37 @@ class EnergyPlot(ToolInstance):
         toolbar.setMaximumHeight(24)
         self.toolbar = toolbar
         layout.addWidget(toolbar)
-                
+        
+        #menu bar for saving stuff
+        menu = QMenuBar()
+        file = menu.addMenu("&File")
+        file.addAction("&Save CSV...")
+        
+        file.triggered[QAction].connect(self.process_file_trigger)
+        
+        menu.setNativeMenuBar(False)
+        
+        layout.setMenuBar(menu)
+        
         self.tool_window.ui_area.setLayout(layout)
         
         self.tool_window.manage(None)
-        
+    
+    def process_file_trigger(self, trigger):
+        if "Save" in trigger.text():
+            self.save()
+            
+    def save(self):
+        filename, _ = QFileDialog.getSaveFileName(filter="CSV Files (*.csv)")
+        if filename:
+            print(filename)
+            s = "iteration,energy\n"
+            for i, nrg in enumerate(self.ys):
+                s += "%i,%f\n" % (self.structure.coordset_ids[i], nrg)
+                
+            with open(filename, 'w') as f:
+                f.write(s.strip())
+    
     def zoom(self, factor):
         '''
         Zoom plot objects by specified factor by changing
