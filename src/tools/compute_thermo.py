@@ -1,12 +1,24 @@
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow
+from chimerax.core.settings import Settings
+from chimerax.core.configfile import Value
+from chimerax.core.commands.cli import FloatArg
 
+from PyQt5.Qt import QClipboard
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, QDoubleSpinBox
+from PyQt5.QtGui import QKeySequence
+from PyQt5.QtWidgets import QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, QDoubleSpinBox, QMenuBar, QFileDialog, QAction, QApplication
 
 from ChimAARON.managers.filereader_manager import FILEREADER_CHANGE 
 
 from AaronTools.comp_output import CompOutput
+
+class _ComputeThermoSettings(Settings):
+
+    AUTO_SAVE = {
+        'w0': Value(100.0, FloatArg, str),
+    }
+
 
 class Thermochem(ToolInstance):
     #XML_TAG ChimeraX :: Tool :: Process Thermochemistry :: AaronTools :: Compute the free energy of a molecule with frequency data
@@ -19,6 +31,8 @@ class Thermochem(ToolInstance):
         self.display_name = "Thermochemistry"
         
         self.tool_window = MainToolWindow(self)        
+
+        self.settings = _ComputeThermoSettings(self.session, name)
 
         self._build_ui()
 
@@ -88,7 +102,7 @@ class Thermochem(ToolInstance):
         
         self.v0_edit = QDoubleSpinBox()
         self.v0_edit.setMaximum(2**31 - 1)
-        self.v0_edit.setValue(100)
+        self.v0_edit.setValue(self.settings.w0)
         self.v0_edit.setSingleStep(25)
         self.v0_edit.setSuffix(" cm\u207b\u00b9")
         self.v0_edit.valueChanged.connect(self.set_thermo)
@@ -244,9 +258,71 @@ class Thermochem(ToolInstance):
         
         layout.addWidget(splitter)
 
+        #menu stuff
+        menu = QMenuBar()
+        file = menu.addMenu("&File")
+        save = QAction("&Save CSV...", self.tool_window.ui_area)
+        save.triggered.connect(self.save_csv)
+        file.addAction(save)
+        
+        edit = menu.addMenu("&Edit")
+        copy = QAction("&Copy CSV to clipboard", self.tool_window.ui_area)
+        copy.triggered.connect(self.copy_csv)
+        shortcut = QKeySequence(Qt.CTRL + Qt.Key_C)
+        copy.setShortcut(shortcut)
+        edit.addAction(copy)
+        
+        menu.setNativeMenuBar(False)
+        layout.setMenuBar(menu)
+
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(None)
+        
+    def save_csv(self):
+        filename, _ = QFileDialog.getSaveFileName(filter="CSV Files (*.csv)")
+        if filename:
+            s = self.get_csv()
+   
+            with open(filename, 'w') as f:
+                f.write(s.strip())
+                
+            print("saved to %s" % filename)
+
+    def copy_csv(self):
+        app = QApplication.instance()
+        clipboard = app.clipboard()
+        csv = self.get_csv()
+        clipboard.setText(csv)
+        print("copied to clipboard")
+
+    def get_csv(self):
+        s = "E,ZPE,H(RRHO),G(RRHO),G(Quasi-RRHO),G(Quasi-harmonic),dZPE,dH(RRHO),dG(RRHO),dG(Quasi-RRHO),dG(Quasi-harmonic),SP File,Thermo File\n"
+        fmt = 11*"%.12f," + "%s,%s" + "\n"
+        
+        E    = float(self.sp_nrg_line.text())
+        
+        dZPE = float(self.zpe_line.text())
+        dH       = float(self.enthalpy_line.text())
+        rrho_dG  = float(self.rrho_g_line.text())
+        qrrho_dG = float(self.qrrho_g_line.text())
+        qharm_dG = float(self.qharm_g_line.text())            
+        
+        ZPE = float(self.zpe_sum_line.text())
+        H       = float(self.h_sum_line.text())
+        rrho_G  = float(self.rrho_g_sum_line.text())
+        qrrho_G = float(self.qrrho_g_sum_line.text())
+        qharm_G = float(self.qharm_g_sum_line.text())
+        
+        sp_mdl = self.sp_selector.currentData()
+        sp_name = sp_mdl.aarontools_filereader.name
+                    
+        therm_mdl = self.thermo_selector.currentData()
+        therm_name = therm_mdl.aarontools_filereader.name
+        
+        s += fmt % (E, ZPE, H, rrho_G, qrrho_G, qharm_G, dZPE, dH, rrho_dG, qrrho_dG, qharm_dG, sp_name, therm_name)
+        
+        return s
         
     def refresh_models(self, *args, **kwargs):
         models = self.session.filereader_manager.models
@@ -295,13 +371,16 @@ class Thermochem(ToolInstance):
 
         self.set_thermo()
                 
-    def set_thermo(self):
+    def set_thermo(self):      
         if self.thermo_selector.currentIndex() >= 0:
             mdl = self.thermo_models[self.thermo_selector.currentIndex()]
             co = self.thermo_cos[mdl]
             
             v0 = self.v0_edit.value()
 
+            if v0 != self.settings.w0:
+                self.settings.w0 = v0
+            
             T = self.temperature_line.value()
             if not T:
                 return

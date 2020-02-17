@@ -1,10 +1,12 @@
 from chimerax.core.settings import Settings
+from chimerax.core.configfile import Value
+from chimerax.core.commands.cli import StringArg
 
 from os import getenv
 
 class _ChimAARONSettings(Settings):
     EXPLICIT_SAVE = {
-        'AARONLIB': getenv('AARONLIB', None),
+        'AARONLIB': Value(getenv('AARONLIB', None), StringArg, str),
     }
 
 # 'settings' module attribute will be set by manager initialization

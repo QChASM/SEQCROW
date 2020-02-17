@@ -10,8 +10,8 @@ class _QChaSM_API(BundleAPI):
     @staticmethod
     def initialize(session, bundle_info):
         #TODO set AaronTools environment variables
-        from . import settings
-        settings.settings = settings._ChimAARONSettings(session, "ChimAARON")
+        from . import settings as chimaaron_settings
+        chimaaron_settings.settings = settings._ChimAARONSettings(session, "ChimAARON")
         if session.ui.is_gui:
             from .presets import chimaaron_bse, chimaaron_s\
                 ,indexLabel \
@@ -36,8 +36,8 @@ class _QChaSM_API(BundleAPI):
                 lambda *args, ses=session: settings.register_settings_options(ses))
         
         #apply AARONLIB setting
-        if settings.settings.AARONLIB is not None:
-            os.environ['AARONLIB'] = settings.settings.AARONLIB
+        if chimaaron_settings.settings.AARONLIB is not None:
+            os.environ['AARONLIB'] = chimaaron_settings.settings.AARONLIB
 
         #register selectors from the user's personal library
         from AaronTools.substituent import Substituent

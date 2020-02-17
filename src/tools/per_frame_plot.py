@@ -134,13 +134,14 @@ class EnergyPlot(ToolInstance):
     def save(self):
         filename, _ = QFileDialog.getSaveFileName(filter="CSV Files (*.csv)")
         if filename:
-            print(filename)
             s = "iteration,energy\n"
             for i, nrg in enumerate(self.ys):
                 s += "%i,%f\n" % (self.structure.coordset_ids[i], nrg)
                 
             with open(filename, 'w') as f:
                 f.write(s.strip())
+                
+            print("saved to %s" % filename)
     
     def zoom(self, factor):
         '''
