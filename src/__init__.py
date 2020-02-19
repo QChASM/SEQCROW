@@ -15,22 +15,10 @@ class _QChaSM_API(BundleAPI):
         if session.ui.is_gui:
             from .presets import chimaaron_bse, chimaaron_s\
                 ,indexLabel \
-                ,blue_filter1, blue_filter2 \
-                #,protanopia, protanomaly, deuteranopia, deuteranomaly, tritanopia, tritanomaly, achromatopsia, achromatomaly
                     
             session.presets.add_presets("ChimAARON", {"ball-stick-endcap":lambda p=chimaaron_bse: p(session)})
             session.presets.add_presets("ChimAARON", {"sticks":lambda p=chimaaron_s: p(session)})
             session.presets.add_presets("ChimAARON", {"index labels":lambda p=indexLabel: p(session)})
-            session.presets.add_presets("Filters", {"blue filter 1":lambda p=blue_filter1: p(session)})
-            session.presets.add_presets("Filters", {"blue filter 2":lambda p=blue_filter2: p(session)})
-            #session.presets.add_presets("Filters", {"protanopia":lambda p=protanopia: p(session)})
-            #session.presets.add_presets("Filters", {"protanomaly":lambda p=protanomaly: p(session)})
-            #session.presets.add_presets("Filters", {"deuteranopia":lambda p=deuteranopia: p(session)})
-            #session.presets.add_presets("Filters", {"deuteranomaly":lambda p=deuteranomaly: p(session)})
-            #session.presets.add_presets("Filters", {"tritanopia":lambda p=tritanopia: p(session)})
-            #session.presets.add_presets("Filters", {"tritanomaly":lambda p=tritanomaly: p(session)})
-            #session.presets.add_presets("Filters", {"achromatopsia":lambda p=achromatopsia: p(session)})
-            #session.presets.add_presets("Filters", {"achromatomaly":lambda p=achromatomaly: p(session)})
 
             session.ui.triggers.add_handler('ready',
                 lambda *args, ses=session: settings.register_settings_options(ses))
