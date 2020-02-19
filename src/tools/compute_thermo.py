@@ -2,7 +2,7 @@ from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
-from chimerax.core.commands.cli import FloatArg
+from chimerax.core.commands.cli import FloatArg, BoolArg
 
 from PyQt5.Qt import QClipboard
 from PyQt5.QtCore import Qt
@@ -17,6 +17,7 @@ class _ComputeThermoSettings(Settings):
 
     AUTO_SAVE = {
         'w0': Value(100.0, FloatArg, str),
+        'include_header': Value(True, BoolArg, str),
     }
 
 
@@ -260,17 +261,26 @@ class Thermochem(ToolInstance):
 
         #menu stuff
         menu = QMenuBar()
-        file = menu.addMenu("&File")
-        save = QAction("&Save CSV...", self.tool_window.ui_area)
-        save.triggered.connect(self.save_csv)
-        file.addAction(save)
         
-        edit = menu.addMenu("&Edit")
+        export = menu.addMenu("&Export")
         copy = QAction("&Copy CSV to clipboard", self.tool_window.ui_area)
         copy.triggered.connect(self.copy_csv)
         shortcut = QKeySequence(Qt.CTRL + Qt.Key_C)
         copy.setShortcut(shortcut)
-        edit.addAction(copy)
+        export.addAction(copy)
+        
+        add_header = QAction("&Include CSV header", self.tool_window.ui_area, checkable=True)
+        add_header.setChecked(self.settings.include_header)
+        add_header.triggered.connect(self.header_check)
+        export.addAction(add_header)
+        
+        save = QAction("&Save CSV...", self.tool_window.ui_area)
+        save.triggered.connect(self.save_csv)
+        #this shortcut interferes with main window's save shortcut
+        #shortcut = QKeySequence(Qt.CTRL + Qt.Key_S)
+        #save.setShortcut(shortcut)
+        #save.setShortcutContext(Qt.WidgetShortcut)
+        export.addAction(save)
         
         menu.setNativeMenuBar(False)
         layout.setMenuBar(menu)
@@ -297,7 +307,11 @@ class Thermochem(ToolInstance):
         print("copied to clipboard")
 
     def get_csv(self):
-        s = "E,ZPE,H(RRHO),G(RRHO),G(Quasi-RRHO),G(Quasi-harmonic),dZPE,dH(RRHO),dG(RRHO),dG(Quasi-RRHO),dG(Quasi-harmonic),SP File,Thermo File\n"
+        if self.settings.include_header:
+            s = "E,ZPE,H(RRHO),G(RRHO),G(Quasi-RRHO),G(Quasi-harmonic),dZPE,dH(RRHO),dG(RRHO),dG(Quasi-RRHO),dG(Quasi-harmonic),SP File,Thermo File\n"
+        else:
+            s = ""
+        
         fmt = 11*"%.12f," + "%s,%s" + "\n"
         
         E    = float(self.sp_nrg_line.text())
@@ -323,7 +337,13 @@ class Thermochem(ToolInstance):
         s += fmt % (E, ZPE, H, rrho_G, qrrho_G, qharm_G, dZPE, dH, rrho_dG, qrrho_dG, qharm_dG, sp_name, therm_name)
         
         return s
-        
+    
+    def header_check(self, state):
+        if state:
+            self.settings.include_header = True
+        else:
+            self.settings.include_header = False
+    
     def refresh_models(self, *args, **kwargs):
         models = self.session.filereader_manager.models
         
