@@ -354,7 +354,10 @@ class LigandSelection(ChildToolWindow):
         
     def refresh_selection(self):
         lig_names = []
-        for row in self.lig_table.selectionModel().selectedRows():
+        for row in self.lig_table.table.selectionModel().selectedRows():
+            if self.lig_table.table.isRowHidden(row.row()):
+                continue
+            
             lig_names.append(row.data())
             
         self.textBox.setText(",".join(lig_names))   

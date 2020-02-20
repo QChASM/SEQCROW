@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QTableWidgetItem
-from PyQt5.QtCore import Qt
-from PyQt5 import QtWidgets
+from PyQt5.QtCore import Qt, QSortFilterProxyModel, QRegularExpression
+from PyQt5.QtWidgets import QWidget, QTableWidget, QGridLayout, QLineEdit, QComboBox, QLabel
 from glob import glob
 
 class _PseudoGeometry:
@@ -65,18 +65,54 @@ class _PseudoGeometry:
             clearcache()
 
 
-class LigandTable(QtWidgets.QTableWidget):
+class LigandTable(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         
-        self.setColumnCount(3)
-        self.setHorizontalHeaderLabels(['name', 'denticity', 'coordinating elements'])
+        layout = QGridLayout(self)
+        
+        self.table = QTableWidget()
+        
+        self.table.setColumnCount(3)
+        self.table.setHorizontalHeaderLabels(['name', 'denticity', 'coordinating elements'])
         
         self.add_ligands()
         
-        self.setSortingEnabled(True)
-        self.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
-        self.setEditTriggers(QtWidgets.QTableWidget.NoEditTriggers)
+        for i in range(0, 3):
+            self.table.resizeColumnToContents(i)
+        
+        self.table.setSortingEnabled(True)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        
+        self.filterEdit = QLineEdit()
+        self.filterEdit.textChanged.connect(self.apply_filter)
+        
+        self.filter_columns = QComboBox()
+        self.filter_columns.addItem("name")
+        self.filter_columns.addItem("denticity")
+        self.filter_columns.addItem("coordinating elements")
+        self.filter_columns.currentTextChanged.connect(self.change_filter_method)
+        self.filter_columns.currentTextChanged.connect(self.apply_filter)
+
+        self.name_regex_option = QComboBox()
+        self.name_regex_option.addItem("case-insensitive")
+        self.name_regex_option.addItem("case-sensitive")
+        self.name_regex_option.currentTextChanged.connect(self.apply_filter)
+        self.name_regex_option.setVisible(self.filter_columns.currentText() == "name")
+
+        self.coordinating_elements_method = QComboBox()
+        self.coordinating_elements_method.addItem("exactly")
+        self.coordinating_elements_method.addItem("at least")
+        self.coordinating_elements_method.currentTextChanged.connect(self.apply_filter)
+        self.coordinating_elements_method.setVisible(self.filter_columns.currentText() == "coordinating elements")
+
+        layout.addWidget(self.table, 0, 0, 1, 4)
+        layout.addWidget(QLabel("filter based on"), 1, 0)
+        layout.addWidget(self.filter_columns, 1, 1)
+        layout.addWidget(self.coordinating_elements_method, 1, 2)
+        layout.addWidget(self.name_regex_option, 1, 2)
+        layout.addWidget(self.filterEdit, 1, 3)
 
     def add_ligands(self):
         from AaronTools.component import Component
@@ -84,21 +120,77 @@ class LigandTable(QtWidgets.QTableWidget):
         lig_list = [_PseudoGeometry(lig, Component) for lig in glob(Component.AARON_LIBS) + glob(Component.BUILTIN)]
         
         for lig in lig_list:
-            row = self.rowCount()
-            self.insertRow(row)
-            self.setItem(row, 0, QTableWidgetItem(lig.name))
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            self.table.setItem(row, 0, QTableWidgetItem(lig.name))
             
             #this is an integer, so I need to initialize it then set the data
             denticity = QTableWidgetItem()
             denticity.setData(Qt.DisplayRole, len(lig.key_elements))
-            self.setItem(row, 1, denticity)
+            self.table.setItem(row, 1, denticity)
             
-            self.setItem(row, 2, QTableWidgetItem(", ".join(sorted(lig.key_elements))))
+            self.table.setItem(row, 2, QTableWidgetItem(", ".join(sorted(lig.key_elements))))
     
         self.ligand_list = lig_list
+
+    def change_filter_method(self, text):
+        if text == "coordinating elements":
+            self.coordinating_elements_method.setVisible(True)
+            self.name_regex_option.setVisible(False)
+        elif text == "name":
+            self.coordinating_elements_method.setVisible(False)
+            self.name_regex_option.setVisible(True)
+        else:
+            self.coordinating_elements_method.setVisible(False)
+            self.name_regex_option.setVisible(False)
+
+    def apply_filter(self, *args):
+        text = self.filterEdit.text()
+        if text:
+            if self.filter_columns.currentText() == "name":
+                m = QRegularExpression(text)
+                if self.name_regex_option.currentText() == "case-insensitive":
+                    m.setPatternOptions(QRegularExpression.CaseInsensitiveOption)
+                    
+                m.optimize()
+                filter = lambda row_num: m.match(self.table.item(row_num, 0).text()).hasMatch()
+            
+            elif self.filter_columns.currentText() == "denticity":
+                if text.isdigit():
+                    filter = lambda row_num: int(self.table.item(row_num, 1).text()) == int(text)
+                else:
+                    filter = lambda row: True
+            
+            elif self.filter_columns.currentText() == "coordinating elements":
+                method = self.coordinating_elements_method.currentText()
+                def filter(row_num):
+                    row_key_atoms = [item.strip() for item in self.table.item(row_num, 2).text().split(',')]
+                    search_atoms = []
+                    for item in text.split():
+                        for ele in item.split(','):
+                            if ele.strip() != "":
+                                search_atoms.append(ele)
+                    
+                    if method == "exactly":
+                        if all([row_key_atoms.count(element) == search_atoms.count(element) for element in set(search_atoms)]) and \
+                            all([row_key_atoms.count(element) == search_atoms.count(element) for element in set(row_key_atoms)]):
+                            return True
+                        else:
+                            return False                    
+                    
+                    elif method == "at least":
+                        if all([row_key_atoms.count(element) >= search_atoms.count(element) for element in set(search_atoms)]):
+                            return True
+                        else:
+                            return False
+                        
+        else:
+            filter = lambda row: True
+            
+        for i in range(0, self.table.rowCount()):
+            self.table.setRowHidden(i, not filter(i))
  
- 
-class SubstituentTable(QtWidgets.QTableWidget):
+class SubstituentTable(QTableWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         
@@ -108,8 +200,8 @@ class SubstituentTable(QtWidgets.QTableWidget):
         self.add_subs()
         
         self.setSortingEnabled(True)
-        self.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
-        self.setEditTriggers(QtWidgets.QTableWidget.NoEditTriggers)
+        self.setSelectionBehavior(QTableWidget.SelectRows)
+        self.setEditTriggers(QTableWidget.NoEditTriggers)
         
     def add_subs(self):
         from AaronTools.substituent import Substituent
@@ -133,7 +225,7 @@ class SubstituentTable(QtWidgets.QTableWidget):
         self.substituent_list = sub_list
 
 
-class RingTable(QtWidgets.QTableWidget):
+class RingTable(QTableWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         
@@ -143,8 +235,8 @@ class RingTable(QtWidgets.QTableWidget):
         self.add_rings()
         
         self.setSortingEnabled(True)
-        self.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
-        self.setEditTriggers(QtWidgets.QTableWidget.NoEditTriggers)
+        self.setSelectionBehavior(QTableWidget.SelectRows)
+        self.setEditTriggers(QTableWidget.NoEditTriggers)
         
     def add_rings(self):
         from AaronTools.ring import Ring

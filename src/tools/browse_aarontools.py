@@ -117,7 +117,7 @@ class AaronTools_Library(ToolInstance):
         
         self.tool_window.ui_area.setLayout(layout)
 
-        self.tool_window.manage('side')
+        self.tool_window.manage(None)
 
     def showKeyAtoms(self, state):
         if state == QtCore.Qt.Checked:
@@ -126,7 +126,10 @@ class AaronTools_Library(ToolInstance):
             self.showLigKeyBool = False
 
     def open_ligands(self):
-        for row in self.lig_table.selectionModel().selectedRows():
+        for row in self.lig_table.table.selectionModel().selectedRows():
+            if self.lig_table.table.isRowHidden(row.row()):
+                continue
+                
             lig_name = row.data()
             ligand = Component(lig_name)
             chimera_ligand = ResidueCollection(ligand, name=lig_name).get_chimera(self.session)
@@ -206,7 +209,7 @@ def key_atom_highlight(ligand, color, session):
         s += ".sphere %f %f %f   %f\n" % (*atom.coords, r)
         
     stream = BytesIO(bytes(s, 'utf-8'))
-    bild_obj, status = read_bild(session, stream, "highlighting %s's key atoms" % ligand.name)
+    bild_obj, status = read_bild(session, stream, "highlighting key atoms")
         
     return bild_obj
     
@@ -219,7 +222,7 @@ def ghost_connection_highlight(substituent, color, session):
     s += ".cylinder 0 0 0   %f 0 0   %f open\n" % (substituent.atoms[0].coords[0], 0.15)
         
     stream = BytesIO(bytes(s, 'utf-8'))
-    bild_obj, status = read_bild(session, stream, "ghost connection for %s" % substituent.name)
+    bild_obj, status = read_bild(session, stream, "ghost connection" % substituent.name)
     
     return bild_obj
     
@@ -257,6 +260,6 @@ def show_walk_highlight(ring, chimera_ring, color, session):
                     break
                         
     stream = BytesIO(bytes(s, 'utf-8'))
-    bild_obj, status = read_bild(session, stream, "walk direction for %s" % ring.name)
+    bild_obj, status = read_bild(session, stream, "walk direction" % ring.name)
     
     return bild_obj

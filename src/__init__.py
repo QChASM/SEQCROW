@@ -27,12 +27,12 @@ class _QChaSM_API(BundleAPI):
         if chimaaron_settings.settings.AARONLIB is not None:
             os.environ['AARONLIB'] = chimaaron_settings.settings.AARONLIB
 
-        #register selectors from the user's personal library
-        from AaronTools.substituent import Substituent
-        for sub in Substituent.list():  
-            if not any([selector.name == sub for selector in bundle_info.selectors]):
-                si = SelectorInfo(sub, atomic=True, synopsis="%s substituent" % sub)
-                bundle_info.selectors.append(si)
+        ##register selectors from the user's personal library
+        #from AaronTools.substituent import Substituent
+        #for sub in Substituent.list():  
+        #    if not any([selector.name == sub for selector in bundle_info.selectors]):
+        #        si = SelectorInfo(sub, atomic=True, synopsis="%s substituent" % sub)
+        #        bundle_info.selectors.append(si)
 
     @staticmethod
     def open_file(session, path, format_name, coordsets=False):
