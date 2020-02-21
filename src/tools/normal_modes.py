@@ -5,6 +5,9 @@ from chimerax.ui.widgets import ColorButton
 from chimerax.bild.bild import read_bild
 from chimerax.core.models import MODEL_DISPLAY_CHANGED
 from chimerax.std_commands.coordset_gui import CoordinateSetSlider
+from chimerax.core.settings import Settings
+from chimerax.core.configfile import Value
+from chimerax.core.commands.cli import FloatArg, TupleOf, IntArg
 
 from AaronTools.atoms import Atom
 from AaronTools.geometry import Geometry
@@ -13,9 +16,18 @@ from AaronTools.trajectory import Pathway
 from io import BytesIO
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QLineEdit, QGridLayout, QPushButton, QTabWidget, QComboBox, QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, QFormLayout, QCheckBox
+from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, QTabWidget, QComboBox, QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, QFormLayout, QCheckBox
 
 from ..managers import FILEREADER_CHANGE
+from ChimAARON.settings import tuple2str
+
+class _NormalModeSettings(Settings):
+    AUTO_SAVE = {
+        'arrow_color': Value((0.0, 1.0, 0.0, 1.0), TupleOf(FloatArg, 4), tuple2str),
+        'arrow_scale': Value(1.5, FloatArg, str),
+        'anim_scale': Value(0.2, FloatArg, str),
+        'anim_duration': Value(101, IntArg, str),
+    }
 
 class NormalModes(ToolInstance):
     #XML_TAG ChimeraX :: Tool :: Visualize Normal Modes :: AaronTools :: Visualize normal modes from a Gaussian output file as displacement vectors or as an animation
@@ -30,6 +42,8 @@ class NormalModes(ToolInstance):
         self.tool_window = MainToolWindow(self)        
         
         self.vec_mw_bool = False
+        
+        self.settings = _NormalModeSettings(self.session, name)
         
         self.models_with_freq = self.session.filereader_manager.frequency_models
 
@@ -57,6 +71,9 @@ class NormalModes(ToolInstance):
         table.setSelectionBehavior(QTableView.SelectRows)
         table.setSelectionMode(QTableView.SingleSelection)
         table.setEditTriggers(QTableWidget.NoEditTriggers)
+        for i in range(0, 2):
+            table.resizeColumnToContents(i)
+        
         layout.addWidget(table)
         self.table = table
         
@@ -68,9 +85,13 @@ class NormalModes(ToolInstance):
         vec_opts_form = QWidget()
         vector_opts = QFormLayout(vec_opts_form)
         
-        self.vec_scale = QLineEdit()
-        self.vec_scale.setText('1.5')
-        self.vec_scale.setToolTip("vectors will be scaled so that the longest is this many Angstroms long")
+        self.vec_scale = QDoubleSpinBox()
+        self.vec_scale.setDecimals(1)
+        self.vec_scale.setRange(-100.0, 100.0)
+        self.vec_scale.setValue(self.settings.arrow_scale)
+        self.vec_scale.setSuffix(" \u212B")
+        self.vec_scale.setSingleStep(1.0)
+        self.vec_scale.setToolTip("vectors will be scaled so that this is the length of the longest vector")
         vector_opts.addRow("vector scale:", self.vec_scale)
         
         self.vec_use_mass_weighted = QCheckBox()
@@ -82,7 +103,7 @@ class NormalModes(ToolInstance):
         
         self.vector_color = ColorButton("vector color", has_alpha_channel=True)
         self.vector_color.setToolTip("color of vectors")
-        self.vector_color.set_color([0.0, 1.0, 0.0, 1.0])
+        self.vector_color.set_color(self.settings.arrow_color)
         self.vector_layout.addWidget(self.vector_color)
         
         show_vec_button = QPushButton("display selected modes")
@@ -94,14 +115,19 @@ class NormalModes(ToolInstance):
         anim_opts_form = QWidget()
         anim_opts = QFormLayout(anim_opts_form)
         
-        self.anim_scale = QLineEdit()
-        self.anim_scale.setText('0.2')
-        self.anim_scale.setToolTip("max. Angstroms an atom is displaced from equilibrium")
+        self.anim_scale = QDoubleSpinBox()
+        self.anim_scale.setSingleStep(0.1)
+        self.anim_scale.setRange(0.01, 100.0)
+        self.anim_scale.setValue(self.settings.anim_scale)
+        self.anim_scale.setSuffix(" \u212B")
+        self.anim_scale.setToolTip("maximum distance an atom is displaced from equilibrium")
         anim_opts.addRow("max. displacement:", self.anim_scale)
         
-        self.anim_duration = QLineEdit()
-        self.anim_duration.setText('101')
+        self.anim_duration = QSpinBox()
+        self.anim_duration.setRange(1, 1001)
+        self.anim_duration.setValue(self.settings.anim_duration)
         self.anim_duration.setToolTip("number of frames in animation")
+        self.anim_duration.setSingleStep(10)
         anim_opts.addRow("duration:", self.anim_duration)
         
         self.animate_layout.addWidget(anim_opts_form)
@@ -203,15 +229,16 @@ class NormalModes(ToolInstance):
             mode = modes[::2][0]
             mode = self.rows.index(mode)
 
-        try:
-            scale = float(self.vec_scale.text())
-        except:
-            raise RuntimeError("scale value '%s' is not a valid floating point number" % self.vec_scale.text())
+        scale = self.vec_scale.value()
+                
+        self.settings.arrow_scale = scale
                 
         color = self.vector_color.get_color()
         
         color = [c/255. for c in color]
-                
+        
+        self.settings.arrow_color = tuple(color)
+        
         geom = Geometry(model.aarontools_filereader)
         coords = np.array([geom.coords()])
         model.add_coordsets(coords, replace=True)
@@ -252,18 +279,11 @@ class NormalModes(ToolInstance):
             mode = modes[::2][0]
             mode = self.rows.index(mode)
 
-        try:
-            scale = float(self.anim_scale.text())
-        except:
-            raise RuntimeError("scale value '%s' is not a valid floating point number" % self.anim_scale.text())
+        scale = self.anim_scale.value()
+        frames = self.anim_duration.value()
         
-        try:
-            frames = int(self.anim_duration.text())
-        except:
-            raise RuntimeError("duration value '%s' is not a valid integer" % self.anim_duration.text())
-            
-        if frames < 0:
-            raise RuntimeError("duration value '%s' is not a valid integer" % self.anim_duration.text())
+        self.settings.anim_scale = scale
+        self.settings.anim_duration = frames
         
         geom = Geometry(model.aarontools_filereader)
         coords = np.array([geom.coords()])

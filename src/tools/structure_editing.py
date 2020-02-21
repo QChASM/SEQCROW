@@ -318,7 +318,7 @@ class SubstituentSelection(ChildToolWindow):
         layout = QGridLayout()
         
         self.sub_table = SubstituentTable()
-        self.sub_table.itemSelectionChanged.connect(self.refresh_selection)
+        self.sub_table.table.itemSelectionChanged.connect(self.refresh_selection)
         layout.addWidget(self.sub_table)
         
         self.ui_area.setLayout(layout)
@@ -327,7 +327,10 @@ class SubstituentSelection(ChildToolWindow):
         
     def refresh_selection(self):
         sub_names = []
-        for row in self.sub_table.selectionModel().selectedRows():
+        for row in self.sub_table.table.selectionModel().selectedRows():
+            if self.sub_table.table.isRowHidden(row.row()):
+                continue
+            
             sub_names.append(row.data())
             
         self.textBox.setText(",".join(sub_names))  
@@ -345,7 +348,7 @@ class LigandSelection(ChildToolWindow):
         layout = QGridLayout()
         
         self.lig_table = LigandTable()
-        self.lig_table.itemSelectionChanged.connect(self.refresh_selection)
+        self.lig_table.table.itemSelectionChanged.connect(self.refresh_selection)
         layout.addWidget(self.lig_table)
         
         self.ui_area.setLayout(layout)
@@ -375,7 +378,7 @@ class RingSelection(ChildToolWindow):
         layout = QGridLayout()
         
         self.ring_table = RingTable()
-        self.ring_table.itemSelectionChanged.connect(self.refresh_selection)
+        self.ring_table.table.itemSelectionChanged.connect(self.refresh_selection)
         layout.addWidget(self.ring_table)
         
         self.ui_area.setLayout(layout)
@@ -384,7 +387,10 @@ class RingSelection(ChildToolWindow):
         
     def refresh_selection(self):
         ring_names = []
-        for row in self.ring_table.selectionModel().selectedRows():
+        for row in self.ring_table.table.selectionModel().selectedRows():
+            if self.ring_table.table.isRowHidden(row.row()):
+                continue
+
             ring_names.append(row.data())
             
         self.textBox.setText(",".join(ring_names))

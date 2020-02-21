@@ -1,7 +1,9 @@
 from PyQt5.QtWidgets import QTableWidgetItem
 from PyQt5.QtCore import Qt, QSortFilterProxyModel, QRegularExpression
 from PyQt5.QtWidgets import QWidget, QTableWidget, QGridLayout, QLineEdit, QComboBox, QLabel
+
 from glob import glob
+
 
 class _PseudoGeometry:
     """it would take a long ling to create the library dialogs if we actually had to read
@@ -93,7 +95,6 @@ class LigandTable(QWidget):
         self.filter_columns.addItem("denticity")
         self.filter_columns.addItem("coordinating elements")
         self.filter_columns.currentTextChanged.connect(self.change_filter_method)
-        self.filter_columns.currentTextChanged.connect(self.apply_filter)
 
         self.name_regex_option = QComboBox()
         self.name_regex_option.addItem("case-insensitive")
@@ -113,6 +114,8 @@ class LigandTable(QWidget):
         layout.addWidget(self.coordinating_elements_method, 1, 2)
         layout.addWidget(self.name_regex_option, 1, 2)
         layout.addWidget(self.filterEdit, 1, 3)
+
+        self.change_filter_method("name")
 
     def add_ligands(self):
         from AaronTools.component import Component
@@ -135,14 +138,19 @@ class LigandTable(QWidget):
 
     def change_filter_method(self, text):
         if text == "coordinating elements":
+            self.filterEdit.setToolTip("comma and/or space delimited elements")
             self.coordinating_elements_method.setVisible(True)
             self.name_regex_option.setVisible(False)
         elif text == "name":
+            self.filterEdit.setToolTip("name regex")
             self.coordinating_elements_method.setVisible(False)
             self.name_regex_option.setVisible(True)
-        else:
+        elif text == "denticity":
+            self.filterEdit.setToolTip("number of key atoms")
             self.coordinating_elements_method.setVisible(False)
             self.name_regex_option.setVisible(False)
+            
+        self.apply_filter()
 
     def apply_filter(self, *args):
         text = self.filterEdit.text()
@@ -190,63 +198,187 @@ class LigandTable(QWidget):
         for i in range(0, self.table.rowCount()):
             self.table.setRowHidden(i, not filter(i))
  
-class SubstituentTable(QTableWidget):
+class SubstituentTable(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         
-        self.setColumnCount(3)
-        self.setHorizontalHeaderLabels(['name', 'conformers', 'conf. angle'])
+        layout = QGridLayout(self)
         
+        self.table = QTableWidget()
+        
+        self.table.setColumnCount(3)
+        self.table.setHorizontalHeaderLabels(['name', 'conformers', 'conf. angle'])
+
         self.add_subs()
+
+        for i in range(0, 3):
+            self.table.resizeColumnToContents(i)
         
-        self.setSortingEnabled(True)
-        self.setSelectionBehavior(QTableWidget.SelectRows)
-        self.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setSortingEnabled(True)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         
+        self.filterEdit = QLineEdit()
+        self.filterEdit.textChanged.connect(self.apply_filter)
+        
+        self.filter_columns = QComboBox()
+        self.filter_columns.addItem("name")
+        self.filter_columns.addItem("conformers")
+        self.filter_columns.addItem("conf. angle")
+        self.filter_columns.currentTextChanged.connect(self.change_filter_method)
+
+        self.name_regex_option = QComboBox()
+        self.name_regex_option.addItem("case-insensitive")
+        self.name_regex_option.addItem("case-sensitive")
+        self.name_regex_option.currentTextChanged.connect(self.apply_filter)
+        self.name_regex_option.setVisible(self.filter_columns.currentText() == "name")
+
+        layout.addWidget(self.table, 0, 0, 1, 4)
+        layout.addWidget(QLabel("filter based on"), 1, 0)
+        layout.addWidget(self.filter_columns, 1, 1)
+        layout.addWidget(self.name_regex_option, 1, 2)
+        layout.addWidget(self.filterEdit, 1, 3)
+    
+        self.change_filter_method("name")
+    
+    def change_filter_method(self, text):
+        if text == "name":
+            self.filterEdit.setToolTip("name regex")
+            self.name_regex_option.setVisible(True)
+        elif text == "conformers":
+            self.filterEdit.setToolTip("number of conformers")
+            self.name_regex_option.setVisible(False)        
+        elif text == "conf. angle":
+            self.filterEdit.setToolTip("angle between conformers")
+            self.name_regex_option.setVisible(False)
+            
+        self.apply_filter()
+
+    def apply_filter(self, *args):
+        text = self.filterEdit.text()
+        if text:
+            if self.filter_columns.currentText() == "name":
+                m = QRegularExpression(text)
+                if self.name_regex_option.currentText() == "case-insensitive":
+                    m.setPatternOptions(QRegularExpression.CaseInsensitiveOption)
+                    
+                m.optimize()
+                filter = lambda row_num: m.match(self.table.item(row_num, 0).text()).hasMatch()
+
+            elif self.filter_columns.currentText() == "conformers":
+                if text.isdigit():
+                    filter = lambda row_num: int(self.table.item(row_num, 1).text()) == int(text)
+                else:
+                    filter = lambda row: True
+            
+            elif self.filter_columns.currentText() == "conf. angle":
+                if text.isdigit():
+                    filter = lambda row_num: int(self.table.item(row_num, 2).text()) == int(text)
+                else:
+                    filter = lambda row: True
+                    
+        else:
+            filter = lambda row: True
+            
+        for i in range(0, self.table.rowCount()):
+            self.table.setRowHidden(i, not filter(i))
+            
     def add_subs(self):
         from AaronTools.substituent import Substituent
 
         sub_list = [_PseudoGeometry(sub, Substituent) for sub in glob(Substituent.AARON_LIBS) + glob(Substituent.BUILTIN)]
         
         for sub in sub_list:
-            row = self.rowCount()
-            self.insertRow(row)
-            self.setItem(row, 0, QTableWidgetItem(sub.name))
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            self.table.setItem(row, 0, QTableWidgetItem(sub.name))
             
             #the next two items are integers - need to initialize then setData so they sort and display correctly
             conf_num = QTableWidgetItem()
             conf_num.setData(Qt.DisplayRole, sub.conf_num)
-            self.setItem(row, 1, conf_num)
+            self.table.setItem(row, 1, conf_num)
             
             conf_angle = QTableWidgetItem()
             conf_angle.setData(Qt.DisplayRole, sub.conf_angle)
-            self.setItem(row, 2, conf_angle)
+            self.table.setItem(row, 2, conf_angle)
 
         self.substituent_list = sub_list
 
 
-class RingTable(QTableWidget):
+class RingTable(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         
-        self.setColumnCount(1)
-        self.setHorizontalHeaderLabels(['name'])
+        layout = QGridLayout(self)
         
+        self.table = QTableWidget()
+        
+        self.table.setColumnCount(1)
+        self.table.setHorizontalHeaderLabels(['name'])
+
         self.add_rings()
+
+        for i in range(0, 1):
+            self.table.resizeColumnToContents(i)
         
-        self.setSortingEnabled(True)
-        self.setSelectionBehavior(QTableWidget.SelectRows)
-        self.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setSortingEnabled(True)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         
+        self.filterEdit = QLineEdit()
+        self.filterEdit.textChanged.connect(self.apply_filter)
+        
+        self.filter_columns = QComboBox()
+        self.filter_columns.addItem("name")
+        self.filter_columns.currentTextChanged.connect(self.change_filter_method)
+
+        self.name_regex_option = QComboBox()
+        self.name_regex_option.addItem("case-insensitive")
+        self.name_regex_option.addItem("case-sensitive")
+        self.name_regex_option.currentTextChanged.connect(self.apply_filter)
+        self.name_regex_option.setVisible(self.filter_columns.currentText() == "name")
+
+        layout.addWidget(self.table, 0, 0, 1, 4)
+        layout.addWidget(QLabel("filter based on"), 1, 0)
+        layout.addWidget(self.filter_columns, 1, 1)
+        layout.addWidget(self.name_regex_option, 1, 2)
+        layout.addWidget(self.filterEdit, 1, 3)
+    
+        self.change_filter_method("name")        
+        
+    def change_filter_method(self, text):
+        if text == "name":
+            self.filterEdit.setToolTip("name regex")
+            self.name_regex_option.setVisible(True)
+            
+        self.apply_filter()
+
+    def apply_filter(self, *args):
+        text = self.filterEdit.text()
+        if text:
+            if self.filter_columns.currentText() == "name":
+                m = QRegularExpression(text)
+                if self.name_regex_option.currentText() == "case-insensitive":
+                    m.setPatternOptions(QRegularExpression.CaseInsensitiveOption)
+                    
+                m.optimize()
+                filter = lambda row_num: m.match(self.table.item(row_num, 0).text()).hasMatch()
+                    
+        else:
+            filter = lambda row: True
+            
+        for i in range(0, self.table.rowCount()):
+            self.table.setRowHidden(i, not filter(i))
+            
     def add_rings(self):
         from AaronTools.ring import Ring
         
         rings = [_PseudoGeometry(ring, Ring) for ring in glob(Ring.AARON_LIBS) + glob(Ring.BUILTIN)]
         
         for ring in rings:
-            row = self.rowCount()
-            self.insertRow(row)
-            self.setItem(row, 0, QTableWidgetItem(ring.name))
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            self.table.setItem(row, 0, QTableWidgetItem(ring.name))
             
         self.ring_list = rings
         

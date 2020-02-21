@@ -4,6 +4,10 @@ from chimerax.core.commands.cli import StringArg
 
 from os import getenv
 
+def tuple2str(t):
+    """converts tuple to str and cuts off ()"""
+    return str(t)[1:-1]
+    
 class _ChimAARONSettings(Settings):
     EXPLICIT_SAVE = {
         'AARONLIB': Value(getenv('AARONLIB', None), StringArg, str),

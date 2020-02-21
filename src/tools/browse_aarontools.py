@@ -3,6 +3,9 @@ from chimerax.ui.widgets import ColorButton
 from chimerax.bild.bild import read_bild
 from chimerax.atomic import Atom
 from chimerax.core.models import MODEL_DISPLAY_CHANGED
+from chimerax.core.settings import Settings
+from chimerax.core.configfile import Value
+from chimerax.core.commands.cli import FloatArg, TupleOf
 
 from io import BytesIO
 
@@ -15,9 +18,17 @@ from AaronTools.substituent import Substituent
 
 from ..libraries import LigandTable, SubstituentTable, RingTable
 from ..residue_collection import ResidueCollection
+from ChimAARON.settings import tuple2str
 
 # TODO: change decorations to use ChimeraX atom/bond defaults
-
+class _BrowseLibSettings(Settings):
+    AUTO_SAVE = {
+        'key_atom_color': Value((0.2, 0.5, 0.8, 0.5), TupleOf(FloatArg, 4), tuple2str),
+        'ghost_connection_color': Value((0.60784, 0.145098, 0.70196, 0.5), TupleOf(FloatArg, 4), tuple2str),
+        'ring_walk_color': Value((0.9, 0.4, 0.3, 0.9), TupleOf(FloatArg, 4), tuple2str),
+    }
+    
+    
 class AaronTools_Library(ToolInstance):
     #XML_TAG ChimeraX :: Tool :: Browse AaronTools Libraries :: AaronTools :: Browse the AaronTools ligand, substituent, and ring libraries
     SESSION_ENDURING = False
@@ -29,6 +40,8 @@ class AaronTools_Library(ToolInstance):
         
         from chimerax.ui import MainToolWindow
         self.tool_window = MainToolWindow(self)
+        
+        self.settings = _BrowseLibSettings(self.session, name)
         
         self.showLigKeyBool = True
         self.showSubGhostBool = True
@@ -55,7 +68,7 @@ class AaronTools_Library(ToolInstance):
         
         self.lig_color = ColorButton('key atom color', has_alpha_channel=True)
         self.lig_color.setToolTip("highlight color for ligand's key atoms")
-        self.lig_color.set_color([0.2, 0.5, 0.8, 0.5])
+        self.lig_color.set_color(self.settings.key_atom_color)
         self.ligand_layout.addWidget(self.lig_color)
 
         openLigButton = QPushButton("open selected ligands")
@@ -77,7 +90,7 @@ class AaronTools_Library(ToolInstance):
         
         self.sub_color = ColorButton('ghost connection color', has_alpha_channel=True)
         self.sub_color.setToolTip("color of ghost connection")
-        self.sub_color.set_color([0.60784, 0.145098, 0.70196, 0.5])
+        self.sub_color.set_color(self.settings.ghost_connection_color)
         self.substituent_layout.addWidget(self.sub_color)
 
         openSubButton = QPushButton("open selected substituents")
@@ -99,7 +112,7 @@ class AaronTools_Library(ToolInstance):
         
         self.ring_color = ColorButton('walk arrow color', has_alpha_channel=True)
         self.ring_color.setToolTip("color of walk arrows")
-        self.ring_color.set_color([0.9, 0.4, 0.3, 0.9])
+        self.ring_color.set_color(self.settings.ring_walk_color)
         self.ring_layout.addWidget(self.ring_color)
 
         openRingButton = QPushButton("open selected rings")
@@ -141,6 +154,8 @@ class AaronTools_Library(ToolInstance):
                 
                 color = [c/255. for c in color]
                 
+                self.settings.key_atom_color = tuple(color)
+                
                 bild_obj = key_atom_highlight(ligand, color, self.session)
             
                 self.session.models.add(bild_obj, parent=chimera_ligand)
@@ -152,7 +167,10 @@ class AaronTools_Library(ToolInstance):
             self.showSubGhostBool = False
 
     def open_substituents(self):
-        for row in self.sub_table.selectionModel().selectedRows():
+        for row in self.sub_table.table.selectionModel().selectedRows():
+            if self.sub_table.table.isRowHidden(row.row()):
+                continue
+            
             sub_name = row.data()
             substituent = Substituent(sub_name, name=sub_name)
             chimera_substituent = ResidueCollection(substituent).get_chimera(self.session)
@@ -163,6 +181,8 @@ class AaronTools_Library(ToolInstance):
                 color = self.sub_color.get_color()
                 
                 color = [c/255. for c in color]
+                
+                self.settings.ghost_connection_color = tuple(color)
                 
                 bild_obj = ghost_connection_highlight(substituent, color, self.session)
             
@@ -175,7 +195,10 @@ class AaronTools_Library(ToolInstance):
             self.showRingWalkBool = False
 
     def open_rings(self):
-        for row in self.ring_table.selectionModel().selectedRows():
+        for row in self.ring_table.table.selectionModel().selectedRows():
+            if self.ring_table.table.isRowHidden(row.row()):
+                continue
+
             ring_name = row.data()
             ring = Ring(ring_name, name=ring_name)
             chimera_ring = ResidueCollection(ring.copy()).get_chimera(self.session)
@@ -186,6 +209,8 @@ class AaronTools_Library(ToolInstance):
                 color = self.ring_color.get_color()
                 
                 color = [c/255. for c in color]
+                
+                self.ring_walk_color = tuple(color)
                 
                 bild_obj = show_walk_highlight(ring, chimera_ring, color, self.session)
             
@@ -222,7 +247,7 @@ def ghost_connection_highlight(substituent, color, session):
     s += ".cylinder 0 0 0   %f 0 0   %f open\n" % (substituent.atoms[0].coords[0], 0.15)
         
     stream = BytesIO(bytes(s, 'utf-8'))
-    bild_obj, status = read_bild(session, stream, "ghost connection" % substituent.name)
+    bild_obj, status = read_bild(session, stream, "ghost connection")
     
     return bild_obj
     
@@ -260,6 +285,6 @@ def show_walk_highlight(ring, chimera_ring, color, session):
                     break
                         
     stream = BytesIO(bytes(s, 'utf-8'))
-    bild_obj, status = read_bild(session, stream, "walk direction" % ring.name)
+    bild_obj, status = read_bild(session, stream, "walk direction")
     
     return bild_obj
