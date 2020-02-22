@@ -349,7 +349,7 @@ class Thermochem(ToolInstance):
         
         comp_outs = [CompOutput(mdl.aarontools_filereader) for mdl in models]
         self.nrg_cos = {mdl:co for mdl, co in zip(models, comp_outs) if co.energy is not None}
-        self.thermo_cos = {mdl:co for mdl, co in zip(models, comp_outs) if co.free_energy is not None}
+        self.thermo_cos = {mdl:co for mdl, co in zip(models, comp_outs) if co.grimme_g is not None}
         
         self.nrg_models = list(self.nrg_cos.keys())
         self.thermo_models = list(self.thermo_cos.keys())

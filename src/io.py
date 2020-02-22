@@ -9,10 +9,14 @@ def open_aarontools(session, path, format_name=None, trajectory=False):
     #XML_TAG ChimeraX :: Open :: COM :: Gaussian input file ::
     #XML_TAG ChimeraX :: DataFormat :: LOG :: Gaussian output file :: Molecular structure :: .log :: :: :: :: :: Gaussian output file :: utf-8
     #XML_TAG ChimeraX :: Open :: LOG :: Gaussian output file :: false :: coordsets:Bool
+    #XML_TAG ChimeraX :: DataFormat :: OUT :: Orca output file :: Molecular structure :: .out :: :: :: :: :: Orca output file :: utf-8
+    #XML_TAG ChimeraX :: Open :: OUT :: Orca output file :: false :: coordsets:Bool
     if format_name == "Gaussian input file":
         fmt = "com"
     elif format_name == "Gaussian output file":
-        fmt = "log"
+        fmt = "log"    
+    elif format_name == "Orca output file":
+        fmt = "out"
     elif format_name == "XYZ":
         fmt = "xyz"
     else:
