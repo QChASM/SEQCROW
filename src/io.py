@@ -3,6 +3,7 @@ def open_aarontools(session, path, format_name=None, trajectory=False):
     from AaronTools.geometry import Geometry
     from ChimAARON.residue_collection import ResidueCollection
     from os.path import split as path_split
+    from warnings import warn
     #XML_TAG ChimeraX :: DataFormat :: XYZ :: XYZ :: Molecular structure :: .xyz :: :: :: :: :: XYZ Format :: utf-8
     #XML_TAG ChimeraX :: Open :: XYZ :: AaronTools :: false :: coordsets:Bool
     #XML_TAG ChimeraX :: DataFormat :: COM :: Gaussian input file :: Molecular structure :: .com,.gjf :: :: :: :: :: Gaussian input file :: utf-8
@@ -39,7 +40,11 @@ def open_aarontools(session, path, format_name=None, trajectory=False):
         for structure in structures:
             CoordinateSetSlider(session, structure)
             if "energy" in structure.aarontools_filereader.other:
-                EnergyPlot(session, structure)
+                nrg_plot = EnergyPlot(session, structure)
+                if not nrg_plot.opened:
+                    warn("energy plot could not be opened\n" + \
+                         "there might be a mismatch between energy entries and structure entries in %s" % path)
+                    nrg_plot.delete()                    
 
     status = "Opened %s as a %s %s" % (path, fmt, "trajectory" if trajectory else "file")
 

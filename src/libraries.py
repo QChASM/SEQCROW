@@ -157,12 +157,15 @@ class LigandTable(QWidget):
         if text:
             if self.filter_columns.currentText() == "name":
                 m = QRegularExpression(text)
-                if self.name_regex_option.currentText() == "case-insensitive":
-                    m.setPatternOptions(QRegularExpression.CaseInsensitiveOption)
-                    
-                m.optimize()
-                filter = lambda row_num: m.match(self.table.item(row_num, 0).text()).hasMatch()
-            
+                if m.isValid():
+                    if self.name_regex_option.currentText() == "case-insensitive":
+                        m.setPatternOptions(QRegularExpression.CaseInsensitiveOption)
+                        
+                    m.optimize()
+                    filter = lambda row_num: m.match(self.table.item(row_num, 0).text()).hasMatch()
+                else:
+                    return
+                
             elif self.filter_columns.currentText() == "denticity":
                 if text.isdigit():
                     filter = lambda row_num: int(self.table.item(row_num, 1).text()) == int(text)
@@ -259,12 +262,15 @@ class SubstituentTable(QWidget):
         if text:
             if self.filter_columns.currentText() == "name":
                 m = QRegularExpression(text)
-                if self.name_regex_option.currentText() == "case-insensitive":
-                    m.setPatternOptions(QRegularExpression.CaseInsensitiveOption)
-                    
-                m.optimize()
-                filter = lambda row_num: m.match(self.table.item(row_num, 0).text()).hasMatch()
-
+                if m.isValid():
+                    if self.name_regex_option.currentText() == "case-insensitive":
+                        m.setPatternOptions(QRegularExpression.CaseInsensitiveOption)
+                        
+                    m.optimize()
+                    filter = lambda row_num: m.match(self.table.item(row_num, 0).text()).hasMatch()
+                else:
+                    return
+ 
             elif self.filter_columns.currentText() == "conformers":
                 if text.isdigit():
                     filter = lambda row_num: int(self.table.item(row_num, 1).text()) == int(text)
@@ -358,12 +364,15 @@ class RingTable(QWidget):
         if text:
             if self.filter_columns.currentText() == "name":
                 m = QRegularExpression(text)
-                if self.name_regex_option.currentText() == "case-insensitive":
-                    m.setPatternOptions(QRegularExpression.CaseInsensitiveOption)
-                    
-                m.optimize()
-                filter = lambda row_num: m.match(self.table.item(row_num, 0).text()).hasMatch()
-                    
+                if m.isValid():
+                    if self.name_regex_option.currentText() == "case-insensitive":
+                        m.setPatternOptions(QRegularExpression.CaseInsensitiveOption)
+                        
+                    m.optimize()
+                    filter = lambda row_num: m.match(self.table.item(row_num, 0).text()).hasMatch()
+                else:
+                    return
+                     
         else:
             filter = lambda row: True
             

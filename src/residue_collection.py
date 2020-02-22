@@ -12,6 +12,8 @@ from chimerax.atomic import AtomicStructure
 from chimerax.atomic import Atom as ChixAtom
 from chimerax.atomic.colors import element_color
 
+from warnings import warn
+
 def fromChimAtom(atom=None, *args, serial_number=None, atomspec=None, **kwargs):
     """get AaronTools Atom object from ChimeraX Atom"""
     aarontools_atom = Atom(*args, name=str(atom.serial_number), element=str(atom.element), coords=atom.coord, **kwargs)
@@ -322,14 +324,18 @@ class ResidueCollection(Geometry):
             else:
                 #filereader was given
                 #each list of atoms in filereader.all_geom is a frame in the trajectory
-                coordsets = np.zeros((len(filereader.all_geom), len(self.atoms), 3))
-                for i, all_geom in enumerate(filereader.all_geom):
-                    if not all([isinstance(a, Atom) for a in all_geom]):
-                        atom_list = [l for l in all_geom if all([isinstance(a, Atom) for a in l])][0]
-                    else:
-                        atom_list = all_geom
-                    for j, atom in enumerate(atom_list):
-                        coordsets[i][j] = atom.coords
+                if filereader.all_geom is None:
+                    warn("coordsets requested, but the file contains one or fewer sets of coordinates")
+                    coordsets = struc.coordset(1)
+                else:
+                    coordsets = np.zeros((len(filereader.all_geom), len(self.atoms), 3))
+                    for i, all_geom in enumerate(filereader.all_geom):
+                        if not all([isinstance(a, Atom) for a in all_geom]):
+                            atom_list = [l for l in all_geom if all([isinstance(a, Atom) for a in l])][0]
+                        else:
+                            atom_list = all_geom
+                        for j, atom in enumerate(atom_list):
+                            coordsets[i][j] = atom.coords
             
             #replace previous coordinates
             #this matters when a filereader is given because the

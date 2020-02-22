@@ -52,6 +52,7 @@ class EnergyPlot(ToolInstance):
         self._drag_mode = None
 
         self._build_ui()
+
         self.press = None
         self.drag_prev = None
         self.dragging = False
@@ -68,7 +69,13 @@ class EnergyPlot(ToolInstance):
 
         data = []
         for step in self.structure.aarontools_filereader.all_geom:
-            info = [item for item in step if isinstance(item, dict) and "energy" in item][0]
+            info = [item for item in step if isinstance(item, dict) and "energy" in item]
+            if len(info) < 1:
+                #we will be unable to load an enegy plot because some structure does not have an associated energy
+                self.opened = False
+                return
+            else:
+                info = info[0]
             data.append(info["energy"])
 
         self.ys = data
@@ -126,6 +133,8 @@ class EnergyPlot(ToolInstance):
         self.tool_window.ui_area.setLayout(layout)
         
         self.tool_window.manage(None)
+        
+        self.opened = True
     
     def process_file_trigger(self, trigger):
         if "Save" in trigger.text():
