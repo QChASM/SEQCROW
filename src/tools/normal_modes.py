@@ -205,7 +205,7 @@ class NormalModes(ToolInstance):
         max_norm = None
         for i, displacement in enumerate(vector):
             n = np.linalg.norm(displacement)
-            if self.vec_mw_bool:
+            if self.vec_mw_bool and self.display_tabs.currentIndex() == 0:
                 n *= geom.atoms[i].mass()
             
             if max_norm is None or n > max_norm:
@@ -213,7 +213,7 @@ class NormalModes(ToolInstance):
                 
         dX = vector * scaling/max_norm
         
-        if self.vec_mw_bool:
+        if self.vec_mw_bool and self.display_tabs.currentIndex() == 0:
             for i, x in enumerate(dX):
                 dX[i] *= geom.atoms[i].mass()
         
