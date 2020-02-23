@@ -10,6 +10,7 @@ from PyQt5.QtGui import QKeySequence
 from PyQt5.QtWidgets import QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, QDoubleSpinBox, QMenuBar, QFileDialog, QAction, QApplication
 
 from ChimAARON.managers.filereader_manager import FILEREADER_CHANGE 
+from ChimAARON.tools.theory_literature import LiteratureBrowser
 
 from AaronTools.comp_output import CompOutput
 
@@ -25,6 +26,9 @@ class Thermochem(ToolInstance):
     #XML_TAG ChimeraX :: Tool :: Process Thermochemistry :: AaronTools :: Compute the free energy of a molecule with frequency data
     SESSION_ENDURING = False
     SESSION_SAVE = False         
+
+    theory_helper = {"Grimme's Quasi-RRHO":"https://doi.org/10.1002/chem.201200497",
+                     "Truhlar's Quasi-Harmonic":"https://doi.org/10.1021/jp205508z"}
     
     def __init__(self, session, name):       
         super().__init__(session, name)
@@ -37,6 +41,9 @@ class Thermochem(ToolInstance):
 
         self._build_ui()
 
+
+        self.nrg_cos = {}
+        self.thermo_cos = {}
         self.refresh_models()
         
         self._refresh_handler = self.session.filereader_manager.triggers.add_handler(FILEREADER_CHANGE, self.refresh_models)
@@ -108,7 +115,7 @@ class Thermochem(ToolInstance):
         self.v0_edit.setSuffix(" cm\u207b\u00b9")
         self.v0_edit.valueChanged.connect(self.set_thermo)
         self.v0_edit.setMinimum(0)
-        self.v0_edit.setToolTip("frequency paramter for quasi treatments of entropy")
+        self.v0_edit.setToolTip("frequency parameter for quasi treatments of entropy")
         self.thermo_layout.addWidget(self.v0_edit, row, 1, 1, 2, Qt.AlignTop)
         
         row += 1
@@ -146,7 +153,15 @@ class Thermochem(ToolInstance):
         
         row += 1
         
-        self.thermo_layout.addWidget(QLabel("𝛿G<sub>Quasi-RRHO</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        dqrrho_g_label = QLabel()
+        dqrrho_g_label.setText("<a href=\"Grimme's Quasi-RRHO\" style=\"text-decoration: none;\">𝛿G<sub>Quasi-RRHO</sub></a> =")
+        dqrrho_g_label.setTextFormat(Qt.RichText)
+        dqrrho_g_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        dqrrho_g_label.linkActivated.connect(self.open_link)
+        dqrrho_g_label.setToolTip("click to open a relevant reference\n" + \
+                                  "see the \"Computation of internal (gas‐phase) entropies\" section for a description of the method")
+        
+        self.thermo_layout.addWidget(dqrrho_g_label, row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
         
         self.qrrho_g_line = QLineEdit()
         self.qrrho_g_line.setReadOnly(True)
@@ -159,7 +174,15 @@ class Thermochem(ToolInstance):
         
         row += 1
         
-        self.thermo_layout.addWidget(QLabel("𝛿G<sub>Quasi-Harmonic</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        dqharm_g_label = QLabel("")
+        dqharm_g_label.setText("<a href=\"Truhlar's Quasi-Harmonic\" style=\"text-decoration: none;\">𝛿G<sub>Quasi-Harmonic</sub></a> =")
+        dqharm_g_label.setTextFormat(Qt.RichText)
+        dqharm_g_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        dqharm_g_label.linkActivated.connect(self.open_link)
+        dqharm_g_label.setToolTip("click to open a relevant reference\n" + \
+                                  "see the \"Computations\" section for a description of the method")
+        
+        self.thermo_layout.addWidget(dqharm_g_label, row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
         
         self.qharm_g_line = QLineEdit()
         self.qharm_g_line.setReadOnly(True)
@@ -277,6 +300,8 @@ class Thermochem(ToolInstance):
         save = QAction("&Save CSV...", self.tool_window.ui_area)
         save.triggered.connect(self.save_csv)
         #this shortcut interferes with main window's save shortcut
+        #I've tried different shortcut contexts to no avail
+        #thanks Qt...
         #shortcut = QKeySequence(Qt.CTRL + Qt.Key_S)
         #save.setShortcut(shortcut)
         #save.setShortcutContext(Qt.WidgetShortcut)
@@ -288,6 +313,11 @@ class Thermochem(ToolInstance):
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(None)
+        
+    def open_link(self, theory):
+        link = self.theory_helper[theory]
+        title = "%s (%s)" % (theory, link)
+        self.tool_window.create_child_window(title, window_class=LiteratureBrowser, url=link)
         
     def save_csv(self):
         filename, _ = QFileDialog.getSaveFileName(filter="CSV Files (*.csv)")
@@ -347,9 +377,34 @@ class Thermochem(ToolInstance):
     def refresh_models(self, *args, **kwargs):
         models = self.session.filereader_manager.models
         
+        #purge old models
+        models_to_del = []
+        for mdl in self.nrg_cos.keys():
+            if self.nrg_cos[mdl] not in models:
+                models_to_del.append(mdl)
+        
+        for mdl in self.thermo_cos.keys():
+            if self.thermo_cos[mdl] not in models:
+                models_to_del.append(mdl)
+
+        for mdl in models_to_del:
+            if mdl in self.nrg_cos:
+                del self.nrg_cos[mdl]
+                
+            if mdl in self.thermo_cos:
+                del self.thermo_cos[mdl]
+        
+        #figure out new models
+        new_models = [model for model in models if model not in self.nrg_cos.keys()]
+        new_models.extend([model for model in models if model not in self.nrg_cos.keys() and model not in new_models])
+        
         comp_outs = [CompOutput(mdl.aarontools_filereader) for mdl in models]
-        self.nrg_cos = {mdl:co for mdl, co in zip(models, comp_outs) if co.energy is not None}
-        self.thermo_cos = {mdl:co for mdl, co in zip(models, comp_outs) if co.grimme_g is not None}
+        for mdl, co in zip(new_models, comp_outs):
+            if co.energy is not None:
+                self.nrg_cos[mdl] = co
+            
+            if co.grimme_g is not None:    
+                self.thermo_cos[mdl] = co
         
         self.nrg_models = list(self.nrg_cos.keys())
         self.thermo_models = list(self.thermo_cos.keys())
@@ -371,6 +426,7 @@ class Thermochem(ToolInstance):
                 self.thermo_selector.addItem("%s (%s)" % (model.name, model.atomspec), model)
 
     def set_sp(self):
+        """set energy entry for when sp model changes"""
         if self.sp_selector.currentIndex() >= 0:
             mdl = self.nrg_models[self.sp_selector.currentIndex()]
             co = self.nrg_cos[mdl]
@@ -391,7 +447,9 @@ class Thermochem(ToolInstance):
 
         self.set_thermo()
                 
-    def set_thermo(self):      
+    def set_thermo(self):
+        """sets thermo entries for when thermo model changes"""
+        #index of combobox is -1 when combobox has no entries
         if self.thermo_selector.currentIndex() >= 0:
             mdl = self.thermo_models[self.thermo_selector.currentIndex()]
             co = self.thermo_cos[mdl]
@@ -406,8 +464,11 @@ class Thermochem(ToolInstance):
                 return
             
             dZPE = co.ZPVE
-            dE, dH, s = co.therm_corr(temperature=T)
-            rrho_dg = co.calc_G_corr(v0=0, temperature=T)
+            #compute enthalpy and entropy at this temperature
+            #AaronTools uses Grimme's Quasi-RRHO, but this is the same as RRHO when w0=0
+            dE, dH, s = co.therm_corr(temperature=T, v0=0, quasi_harmonic=False)
+            rrho_dg = dH - T * s
+            #compute G with quasi entropy treatments
             qrrho_dg = co.calc_G_corr(v0=v0, temperature=T, quasi_harmonic=False)
             qharm_dg = co.calc_G_corr(v0=v0, temperature=T, quasi_harmonic=True)
             
@@ -426,6 +487,7 @@ class Thermochem(ToolInstance):
         self.update_sum()
         
     def update_sum(self):
+        """updates the sum of energy and thermo corrections"""
         dZPE = self.zpe_line.text()
         dH = self.enthalpy_line.text()
         dG = self.rrho_g_line.text()
@@ -463,6 +525,6 @@ class Thermochem(ToolInstance):
             self.qharm_g_sum_line.setText(repr(qharm_g))
         
     def delete(self):
-        """overload delete"""
+        #overload delete ro de-register handler
         self.session.filereader_manager.triggers.remove_handler(self._refresh_handler)
         super().delete()           
