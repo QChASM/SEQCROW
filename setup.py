@@ -12,19 +12,22 @@ synopsis = "Structure editing and visualization with a focus on small molecules,
 description = """
 ChimAARON extends ChimeraX:
 I/O:
-    read XYZ, Gaussian COM, and Gaussian LOG files
+    read XYZ, Gaussian COM, Gaussian LOG files, and Orca output files
     save models to XYZ files
 
 tools:
+    Add to Personal Library  - add substituents, ligands, or rings to your personal AaronTools library
     Browse AaronTools        - browse substituents, ligands, and rings in the AaronTools library
+    Process Thermochemistry  - compute thermal corrections for models with vibrational mode information
     Structure Modification   - modify your structure using pieces from the AaronTools library
-    Visualize Normal Modes   - display normal modes from Gaussian LOG files as vectors or an animation
+    Visualize Normal Modes   - display normal modes for models with vibrational mode information as vectors or an animation
 
 selectors:
     tm  - select all transition metals
 
 presets:
     ball-stick-endcap       - all non-H atoms are represented as balls and sticks; H atoms are represented as sticks/endcaps
+    index labels            - label each atom with its index (1-indexed)
     sticks                  - all atoms are represented as sticks/endcaps
 """
 

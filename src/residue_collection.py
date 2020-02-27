@@ -342,7 +342,7 @@ class ResidueCollection(Geometry):
                             atom_list = all_geom
                         for j, atom in enumerate(atom_list):
                             coordsets[i][j] = atom.coords
-            
+
             #replace previous coordinates
             #this matters when a filereader is given because the
             #geometry created from a filereader (which was probably passed as geom)
