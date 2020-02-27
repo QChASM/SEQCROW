@@ -134,7 +134,7 @@ class ResidueCollection(Geometry):
             super().__init__(molecule, refresh_connected=refresh_connected, **kwargs)
             if "comment" in kwargs:
                 self.residues = [Residue(molecule, resnum=1, name="UNK", refresh_connected=refresh_connected, comment=kwargs['comment'])]
-            if hasattr(molecule, "comment"):
+            elif hasattr(molecule, "comment"):
                 self.residues = [Residue(molecule, resnum=1, name="UNK", refresh_connected=refresh_connected, comment=molecule.comment)]
             else:
                 self.residues = [Residue(molecule, resnum=1, name="UNK", refresh_connected=refresh_connected)]
@@ -289,7 +289,13 @@ class ResidueCollection(Geometry):
                 
                 known_bonds.append(sorted((aaron_atom1, aaron_atom2,)))
 
-                atom2 = [atom for atom in atomic_structure.atoms if atom == aaron_atom2.chix_atom][0]
+                atom2 = [atom for atom in atomic_structure.atoms if atom == aaron_atom2.chix_atom]
+                if len(atom2) > 0:
+                    atom2 = atom2[0]
+                else:
+                    #we cannot draw a bond to an atom that is not in the residue
+                    #this could happen when previewing a substituent or w/e with the libadd tool
+                    continue
 
                 ##this doesn't work for some reason?
                 #if any([atom2 in bond.atoms for bond in atom1.bonds]):

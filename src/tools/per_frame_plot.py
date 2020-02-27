@@ -121,7 +121,7 @@ class EnergyPlot(ToolInstance):
         
         #menu bar for saving stuff
         menu = QMenuBar()
-        file = menu.addMenu("&File")
+        file = menu.addMenu("&Export")
         file.addAction("&Save CSV...")
         
         file.triggered[QAction].connect(self.process_file_trigger)
