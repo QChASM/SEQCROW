@@ -4,8 +4,6 @@ AaronTools plug-in for Chimera
 Almost all of the functionality added by ChimAARON is based on our AaronTools package for Python 3. 
 The AaronTools installation that comes with ChimAARON is compatible with Python 2, which is what Chimera uses. 
 
-Installing and updating ChimAARON can be simplified using <code>git</code> or <a href="https://desktop.github.com/">GitHub Desktop</a>. 
-
 # Tools and Features
 ## Browse AaronTools Libraries <img src="https://github.com/QChASM/ChimAARON/blob/Chimera/ChimAARON/Icons/AaronTools_Libraries.png">
 
