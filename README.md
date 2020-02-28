@@ -19,4 +19,7 @@ QChASM plug-in for ChimeraX
 
 ## Other Versions
 ### Chimera
-The Chimera version of ChimAARON can be found on the [master branch](https://github.com/QChASM/ChimAARON/tree/master).
+The Chimera version of ChimAARON can be found on the [Chimera branch](https://github.com/QChASM/ChimAARON/tree/Chimera).
+
+### ChimeraX Stable
+Everything should be working as intended on the [master branch](https://github.com/QChASM/ChimAARON/tree/master)
