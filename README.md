@@ -1,3 +1,4 @@
+# ChimAARON
 QChASM plug-in for ChimeraX
 
 ## Installation
@@ -18,4 +19,7 @@ QChASM plug-in for ChimeraX
 
 ## Other Versions
 ### Chimera
-The Chimera version of ChimAARON can be found on the [master branch](https://github.com/QChASM/ChimAARON/tree/master).
+The Chimera version of ChimAARON can be found on the [Chimera branch](https://github.com/QChASM/ChimAARON/tree/Chimera).
+
+### ChimeraX Daily
+For the latest features and bugs, go to the [development branch](https://github.com/QChASM/ChimAARON/tree/dev)
