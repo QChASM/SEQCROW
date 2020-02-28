@@ -18,6 +18,9 @@ class FileReaderPanel(ToolInstance):
     
     NAME_COL = 0
     ID_COL = 1
+    COORDSETS_COL = 2
+    NRG_COL = 3
+    FREQ_COL = 4
     
     def __init__(self, session, name):       
         super().__init__(session, name)
@@ -38,7 +41,7 @@ class FileReaderPanel(ToolInstance):
         layout.setSpacing(0)
         layout.addWidget(self.tree)
 
-        self.tree.setHeaderLabels(["Name", "ID"])
+        self.tree.setHeaderLabels(["Name", "ID", "movie", "energy", "frequencies"])
         self.tree.setUniformRowHeights(True)
         
         self._fr_change = self.session.filereader_manager.triggers.add_handler(FILEREADER_CHANGE,
@@ -69,6 +72,21 @@ class FileReaderPanel(ToolInstance):
             
             item.setText(self.NAME_COL, name)
             item.setText(self.ID_COL, ".".join([str(x) for x in id]))
+            
+            if model.aarontools_filereader.all_geom is not None and len(model.aarontools_filereader.all_geom) > 1:
+                item.setText(self.COORDSETS_COL, "yes")
+            else:
+                item.setText(self.COORDSETS_COL, "no")
+                
+            if "energy" in model.aarontools_filereader.other:
+                item.setText(self.NRG_COL, "%.6f" % model.aarontools_filereader.other["energy"])
+            else:
+                item.setText(self.NRG_COL, "")
+                
+            if "frequency" in model.aarontools_filereader.other:
+                item.setText(self.FREQ_COL, "yes")
+            else:
+                item.setText(self.FREQ_COL, "no")
     
             self.tree.expandItem(item)
     
