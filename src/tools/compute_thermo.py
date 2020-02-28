@@ -431,7 +431,7 @@ class Thermochem(ToolInstance):
             mdl = self.nrg_models[self.sp_selector.currentIndex()]
             co = self.nrg_cos[mdl]
                 
-            self.sp_nrg_line.setText(repr(co.energy))
+            self.sp_nrg_line.setText("%.6f" % co.energy)
         else:
             self.sp_nrg_line.setText("")
             
@@ -472,11 +472,11 @@ class Thermochem(ToolInstance):
             qrrho_dg = co.calc_G_corr(v0=v0, temperature=T, quasi_harmonic=False)
             qharm_dg = co.calc_G_corr(v0=v0, temperature=T, quasi_harmonic=True)
             
-            self.zpe_line.setText(repr(dZPE))
-            self.enthalpy_line.setText(repr(dH))
-            self.rrho_g_line.setText(repr(rrho_dg))
-            self.qrrho_g_line.setText(repr(qrrho_dg))
-            self.qharm_g_line.setText(repr(qharm_dg))
+            self.zpe_line.setText("%.6f" % dZPE)
+            self.enthalpy_line.setText("%.6f" % dH)
+            self.rrho_g_line.setText("%.6f" % rrho_dg)
+            self.qrrho_g_line.setText("%.6f" % qrrho_dg)
+            self.qharm_g_line.setText("%.6f" % qharm_dg)
         else:
             self.zpe_line.setText("")
             self.enthalpy_line.setText("")
@@ -518,11 +518,11 @@ class Thermochem(ToolInstance):
             qrrho_g = nrg + dG_qrrho
             qharm_g = nrg + dG_qharm
             
-            self.zpe_sum_line.setText(repr(zpe))
-            self.h_sum_line.setText(repr(enthalpy))
-            self.rrho_g_sum_line.setText(repr(rrho_g))
-            self.qrrho_g_sum_line.setText(repr(qrrho_g))
-            self.qharm_g_sum_line.setText(repr(qharm_g))
+            self.zpe_sum_line.setText("%.6f" % zpe)
+            self.h_sum_line.setText("%.6f" % enthalpy)
+            self.rrho_g_sum_line.setText("%.6f" % rrho_g)
+            self.qrrho_g_sum_line.setText("%.6f" % qrrho_g)
+            self.qharm_g_sum_line.setText("%.6f" % qharm_g)
         
     def delete(self):
         #overload delete ro de-register handler
