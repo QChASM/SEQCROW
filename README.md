@@ -2,7 +2,7 @@
 QChASM plug-in for ChimeraX
 
 ## Installation
-1. Download <a href="https://github.com/QChASM/ChimAARON/raw/dev/dist/ChimAARON-0.1-py3-none-any.whl" target="_blank">ChimAARON-0.1-py3-none-any.whl</a>
+1. Download <a href="https://github.com/QChASM/ChimAARON/raw/master/dist/ChimAARON-0.1-py3-none-any.whl" target="_blank">ChimAARON-0.1-py3-none-any.whl</a>
 2. Open ChimeraX
 3. On the command line, enter `toolshed install /path/to/ChimAARON-0.1-py3-none-any.whl`
 4. Install [AaronTools](https://github.com/QChASM/AaronTools.py) in a directory where ChimeraX can find it
