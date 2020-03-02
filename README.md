@@ -1,3 +1,4 @@
+![ChimAARON](ChimAARONX.png)
 # ChimAARON
 QChASM plug-in for ChimeraX
 
