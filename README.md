@@ -1,3 +1,4 @@
+![ChimAARON](ChimAARON.png)
 # ChimAARON
 AaronTools plug-in for Chimera
 
