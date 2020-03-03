@@ -348,9 +348,5 @@ class ResidueCollection(Geometry):
             #geometry created from a filereader (which was probably passed as geom)
             #is the last geometry in the log or xyz file
             struc.add_coordsets(coordsets, replace=True)
-            
-        #associate filereader with structure
-        if filereader is not None:
-            struc.aarontools_filereader = filereader
 
         return struc

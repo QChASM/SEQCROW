@@ -1,7 +1,7 @@
 from chimerax.atomic import selected_atoms, selected_residues
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow
-from chimerax.core.models import MODEL_ID_CHANGED, MODEL_NAME_CHANGED
+from chimerax.core.models import MODEL_ID_CHANGED, MODEL_NAME_CHANGED, ADD_MODELS
             
 from io import BytesIO
 
@@ -32,7 +32,16 @@ class FileReaderPanel(ToolInstance):
 
         self._build_ui()
         self.fill_tree()
-
+        
+        self._fr_change = self.session.filereader_manager.triggers.add_handler(FILEREADER_CHANGE,
+            lambda *args: self.fill_tree(*args))        
+        self._add_models = self.session.triggers.add_handler(ADD_MODELS,
+            lambda *args: self.fill_tree(*args))
+        self._molid_change = self.session.triggers.add_handler(MODEL_ID_CHANGED,
+            lambda *args: self.fill_tree(*args))
+        self._molname_change = self.session.triggers.add_handler(MODEL_NAME_CHANGED,
+            lambda *args: self.fill_tree(*args))
+            
     def _build_ui(self):
         layout = QGridLayout()
 
@@ -44,12 +53,7 @@ class FileReaderPanel(ToolInstance):
         self.tree.setHeaderLabels(["Name", "ID", "movie", "energy", "frequencies"])
         self.tree.setUniformRowHeights(True)
         
-        self._fr_change = self.session.filereader_manager.triggers.add_handler(FILEREADER_CHANGE,
-            lambda *args: self.fill_tree(*args))
-        self._molid_change = self.session.triggers.add_handler(MODEL_ID_CHANGED,
-            lambda *args: self.fill_tree(*args))
-        self._molname_change = self.session.triggers.add_handler(MODEL_NAME_CHANGED,
-            lambda *args: self.fill_tree(*args))
+        self.tree.setColumnWidth(self.NAME_COL, 200)
 
         self.tool_window.ui_area.setLayout(layout)
 
@@ -61,8 +65,13 @@ class FileReaderPanel(ToolInstance):
         self.tree.clear()
         self._items = []
 
-        for model in self.session.filereader_manager.models:
+        fr_dict = self.session.filereader_manager.filereader_dict
+
+        for model in fr_dict.keys():
             id = model.id
+            if id is None:
+                continue
+                
             name = model.name
             parent = item_stack[0]
             item = QTreeWidgetItem(parent)
@@ -73,26 +82,30 @@ class FileReaderPanel(ToolInstance):
             item.setText(self.NAME_COL, name)
             item.setText(self.ID_COL, ".".join([str(x) for x in id]))
             
-            if model.aarontools_filereader.all_geom is not None and len(model.aarontools_filereader.all_geom) > 1:
+            if fr_dict[model].all_geom is not None and len(fr_dict[model].all_geom) > 1:
                 item.setText(self.COORDSETS_COL, "yes")
             else:
                 item.setText(self.COORDSETS_COL, "no")
                 
-            if "energy" in model.aarontools_filereader.other:
-                item.setText(self.NRG_COL, "%.6f" % model.aarontools_filereader.other["energy"])
+            if "energy" in fr_dict[model].other:
+                item.setText(self.NRG_COL, "%.6f" % fr_dict[model].other["energy"])
             else:
                 item.setText(self.NRG_COL, "")
                 
-            if "frequency" in model.aarontools_filereader.other:
+            if "frequency" in fr_dict[model].other:
                 item.setText(self.FREQ_COL, "yes")
             else:
                 item.setText(self.FREQ_COL, "no")
     
             self.tree.expandItem(item)
     
+        for i in [self.ID_COL, self.COORDSETS_COL, self.NRG_COL, self.FREQ_COL]:
+            self.tree.resizeColumnToContents(i)
+    
     def delete(self):
         """overload delete"""
         self.session.filereader_manager.triggers.remove_handler(self._fr_change)
+        self.session.triggers.remove_handler(self._add_models)
         self.session.triggers.remove_handler(self._molid_change)
         self.session.triggers.remove_handler(self._molname_change)
         super().delete()

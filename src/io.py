@@ -2,6 +2,7 @@ def open_aarontools(session, path, format_name=None, trajectory=False):
     from AaronTools.fileIO import FileReader
     from AaronTools.geometry import Geometry
     from ChimAARON.residue_collection import ResidueCollection
+    from ChimAARON.managers import FILEREADER_ADDED
     from os.path import split as path_split
     from warnings import warn
     #XML_TAG ChimeraX :: DataFormat :: XYZ :: XYZ :: Molecular structure :: .xyz :: :: :: :: :: XYZ Format :: utf-8
@@ -23,32 +24,31 @@ def open_aarontools(session, path, format_name=None, trajectory=False):
     else:
         fmt = path.split('.')[-1]
             
-    f = FileReader((path, fmt, None), just_geom=False, get_all=trajectory)
+    f = FileReader((path, fmt, None), just_geom=False, get_all=True)
 
     geom = ResidueCollection(Geometry(f).copy())
     geom.name = path_split(path)[-1]
 
-    structures = [geom.get_chimera(session, coordsets=trajectory, filereader=f)]
+    structure = geom.get_chimera(session, coordsets=trajectory, filereader=f)
 
     #associate the AaronTools FileReader with each structure
-    for res_coll in structures:
-        res_coll.aarontools_filereader = f
+    session.filereader_manager.triggers.activate_trigger(FILEREADER_ADDED, ([structure], [f]))
 
     if trajectory:
         from chimerax.std_commands.coordset_gui import CoordinateSetSlider
         from ChimAARON.tools import EnergyPlot
-        for structure in structures:
-            CoordinateSetSlider(session, structure)
-            if "energy" in structure.aarontools_filereader.other:
-                nrg_plot = EnergyPlot(session, structure)
-                if not nrg_plot.opened:
-                    warn("energy plot could not be opened\n" + \
-                         "there might be a mismatch between energy entries and structure entries in %s" % path)
-                    nrg_plot.delete()                    
+        
+        CoordinateSetSlider(session, structure)
+        if "energy" in f.other:
+            nrg_plot = EnergyPlot(session, structure)
+            if not nrg_plot.opened:
+                warn("energy plot could not be opened\n" + \
+                     "there might be a mismatch between energy entries and structure entries in %s" % path)
+                nrg_plot.delete()                    
 
     status = "Opened %s as a %s %s" % (path, fmt, "trajectory" if trajectory else "file")
 
-    return structures, status
+    return [structure], status
 
 def save_aarontools(session, path, format_name, **kwargs):
     """ 
