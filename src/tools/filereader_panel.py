@@ -80,7 +80,7 @@ class FileReaderPanel(ToolInstance):
 
         self.tool_window.ui_area.setLayout(layout)
 
-        self.tool_window.manage('side')
+        self.tool_window.manage(placement="side")
         
     def fill_tree(self, *args):        
         item_stack = [self.tree.invisibleRootItem()]
