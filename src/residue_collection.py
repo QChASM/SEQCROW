@@ -236,16 +236,22 @@ class ResidueCollection(Geometry):
         """update chimerax atomic structure to match self
         may also change residue numbers for self"""
         differences = self.difference(atomic_structure)
-        
-        for atom in differences['geom missing']:
-            atom.delete()
+
+        #for key in differences:
+        #    print(key)
+        #    for atom in differences[key]:
+        #        print(atom)
 
         for residue in self.residues:
-            res = [res for res in atomic_structure.residues if res.number == residue.resnum and res.name == residue.name]
-            if len(res) == 0:
-                res = atomic_structure.new_residue(residue.name, "a", residue.resnum)
+            if hasattr(atomic_structure, "residues"):
+                res = [res for res in atomic_structure.residues if res.number == residue.resnum and res.name == residue.name]
+                if len(res) == 0:
+                    res = atomic_structure.new_residue(residue.name, "a", residue.resnum)
+                else:
+                    res = res[0]
             else:
-                res = res[0]
+                res = atomic_structure.new_residue(residue.name, "a", residue.resnum)
+            
             for atom in residue.atoms:
                 if atom in differences['chix missing']:                  
                     i = 1
@@ -261,6 +267,11 @@ class ResidueCollection(Geometry):
                     res.add_atom(new_atom)
                     
                     atom.chix_atom = new_atom
+        
+        #cannot move this above the part where we add new atoms
+        #if we delete all atoms, the structure gets deleted
+        for atom in differences['geom missing']:
+            atom.delete()
         
         for atom in self.atoms:
             atom.chix_atom.coord = atom.coords

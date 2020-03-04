@@ -2,7 +2,8 @@ from chimerax.atomic import selected_atoms, selected_residues
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow
 from chimerax.core.models import MODEL_ID_CHANGED, MODEL_NAME_CHANGED, ADD_MODELS
-            
+from chimerax.std_commands.coordset_gui import CoordinateSetSlider
+        
 from io import BytesIO
 
 from PyQt5.QtCore import Qt
@@ -10,9 +11,12 @@ from PyQt5.QtWidgets import QLabel, QGridLayout, QPushButton, QTreeWidget, QWidg
 
 from ChimAARON.residue_collection import ResidueCollection
 from ChimAARON.managers.filereader_manager import FILEREADER_CHANGE 
+from ChimAARON.tools import EnergyPlot
+
+from AaronTools.catalyst import Catalyst
 
 class FileReaderPanel(ToolInstance):
-    #XML_TAG ChimeraX :: Tool :: FileReader Panel :: ChimAARON :: Access information from a model's FileReader object
+    #XML_TAG ChimeraX :: Tool :: Managed Models :: ChimAARON :: see models managed by ChimAARON
     SESSION_ENDURING = False
     SESSION_SAVE = False         
     
@@ -26,10 +30,10 @@ class FileReaderPanel(ToolInstance):
         super().__init__(session, name)
         
         # a lot of this is basically copy pasta from the model panel
-        self.display_name = "FileReader Panel"
+        self.display_name = "ChimAARON Models"
         
         self.tool_window = MainToolWindow(self)        
-
+        
         self._build_ui()
         self.fill_tree()
         
@@ -42,22 +46,41 @@ class FileReaderPanel(ToolInstance):
         self._molname_change = self.session.triggers.add_handler(MODEL_NAME_CHANGED,
             lambda *args: self.fill_tree(*args))
             
+        
     def _build_ui(self):
         layout = QGridLayout()
 
-        self.tree = QTreeWidget()
         layout.setContentsMargins(0,0,0,0)
         layout.setSpacing(0)
-        layout.addWidget(self.tree)
 
+        #TODO: make buttons disabled/enabled if items are selected that don't have the info
+        self.tree = QTreeWidget()
+        self.tree.setSelectionMode(QTreeWidget.ExtendedSelection)
         self.tree.setHeaderLabels(["Name", "ID", "movie", "energy", "frequencies"])
         self.tree.setUniformRowHeights(True)
         
         self.tree.setColumnWidth(self.NAME_COL, 200)
+        layout.addWidget(self.tree, 0, 0, 3, 1)
+
+        restore_button = QPushButton("restore")
+        restore_button.clicked.connect(self.restore_selected)
+        layout.addWidget(restore_button, 0, 1)
+        
+        nrg_plot_button = QPushButton("energy plot")
+        nrg_plot_button.clicked.connect(self.open_nrg_plot)
+        layout.addWidget(nrg_plot_button, 1, 1)
+        
+        coordset_slider_button = QPushButton("movie slider")
+        coordset_slider_button.clicked.connect(self.open_movie_slider)
+        layout.addWidget(coordset_slider_button, 2, 1)
+        
+        #cat_res_button = QPushButton("catalyst residues")
+        #cat_res_button.clicked.connect(self.use_cat_residues)
+        #layout.addWidget(cat_res_button, 3, 1)
 
         self.tool_window.ui_area.setLayout(layout)
 
-        self.tool_window.manage(None)
+        self.tool_window.manage('side')
         
     def fill_tree(self, *args):        
         item_stack = [self.tree.invisibleRootItem()]
@@ -71,7 +94,7 @@ class FileReaderPanel(ToolInstance):
             id = model.id
             if id is None:
                 continue
-                
+            
             name = model.name
             parent = item_stack[0]
             item = QTreeWidgetItem(parent)
@@ -79,6 +102,7 @@ class FileReaderPanel(ToolInstance):
             item_stack.append(item)
             self._items.append(item)
             
+            item.setData(self.NAME_COL, Qt.DisplayRole, model)
             item.setText(self.NAME_COL, name)
             item.setText(self.ID_COL, ".".join([str(x) for x in id]))
             
@@ -101,7 +125,49 @@ class FileReaderPanel(ToolInstance):
     
         for i in [self.ID_COL, self.COORDSETS_COL, self.NRG_COL, self.FREQ_COL]:
             self.tree.resizeColumnToContents(i)
+   
+    def use_cat_residues(self):
+        #think more about this - ResidueCollection.difference doesn't check atom residues
+        #maybe during Residue(Geometry) rework, make differences/update_chix more residue-centric 
+        #call similar functions but from Residue class
+        ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
+        model_dict = self.session.filereader_manager.filereader_dict
+        models = list(model_dict.keys())
+        for ndx in ndxs:
+            mdl = models[ndx]
+            rescol = ResidueCollection(mdl)
+            cat = Catalyst(rescol)
+            rescat = ResidueCollection(cat)
+            for res in rescat.residues:
+                print(res.name)
+            rescat.update_chix(mdl)
+   
+    def restore_selected(self):
+        ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
+        model_dict = self.session.filereader_manager.filereader_dict
+        models = list(model_dict.keys())
+        for ndx in ndxs:
+            mdl = models[ndx]
+            fr = model_dict[mdl]
+            fr_rescol = ResidueCollection(fr)
+            fr_rescol.update_chix(mdl)
+
+    def open_nrg_plot(self):
+        ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
+        model_dict = self.session.filereader_manager.filereader_dict
+        models = list(model_dict.keys())
+        for ndx in ndxs:
+            mdl = models[ndx]
+            EnergyPlot(self.session, mdl)
     
+    def open_movie_slider(self):
+        ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
+        model_dict = self.session.filereader_manager.filereader_dict
+        models = list(model_dict.keys())
+        for ndx in ndxs:
+            mdl = models[ndx]
+            CoordinateSetSlider(self.session, mdl)
+
     def delete(self):
         """overload delete"""
         self.session.filereader_manager.triggers.remove_handler(self._fr_change)

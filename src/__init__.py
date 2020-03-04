@@ -98,7 +98,7 @@ class _QChaSM_API(BundleAPI):
             from .tools import LibAdd
             tool = LibAdd(session, ti.name)
             return tool
-        elif ti.name == "FileReader Panel":
+        elif ti.name == "Managed Models":
             from .tools import FileReaderPanel
             tool = FileReaderPanel(session, ti.name)
             return tool        

@@ -2,6 +2,6 @@ from .browse_aarontools import AaronTools_Library, key_atom_highlight, ghost_con
 from .normal_modes import NormalModes
 from .structure_editing import EditStructure
 from .libadd import LibAdd
+from .per_frame_plot import EnergyPlot
 from .filereader_panel import FileReaderPanel
 from .compute_thermo import Thermochem
-from .per_frame_plot import EnergyPlot

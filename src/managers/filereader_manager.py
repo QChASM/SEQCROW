@@ -1,7 +1,7 @@
 from chimerax.core.toolshed import ProviderManager
 from chimerax.core.models import REMOVE_MODELS
 from chimerax.core.triggerset import TriggerSet
-
+        
 FILEREADER_CHANGE = "AaronTools file opened or closed"
 FILEREADER_REMOVED = "AaronTools file closed"
 FILEREADER_ADDED = "AaronTools file opened"
