@@ -33,7 +33,7 @@ class Residue(Geometry):
     resnum      - same as chimerax Residue.number
     name        - same as chimerax Residue.name
     """
-    def __init__(self, geom, resnum=None, atomspec=None, name=None, **kwargs):
+    def __init__(self, geom, resnum=None, atomspec=None, chain_id=None, name=None, **kwargs):      
         if isinstance(geom, ChimeraResidue):
             aaron_atoms = []
             for atom in geom.atoms:
@@ -42,8 +42,20 @@ class Residue(Geometry):
                     aaron_atoms.append(aaron_atom)
             
             super().__init__(aaron_atoms, name=geom.name, **kwargs)
-            self.resnum = geom.number
-            self.atomspec = geom.atomspec
+            if resnum is None:
+                self.resnum = geom.number
+            else:
+                self.resnum = resnum
+                
+            if atomspec is None:
+                self.atomspec = geom.atomspec
+            else:
+                self.atomspec = atomspec
+                
+            if chain_id is None:
+                self.chain_id = geom.chain_id
+            else:
+                self.chain_id = chain_id
             
         else:
             if name is None:
@@ -51,6 +63,10 @@ class Residue(Geometry):
             super().__init__(geom, name=name, **kwargs)
             self.resnum = resnum
             self.atomspec = atomspec
+            if chain_id is None:
+                self.chain_id = "a"
+            else:
+                self.chain_id = chain_id
 
     def get_element_count(self):
         """returns a dictionary with element symbols as keys and values corresponding to the
@@ -70,7 +86,7 @@ class Residue(Geometry):
         known_atoms = []
         
         for i, atom in enumerate(self.atoms):          
-            if not hasattr(atom, "chix_atom") or atom.chix_atom is None:
+            if not hasattr(atom, "chix_atom") or atom.chix_atom is None or atom.chix_atom.deleted:
                 atom_name = "%s1" % atom.element
                 k = 1
                 while any([chix_atom.name == atom_name for chix_atom in chix_residue.atoms]):
@@ -123,12 +139,12 @@ class Residue(Geometry):
                     new_bond = chix_residue.structure.new_bond(atom1, atom2)
                                         
                     if any([aaron_atom.element in TMETAL for aaron_atom in [aaron_atom1, aaron_atom2]]):
-                        pbg = chix_residue.structure.pseudobond_group(chix_residue.PBG_METAL_COORDINATION, create_type='normal') 
+                        pbg = chix_residue.structure.pseudobond_group(chix_residue.structure.PBG_METAL_COORDINATION, create_type='normal') 
                         pbg.new_pseudobond(atom1, atom2)
                         new_bond.delete()
                     else:
                         known_chix_bonds.append(new_bond)
-                except:
+                except Exception as e:
                     bond = [bond for bond in residue_bonds if atom1 in bond.atoms and atom2 in bond.atoms]
                     if len(bond) != 1:
                         continue
@@ -325,11 +341,14 @@ class ResidueCollection(Geometry):
 
         for i, residue in enumerate(self.residues):
             if i >= len(atomic_structure.residues):
-                res = atomic_structure.new_residue(residue.name, "a", residue.resnum)
+                res = atomic_structure.new_residue(residue.name, residue.chain_id, residue.resnum)
             else:
                 res = atomic_structure.residues[i]
 
             residue.update_chix(res, refresh_connected=False)
+            
+        for residue in atomic_structure.residues[len(self.residues):]:
+            residue.delete()
         
         self.refresh_chix_connected(atomic_structure, sanity_check=False)
     

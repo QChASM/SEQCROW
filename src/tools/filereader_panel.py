@@ -60,7 +60,7 @@ class FileReaderPanel(ToolInstance):
         self.tree.setUniformRowHeights(True)
         
         self.tree.setColumnWidth(self.NAME_COL, 200)
-        layout.addWidget(self.tree, 0, 0, 3, 1)
+        layout.addWidget(self.tree, 0, 0, 4, 1)
 
         restore_button = QPushButton("restore")
         restore_button.clicked.connect(self.restore_selected)
@@ -74,9 +74,9 @@ class FileReaderPanel(ToolInstance):
         coordset_slider_button.clicked.connect(self.open_movie_slider)
         layout.addWidget(coordset_slider_button, 2, 1)
         
-        #cat_res_button = QPushButton("catalyst residues")
-        #cat_res_button.clicked.connect(self.use_cat_residues)
-        #layout.addWidget(cat_res_button, 3, 1)
+        cat_res_button = QPushButton("catalyst residues")
+        cat_res_button.clicked.connect(self.use_cat_residues)
+        layout.addWidget(cat_res_button, 3, 1)
 
         self.tool_window.ui_area.setLayout(layout)
 
@@ -138,8 +138,6 @@ class FileReaderPanel(ToolInstance):
             rescol = ResidueCollection(mdl)
             cat = Catalyst(rescol)
             rescat = ResidueCollection(cat)
-            for res in rescat.residues:
-                print(res.name)
             rescat.update_chix(mdl)
    
     def restore_selected(self):

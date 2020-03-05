@@ -163,7 +163,7 @@ class EditStructure(ToolInstance):
             
                         else:
                             if atom.residue not in models[atom.structure]:
-                                models[atom.structure] = {atom.residue:[atom]}
+                                models[atom.structure][atom.residue] = [atom]
                             else:
                                 models[atom.structure][atom.residue].append(atom)
             
@@ -173,7 +173,7 @@ class EditStructure(ToolInstance):
     
                 else:
                     if atom.residue not in models[atom.structure]:
-                        models[atom.structure] = {atom.residue:[atom]}
+                        models[atom.structure][atom.residue] = [atom]
                     else:
                         models[atom.structure][atom.residue].append(atom)
 
@@ -191,7 +191,7 @@ class EditStructure(ToolInstance):
                                 end = attached[target].atomspec
                             else:
                                 end = None 
-                                
+                            
                             residue.substitute(sub.copy(), target.atomspec, attached_to=end)
                     
                         residue.update_chix(res)
