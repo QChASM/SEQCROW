@@ -3,7 +3,7 @@ import numpy as np
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.widgets import ColorButton
 from chimerax.bild.bild import read_bild
-from chimerax.core.models import MODEL_DISPLAY_CHANGED
+from chimerax.core.models import MODEL_DISPLAY_CHANGED, ADD_MODELS
 from chimerax.std_commands.coordset_gui import CoordinateSetSlider
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
@@ -51,6 +51,7 @@ class NormalModes(ToolInstance):
 
         self.refresh_models()
 
+        self._add_handler = self.session.triggers.add_handler(ADD_MODELS, self.refresh_models)
         self._refresh_handler = self.session.filereader_manager.triggers.add_handler(FILEREADER_CHANGE, self.refresh_models)
 
     def _build_ui(self):
@@ -163,8 +164,9 @@ class NormalModes(ToolInstance):
             return
             
         model = self.models_with_freq[state]
+        fr = self.session.filereader_manager.filereader_dict[model]
         
-        freq_data = model.aarontools_filereader.other['frequency'].data
+        freq_data = fr.other['frequency'].data
         self.rows = []
         
         for i, mode in enumerate(freq_data):
@@ -222,6 +224,7 @@ class NormalModes(ToolInstance):
     def show_vec(self):
         """display normal mode displacement vector"""
         model = self.models_with_freq[self.model_selector.currentIndex()]
+        fr = self.session.filereader_manager.filereader_dict[model]
         modes = self.table.selectedItems()
         if len([mode for mode in modes if mode.column() == 0]) != 1:
             raise RuntimeError("one mode must be selected")
@@ -239,11 +242,12 @@ class NormalModes(ToolInstance):
         
         self.settings.arrow_color = tuple(color)
         
-        geom = Geometry(model.aarontools_filereader)
+        #reset coordinates b/c movie maight be playing
+        geom = Geometry(fr)
         coords = np.array([geom.coords()])
         model.add_coordsets(coords, replace=True)
         
-        vector = model.aarontools_filereader.other['frequency'].data[mode].vector
+        vector = fr.other['frequency'].data[mode].vector
 
         dX = self._get_coord_change(geom, vector, scale)
         
@@ -261,7 +265,7 @@ class NormalModes(ToolInstance):
                 s += ".arrow %10.6f %10.6f %10.6f   %10.6f %10.6f %10.6f   0.02 0.05 %5.3f\n" % info
                 
         stream = BytesIO(bytes(s, 'utf-8'))
-        bild_obj, status = read_bild(self.session, stream, "%.2f cm^-1" % model.aarontools_filereader.other['frequency'].data[mode].frequency)
+        bild_obj, status = read_bild(self.session, stream, "%.2f cm^-1" % fr.other['frequency'].data[mode].frequency)
 
         self.session.models.add(bild_obj, parent=model)
         
@@ -272,6 +276,7 @@ class NormalModes(ToolInstance):
     def show_anim(self):
         """play selected modes as an animation"""
         model = self.models_with_freq[self.model_selector.currentIndex()]
+        fr = self.session.filereader_manager.filereader_dict[model]
         modes = self.table.selectedItems()
         if len([mode for mode in modes if mode.column() == 0]) != 1:
             raise RuntimeError("one mode must be selected")
@@ -285,10 +290,10 @@ class NormalModes(ToolInstance):
         self.settings.anim_scale = scale
         self.settings.anim_duration = frames
         
-        geom = Geometry(model.aarontools_filereader)
+        geom = Geometry(fr)
         coords = np.array([geom.coords()])
         
-        vector = model.aarontools_filereader.other['frequency'].data[mode].vector
+        vector = fr.other['frequency'].data[mode].vector
 
         dX = self._get_coord_change(geom, vector, scale)
         
@@ -314,5 +319,6 @@ class NormalModes(ToolInstance):
 
     def delete(self):
         """overload delete"""
+        self.session.triggers.remove_handler(self._add_handler)
         self.session.filereader_manager.triggers.remove_handler(self._refresh_handler)
         super().delete()

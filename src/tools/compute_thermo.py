@@ -3,6 +3,7 @@ from chimerax.ui.gui import MainToolWindow
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
 from chimerax.core.commands.cli import FloatArg, BoolArg
+from chimerax.core.models import ADD_MODELS
 
 from PyQt5.Qt import QClipboard
 from PyQt5.QtCore import Qt
@@ -46,7 +47,8 @@ class Thermochem(ToolInstance):
         self.thermo_cos = {}
         self.refresh_models()
         
-        self._refresh_handler = self.session.filereader_manager.triggers.add_handler(FILEREADER_CHANGE, self.refresh_models)
+        self._add_handler = self.session.triggers.add_handler(ADD_MODELS, self.refresh_models)
+        self._remove_handler = self.session.filereader_manager.triggers.add_handler(FILEREADER_CHANGE, self.refresh_models)
 
     def _build_ui(self):
         layout = QGridLayout()
@@ -359,10 +361,10 @@ class Thermochem(ToolInstance):
         qharm_G = float(self.qharm_g_sum_line.text())
         
         sp_mdl = self.sp_selector.currentData()
-        sp_name = sp_mdl.aarontools_filereader.name
+        sp_name = sp_mdl.name
                     
         therm_mdl = self.thermo_selector.currentData()
-        therm_name = therm_mdl.aarontools_filereader.name
+        therm_name = therm_mdl.name
         
         s += fmt % (E, ZPE, H, rrho_G, qrrho_G, qharm_G, dZPE, dH, rrho_dG, qrrho_dG, qharm_dG, sp_name, therm_name)
         
@@ -398,7 +400,7 @@ class Thermochem(ToolInstance):
         new_models = [model for model in models if model not in self.nrg_cos.keys()]
         new_models.extend([model for model in models if model not in self.nrg_cos.keys() and model not in new_models])
         
-        comp_outs = [CompOutput(mdl.aarontools_filereader) for mdl in models]
+        comp_outs = [CompOutput(self.session.filereader_manager.filereader_dict[mdl]) for mdl in models]
         for mdl, co in zip(new_models, comp_outs):
             if co.energy is not None:
                 self.nrg_cos[mdl] = co
@@ -526,5 +528,6 @@ class Thermochem(ToolInstance):
         
     def delete(self):
         #overload delete ro de-register handler
-        self.session.filereader_manager.triggers.remove_handler(self._refresh_handler)
+        self.session.triggers.remove_handler(self._add_handler)
+        self.session.filereader_manager.triggers.remove_handler(self._remove_handler)
         super().delete()           

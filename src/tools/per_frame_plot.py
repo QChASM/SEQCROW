@@ -67,8 +67,10 @@ class EnergyPlot(ToolInstance):
         
         ax = self.figure.add_axes((0.22, 0.22, 0.66, 0.66))
 
+        fr = self.session.filereader_manager.filereader_dict[self.structure]
+
         data = []
-        for step in self.structure.aarontools_filereader.all_geom:
+        for step in fr.all_geom:
             info = [item for item in step if isinstance(item, dict) and "energy" in item]
             if len(info) < 1:
                 #we will be unable to load an enegy plot because some structure does not have an associated energy

@@ -14,7 +14,7 @@ from io import BytesIO
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QLabel, QLineEdit, QGridLayout, QPushButton, QTabWidget, QComboBox, QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, QFormLayout, QCheckBox
 
-from ChimAARON.residue_collection import ResidueCollection
+from ChimAARON.residue_collection import ResidueCollection, Residue
 from ChimAARON.libraries import SubstituentTable, LigandTable, RingTable
 
 class EditStructure(ToolInstance):
@@ -56,11 +56,16 @@ class EditStructure(ToolInstance):
         self.close_previous_sub.setToolTip("checked: selected structure will be modified\nunchecked: new model will be created for the modified structure")
         self.close_previous_sub.toggle()
         self.close_previous_sub.stateChanged.connect(self.close_previous_change)
-        self.substitute_layout.addWidget(self.close_previous_sub, 1, 0, 1, 3)
+        self.substitute_layout.addWidget(self.close_previous_sub, 1, 0, 1, 3)    
+        
+        self.guess_old = QCheckBox("guess old substituent")
+        self.guess_old.setToolTip("checked: AaronTools will use the shortest connected fragment in the residue\nunchecked:previous substituent must be selected")
+        self.guess_old.toggle()
+        self.substitute_layout.addWidget(self.guess_old, 2, 0, 1, 3)
         
         substitute_button = QPushButton("substitute current selection")
         substitute_button.clicked.connect(self.do_substitute)
-        self.substitute_layout.addWidget(substitute_button, 2, 0, 1, 3)
+        self.substitute_layout.addWidget(substitute_button, 3, 0, 1, 3)
         
         #map ligand
         self.maplig_tab = QWidget()
@@ -139,13 +144,39 @@ class EditStructure(ToolInstance):
         if len(selection) < 1:
             raise RuntimeWarning("nothing selected")
         
+        use_attached = not self.guess_old.isChecked()
+        
         models = {}
+        attached = {}
         for atom in selection:
-            if atom.structure not in models:
-                models[atom.structure] = [str(atom.atomspec)]
+            if use_attached:
+                for bond in atom.bonds:
+                    atom2 = bond.other_atom(atom)
+                    if atom2 not in selection:
+                        if atom in attached:
+                            raise RuntimeError("cannot determine previous substituent; multiple fragments unselected")
+                        
+                        attached[atom] = atom2
+           
+                        if atom.structure not in models:
+                            models[atom.structure] = {atom.residue:[atom]}
+            
+                        else:
+                            if atom.residue not in models[atom.structure]:
+                                models[atom.structure][atom.residue] = [atom]
+                            else:
+                                models[atom.structure][atom.residue].append(atom)
+            
             else:
-                models[atom.structure].append(str(atom.atomspec))
-                
+                if atom.structure not in models:
+                    models[atom.structure] = {atom.residue:[atom]}
+    
+                else:
+                    if atom.residue not in models[atom.structure]:
+                        models[atom.structure][atom.residue] = [atom]
+                    else:
+                        models[atom.structure][atom.residue].append(atom)
+
         first_pass = True
         new_structures = []
         for subname in subnames.split(','):
@@ -153,26 +184,39 @@ class EditStructure(ToolInstance):
             sub = Substituent(subname)
             for model in models:
                 if self.close_previous_bool and first_pass:
-                    rescol = ResidueCollection(model)
-                    for target in models[model]:
-                        rescol.substitute(sub.copy(), target)
+                    for res in models[model]:
+                        residue = Residue(res)
+                        for target in models[model][res]:
+                            if use_attached:
+                                end = attached[target].atomspec
+                            else:
+                                end = None 
+                            
+                            residue.substitute(sub.copy(), target.atomspec, attached_to=end)
                     
-                    rescol.update_chix(model)
+                        residue.update_chix(res)
                     
                 elif self.close_previous_bool and not first_pass:
                     raise RuntimeError("only the first model can be replaced")
                 else:
                     model_copy = model.copy()
+                    
+                    residues = [model_copy.residues[i] for i in [model.residues.index(res) for res in models[model]]]
+                    
                     rescol = ResidueCollection(model_copy)
-                    for i, atom in enumerate(model.atoms):
-                        rescol.atoms[i].atomspec = atom.atomspec
-                        rescol.atoms[i].add_tag(atom.atomspec)
-                        
-                    for target in models[model]:
-                        rescol.substitute(sub.copy(), target)
+                    for res_copy, res in zip(residues, models[model]):                        
+                        residue = Residue(res_copy)
+                        for target in models[model][res]:
+                            if use_attached:
+                                end = attached[target].atomspec
+                            else:
+                                end = None
                                 
-                    struc = rescol.get_chimera(self.session)
-                    new_structures.append(struc)
+                            residue.substitute(sub.copy(), target.atomspec, attached_to=end)  
+                            
+                        residue.update_chix(res_copy)
+                        
+                    new_structures.append(model_copy)
             
             first_pass = False
         
@@ -393,5 +437,4 @@ class RingSelection(ChildToolWindow):
 
             ring_names.append(row.data())
             
-        self.textBox.setText(",".join(ring_names))
-        
+        self.textBox.setText(",".join(ring_names))  

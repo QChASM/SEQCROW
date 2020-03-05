@@ -15,7 +15,6 @@ def chimaaron_bse(session):
     
     lighting_profile = view.lighting
     
-    lighting_profile.shadows = False
     lighting_profile.key_light_intensity = 1.
     lighting_profile.depth_cue = True
     lighting_profile.shadows = False
@@ -65,11 +64,13 @@ def chimaaron_s(session):
 
     lighting_profile = view.lighting
     
-    lighting_profile.shadows = False
     lighting_profile.key_light_intensity = 1.
     lighting_profile.depth_cue = True
-    lighting_profile.shadows = False
-
+    lighting_profile.shadows = True
+    lighting_profile.key_light_color = [1., 1., 1., 0]   
+    lighting_profile.fill_light_color = [1., 1., 1., 0]
+    lighting_profile.ambient_light_color = [1., 1., 1., 0]
+    
     view.update_lighting = True
     view.redraw_needed = True
     
@@ -105,4 +106,3 @@ def indexLabel(session):
             l = str(i+1)
             label(session, objects=Objects(atoms=Atoms([atom])), object_type='atoms', \
                 text=l, offset=(-0.2,-0.2,-0.2), height=0.4, on_top=True)
-
