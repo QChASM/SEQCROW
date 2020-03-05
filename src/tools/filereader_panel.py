@@ -127,9 +127,6 @@ class FileReaderPanel(ToolInstance):
             self.tree.resizeColumnToContents(i)
    
     def use_cat_residues(self):
-        #think more about this - ResidueCollection.difference doesn't check atom residues
-        #maybe during Residue(Geometry) rework, make differences/update_chix more residue-centric 
-        #call similar functions but from Residue class
         ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
         model_dict = self.session.filereader_manager.filereader_dict
         models = list(model_dict.keys())
