@@ -59,7 +59,7 @@ class EditStructure(ToolInstance):
         self.substitute_layout.addWidget(self.close_previous_sub, 1, 0, 1, 3)    
         
         self.guess_old = QCheckBox("guess old substituent")
-        self.guess_old.setToolTip("checked: AaronTools will use the shortest connected fragment in the residue\nunchecked:previous substituent must be selected")
+        self.guess_old.setToolTip("checked: AaronTools will use the shortest connected fragment in the residue\nunchecked: previous substituent must be selected")
         self.guess_old.toggle()
         self.substitute_layout.addWidget(self.guess_old, 2, 0, 1, 3)
         
