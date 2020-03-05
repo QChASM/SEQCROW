@@ -1,3 +1,5 @@
+import numpy as np
+
 from chimerax.atomic import selected_atoms, selected_residues
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow
@@ -146,7 +148,11 @@ class FileReaderPanel(ToolInstance):
             fr = model_dict[mdl]
             fr_rescol = ResidueCollection(fr)
             fr_rescol.update_chix(mdl)
-
+            if fr.all_geom is not None and len(fr.all_geom) > 1:
+                coordsets = fr_rescol.all_geom_coordsets(fr)
+                mdl.add_coordsets(coordsets)
+                #mdl.active_coordset_id = 1
+                    
     def open_nrg_plot(self):
         ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
         model_dict = self.session.filereader_manager.filereader_dict

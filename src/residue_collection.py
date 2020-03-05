@@ -60,7 +60,8 @@ class Residue(Geometry):
         else:
             if name is None:
                 name = "UNK"
-            super().__init__(geom, name=name, **kwargs)
+            super().__init__(geom, **kwargs)
+            self.name = name
             self.resnum = resnum
             self.atomspec = atomspec
             if chain_id is None:
@@ -84,7 +85,7 @@ class Residue(Geometry):
         """changes chimerax residue to match self"""
         elements = {}
         known_atoms = []
-        
+                
         chix_residue.name = self.name
         
         for i, atom in enumerate(self.atoms):          
@@ -406,11 +407,16 @@ class ResidueCollection(Geometry):
             coordsets = np.zeros((len(filereader.all_geom), len(self.atoms), 3))
             for i, all_geom in enumerate(filereader.all_geom):
                 if not all([isinstance(a, Atom) for a in all_geom]):
-                    atom_list = [l for l in all_geom if all([isinstance(a, Atom) for a in l])][0]
+                    atom_list = [l for l in all_geom if isinstance(l, list) and len(l) == len(self.atoms)][0]
                 else:
                     atom_list = all_geom
                 for j, atom in enumerate(atom_list):
                     coordsets[i][j] = atom.coords  
+        
+        print("there are %i coordsets" % len(coordsets))
+        for i, coordset in enumerate(coordsets):
+            print(i, coordset.dtype)
+            print(coordset)
         
         return coordsets                    
     
@@ -421,14 +427,14 @@ class ResidueCollection(Geometry):
         
         self.update_chix(struc)
 
-        if coordsets:
+        if coordsets and filereader is not None and filereader.all_geom is not None:
             #make a trajectory
             #each list of atoms in filereader.all_geom is a frame in the trajectory
             #replace previous coordinates
             #this matters when a filereader is given because the
             #geometry created from a filereader (which was probably passed as geom)
             #is the last geometry in the log or xyz file
-            coordsets = self.all_geom_coordsets(filereader)
-            struc.add_coordsets(coordsets, replace=True)
+            xyzs = self.all_geom_coordsets(filereader)
+            struc.add_coordsets(xyzs, replace=True)
 
         return struc
