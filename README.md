@@ -1,6 +1,8 @@
 ![ChimAARON](ChimAARONX.png)
 # ChimAARON
-QChASM plug-in for ChimeraX
+ChimAARON is an AaronTools-based plugin for <a href="https://www.cgl.ucsf.edu/chimerax/" target="_blank">UCSF ChimeraX</a>, a cross-platform 3D molecular graphics program.
+ChimAARON extends ChimeraX by adding tools to build and modify complex molecular structures, map new catalysts and ligands onto previously-computed structures, and manage AaronTools libraries.
+These tools enable users to rapidly modify several structures simultaneously, providing an intuitive interface to build libraries of the complex molecular structures frequently encountered in modern quantum chemistry applications.
 
 ## Installation
 1. Download <a href="https://github.com/QChASM/ChimAARON/raw/master/dist/ChimAARON-0.1-py3-none-any.whl" target="_blank">ChimAARON-0.1-py3-none-any.whl</a>
