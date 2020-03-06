@@ -21,6 +21,8 @@ These tools enable users to rapidly modify several structures simultaneously, pr
 6. If you have a personal AaronTools library already, you can specify the path to it in the ChimAARON settings. Open ChimeraX and go Favorites &rarr; Settings... &rarr; ChimAARON. You will have to restart ChimeraX if you change this setting. 
 
 ## Other Versions
+This is a plug-in for ChimeraX.
+
 ### Chimera
 The Chimera version of ChimAARON can be found on the [Chimera branch](https://github.com/QChASM/ChimAARON/tree/Chimera).
 
