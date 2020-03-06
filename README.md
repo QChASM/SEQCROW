@@ -15,8 +15,8 @@ These tools enable users to rapidly modify several structures simultaneously, pr
    import ChimAARON
    ChimAARON.__file__
    ```
-   * This should print out the path to ChimAARON's \_\_init\_\_ file (something like "/stuff/things/UCSF/ChimeraX/version/site-packages/ChimAARON/\_\_init\_\_.py"). 
-   *Save AaronTools.py in a directory called AaronTools in "/stuff/things/UCSF/ChimeraX/version/site-packages".
+   * This should print out the path to ChimAARON's \_\_init\_\_ file (something like "/stuff/things/UCSF/ChimeraX/version/site-packages/ChimAARON/\_\_init\_\_.py").
+   * Save AaronTools.py in a directory called AaronTools in "/stuff/things/UCSF/ChimeraX/version/site-packages".
 5. Restart ChimeraX
 6. If you have a personal AaronTools library already, you can specify the path to it in the ChimAARON settings. Open ChimeraX and go Favorites &rarr; Settings... &rarr; ChimAARON. You will have to restart ChimeraX if you change this setting. 
 
