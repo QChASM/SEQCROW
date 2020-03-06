@@ -413,11 +413,6 @@ class ResidueCollection(Geometry):
                 for j, atom in enumerate(atom_list):
                     coordsets[i][j] = atom.coords  
         
-        print("there are %i coordsets" % len(coordsets))
-        for i, coordset in enumerate(coordsets):
-            print(i, coordset.dtype)
-            print(coordset)
-        
         return coordsets                    
     
     def get_chimera(self, session, coordsets=False, filereader=None):

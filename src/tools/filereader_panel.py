@@ -150,8 +150,16 @@ class FileReaderPanel(ToolInstance):
             fr_rescol.update_chix(mdl)
             if fr.all_geom is not None and len(fr.all_geom) > 1:
                 coordsets = fr_rescol.all_geom_coordsets(fr)
-                mdl.add_coordsets(coordsets)
-                #mdl.active_coordset_id = 1
+
+                mdl.remove_coordsets()
+                #mdl.add_coordsets(coordsets)
+                for i, coordset in enumerate(coordsets):
+                    mdl.add_coordset(i+1, coordsets)
+                    mdl.active_coordset_id = i + 1
+                    for atom, coord in zip(mdl.atoms, coordset):
+                        atom.coord = coord
+                
+                mdl.active_coordset_id = 1
                     
     def open_nrg_plot(self):
         ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
