@@ -291,6 +291,12 @@ class NormalModes(ToolInstance):
         self.settings.anim_duration = frames
         
         geom = Geometry(fr)
+        #if the filereader has been processed somewhere else, the atoms might
+        #have a chimerax atom associated with them that prevents them from being pickled 
+        for atom in geom.atoms:
+            if hasattr(atom, "chix_atom"):
+                atom.chix_atom = None
+                
         coords = np.array([geom.coords()])
         
         vector = fr.other['frequency'].data[mode].vector
@@ -310,6 +316,9 @@ class NormalModes(ToolInstance):
             coordsets[i] = S.Geom_func(t).coords()
             
         model.add_coordsets(coordsets, replace=True)
+        
+        for atom, chix_atom in zip(geom.atoms, model.atoms):
+            atom.chix_atom = chix_atom
         
         if hasattr(model, "chimaaron_freq_slider") and model.chimaaron_freq_slider.structure is not None:
             model.chimaaron_freq_slider.delete()

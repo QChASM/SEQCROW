@@ -26,7 +26,7 @@ def open_aarontools(session, path, format_name=None, trajectory=False):
             
     f = FileReader((path, fmt, None), just_geom=False, get_all=True)
 
-    geom = ResidueCollection(Geometry(f).copy())
+    geom = ResidueCollection(Geometry(f))
     geom.name = path_split(path)[-1]
 
     structure = geom.get_chimera(session, coordsets=(f.all_geom is not None and len(f.all_geom) > 1), filereader=f)

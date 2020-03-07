@@ -89,7 +89,17 @@ class Residue(Geometry):
         chix_residue.name = self.name
         
         for i, atom in enumerate(self.atoms):          
-            if not hasattr(atom, "chix_atom") or atom.chix_atom is None or atom.chix_atom.deleted:
+            if not hasattr(atom, "chix_atom") or atom.chix_atom is None or \
+                    atom.chix_atom.deleted or atom.chix_atom != chix_residue.atoms[i]:
+                #if not hasattr(atom, "chix_atom"):
+                #    print("no chix atom", atom)
+                #elif atom.chix_atom is None:
+                #    print("no chix atom yet", atom)
+                #elif atom.chix_atom.deleted:
+                #    print("chix_atom deleted", atom)
+                #elif atom.chix_atom != chix_residue.atoms[i]:
+                #    print("atoms do not match", atom.chix_atom, chix_residue.atoms[i])
+                    
                 atom_name = "%s1" % atom.element
                 k = 1
                 while any([chix_atom.name == atom_name for chix_atom in chix_residue.atoms]):
