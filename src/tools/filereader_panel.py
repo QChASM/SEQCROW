@@ -152,10 +152,11 @@ class FileReaderPanel(ToolInstance):
                 coordsets = fr_rescol.all_geom_coordsets(fr)
 
                 mdl.remove_coordsets()
-                #mdl.add_coordsets(coordsets)
+                mdl.add_coordsets(coordsets)
+
                 for i, coordset in enumerate(coordsets):
-                    mdl.add_coordset(i+1, coordsets)
                     mdl.active_coordset_id = i + 1
+                    
                     for atom, coord in zip(mdl.atoms, coordset):
                         atom.coord = coord
                 

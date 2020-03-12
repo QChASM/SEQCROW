@@ -316,6 +316,11 @@ class NormalModes(ToolInstance):
             coordsets[i] = S.Geom_func(t).coords()
             
         model.add_coordsets(coordsets, replace=True)
+        for i, coordset in enumerate(coordsets):
+            model.active_coordset_id = i + 1
+
+            for atom, coord in zip(model.atoms, coordset):
+                atom.coord = coord
         
         for atom, chix_atom in zip(geom.atoms, model.atoms):
             atom.chix_atom = chix_atom
