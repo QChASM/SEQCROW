@@ -60,7 +60,8 @@ class Residue(Geometry):
         else:
             if name is None:
                 name = "UNK"
-            super().__init__(geom, name=name, **kwargs)
+            super().__init__(geom, **kwargs)
+            self.name = name
             self.resnum = resnum
             self.atomspec = atomspec
             if chain_id is None:
@@ -84,9 +85,21 @@ class Residue(Geometry):
         """changes chimerax residue to match self"""
         elements = {}
         known_atoms = []
+                
+        chix_residue.name = self.name
         
         for i, atom in enumerate(self.atoms):          
-            if not hasattr(atom, "chix_atom") or atom.chix_atom is None or atom.chix_atom.deleted:
+            if not hasattr(atom, "chix_atom") or atom.chix_atom is None or \
+                    atom.chix_atom.deleted or atom.chix_atom != chix_residue.atoms[i]:
+                #if not hasattr(atom, "chix_atom"):
+                #    print("no chix atom", atom)
+                #elif atom.chix_atom is None:
+                #    print("no chix atom yet", atom)
+                #elif atom.chix_atom.deleted:
+                #    print("chix_atom deleted", atom)
+                #elif atom.chix_atom != chix_residue.atoms[i]:
+                #    print("atoms do not match", atom.chix_atom, chix_residue.atoms[i])
+                    
                 atom_name = "%s1" % atom.element
                 k = 1
                 while any([chix_atom.name == atom_name for chix_atom in chix_residue.atoms]):
@@ -396,6 +409,22 @@ class ResidueCollection(Geometry):
                 except:
                     pass
 
+    def all_geom_coordsets(self, filereader):
+        if filereader.all_geom is None:
+            warn("coordsets requested, but the file contains one or fewer sets of coordinates")
+            coordsets = struc.coordset(1)
+        else:
+            coordsets = np.zeros((len(filereader.all_geom), len(self.atoms), 3))
+            for i, all_geom in enumerate(filereader.all_geom):
+                if not all([isinstance(a, Atom) for a in all_geom]):
+                    atom_list = [l for l in all_geom if isinstance(l, list) and len(l) == len(self.atoms)][0]
+                else:
+                    atom_list = all_geom
+                for j, atom in enumerate(atom_list):
+                    coordsets[i][j] = atom.coords  
+        
+        return coordsets                    
+    
     def get_chimera(self, session, coordsets=False, filereader=None):
         """returns a chimerax equivalent of self"""
         struc = AtomicStructure(session, name=self.name)
@@ -403,35 +432,14 @@ class ResidueCollection(Geometry):
         
         self.update_chix(struc)
 
-        if coordsets:
+        if coordsets and filereader is not None and filereader.all_geom is not None:
             #make a trajectory
-            if filereader is None:
-                #list of geometries was given
-                #each geometry is a different frame in the trajectory
-                coordsets = np.zeros((len(geom_list), len(self.atoms), 3))
-                for i, g in geom_list:
-                    coordsets[i] = g.coords()
-                    
-            else:
-                #filereader was given
-                #each list of atoms in filereader.all_geom is a frame in the trajectory
-                if filereader.all_geom is None:
-                    warn("coordsets requested, but the file contains one or fewer sets of coordinates")
-                    coordsets = struc.coordset(1)
-                else:
-                    coordsets = np.zeros((len(filereader.all_geom), len(self.atoms), 3))
-                    for i, all_geom in enumerate(filereader.all_geom):
-                        if not all([isinstance(a, Atom) for a in all_geom]):
-                            atom_list = [l for l in all_geom if all([isinstance(a, Atom) for a in l])][0]
-                        else:
-                            atom_list = all_geom
-                        for j, atom in enumerate(atom_list):
-                            coordsets[i][j] = atom.coords
-
+            #each list of atoms in filereader.all_geom is a frame in the trajectory
             #replace previous coordinates
             #this matters when a filereader is given because the
             #geometry created from a filereader (which was probably passed as geom)
             #is the last geometry in the log or xyz file
-            struc.add_coordsets(coordsets, replace=True)
+            xyzs = self.all_geom_coordsets(filereader)
+            struc.add_coordsets(xyzs, replace=True)
 
         return struc

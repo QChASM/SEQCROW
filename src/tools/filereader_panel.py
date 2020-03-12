@@ -1,3 +1,5 @@
+import numpy as np
+
 from chimerax.atomic import selected_atoms, selected_residues
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow
@@ -127,9 +129,6 @@ class FileReaderPanel(ToolInstance):
             self.tree.resizeColumnToContents(i)
    
     def use_cat_residues(self):
-        #think more about this - ResidueCollection.difference doesn't check atom residues
-        #maybe during Residue(Geometry) rework, make differences/update_chix more residue-centric 
-        #call similar functions but from Residue class
         ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
         model_dict = self.session.filereader_manager.filereader_dict
         models = list(model_dict.keys())
@@ -149,7 +148,20 @@ class FileReaderPanel(ToolInstance):
             fr = model_dict[mdl]
             fr_rescol = ResidueCollection(fr)
             fr_rescol.update_chix(mdl)
+            if fr.all_geom is not None and len(fr.all_geom) > 1:
+                coordsets = fr_rescol.all_geom_coordsets(fr)
 
+                mdl.remove_coordsets()
+                mdl.add_coordsets(coordsets)
+
+                for i, coordset in enumerate(coordsets):
+                    mdl.active_coordset_id = i + 1
+                    
+                    for atom, coord in zip(mdl.atoms, coordset):
+                        atom.coord = coord
+                
+                mdl.active_coordset_id = 1
+                    
     def open_nrg_plot(self):
         ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
         model_dict = self.session.filereader_manager.filereader_dict
