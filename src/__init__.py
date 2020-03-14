@@ -3,7 +3,7 @@ import os
 from chimerax.core.toolshed import BundleAPI
 from chimerax.core.toolshed.info import SelectorInfo
 
-class _QChaSM_API(BundleAPI):
+class _SEQCRO_API(BundleAPI):
 
     api_version = 1
     
@@ -109,4 +109,4 @@ class _QChaSM_API(BundleAPI):
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCRO" % ti.name)
 
-bundle_api = _QChaSM_API()
+bundle_api = _SEQCRO_API()

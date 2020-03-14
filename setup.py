@@ -106,7 +106,7 @@ setup(
     },
     packages=[
         "SEQCRO", 
-        "SECRO.tools", 
+        "SEQCRO.tools", 
         "SEQCRO.managers", 
     ],
     ext_modules=ext_mods,

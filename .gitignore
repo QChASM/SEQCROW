@@ -1,3 +1,4 @@
 ChimAARON*
 build
 *.pxd
+*.egg*

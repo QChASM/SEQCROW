@@ -15,6 +15,8 @@ from AaronTools.const import AARONLIB
 from SEQCRO.residue_collection import ResidueCollection
 from SEQCRO.tools import key_atom_highlight, ghost_connection_highlight, show_walk_highlight
 
+from warnings import warn
+
 # TODO: change decorations to use ChimeraX atom/bond defaults
 
 class LibAdd(ToolInstance):
@@ -302,7 +304,7 @@ def check_aaronlib_dir():
     aaronlib = os.getenv("AARONLIB", False)
     if not aaronlib:
         aaronlib = AARONLIB
-        raise RuntimeWarning("AARONLIB environment variable not set, using %s" % aaronlib)
+        warn("AARONLIB environment variable not set, using %s" % aaronlib)
         
     libs = ["Subs", "Ligands", "Rings"]
     for d in libs:
