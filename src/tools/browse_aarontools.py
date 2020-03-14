@@ -18,7 +18,7 @@ from AaronTools.substituent import Substituent
 
 from ..libraries import LigandTable, SubstituentTable, RingTable
 from ..residue_collection import ResidueCollection
-from ChimAARON.settings import tuple2str
+from SEQCRO.settings import tuple2str
 
 # TODO: change decorations to use ChimeraX atom/bond defaults
 class _BrowseLibSettings(Settings):
@@ -33,7 +33,7 @@ class AaronTools_Library(ToolInstance):
     #XML_TAG ChimeraX :: Tool :: Browse AaronTools Libraries :: AaronTools :: Browse the AaronTools ligand, substituent, and ring libraries
     SESSION_ENDURING = False
     SESSION_SAVE = False         
-    display_name = "Browse AaronTools Libraries"
+    help = "https://github.com/QChASM/ChimAARON/wiki/Browse-AaronTools-Libraries-Tool"
     
     def __init__(self, session, name):       
         super().__init__(session, name)

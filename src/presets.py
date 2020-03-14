@@ -1,6 +1,6 @@
 import numpy as np
 
-def chimaaron_bse(session):
+def seqcro_bse(session):
     """non-H atoms are displayed with B&S
     H atoms are displayed with S
     atoms colored by Jmol colors"""
@@ -50,7 +50,7 @@ def chimaaron_bse(session):
             else:
                 atom.draw_mode = Atom.STICK_STYLE
 
-def chimaaron_s(session):
+def seqcro_s(session):
     """atoms are represented with sticks
     atoms colored by Jmol colors"""
 

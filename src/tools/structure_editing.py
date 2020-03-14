@@ -14,14 +14,14 @@ from io import BytesIO
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QLabel, QLineEdit, QGridLayout, QPushButton, QTabWidget, QComboBox, QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, QFormLayout, QCheckBox
 
-from ChimAARON.residue_collection import ResidueCollection, Residue
-from ChimAARON.libraries import SubstituentTable, LigandTable, RingTable
+from SEQCRO.residue_collection import ResidueCollection, Residue
+from SEQCRO.libraries import SubstituentTable, LigandTable, RingTable
 
 class EditStructure(ToolInstance):
     #XML_TAG ChimeraX :: Tool :: Structure Modification :: AaronTools :: Modify substituents, swap ligands, and close rings, all for the one-time fee of an arm and a leg!
     SESSION_ENDURING = False
     SESSION_SAVE = False         
-    display_name = "The Alchemist"
+    help = "https://github.com/QChASM/ChimAARON/wiki/Structure-Modification-Tool"
     
     def __init__(self, session, name):       
         super().__init__(session, name)
@@ -228,7 +228,7 @@ class EditStructure(ToolInstance):
 
     def do_maplig(self):
         lignames = self.ligname.text()
-        selection = self.session.chimaaron_ordered_selection_manager.selection
+        selection = self.session.seqcro_ordered_selection_manager.selection
         
         if len(selection) < 1:
             raise RuntimeWarning("nothing selected")
@@ -299,7 +299,7 @@ class EditStructure(ToolInstance):
     
     def do_closering(self):
         ringnames = self.ringname.text()
-        selection = self.session.chimaaron_ordered_selection_manager.selection
+        selection = self.session.seqcro_ordered_selection_manager.selection
         
         if len(selection) < 2:
             raise RuntimeWarning("two atoms must be selected per molecule")

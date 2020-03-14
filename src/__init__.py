@@ -10,22 +10,22 @@ class _QChaSM_API(BundleAPI):
     @staticmethod
     def initialize(session, bundle_info):
         #TODO set AaronTools environment variables
-        from . import settings as chimaaron_settings
-        chimaaron_settings.settings = settings._ChimAARONSettings(session, "ChimAARON")
+        from SEQCRO import settings as seqcro_settings
+        seqcro_settings.settings = settings._SEQCROSettings(session, "SEQCRO")
         if session.ui.is_gui:
-            from .presets import chimaaron_bse, chimaaron_s\
+            from .presets import seqcro_bse, seqcro_s\
                 ,indexLabel \
                     
-            session.presets.add_presets("ChimAARON", {"ball-stick-endcap":lambda p=chimaaron_bse: p(session)})
-            session.presets.add_presets("ChimAARON", {"sticks":lambda p=chimaaron_s: p(session)})
-            session.presets.add_presets("ChimAARON", {"index labels":lambda p=indexLabel: p(session)})
+            session.presets.add_presets("SEQCRO", {"ball-stick-endcap":lambda p=seqcro_bse: p(session)})
+            session.presets.add_presets("SEQCRO", {"sticks":lambda p=seqcro_s: p(session)})
+            session.presets.add_presets("SEQCRO", {"index labels":lambda p=indexLabel: p(session)})
 
             session.ui.triggers.add_handler('ready',
                 lambda *args, ses=session: settings.register_settings_options(ses))
         
         #apply AARONLIB setting
-        if chimaaron_settings.settings.AARONLIB is not None:
-            os.environ['AARONLIB'] = chimaaron_settings.settings.AARONLIB
+        if seqcro_settings.settings.AARONLIB is not None:
+            os.environ['AARONLIB'] = seqcro_settings.settings.AARONLIB
 
         ##register selectors from the user's personal library
         #from AaronTools.substituent import Substituent
@@ -51,7 +51,7 @@ class _QChaSM_API(BundleAPI):
         #XML_TAG ChimeraX :: Save :: XYZ :: AaronTools :: false :: extra_keywords
         from .io import save_aarontools
         if format_name != "XYZ":
-            raise NotImplementedError("ChimAARON can only save XYZ files, not %s files" % format_name)
+            raise NotImplementedError("SEQCRO can only save XYZ files, not %s files" % format_name)
             
         elif format_name == "XYZ":
             return save_aarontools(session, path, format_name, **kw)
@@ -73,12 +73,12 @@ class _QChaSM_API(BundleAPI):
             from .managers import FileReaderManager
             session.filereader_manager = FileReaderManager(session)
             return session.filereader_manager
-        elif name == "chimaaron_ordered_selection_manager":
-            from ChimAARON.managers import OrderedSelectionManager
-            session.chimaaron_ordered_selection_manager = OrderedSelectionManager(session)
-            return session.chimaaron_ordered_selection_manager
+        elif name == "seqcro_ordered_selection_manager":
+            from SEQCRO.managers import OrderedSelectionManager
+            session.seqcro_ordered_selection_manager = OrderedSelectionManager(session)
+            return session.seqcro_ordered_selection_manager
         else:
-            raise RuntimeError("manager named '%s' is unknown to ChimAARON" % name)
+            raise RuntimeError("manager named '%s' is unknown to SEQCRO" % name)
   
     @staticmethod
     def start_tool(session, bi, ti):
@@ -107,6 +107,6 @@ class _QChaSM_API(BundleAPI):
             tool = Thermochem(session, ti.name)
             return tool
         else:
-            raise RuntimeError("tool named '%s' is unknown to ChimAARON" % ti.name)
+            raise RuntimeError("tool named '%s' is unknown to SEQCRO" % ti.name)
 
 bundle_api = _QChaSM_API()

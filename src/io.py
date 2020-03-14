@@ -1,8 +1,8 @@
 def open_aarontools(session, path, format_name=None, trajectory=False):
     from AaronTools.fileIO import FileReader
     from AaronTools.geometry import Geometry
-    from ChimAARON.residue_collection import ResidueCollection
-    from ChimAARON.managers import FILEREADER_ADDED
+    from SEQCRO.residue_collection import ResidueCollection
+    from SEQCRO.managers import FILEREADER_ADDED
     from os.path import split as path_split
     from warnings import warn
     #XML_TAG ChimeraX :: DataFormat :: XYZ :: XYZ :: Molecular structure :: .xyz :: :: :: :: :: XYZ Format :: utf-8
@@ -36,7 +36,7 @@ def open_aarontools(session, path, format_name=None, trajectory=False):
 
     if trajectory:
         from chimerax.std_commands.coordset_gui import CoordinateSetSlider
-        from ChimAARON.tools import EnergyPlot
+        from SEQCRO.tools import EnergyPlot
         
         CoordinateSetSlider(session, structure)
         if "energy" in f.other:
@@ -58,7 +58,7 @@ def save_aarontools(session, path, format_name, **kwargs):
     """
     #XML: ChimeraX :: Save -> extra_keywords=models:Models
     #^ this doesn't do anything b/c save doesn't expect a 'comment' keyword
-    from ChimAARON.residue_collection import ResidueCollection
+    from SEQCRO.residue_collection import ResidueCollection
     from AaronTools.geometry import Geometry
     from chimerax.atomic import AtomicStructure
     

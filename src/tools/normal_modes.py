@@ -19,7 +19,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, QTabWidget, QComboBox, QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, QFormLayout, QCheckBox
 
 from ..managers import FILEREADER_CHANGE
-from ChimAARON.settings import tuple2str
+from SEQCRO.settings import tuple2str
 
 class _NormalModeSettings(Settings):
     AUTO_SAVE = {
@@ -33,7 +33,7 @@ class NormalModes(ToolInstance):
     #XML_TAG ChimeraX :: Tool :: Visualize Normal Modes :: AaronTools :: Visualize normal modes from a Gaussian output file as displacement vectors or as an animation
     SESSION_ENDURING = False
     SESSION_SAVE = False         
-    display_name = "Visualize normal modes"
+    help = "https://github.com/QChASM/ChimAARON/wiki/Visualize-Normal-Modes-Tool"
     
     def __init__(self, session, name):       
         super().__init__(session, name)
@@ -269,9 +269,9 @@ class NormalModes(ToolInstance):
 
         self.session.models.add(bild_obj, parent=model)
         
-        if hasattr(model, "chimaaron_freq_slider") and model.chimaaron_freq_slider.structure is not None:
+        if hasattr(model, "seqcro_freq_slider") and model.seqcro_freq_slider.structure is not None:
             #close animation slider
-            model.chimaaron_freq_slider.delete()
+            model.seqcro_freq_slider.delete()
     
     def show_anim(self):
         """play selected modes as an animation"""
@@ -325,11 +325,11 @@ class NormalModes(ToolInstance):
         for atom, chix_atom in zip(geom.atoms, model.atoms):
             atom.chix_atom = chix_atom
         
-        if hasattr(model, "chimaaron_freq_slider") and model.chimaaron_freq_slider.structure is not None:
-            model.chimaaron_freq_slider.delete()
+        if hasattr(model, "seqcro_freq_slider") and model.seqcro_freq_slider.structure is not None:
+            model.seqcro_freq_slider.delete()
             
-        model.chimaaron_freq_slider = CoordinateSetSlider(self.session, model)
-        model.chimaaron_freq_slider.play_cb()
+        model.seqcro_freq_slider = CoordinateSetSlider(self.session, model)
+        model.seqcro_freq_slider.play_cb()
 
     def delete(self):
         """overload delete"""

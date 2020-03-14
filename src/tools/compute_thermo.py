@@ -10,8 +10,8 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QKeySequence
 from PyQt5.QtWidgets import QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, QDoubleSpinBox, QMenuBar, QFileDialog, QAction, QApplication
 
-from ChimAARON.managers.filereader_manager import FILEREADER_CHANGE 
-from ChimAARON.tools.theory_literature import LiteratureBrowser
+from SEQCRO.managers.filereader_manager import FILEREADER_CHANGE 
+from SEQCRO.tools.theory_literature import LiteratureBrowser
 
 from AaronTools.comp_output import CompOutput
 
@@ -27,6 +27,7 @@ class Thermochem(ToolInstance):
     #XML_TAG ChimeraX :: Tool :: Process Thermochemistry :: AaronTools :: Compute the free energy of a molecule with frequency data
     SESSION_ENDURING = False
     SESSION_SAVE = False         
+    help = "https://github.com/QChASM/ChimAARON/wiki/Process-Thermochemistry-Tool"
 
     theory_helper = {"Grimme's Quasi-RRHO":"https://doi.org/10.1002/chem.201200497",
                      "Truhlar's Quasi-Harmonic":"https://doi.org/10.1021/jp205508z"}

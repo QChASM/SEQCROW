@@ -1,26 +1,32 @@
 
 """
 python3 setup.py sdist bdist_wheel
-cp dist/ChimAARON-0.1-py3-none-any.whl $desktop/
+cp dist/SEQCRO-0.1-py3-none-any.whl $desktop/
 """
 
 from setuptools import setup, find_packages
 import os
 
-synopsis = "Structure editing and visualization with a focus on small molecules, QM, and organometallic catalysts"
+synopsis = "Structure Editing and Quantum Chemical Representation and Organization"
 
 description = """
-ChimAARON extends ChimeraX:
+An AaronTools-based plugin for ChimeraX. 
+
+SEQCRO adds the following to ChimeraX:
 I/O:
     read XYZ, Gaussian COM, Gaussian LOG files, and Orca output files
     save models to XYZ files
 
 tools:
-    Add to Personal Library  - add substituents, ligands, or rings to your personal AaronTools library
-    Browse AaronTools        - browse substituents, ligands, and rings in the AaronTools library
-    Process Thermochemistry  - compute thermal corrections for models with vibrational mode information
-    Structure Modification   - modify your structure using pieces from the AaronTools library
-    Visualize Normal Modes   - display normal modes for models with vibrational mode information as vectors or an animation
+    AaronTools
+        Add to Personal Library  - add substituents, ligands, or rings to your personal AaronTools library
+        Browse AaronTools        - browse substituents, ligands, and rings in the AaronTools library
+        Process Thermochemistry  - compute thermal corrections for models with vibrational mode information
+        Structure Modification   - modify your structure using pieces from the AaronTools library
+        Visualize Normal Modes   - display normal modes for models with vibrational mode information as vectors or an animation
+
+    SEQCRO
+        Managed Models           - restore models opened through SEQCRO to their original state
 
 selectors:
     tm  - select all transition metals
@@ -87,7 +93,7 @@ environments = [
 ]
 
 setup(
-    name="ChimAARON",
+    name="SEQCRO",
     version="0.1",  
     description=synopsis,  
     long_description=description,
@@ -96,17 +102,17 @@ setup(
     url="https://github.com/QChASM",
     python_requires=">= 3.5",
     package_dir={
-        "ChimAARON": src_dir,
+        "SEQCRO": src_dir,
     },
     packages=[
-        "ChimAARON", 
-        "ChimAARON.tools", 
-        "ChimAARON.managers", 
+        "SEQCRO", 
+        "SECRO.tools", 
+        "SEQCRO.managers", 
     ],
     ext_modules=ext_mods,
     install_requires=[
         #TODO: add AaronTools (AaronTools should require scipy)
-        "ChimeraX-Core >= 0.1",
+        "ChimeraX-Core >= 0.92",
         "scipy",
         "numpy", 
     ],
@@ -120,7 +126,7 @@ setup(
         "Programming Language :: Python :: 3",
         "Topic :: Scientific/Engineering :: Visualization",
         "Topic :: Scientific/Engineering :: Chemistry",
-        "ChimeraX :: Bundle :: General,Input/Output,Structure Editing,External Program :: 1,1 :: ChimAARON :: ChimAARON :: true ",
+        "ChimeraX :: Bundle :: General,Input/Output,Structure Editing,External Program :: 1,1 :: SEQCRO :: ChimAARON,SEQCRO :: true ",
         *chimerax_classifiers
     ] + environments,
 )

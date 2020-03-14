@@ -11,16 +11,17 @@ from io import BytesIO
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QLabel, QGridLayout, QPushButton, QTreeWidget, QWidget, QVBoxLayout, QTreeWidgetItem, QCheckBox
 
-from ChimAARON.residue_collection import ResidueCollection
-from ChimAARON.managers.filereader_manager import FILEREADER_CHANGE 
-from ChimAARON.tools import EnergyPlot
+from SEQCRO.residue_collection import ResidueCollection
+from SEQCRO.managers.filereader_manager import FILEREADER_CHANGE 
+from SEQCRO.tools import EnergyPlot
 
 from AaronTools.catalyst import Catalyst
 
 class FileReaderPanel(ToolInstance):
-    #XML_TAG ChimeraX :: Tool :: Managed Models :: ChimAARON :: see models managed by ChimAARON
+    #XML_TAG ChimeraX :: Tool :: Managed Models :: SEQCRO :: see models managed by SEQCRO
     SESSION_ENDURING = False
     SESSION_SAVE = False         
+    help = "https://github.com/QChASM/ChimAARON/wiki/Model-Manager-Tool"
     
     NAME_COL = 0
     ID_COL = 1
@@ -32,7 +33,7 @@ class FileReaderPanel(ToolInstance):
         super().__init__(session, name)
         
         # a lot of this is basically copy pasta from the model panel
-        self.display_name = "ChimAARON Models"
+        self.display_name = "SEQCRO Models"
         
         self.tool_window = MainToolWindow(self)        
         
