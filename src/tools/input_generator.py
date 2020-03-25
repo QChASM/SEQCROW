@@ -418,7 +418,7 @@ class FunctionalOption(QWidget):
             if needs_basis == "yes":
                 self.is_semiemperical.setCheckState(Qt.Unchecked)
             else:
-                self.is_builtin.setCheckState(Qt.Checked)            
+                self.is_semiemperical.setCheckState(Qt.Checked)            
                                
     def getFunctional(self):
         if self.form == "Gaussian":
