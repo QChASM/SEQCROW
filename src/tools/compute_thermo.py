@@ -10,8 +10,8 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QKeySequence
 from PyQt5.QtWidgets import QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, QDoubleSpinBox, QMenuBar, QFileDialog, QAction, QApplication
 
-from SEQCRO.managers.filereader_manager import FILEREADER_CHANGE 
-from SEQCRO.tools.theory_literature import LiteratureBrowser
+from SEQCROW.managers.filereader_manager import FILEREADER_CHANGE 
+from SEQCROW.tools.theory_literature import LiteratureBrowser
 
 from AaronTools.comp_output import CompOutput
 

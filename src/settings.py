@@ -8,7 +8,7 @@ def tuple2str(t):
     """converts tuple to str and cuts off ()"""
     return str(t)[1:-1]
     
-class _SEQCROSettings(Settings):
+class _SEQCROWSettings(Settings):
     EXPLICIT_SAVE = {
         'AARONLIB': Value(getenv('AARONLIB', None), StringArg, str),
     }
@@ -41,4 +41,4 @@ def register_settings_options(session):
         opt = opt_class(opt_name, getattr(settings, setting), _opt_cb,
             attr_name=setting, settings=settings, balloon=balloon, auto_set_attr=False)
         
-        session.ui.main_window.add_settings_option("SEQCRO", opt)
+        session.ui.main_window.add_settings_option("SEQCROW", opt)

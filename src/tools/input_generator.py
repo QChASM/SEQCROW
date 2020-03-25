@@ -11,11 +11,11 @@ from PyQt5.QtCore import Qt, QRegularExpression
 from PyQt5.QtGui import QKeySequence, QFontMetrics
 from PyQt5.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, QHBoxLayout, QToolBox, QFormLayout
 
-from SEQCRO.residue_collection import ResidueCollection
-from SEQCRO.tools.theory_literature import LiteratureBrowser
-from SEQCRO.theory import *
+from SEQCROW.residue_collection import ResidueCollection
+from SEQCROW.tools.theory_literature import LiteratureBrowser
+from SEQCROW.theory import *
 #TODO: rename tuple2str to iter2str
-from SEQCRO.settings import tuple2str
+from SEQCROW.settings import tuple2str
 
 class _InputGeneratorSettings(Settings):
     EXPLICIT_SAVE = {

@@ -14,8 +14,8 @@ from io import BytesIO
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QLabel, QLineEdit, QGridLayout, QPushButton, QTabWidget, QComboBox, QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, QFormLayout, QCheckBox
 
-from SEQCRO.residue_collection import ResidueCollection, Residue
-from SEQCRO.libraries import SubstituentTable, LigandTable, RingTable
+from SEQCROW.residue_collection import ResidueCollection, Residue
+from SEQCROW.libraries import SubstituentTable, LigandTable, RingTable
 
 class EditStructure(ToolInstance):
     SESSION_ENDURING = False
@@ -227,7 +227,7 @@ class EditStructure(ToolInstance):
 
     def do_maplig(self):
         lignames = self.ligname.text()
-        selection = self.session.seqcro_ordered_selection_manager.selection
+        selection = self.session.seqcrow_ordered_selection_manager.selection
         
         if len(selection) < 1:
             raise RuntimeWarning("nothing selected")
@@ -298,7 +298,7 @@ class EditStructure(ToolInstance):
     
     def do_closering(self):
         ringnames = self.ringname.text()
-        selection = self.session.seqcro_ordered_selection_manager.selection
+        selection = self.session.seqcrow_ordered_selection_manager.selection
         
         if len(selection) < 2:
             raise RuntimeWarning("two atoms must be selected per molecule")

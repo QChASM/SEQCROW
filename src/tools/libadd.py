@@ -12,8 +12,8 @@ from AaronTools.ring import Ring
 from AaronTools.substituent import Substituent
 from AaronTools.const import AARONLIB
 
-from SEQCRO.residue_collection import ResidueCollection
-from SEQCRO.tools import key_atom_highlight, ghost_connection_highlight, show_walk_highlight
+from SEQCROW.residue_collection import ResidueCollection
+from SEQCROW.tools import key_atom_highlight, ghost_connection_highlight, show_walk_highlight
 
 from warnings import warn
 
@@ -182,7 +182,7 @@ class LibAdd(ToolInstance):
         
     def libadd_ring(self):
         """add ring to library or open it in a new model"""
-        selection = self.session.seqcro_ordered_selection_manager.selection
+        selection = self.session.seqcrow_ordered_selection_manager.selection
         
         if not selection.single_structure:
             raise RuntimeError("selected atoms must be on the same model")

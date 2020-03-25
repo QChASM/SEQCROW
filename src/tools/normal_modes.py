@@ -19,7 +19,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, QTabWidget, QComboBox, QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, QFormLayout, QCheckBox
 
 from ..managers import FILEREADER_CHANGE
-from SEQCRO.settings import tuple2str
+from SEQCROW.settings import tuple2str
 
 class _NormalModeSettings(Settings):
     AUTO_SAVE = {
@@ -244,8 +244,8 @@ class NormalModes(ToolInstance):
         
         #reset coordinates b/c movie maight be playing
         geom = Geometry(fr)
-        coords = np.array([geom.coords()])
-        model.add_coordsets(coords, replace=True)
+        for atom, coord in zip(model.atoms, geom.coords()):
+            atom.coord = coord
         
         vector = fr.other['frequency'].data[mode].vector
 
@@ -269,9 +269,11 @@ class NormalModes(ToolInstance):
 
         self.session.models.add(bild_obj, parent=model)
         
-        if hasattr(model, "seqcro_freq_slider") and model.seqcro_freq_slider.structure is not None:
+        if hasattr(model, "seqcrow_freq_slider") and model.seqcrow_freq_slider.structure is not None:
             #close animation slider
-            model.seqcro_freq_slider.delete()
+            #TODO:
+            #put this in a manager - not an attribute on the model
+            model.seqcrow_freq_slider.delete()
     
     def show_anim(self):
         """play selected modes as an animation"""
@@ -325,11 +327,11 @@ class NormalModes(ToolInstance):
         for atom, chix_atom in zip(geom.atoms, model.atoms):
             atom.chix_atom = chix_atom
         
-        if hasattr(model, "seqcro_freq_slider") and model.seqcro_freq_slider.structure is not None:
-            model.seqcro_freq_slider.delete()
+        if hasattr(model, "seqcrow_freq_slider") and model.seqcrow_freq_slider.structure is not None:
+            model.seqcrow_freq_slider.delete()
             
-        model.seqcro_freq_slider = CoordinateSetSlider(self.session, model)
-        model.seqcro_freq_slider.play_cb()
+        model.seqcrow_freq_slider = CoordinateSetSlider(self.session, model)
+        model.seqcrow_freq_slider.play_cb()
 
     def delete(self):
         """overload delete"""

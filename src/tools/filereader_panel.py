@@ -11,9 +11,9 @@ from io import BytesIO
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QLabel, QGridLayout, QPushButton, QTreeWidget, QWidget, QVBoxLayout, QTreeWidgetItem, QCheckBox
 
-from SEQCRO.residue_collection import ResidueCollection
-from SEQCRO.managers.filereader_manager import FILEREADER_CHANGE 
-from SEQCRO.tools import EnergyPlot
+from SEQCROW.residue_collection import ResidueCollection
+from SEQCROW.managers.filereader_manager import FILEREADER_CHANGE 
+from SEQCROW.tools import EnergyPlot
 
 from AaronTools.catalyst import Catalyst
 
@@ -31,7 +31,7 @@ class FileReaderPanel(ToolInstance):
     def __init__(self, session, name):       
         super().__init__(session, name)
         
-        self.display_name = "SEQCRO Models"
+        self.display_name = "SEQCROW Models"
         
         self.tool_window = MainToolWindow(self)        
         

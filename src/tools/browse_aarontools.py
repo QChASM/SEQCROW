@@ -18,7 +18,7 @@ from AaronTools.substituent import Substituent
 
 from ..libraries import LigandTable, SubstituentTable, RingTable
 from ..residue_collection import ResidueCollection
-from SEQCRO.settings import tuple2str
+from SEQCROW.settings import tuple2str
 
 # TODO: change decorations to use ChimeraX atom/bond defaults
 class _BrowseLibSettings(Settings):

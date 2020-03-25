@@ -5,7 +5,6 @@ from chimerax.atomic import selected_atoms, Atoms
 
 class OrderedSelectionManager(ProviderManager):
     """keeps track of the order atoms were selected"""
-    # XML_TAG ChimeraX :: Manager :: seqcro_ordered_selection_manager
     def __init__(self, session):
         session.triggers.add_handler(SELECTION_CHANGED, self.selection_changed)
         

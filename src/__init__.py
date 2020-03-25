@@ -3,29 +3,29 @@ import os
 from chimerax.core.toolshed import BundleAPI
 from chimerax.core.toolshed.info import SelectorInfo
 
-class _SEQCRO_API(BundleAPI):
+class _SEQCROW_API(BundleAPI):
 
     api_version = 1
     
     @staticmethod
     def initialize(session, bundle_info):
         #TODO set AaronTools environment variables
-        from SEQCRO import settings as seqcro_settings
-        seqcro_settings.settings = settings._SEQCROSettings(session, "SEQCRO")
+        from SEQCROW import settings as seqcrow_settings
+        seqcrow_settings.settings = settings._SEQCROWSettings(session, "SEQCROW")
         if session.ui.is_gui:
-            from .presets import seqcro_bse, seqcro_s\
+            from .presets import seqcrow_bse, seqcrow_s\
                 ,indexLabel \
                     
-            session.presets.add_presets("SEQCRO", {"ball-stick-endcap":lambda p=seqcro_bse: p(session)})
-            session.presets.add_presets("SEQCRO", {"sticks":lambda p=seqcro_s: p(session)})
-            session.presets.add_presets("SEQCRO", {"index labels":lambda p=indexLabel: p(session)})
+            session.presets.add_presets("SEQCROW", {"ball-stick-endcap":lambda p=seqcrow_bse: p(session)})
+            session.presets.add_presets("SEQCROW", {"sticks":lambda p=seqcrow_s: p(session)})
+            session.presets.add_presets("SEQCROW", {"index labels":lambda p=indexLabel: p(session)})
 
             session.ui.triggers.add_handler('ready',
                 lambda *args, ses=session: settings.register_settings_options(ses))
         
         #apply AARONLIB setting
-        if seqcro_settings.settings.AARONLIB is not None:
-            os.environ['AARONLIB'] = seqcro_settings.settings.AARONLIB
+        if seqcrow_settings.settings.AARONLIB is not None:
+            os.environ['AARONLIB'] = seqcrow_settings.settings.AARONLIB
 
         ##register selectors from the user's personal library
         #from AaronTools.substituent import Substituent
@@ -51,7 +51,7 @@ class _SEQCRO_API(BundleAPI):
         #XML_TAG ChimeraX :: Save :: XYZ :: AaronTools :: false :: extra_keywords
         from .io import save_aarontools
         if format_name != "XYZ":
-            raise NotImplementedError("SEQCRO can only save XYZ files, not %s files" % format_name)
+            raise NotImplementedError("SEQCROW can only save XYZ files, not %s files" % format_name)
             
         elif format_name == "XYZ":
             return save_aarontools(session, path, format_name, **kw)
@@ -73,12 +73,12 @@ class _SEQCRO_API(BundleAPI):
             from .managers import FileReaderManager
             session.filereader_manager = FileReaderManager(session)
             return session.filereader_manager
-        elif name == "seqcro_ordered_selection_manager":
-            from SEQCRO.managers import OrderedSelectionManager
-            session.seqcro_ordered_selection_manager = OrderedSelectionManager(session)
-            return session.seqcro_ordered_selection_manager
+        elif name == "seqcrow_ordered_selection_manager":
+            from SEQCROW.managers import OrderedSelectionManager
+            session.seqcrow_ordered_selection_manager = OrderedSelectionManager(session)
+            return session.seqcrow_ordered_selection_manager
         else:
-            raise RuntimeError("manager named '%s' is unknown to SEQCRO" % name)
+            raise RuntimeError("manager named '%s' is unknown to SEQCROW" % name)
   
     @staticmethod
     def start_tool(session, bi, ti):
@@ -111,6 +111,6 @@ class _SEQCRO_API(BundleAPI):
             tool = BuildQM(session, ti.name)
             return tool
         else:
-            raise RuntimeError("tool named '%s' is unknown to SEQCRO" % ti.name)
+            raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)
 
-bundle_api = _SEQCRO_API()
+bundle_api = _SEQCROW_API()
