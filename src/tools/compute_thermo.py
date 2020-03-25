@@ -24,7 +24,6 @@ class _ComputeThermoSettings(Settings):
 
 
 class Thermochem(ToolInstance):
-    #XML_TAG ChimeraX :: Tool :: Process Thermochemistry :: AaronTools :: Compute the free energy of a molecule with frequency data
     SESSION_ENDURING = False
     SESSION_SAVE = False         
     help = "https://github.com/QChASM/ChimAARON/wiki/Process-Thermochemistry-Tool"
@@ -52,6 +51,8 @@ class Thermochem(ToolInstance):
         self._remove_handler = self.session.filereader_manager.triggers.add_handler(FILEREADER_CHANGE, self.refresh_models)
 
     def _build_ui(self):
+        #TODO:
+        #use QFormLayout for this stuff - labels are positioned better relative to lineedits
         layout = QGridLayout()
 
         #box for sp
@@ -412,7 +413,9 @@ class Thermochem(ToolInstance):
         self.nrg_models = list(self.nrg_cos.keys())
         self.thermo_models = list(self.thermo_cos.keys())
         
-        for i in range(0, self.sp_selector.count()):
+        #remove models in reverse order b/c some don't get removed if multiple are
+        #closed at once
+        for i in range(self.sp_selector.count(), -1, -1):
             if self.sp_selector.itemData(i) not in self.nrg_models:
                 self.sp_selector.removeItem(i)
                 
@@ -420,7 +423,7 @@ class Thermochem(ToolInstance):
             if self.sp_selector.findData(model) == -1:
                 self.sp_selector.addItem("%s (%s)" % (model.name, model.atomspec), model)
         
-        for i in range(0, self.thermo_selector.count()):
+        for i in range(self.thermo_selector.count(), -1, -1):
             if self.thermo_selector.itemData(i) not in self.thermo_models:
                 self.thermo_selector.removeItem(i)
                 

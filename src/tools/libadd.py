@@ -20,7 +20,6 @@ from warnings import warn
 # TODO: change decorations to use ChimeraX atom/bond defaults
 
 class LibAdd(ToolInstance):
-    #XML_TAG ChimeraX :: Tool :: Add to Personal Library :: AaronTools :: Add to your personal ligand, substituent, and ring libraries
     SESSION_ENDURING = False
     SESSION_SAVE = False         
     help = "https://github.com/QChASM/ChimAARON/wiki/Add-to-Personal-Library-Tool"

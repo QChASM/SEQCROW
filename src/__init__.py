@@ -106,6 +106,10 @@ class _SEQCRO_API(BundleAPI):
             from .tools import Thermochem
             tool = Thermochem(session, ti.name)
             return tool
+        elif ti.name == "Build QM Input":
+            from .tools import BuildQM
+            tool = BuildQM(session, ti.name)
+            return tool
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCRO" % ti.name)
 

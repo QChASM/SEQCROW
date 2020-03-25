@@ -30,7 +30,6 @@ class _BrowseLibSettings(Settings):
     
     
 class AaronTools_Library(ToolInstance):
-    #XML_TAG ChimeraX :: Tool :: Browse AaronTools Libraries :: AaronTools :: Browse the AaronTools ligand, substituent, and ring libraries
     SESSION_ENDURING = False
     SESSION_SAVE = False         
     help = "https://github.com/QChASM/ChimAARON/wiki/Browse-AaronTools-Libraries-Tool"

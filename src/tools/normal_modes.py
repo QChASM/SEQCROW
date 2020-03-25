@@ -30,7 +30,6 @@ class _NormalModeSettings(Settings):
     }
 
 class NormalModes(ToolInstance):
-    #XML_TAG ChimeraX :: Tool :: Visualize Normal Modes :: AaronTools :: Visualize normal modes from a Gaussian output file as displacement vectors or as an animation
     SESSION_ENDURING = False
     SESSION_SAVE = False         
     help = "https://github.com/QChASM/ChimAARON/wiki/Visualize-Normal-Modes-Tool"
@@ -186,8 +185,9 @@ class NormalModes(ToolInstance):
     def refresh_models(self, *args, **kwargs):
         """refresh the list of models with frequency data and add or remove items from the combobox"""
         self.models_with_freq = self.session.filereader_manager.frequency_models
-            
-        for i in range(0, self.model_selector.count()):
+        
+        #remove in reverse order b/c sometimes they don't get removed in forwards order
+        for i in range(self.model_selector.count(), -1, -1):
             if self.model_selector.itemData(i) not in self.models_with_freq:
                 self.model_selector.removeItem(i)
                 

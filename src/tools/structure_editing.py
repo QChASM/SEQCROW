@@ -18,7 +18,6 @@ from SEQCRO.residue_collection import ResidueCollection, Residue
 from SEQCRO.libraries import SubstituentTable, LigandTable, RingTable
 
 class EditStructure(ToolInstance):
-    #XML_TAG ChimeraX :: Tool :: Structure Modification :: AaronTools :: Modify substituents, swap ligands, and close rings, all for the one-time fee of an arm and a leg!
     SESSION_ENDURING = False
     SESSION_SAVE = False         
     help = "https://github.com/QChASM/ChimAARON/wiki/Structure-Modification-Tool"

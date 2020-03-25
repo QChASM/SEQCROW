@@ -18,7 +18,6 @@ from SEQCRO.tools import EnergyPlot
 from AaronTools.catalyst import Catalyst
 
 class FileReaderPanel(ToolInstance):
-    #XML_TAG ChimeraX :: Tool :: Managed Models :: SEQCRO :: see models managed by SEQCRO
     SESSION_ENDURING = False
     SESSION_SAVE = False         
     help = "https://github.com/QChASM/ChimAARON/wiki/Model-Manager-Tool"
@@ -32,7 +31,6 @@ class FileReaderPanel(ToolInstance):
     def __init__(self, session, name):       
         super().__init__(session, name)
         
-        # a lot of this is basically copy pasta from the model panel
         self.display_name = "SEQCRO Models"
         
         self.tool_window = MainToolWindow(self)        

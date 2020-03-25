@@ -44,41 +44,45 @@ xml_mods = {}
 d = os.path.dirname(os.path.realpath(__file__))
 src_dir = "src"
 src_path = os.path.join(d, src_dir)
-for root, dirs, files in os.walk(src_path, topdown=False):
-    for f in files:
-        file_path = os.path.join(root, f)
-        with open(file_path, 'r') as x:
-            lines = [line.strip().lstrip('#').strip() for line in x.readlines()]
-            
-        for line in lines:
-            if line.startswith('XML_TAG'):
-                #this is a full XML tag
-                chimerax_classifiers.append(line.replace('XML_TAG', '').strip())
-
-            elif line.startswith('XML:'):
-                #this is a modification to an XML tag
-                modification = line.replace('XML:', '').strip()
-                classifier, change = [s.strip() for s in modification.split('->')]
-                replace_phrase, value = [s.strip() for s in change.split('=')]
-                if classifier not in xml_mods:
-                    xml_mods[classifier] = {}
-                
-                if replace_phrase in xml_mods[classifier]:
-                    xml_mods[classifier][replace_phrase].append(value)
-                else:
-                    xml_mods[classifier][replace_phrase] = [value]
-
-#make modifications to XML tags
-for classifier in xml_mods:
-    mod = xml_mods[classifier]
-    print(classifier, mod)
-    for i, c in enumerate(chimerax_classifiers):
-        if c.startswith(classifier):
-            for change in mod:
-                chimerax_classifiers[i] = c.replace(change, ','.join(mod[change]))
-
-for c in chimerax_classifiers:
-    print(c)
+#for root, dirs, files in os.walk(src_path, topdown=False):
+#    for f in files:
+#        file_path = os.path.join(root, f)
+#        with open(file_path, 'r') as x:
+#            try:
+#                lines = [line.strip().lstrip('#').strip() for line in x.readlines()]
+#            except Exception as e:
+#                print("failed to read %s" % f)
+#                raise(e)
+#            
+#        for line in lines:
+#            if line.startswith('XML_TAG'):
+#                #this is a full XML tag
+#                chimerax_classifiers.append(line.replace('XML_TAG', '').strip())
+#
+#            elif line.startswith('XML:'):
+#                #this is a modification to an XML tag
+#                modification = line.replace('XML:', '').strip()
+#                classifier, change = [s.strip() for s in modification.split('->')]
+#                replace_phrase, value = [s.strip() for s in change.split('=')]
+#                if classifier not in xml_mods:
+#                    xml_mods[classifier] = {}
+#                
+#                if replace_phrase in xml_mods[classifier]:
+#                    xml_mods[classifier][replace_phrase].append(value)
+#                else:
+#                    xml_mods[classifier][replace_phrase] = [value]
+#
+##make modifications to XML tags
+#for classifier in xml_mods:
+#    mod = xml_mods[classifier]
+#    print(classifier, mod)
+#    for i, c in enumerate(chimerax_classifiers):
+#        if c.startswith(classifier):
+#            for change in mod:
+#                chimerax_classifiers[i] = c.replace(change, ','.join(mod[change]))
+#
+#for c in chimerax_classifiers:
+#    print(c)
 
 ext_mods = []
 #pure python hopefully works everywhere
@@ -127,6 +131,22 @@ setup(
         "Topic :: Scientific/Engineering :: Visualization",
         "Topic :: Scientific/Engineering :: Chemistry",
         "ChimeraX :: Bundle :: General,Input/Output,Structure Editing,External Program :: 1,1 :: SEQCRO :: ChimAARON,SEQCRO :: true ",
-        *chimerax_classifiers
+        "ChimeraX :: Tool :: Build QM Input :: SEQCRO :: Create input file for Gaussian or Orca",
+        "ChimeraX :: Tool :: Structure Modification :: AaronTools :: Modify substituents, swap ligands, and close rings, all for the one-time fee of an arm and a leg!",
+        "ChimeraX :: Tool :: Browse AaronTools Libraries :: AaronTools :: Browse the AaronTools ligand, substituent, and ring libraries", 
+        "ChimeraX :: Tool :: Process Thermochemistry :: AaronTools :: Compute the free energy of a molecule with frequency data", 
+        "ChimeraX :: Tool :: Managed Models :: SEQCRO :: see models managed by SEQCRO", 
+        "ChimeraX :: Tool :: Add to Personal Library :: AaronTools :: Add to your personal ligand, substituent, and ring libraries", 
+        "ChimeraX :: Tool :: Visualize Normal Modes :: AaronTools :: Visualize normal modes from a Gaussian output file as displacement vectors or as an animation", 
+        "ChimeraX :: DataFormat :: XYZ :: XYZ :: Molecular structure :: .xyz :: :: :: :: :: XYZ Format :: utf-8",
+        "ChimeraX :: Open :: XYZ :: AaronTools :: false :: coordsets:Bool",
+        "ChimeraX :: DataFormat :: COM :: Gaussian input file :: Molecular structure :: .com,.gjf :: :: :: :: :: Gaussian input file :: utf-8",
+        "ChimeraX :: Open :: COM :: Gaussian input file ::",
+        "ChimeraX :: DataFormat :: LOG :: Gaussian output file :: Molecular structure :: .log :: :: :: :: :: Gaussian output file :: utf-8",
+        "ChimeraX :: Open :: LOG :: Gaussian output file :: false :: coordsets:Bool",
+        "ChimeraX :: DataFormat :: OUT :: Orca output file :: Molecular structure :: .out :: :: :: :: :: Orca output file :: utf-8",
+        "ChimeraX :: Open :: OUT :: Orca output file :: false :: coordsets:Bool",
+        "ChimeraX :: Manager :: filereader_manager",
+        "ChimeraX :: Manager :: seqcro_ordered_selection_manager", 
     ] + environments,
 )
