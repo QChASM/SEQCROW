@@ -36,7 +36,7 @@ class _InputGeneratorSettings(Settings):
         'previous_functional': Value("", StringArg),
         'previous_custom_func': Value("", StringArg), 
         'previous_functional_names': Value([], ListOf(StringArg), tuple2str),
-        'previous_functional_needs_basis': Value([], ListOf(StringArg), tuple2str),
+        'previous_functional_needs_basis': Value([], ListOf(BoolArg), tuple2str),
         'previous_dispersion': Value("None", StringArg),
     }
 
@@ -168,11 +168,14 @@ class BuildQM(ToolInstance):
             model = self.models[self.model_selector.currentIndex()]
         else:
             model = None
- 
-        basis = self.get_basis_set()
-        func = self.functional_widget.getFunctional()
-        dispersion = self.functional_widget.getDispersion()
 
+        func = self.functional_widget.getFunctional()
+  
+        self.settings.save()
+        
+        basis = self.get_basis_set()
+        dispersion = self.functional_widget.getDispersion()
+        
         self.settings.save()
         
         self.theory = Method(structure=model, charge=0, multiplicity=1, \
@@ -430,8 +433,8 @@ class FunctionalOption(QWidget):
     def getFunctional(self):
         if self.form == "Gaussian":
             if self.functional_option.currentText() == "B3LYP":
-                self.settings.previous_functional = "Gaussians's B3LYP"
-                return Functional("Gaussians's B3LYP", False)
+                self.settings.previous_functional = "Gaussian's B3LYP"
+                return Functional("Gaussian's B3LYP", False)
             
         if self.functional_option.currentText() != "other":
             functional = self.functional_option.currentText()
