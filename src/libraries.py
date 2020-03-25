@@ -89,6 +89,7 @@ class LigandTable(QWidget):
         
         self.filterEdit = QLineEdit()
         self.filterEdit.textChanged.connect(self.apply_filter)
+        self.filterEdit.setClearButtonEnabled(True)
         
         self.filter_columns = QComboBox()
         self.filter_columns.addItem("name")
@@ -224,6 +225,7 @@ class SubstituentTable(QWidget):
         
         self.filterEdit = QLineEdit()
         self.filterEdit.textChanged.connect(self.apply_filter)
+        self.filterEdit.setClearButtonEnabled(True)
         
         self.filter_columns = QComboBox()
         self.filter_columns.addItem("name")
@@ -334,7 +336,8 @@ class RingTable(QWidget):
         
         self.filterEdit = QLineEdit()
         self.filterEdit.textChanged.connect(self.apply_filter)
-        
+        self.filterEdit.setClearButtonEnabled(True)
+
         self.filter_columns = QComboBox()
         self.filter_columns.addItem("name")
         self.filter_columns.currentTextChanged.connect(self.change_filter_method)

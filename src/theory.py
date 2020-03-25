@@ -58,10 +58,10 @@ class Method:
     def __init__(self, **kw):
         for key in self.ACCEPTED_INIT_KW:
             if key in kw:
-                print("%s in kw" % key)
+                #print("%s in kw" % key)
                 self.__setattr__(key, kw[key])
             else:
-                print("%s not in kw" % key)
+                #print("%s not in kw" % key)
                 self.__setattr__(key, None)
 
     def write_gaussian_input(self, other_kw_dict, fname=None):
@@ -208,15 +208,15 @@ class BasisSet:
         
     def get_gaussian09_basis_info(self):
         info = {}
-        print([basis for basis in self.basis])
-        if self.ecp is not None:
-            print([basis for basis in self.ecp])
+        #print([basis for basis in self.basis])
+        #if self.ecp is not None:
+        #    print([basis for basis in self.ecp])
         
-        for basis in self.basis:
-            print(basis == self.basis[0])
+        #for basis in self.basis:
+        #    print(basis == self.basis[0])
             
-        print(self.basis[0].user_defined)
-        print(self.ecp is None)
+        #print(self.basis[0].user_defined)
+        #print(self.ecp is None)
         
         if all([basis == self.basis[0] for basis in self.basis]) and not self.basis[0].user_defined and self.ecp is None:
             info[Method.GAUSSIAN_ROUTE] = Basis.map_gaussian09_basis(self.basis[0].name)

@@ -29,6 +29,12 @@ class _BrowseLibSettings(Settings):
     }
     
     
+#TODO:
+#make double clicking things in the library tables open them
+
+#TODO:
+#make the AaronTools 'database' be discoverable (so open Me AaronTools works or whatever)
+    
 class AaronTools_Library(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False         

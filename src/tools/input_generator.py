@@ -23,18 +23,20 @@ class _InputGeneratorSettings(Settings):
         'previous_basis_paths': Value([], ListOf(StringArg), tuple2str),        
         'previous_ecp_names': Value([], ListOf(StringArg), tuple2str),
         'previous_ecp_paths': Value([], ListOf(StringArg), tuple2str),
-        'last_basis': Value("def2-SVP", StringArg),
-        'last_custom_basis_kw': Value("", StringArg), 
-        'last_custom_basis_builtin': Value(True, BoolArg), 
+        'last_basis': Value(["def2-SVP"], ListOf(StringArg), tuple2str),
+        'last_custom_basis_kw': Value([""], ListOf(StringArg), tuple2str), 
+        'last_custom_basis_builtin': Value([""], ListOf(StringArg), tuple2str),  
+        'last_basis_elements': Value([""], ListOf(StringArg), tuple2str),
         'last_basis_path': Value("", StringArg), 
-        'last_ecp': Value("SDD", StringArg),
-        'last_custom_ecp_kw': Value("", StringArg), 
-        'last_custom_ecp_builtin': Value(True, BoolArg),
+        'last_ecp': Value([], ListOf(StringArg), tuple2str), 
+        'last_custom_ecp_kw': Value([], ListOf(StringArg), tuple2str), 
+        'last_custom_ecp_builtin': Value([], ListOf(StringArg), tuple2str), 
+        'last_ecp_elements': Value([], ListOf(StringArg), tuple2str),
         'last_ecp_path': Value("", StringArg),
         'previous_functional': Value("", StringArg),
         'previous_custom_func': Value("", StringArg), 
         'previous_functional_names': Value([], ListOf(StringArg), tuple2str),
-        'previous_functional_needs_basis': Value([], ListOf(BoolArg), tuple2str),
+        'previous_functional_needs_basis': Value([], ListOf(StringArg), tuple2str),
         'previous_dispersion': Value("None", StringArg),
     }
 
@@ -66,6 +68,9 @@ class BuildQM(ToolInstance):
     def _build_ui(self):
         #build an interface with a dropdown menu to select software package
         #change from one software widget to another when the dropdown menu changes
+        #TODO: move everything to do with the tabwidget into a different widget
+        #TODO: add a presets tab to save/load presets to aaronrc or to seqcrow 
+        #      so it can easily be used in other tools (like one that runs QM software)
         layout = QGridLayout()
         
         basics_form = QWidget()
@@ -163,11 +168,11 @@ class BuildQM(ToolInstance):
             model = self.models[self.model_selector.currentIndex()]
         else:
             model = None
-            
+ 
         basis = self.get_basis_set()
         func = self.functional_widget.getFunctional()
         dispersion = self.functional_widget.getDispersion()
-        
+
         self.settings.save()
         
         self.theory = Method(structure=model, charge=0, multiplicity=1, \
@@ -222,6 +227,7 @@ class BuildQM(ToolInstance):
 
 
 class FunctionalOption(QWidget):
+    #TODO: make checking the "is_semiemperical" box disable the basis functions tab of the parent tab widget
     GAUSSIAN_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D", "B3PW91", "B97-D", "BP86", "PBE0", "PM6", "AM1"]
     GAUSSIAN_DISPERSION = ["Grimme D2", "Grimme D3", "Becke-Johnson damped Grimme D3", "Petersson-Frisch"]
     
@@ -242,6 +248,7 @@ class FunctionalOption(QWidget):
         keyword_label = QLabel("keyword:")
         
         self.functional_kw = QLineEdit()
+        self.functional_kw.setClearButtonEnabled(True)
         
         func_form_layout.addRow(keyword_label, self.functional_kw)
         
@@ -445,18 +452,19 @@ class FunctionalOption(QWidget):
             
             is_semiemperical = self.is_semiemperical.checkState() == Qt.Checked
             
-            found_func = False
-            for i in range(0, len(self.settings.previous_functional_names)):
-                if self.settings.previous_functional_names[i] == functional and \
-                    self.settings.previous_functional_needs_basis[i] != is_semiemperical:
-                    found_func = True
-            
-            if not found_func:
-                #append doesn't seem to call __setattr__, so the setting doesn't get updated
-                self.settings.previous_functional_names = self.settings.previous_functional_names + [functional]
-                self.settings.previous_functional_needs_basis = self.settings.previous_functional_needs_basis + [not is_semiemperical]
-                row = self.previously_used_table.rowCount()
-                self.add_previously_used(row, functional, not is_semiemperical)
+            if len(functional) > 0:
+                found_func = False
+                for i in range(0, len(self.settings.previous_functional_names)):
+                    if self.settings.previous_functional_names[i] == functional and \
+                        self.settings.previous_functional_needs_basis[i] != is_semiemperical:
+                        found_func = True
+                
+                if not found_func:
+                    #append doesn't seem to call __setattr__, so the setting doesn't get updated
+                    self.settings.previous_functional_names = self.settings.previous_functional_names + [functional]
+                    self.settings.previous_functional_needs_basis = self.settings.previous_functional_needs_basis + [not is_semiemperical]
+                    row = self.previously_used_table.rowCount()
+                    self.add_previously_used(row, functional, not is_semiemperical)
 
             return Functional(functional, is_semiemperical)
 
@@ -469,6 +477,7 @@ class FunctionalOption(QWidget):
             dispersion = EmpiricalDispersion(disp)
             
         return dispersion   
+
 
 class BasisOption(QWidget):
     """widget for basis set options
@@ -499,6 +508,7 @@ class BasisOption(QWidget):
     last_custom = "last_custom_basis_kw"
     last_custom_builtin = "last_custom_basis_builtin"
     last_custom_path = "last_basis_path"
+    last_elements = "last_basis_elements"
         
     toolbox_name = "basis_toolbox"
         
@@ -527,25 +537,15 @@ class BasisOption(QWidget):
         self.elements.itemSelectionChanged.connect(lambda *args, s=self: self.parent.check_elements(s))
         self.layout.addWidget(self.elements, 0, 2, 2, 1, Qt.AlignTop)
         
-        self.remove_self = QPushButton()
-        self.remove_self.setIcon(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)))
-        self.remove_self.clicked.connect(self.destruct)
-        self.remove_self.setToolTip("remove this basis specification")
-        self.layout.addWidget(self.remove_self, 0, 3, 1, 1, Qt.AlignTop)
-        
         self.custom_basis_kw = QLineEdit()
-        self.custom_basis_kw.setText(self.settings.__getattr__(self.last_custom))
         self.custom_basis_kw.textChanged.connect(self.apply_filter)
         self.custom_basis_kw.textChanged.connect(self.update_tooltab)
+        self.custom_basis_kw.setClearButtonEnabled(True)
         
         keyword_label = QLabel("keyword:")
         self.basis_name_options.addRow(keyword_label, self.custom_basis_kw)
 
         self.is_builtin = QCheckBox()
-        if self.settings.__getattr__(self.last_custom_builtin):
-            self.is_builtin.setCheckState(Qt.Checked)
-        else:
-            self.is_builtin.setCheckState(Qt.Unchecked)
             
         self.is_builtin.stateChanged.connect(self.show_gen_path)
         self.layout.addWidget(self.is_builtin, 1, 3, 1, 1, Qt.AlignTop)
@@ -559,12 +559,11 @@ class BasisOption(QWidget):
         self.layout.addWidget(self.basis_names, 0, 0, 3, 2)
                 
         self.path_to_basis_file = QLineEdit()
-        self.path_to_basis_file.setText(self.settings.__getattr__(self.last_custom_path))
-        self.layout.addWidget(self.path_to_basis_file, 3, 1, 1, 2, Qt.AlignTop)
+        self.layout.addWidget(self.path_to_basis_file, 3, 1, 1, 1, Qt.AlignTop)
         
         browse_button = QPushButton("browse...")
         browse_button.clicked.connect(self.open_file_dialog)
-        self.layout.addWidget(browse_button, 3, 3, 1, 1, Qt.AlignTop)
+        self.layout.addWidget(browse_button, 3, 2, 1, 1, Qt.AlignTop)
         
         #previously_used_label = QLabel("previously used:")
         #self.layout.addWidget(previously_used_label, 3, 0, 1, 1, Qt.AlignTop)
@@ -584,12 +583,10 @@ class BasisOption(QWidget):
         self.previously_used_table.resizeColumnToContents(2)
         
         self.previously_used_table.cellActivated.connect(lambda *args, s=self: BasisOption.remove_saved_basis(s, *args))
-        self.layout.addWidget(self.previously_used_table, 4, 0, 1, 4, Qt.AlignTop)
+        self.layout.addWidget(self.previously_used_table, 4, 0, 1, 3, Qt.AlignTop)
         
         self.custom_basis_options = [keyword_label, self.custom_basis_kw, is_builtin_label, self.is_builtin, self.previously_used_table]
         self.gen_options = [gen_path_label, self.path_to_basis_file, browse_button]
-
-        self.basis_option.setCurrentIndex(self.options.index(self.settings.__getattr__(self.last_used)))
         
     def open_file_dialog(self):
         """ask user to locate external basis file on their computer"""
@@ -685,37 +682,69 @@ class BasisOption(QWidget):
         """returns a list of all available element names"""
         return [self.elements.item(i).text() for i in range(0, self.elements.count())]
     
-    def currentBasis(self, update_settings=False):
+    def currentBasis(self, update_settings=False, index=0):
         """get current basis info
         if basis is user-defined, this will also update the basis settings
-        DOES NOT save basis settings (must still call settings.save())
         """
+        #XXX: don't use append when updating list settings
         basis = self.basis_option.currentText()
         if update_settings:
-            self.settings.__setattr__(self.last_used, basis)
-        
+            cur_last_used = [x for x in self.settings.__getattr__(self.last_used)]
+            cur_last_cust = [x for x in self.settings.__getattr__(self.last_custom)]
+            cur_last_builtin = [x for x in self.settings.__getattr__(self.last_custom_builtin)]
+            cur_last_elements = [x for x in self.settings.__getattr__(self.last_elements)]
+            while len(cur_last_used) <= index:
+                cur_last_used.append(basis)
+                cur_last_cust.append(basis)
+                cur_last_builtin.append("" if self.is_builtin.checkState() == Qt.Checked else self.path_to_basis_file.text())
+                cur_last_elements.append(",".join(self.currentElements()))
+                        
+            cur_last_used[index] = basis
+            cur_last_cust[index] = self.custom_basis_kw.text()
+            cur_last_builtin[index] = "" if self.is_builtin.checkState() == Qt.Checked else self.path_to_basis_file.text()
+            cur_last_elements[index] = ",".join(self.currentElements())
+
+              
+            self.settings.__setattr__(self.last_used, cur_last_used)
+            self.settings.__setattr__(self.last_custom, cur_last_cust)
+            self.settings.__setattr__(self.last_custom_builtin, cur_last_builtin)
+            self.settings.__setattr__(self.last_elements, cur_last_elements)
+
         if basis != "other":
             return basis, False
         else:
             basis = self.custom_basis_kw.text()
             if update_settings:
-                self.settings.__setattr__(self.last_custom, basis)
-            
+                cur_settings = self.settings.__getattr__(self.last_custom)
+
             if self.is_builtin.checkState() == Qt.Checked:
-                if update_settings:
-                    self.settings.__setattr__(self.last_custom_builtin, True)
-                
                 gen_path = False
             else:
-                if update_settings:
-                    self.settings.__setattr__(self.last_custom_builtin, False)
-                
                 gen_path = self.path_to_basis_file.text()
                 
                 if update_settings:
                     self.settings.__setattr__(self.last_custom_path, gen_path)
 
             if update_settings:
+                cur_last_used = [x for x in self.settings.__getattr__(self.last_used)]
+                cur_last_cust = [x for x in self.settings.__getattr__(self.last_custom)]
+                cur_last_builtin = [x for x in self.settings.__getattr__(self.last_custom_builtin)]
+                while len(cur_last_used) <= index:
+                    cur_last_used.append("other")
+                    cur_last_cust.append(basis)
+                    cur_last_builtin.append("" if self.is_builtin.checkState() == Qt.Checked else self.path_to_basis_file.text())
+                    cur_last_elements.append(",".join(self.currentElements()))
+            
+                cur_last_used[index] = "other"
+                cur_last_cust[index] = basis
+                cur_last_builtin[index] = "" if self.is_builtin.checkState() == Qt.Checked else self.path_to_basis_file.text()
+                cur_last_elements[index] = ",".join(self.currentElements())
+        
+                self.settings.__setattr__(self.last_used, cur_last_used)
+                self.settings.__setattr__(self.last_custom, cur_last_cust)
+                self.settings.__setattr__(self.last_custom_builtin, cur_last_builtin)
+                self.settings.__setattr__(self.last_elements, cur_last_elements)
+
                 found_in_previous = False
                 for i in range(0, len(self.settings.__getattr__(self.name_setting))):
                     if basis == self.settings.__getattr__(self.name_setting)[i] and \
@@ -731,8 +760,7 @@ class BasisOption(QWidget):
                     new_paths = self.settings.__getattr__(self.path_setting) + [gen_path if gen_path else ""]
                     self.settings.__setattr__(self.name_setting, new_names)
                     self.settings.__setattr__(self.path_setting, new_paths)
-    
-            
+               
                     self.previously_used_table.resizeColumnToContents(0)
                     self.previously_used_table.resizeColumnToContents(2)
 
@@ -779,7 +807,7 @@ class BasisOption(QWidget):
         
         self.elements.addItems(elements)
         self.elements.sortItems()
-        
+                
     def setSelectedElements(self, elements):
         """sets the selected elements"""
         for i in range(0, self.elements.count()):
@@ -787,8 +815,12 @@ class BasisOption(QWidget):
             row.setSelected(False)
             
         for element in elements:
+            if element not in self.allElements():
+                continue
+            
             row = self.elements.findItems(element, Qt.MatchExactly)[0]
             row.setSelected(True)
+            
     
     def remove_saved_basis(self, row, column):
         """removes the row from the table of previously used basis sets
@@ -826,6 +858,16 @@ class BasisOption(QWidget):
                 self.is_builtin.setCheckState(Qt.Unchecked)            
                 self.path_to_basis_file.setText(path)
 
+    def setBasis(self, name, custom_kw="", builtin=""):
+        ndx = self.basis_option.findData(name, Qt.MatchExactly)
+        self.basis_option.setCurrentIndex(ndx)
+        self.custom_basis_kw.setText(custom_kw)
+        if len(builtin) > 0:
+            self.is_builtin.setCheckState(Qt.Unchecked)
+            self.path_to_basis_file.setText(builtin)
+        else:
+            self.is_builtin.setCheckState(Qt.Checked)
+            self.path_to_basis_file.setText(self.settings.__getattr__(self.last_custom_path))
 
 class ECPOption(BasisOption):
     options = ["SDD", "LANL2DZ", "other"]
@@ -836,6 +878,7 @@ class ECPOption(BasisOption):
     last_custom = "last_custom_ecp_kw"
     last_custom_builtin = "last_custom_ecp_builtin"
     last_custom_path = "last_ecp_path"
+    last_elements = "last_ecp_elements"
     
     def __init__(self, parent, settings):
         super().__init__(parent, settings)
@@ -865,6 +908,8 @@ class BasisWidget(QWidget):
         valence_basis_area = QGroupBox("basis set")
         valence_layout = QGridLayout(valence_basis_area)
         self.basis_toolbox = QTabWidget()
+        self.basis_toolbox.setTabsClosable(True)
+        self.basis_toolbox.tabCloseRequested.connect(self.close_basis_tab)
         valence_layout.addWidget(self.basis_toolbox, 0, 0)
         self.basis_warning = QLabel()
         self.basis_warning.setStyleSheet("QLabel { color : red; }")
@@ -875,6 +920,8 @@ class BasisWidget(QWidget):
         ecp_basis_area = QGroupBox("effective core potential")        
         ecp_layout = QGridLayout(ecp_basis_area)
         self.ecp_toolbox = QTabWidget()
+        self.ecp_toolbox.setTabsClosable(True)
+        self.ecp_toolbox.tabCloseRequested.connect(self.close_ecp_tab)
         ecp_layout.addWidget(self.ecp_toolbox, 0, 0)
 
         valence_side_layout.addWidget(valence_basis_area, 0, 0)
@@ -895,13 +942,30 @@ class BasisWidget(QWidget):
         
         self.layout.addWidget(splitter)
         
-        self.new_basis()
+        for i, basis in enumerate(self.settings.last_basis):
+            self.new_basis(use_saved=i)        
+        
+        for i, basis in enumerate(self.settings.last_ecp):
+            self.new_ecp(use_saved=i)
 
-    def new_ecp(self):
+    def close_ecp_tab(self, index):
+        self.remove_basis(self.ecp_options[index])
+    
+    def close_basis_tab(self, index):
+        self.remove_basis(self.basis_options[index])
+
+    def new_ecp(self, use_saved=0):
         """add an ECPOption"""
         new_basis = ECPOption(self, self.settings)
         new_basis.setToolBox(self.ecp_toolbox)
         new_basis.setElements(self.elements)
+        if use_saved < len(self.settings.last_ecp):
+            name = self.settings.last_ecp[use_saved]
+            custom = self.settings.last_custom_ecp_kw[use_saved]
+            builtin = self.settings.last_custom_ecp_builtin[use_saved]
+            new_basis.setBasis(name, custom, builtin)
+            #new_basis.setSelectedElements(self.settings.last_ecp_elements[use_saved].split(','))
+            
         new_basis.basis_changed()
         
         self.ecp_options.append(new_basis)
@@ -914,11 +978,18 @@ class BasisWidget(QWidget):
         self.refresh_ecp()
         self.refresh_basis()
                         
-    def new_basis(self):
+    def new_basis(self, use_saved=0):
         """add a BasisOption"""
         new_basis = BasisOption(self, self.settings)
         new_basis.setToolBox(self.basis_toolbox)
         new_basis.setElements(self.elements)
+        if use_saved < len(self.settings.last_basis):
+            name = self.settings.last_basis[use_saved]
+            custom = self.settings.last_custom_basis_kw[use_saved]
+            builtin = self.settings.last_custom_basis_builtin[use_saved]
+            new_basis.setBasis(name, custom, builtin)
+            #new_basis.setSelectedElements(self.settings.last_basis_elements[use_saved].split(','))
+            
         new_basis.basis_changed()
 
         elements_without_basis = []
@@ -1004,17 +1075,27 @@ class BasisWidget(QWidget):
         """returns ([Basis], [ECP]) corresponding to the current settings"""
         basis_set = []
         ecp = []
-        for basis in self.basis_options[::-1]:
-            basis_name, gen_path = basis.currentBasis(True)
+        for i, basis in enumerate(self.basis_options):
+            basis_name, gen_path = basis.currentBasis(True, index=i)
             basis_set.append(Basis(basis_name, elements=basis.currentElements(), user_defined=gen_path))
-        
+                
+        self.settings.last_basis = self.settings.last_basis[:len(self.basis_options)]
+        self.settings.last_custom_basis_kw = self.settings.last_custom_basis_kw[:len(self.basis_options)]
+        self.settings.last_custom_basis_builtin = self.settings.last_custom_basis_builtin[:len(self.basis_options)]
+        self.settings.last_basis_elements = self.settings.last_basis_elements[:len(self.basis_options)]
+                
         if len(basis_set) == 0:
             basis_set = None
                 
-        for basis in self.ecp_options[::-1]:
-            basis_name, gen_path = basis.currentBasis(True)
+        for i, basis in enumerate(self.ecp_options):
+            basis_name, gen_path = basis.currentBasis(True, index=i)
             ecp.append(ECP(basis_name, elements=basis.currentElements(), user_defined=gen_path))
         
+        self.settings.last_ecp = self.settings.last_ecp[:len(self.ecp_options)]
+        self.settings.last_custom_ecp_kw = self.settings.last_custom_ecp_kw[:len(self.ecp_options)]
+        self.settings.last_custom_ecp_builtin = self.settings.last_custom_ecp_builtin[:len(self.ecp_options)]
+        self.settings.last_ecp_elements = self.settings.last_ecp_elements[:len(self.ecp_options)]
+
         if len(ecp) == 0:
             ecp = None
         
@@ -1071,14 +1152,24 @@ class BasisWidget(QWidget):
         new_elements = [element for element in element_list if element not in previous_elements]
         del_elements = [element for element in previous_elements if element not in element_list]
         
-        for basis in self.basis_options + self.ecp_options:
+        for j, basis in enumerate(self.basis_options):
             for i in range(basis.elements.count()-1, -1, -1):
                 if basis.elements.item(i).text() in del_elements:
                     basis.elements.takeItem(i)
                     
             basis.elements.addItems(new_elements)
             basis.elements.sortItems()
-        
+            basis.setSelectedElements(self.settings.last_basis_elements[j].split(","))
+
+        for j, basis in enumerate(self.ecp_options):
+            for i in range(basis.elements.count()-1, -1, -1):
+                if basis.elements.item(i).text() in del_elements:
+                    basis.elements.takeItem(i)
+                    
+            basis.elements.addItems(new_elements)
+            basis.elements.sortItems()
+            basis.setSelectedElements(self.settings.last_ecp_elements[j].split(","))
+
         if len(self.basis_options) == 1 and len(self.ecp_options) == 0:
             self.basis_options[0].setSelectedElements(self.elements)
                 

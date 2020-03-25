@@ -287,6 +287,9 @@ class Thermochem(ToolInstance):
         layout.addWidget(splitter)
 
         #menu stuff
+        #TODO:
+        #add menu option for delimiter
+        #use settings to save default delimiter
         menu = QMenuBar()
         
         export = menu.addMenu("&Export")
