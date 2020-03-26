@@ -3,7 +3,7 @@ from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
-from chimerax.core.commands.cli import StringArg, BoolArg, ListOf
+from chimerax.core.commands.cli import StringArg, BoolArg, ListOf, IntArg
 from chimerax.core.models import ADD_MODELS, REMOVE_MODELS
 
 from PyQt5.Qt import QClipboard, QStyle, QIcon
@@ -27,11 +27,13 @@ class _InputGeneratorSettings(Settings):
         'last_custom_basis_builtin': Value([""], ListOf(StringArg), tuple2str),  
         'last_basis_elements': Value([""], ListOf(StringArg), tuple2str),
         'last_basis_path': Value("", StringArg), 
+        'last_number_basis': Value(1, IntArg), 
         'last_ecp': Value([], ListOf(StringArg), tuple2str), 
         'last_custom_ecp_kw': Value([], ListOf(StringArg), tuple2str), 
         'last_custom_ecp_builtin': Value([], ListOf(StringArg), tuple2str), 
         'last_ecp_elements': Value([], ListOf(StringArg), tuple2str),
         'last_ecp_path': Value("", StringArg),
+        'last_number_ecp': Value(0, IntArg), 
         'previous_functional': Value("", StringArg),
         'previous_custom_func': Value("", StringArg), 
         'previous_functional_names': Value([], ListOf(StringArg), tuple2str),
@@ -1207,10 +1209,10 @@ class BasisWidget(QWidget):
         
         self.layout.addWidget(splitter)
         
-        for i, basis in enumerate(self.settings.last_basis):
+        for i in range(0, self.settings.last_number_basis):
             self.new_basis(use_saved=i)        
         
-        for i, basis in enumerate(self.settings.last_ecp):
+        for i in range(0, self.settings.last_number_ecp):
             self.new_ecp(use_saved=i)
 
     def close_ecp_tab(self, index):
@@ -1352,7 +1354,9 @@ class BasisWidget(QWidget):
         #self.settings.last_custom_basis_kw = self.settings.last_custom_basis_kw[:len(self.basis_options)]
         #self.settings.last_custom_basis_builtin = self.settings.last_custom_basis_builtin[:len(self.basis_options)]
         #self.settings.last_basis_elements = self.settings.last_basis_elements[:len(self.basis_options)]
-                
+        
+        self.settings.last_number_basis = len(self.basis_options)
+        
         if len(basis_set) == 0:
             basis_set = None
                 
@@ -1367,6 +1371,8 @@ class BasisWidget(QWidget):
 
         if len(ecp) == 0:
             ecp = None
+
+        self.settings.last_number_ecp = len(self.ecp_options)
         
         return basis_set, ecp
 
