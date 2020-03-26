@@ -1,7 +1,6 @@
 import os
 
 KNOWN_GAUSSIAN_PRE_ROUTE_KW = ["chk"]
-KNOWN_GAUSSIAN_JOB_TYPES = ['geometry optimization', 'frequency calculation', 'transition state optimization', 'single-point energy']
 GAUSSIAN_JOB_TYPE_KW = {'geometry optimization':'opt', 'frequency calculation':'freq', 'transition state optimization':'opt(ts)', 'single-point energy':'sp'}
 
 KNOWN_NUMERICAL_EXCHANGE = ["B3LYP", "Gaussian's B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D", "B3PW91", "B97-D", "BP86", "PBE0"]
@@ -19,7 +18,8 @@ class Method:
     
     functional              -   Functional object
     basis                   -   BasisSet object
-    constraints             -   list of bond, angle, and/or torsional constraints (atom constraints are managed by AaronTools tags)
+    constraints             -   dictionary of bond, angle, and torsional constraints (keys: atoms, bonds, angles, torsions)
+                                    currently, only atoms and bonds are enabled. bonds are only enabled if structure is an AtomicStructure.
     empirical_dispersion    -   EmpiricalDispersion object
     grid                    -   IntegrationGrid object (should be a 2-long list for Orca, as one is used for SCF and one is used for energy etc)
     
@@ -102,6 +102,23 @@ class Method:
         s += "#n %s" % func
         if not self.functional.is_semiempirical:
             basis_info = self.basis.get_gaussian09_basis_info()
+            basis_elements = self.basis.elements_in_basis
+            #check if any element is in multiple basis sets
+            for element in basis_elements:
+                if basis_elements.count(element) > 1:
+                    warnings.append("%s is in basis set multiple times" % element)
+                    
+            #check to make sure all elements have a basis set
+            if self.structure is not None:
+                if isinstance(self.structure, Geometry):
+                    struc_elements = set([atom.element for atom in self.structure.atoms])
+                elif isinstance(self.structure, AtomicStructure):
+                    struc_elements = set(self.structure.atoms.elements.names)
+                    
+                for ele in struc_elements:
+                    if ele not in basis_elements:
+                        warnings.append("%s has no basis functions" % ele)
+            
             s += "/%s" % basis_info[self.GAUSSIAN_ROUTE]
         
         s += " "
@@ -123,6 +140,8 @@ class Method:
             s += " "
             for option in other_kw_dict[self.GAUSSIAN_ROUTE]:
                 s += option
+                if len(other_kw_dict[self.GAUSSIAN_ROUTE][option]) > 0:
+                    s += "=(%s)" % ",".join(other_kw_dict[self.GAUSSIAN_ROUTE][option])
                 s += " "
         
         s += "\n\n"
@@ -132,22 +151,46 @@ class Method:
         else:
             s += "%s\n" % self.comment
             
-        s += "\n\n"
+        s += "\n"
         
         s += "%i %i\n" % (self.charge, self.multiplicity)
         if self.structure is not None:
-            if isinstance(self.structure, Geometry):
-                for atom in self.structure.atoms:
-                    s += "%-2s %13.6f %13.6f %13.6f\n" % (atom.element, *atom.coords)
-            elif isinstance(self.structure, AtomicStructure):
-                for atom in self.structure.atoms:
-                    s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element.name, *atom.coord)
+            if self.constraints is not None and len(self.constraints['atoms']) > 0:
+                if isinstance(self.structure, Geometry):
+                    for atom in self.structure.atoms:
+                        if atom in self.constraints['atoms']:
+                            flag = -1
+                        else:
+                            flag = 0
+                        s += "%-2s %2i %13.6f %13.6f %13.6f\n" % (atom.element, flag, *atom.coords)
+                elif isinstance(self.structure, AtomicStructure):
+                    for atom in self.structure.atoms:
+                        if atom in self.constraints['atoms']:
+                            flag = -1
+                        else:
+                            flag = 0
+                        s += "%-2s %2i %12.6f %12.6f %12.6f\n" % (atom.element.name, flag, *atom.coord)
+            
+            else:    
+                if isinstance(self.structure, Geometry):
+                    for atom in self.structure.atoms:
+                        s += "%-2s %13.6f %13.6f %13.6f\n" % (atom.element, *atom.coords)
+                elif isinstance(self.structure, AtomicStructure):
+                    for atom in self.structure.atoms:
+                        s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element.name, *atom.coord)
         else:
             s += "None\n"
         
         s += "\n"
         
-        #TODO: constraints
+        if self.constraints is not None:
+            for constraint in self.constraints['bonds']:
+                atom1, atom2 = constraint.atoms
+                ndx1 = self.structure.atoms.index(atom1) + 1
+                ndx2 = self.structure.atoms.index(atom2) + 1
+                s += "B %i %i F\n" % (ndx1, ndx2)
+                
+            s += '\n'
         
         if not self.functional.is_semiempirical:
             if self.GAUSSIAN_GEN_BASIS in basis_info:
@@ -205,7 +248,15 @@ class BasisSet:
     def __init__(self, basis, ecp=None):
         self.basis = basis
         self.ecp = ecp
-        
+
+    @property
+    def elements_in_basis(self):
+        elements = []
+        for basis in self.basis:
+            elements.extend(basis.elements)
+            
+        return elements
+    
     def get_gaussian09_basis_info(self):
         info = {}
         #print([basis for basis in self.basis])
@@ -457,38 +508,38 @@ class ImplicitSolvent:
         
 class IntegrationGrid:
     def __init__(self, name):
-        self.name == name
+        self.name = name
         
     def get_gaussian09(self):
         if self.name == "UltraFine":
-            return ("grid=UltraFine", None)
+            return ("int=(grid=UltraFine)", None)
         elif self.name == "FineGrid":
-            return ("grid=FineGrid", None)
+            return ("int=(grid=FineGrid)", None)
         elif self.name == "SuperFineGrid":
-            return ("grid=SuperFineGrid", None)
+            return ("int=(grid=SuperFineGrid)", None)
             
         #Grids available in Orca but not Gaussian
         #uses n_rad from K-Kr as specified in Orca 4.2.1 manual (section 9.3)
         #XXX: there's probably IOp's that can get closer
         elif self.name == "Grid 2":
             n_rad = 45
-            return ("grid=%i110" % n_rad, "Approximating Orca Grid 2")
+            return ("int=(grid=%i110)" % n_rad, "Approximating Orca Grid 2")
         elif self.name == "Grid 3":
             n_rad = 45
-            return ("grid=%i194" % n_rad, "Approximating Orca Grid 3")
+            return ("int=(grid=%i194)" % n_rad, "Approximating Orca Grid 3")
         elif self.name == "Grid 4":
             n_rad = 45
-            return ("grid=%i302" % n_rad, "Approximating Orca Grid 4")
+            return ("int=(grid=%i302)" % n_rad, "Approximating Orca Grid 4")
         elif self.name == "Grid 5":
             n_rad = 50
-            return ("grid=%i434" % n_rad, "Approximating Orca Grid 5")
+            return ("int=(grid=%i434)" % n_rad, "Approximating Orca Grid 5")
         elif self.name == "Grid 6":
             n_rad = 55
-            return ("grid=%i590" % n_rad, "Approximating Orca Grid 6")
+            return ("int=(grid=%i590)" % n_rad, "Approximating Orca Grid 6")
         elif self.name == "Grid 7":
             n_rad = 60
-            return ("grid=%i770" % n_rad, "Approximating Orca Grid 7")
+            return ("int=(grid=%i770)" % n_rad, "Approximating Orca Grid 7")
             
         else:
-            return ("grid=%s" % self.name, "grid may not be available in Gaussian")
+            return ("int=(grid=%s)" % self.name, "grid may not be available in Gaussian")
         
