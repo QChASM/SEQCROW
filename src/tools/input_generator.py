@@ -521,6 +521,7 @@ class JobTypeOption(QWidget):
                     
                 if self.ts_opt.checkState() == Qt.Checked:
                     route['opt'].append("TS")
+                    route['opt'].append("CalcFC")
                     
             elif self.do_freq.checkState() == Qt.Checked:
                 route['freq'] = []
