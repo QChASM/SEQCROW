@@ -137,7 +137,6 @@ class Method:
             s += " "
         
         if self.GAUSSIAN_ROUTE in other_kw_dict:
-            s += " "
             for option in other_kw_dict[self.GAUSSIAN_ROUTE]:
                 s += option
                 if len(other_kw_dict[self.GAUSSIAN_ROUTE][option]) > 0:
@@ -481,27 +480,212 @@ class EmpiricalDispersion:
             
 
 class ImplicitSolvent:
+    #solvent names look weird, but I'm leaving them this way to make them easier to read 
+    #many look similar (dichloromethane and dichloroethane, etc)
+    KNOWN_GAUSSIAN_SOLVENTS = ["Water", 
+                               "Acetonitrile", 
+                               "Methanol"
+                               "Ethanol", 
+                               "IsoQuinoline", 
+                               "Quinoline", 
+                               "Chloroform", 
+                               "DiethylEther", 
+                               "DichloroMethane", 
+                               "DiChloroEthane", 
+                               "CarbonTetraChloride", 
+                               "Benzene", 
+                               "Toluene", 
+                               "ChloroBenzene", 
+                               "NitroMethane", 
+                               "Heptane", 
+                               "CycloHexane", 
+                               "Aniline", 
+                               "Acetone", 
+                               "TetraHydroFuran", 
+                               "DiMethylSulfoxide", 
+                               "Argon", 
+                               "Krypton", 
+                               "Xenon", 
+                               "n-Octanol", 
+                               "1,1,1-TriChloroEthane", 
+                               "1,1,2-TriChloroEthane", 
+                               "1,2,4-TriMethylBenzene", 
+                               "1,2-DiBromoEthane", 
+                               "1,2-EthaneDiol", 
+                               "1,4-Dioxane", 
+                               "1-Bromo-2-MethylPropane", 
+                               "1-BromoOctane", 
+                               "1-BromoPentane", 
+                               "1-BromoPropane", 
+                               "1-Butanol", 
+                               "1-ChloroHexane", 
+                               "1-ChloroPentane", 
+                               "1-ChloroPropane", 
+                               "1-Decanol", 
+                               "1-FluoroOctane", 
+                               "1-Heptanol", 
+                               "1-Hexanol", 
+                               "1-Hexene", 
+                               "1-Hexyne", 
+                               "1-IodoButane", 
+                               "1-IodoHexaDecane", 
+                               "1-IodoPentane", 
+                               "1-IodoPropane", 
+                               "1-NitroPropane", 
+                               "1-Nonanol", 
+                               "1-Pentanol", 
+                               "1-Pentene", 
+                               "1-Propanol", 
+                               "2,2,2-TriFluoroEthanol", 
+                               "2,2,4-TriMethylPentane", 
+                               "2,4-DiMethylPentane", 
+                               "2,4-DiMethylPyridine", 
+                               "2,6-DiMethylPyridine", 
+                               "2-BromoPropane", 
+                               "2-Butanol", 
+                               "2-ChloroButane", 
+                               "2-Heptanone", 
+                               "2-Hexanone", 
+                               "2-MethoxyEthanol", 
+                               "2-Methyl-1-Propanol", 
+                               "2-Methyl-2-Propanol", 
+                               "2-MethylPentane", 
+                               "2-MethylPyridine", 
+                               "2-NitroPropane", 
+                               "2-Octanone", 
+                               "2-Pentanone", 
+                               "2-Propanol", 
+                               "2-Propen-1-ol", 
+                               "3-MethylPyridine", 
+                               "3-Pentanone", 
+                               "4-Heptanone", 
+                               "4-Methyl-2-Pentanone", 
+                               "4-MethylPyridine", 
+                               "5-Nonanone", 
+                               "AceticAcid", 
+                               "AcetoPhenone", 
+                               "a-ChloroToluene", 
+                               "Anisole", 
+                               "Benzaldehyde", 
+                               "BenzoNitrile", 
+                               "BenzylAlcohol", 
+                               "BromoBenzene", 
+                               "BromoEthane", 
+                               "Bromoform", 
+                               "Butanal", 
+                               "ButanoicAcid", 
+                               "Butanone", 
+                               "ButanoNitrile", 
+                               "ButylAmine", 
+                               "ButylEthanoate", 
+                               "CarbonDiSulfide", 
+                               "Cis-1,2-DiMethylCycloHexane", 
+                               "Cis-Decalin", 
+                               "CycloHexanone", 
+                               "CycloPentane", 
+                               "CycloPentanol", 
+                               "CycloPentanone", 
+                               "Decalin-mixture", 
+                               "DiBromomEthane", 
+                               "DiButylEther", 
+                               "DiEthylAmine", 
+                               "DiEthylSulfide", 
+                               "DiIodoMethane", 
+                               "DiIsoPropylEther", 
+                               "DiMethylDiSulfide", 
+                               "DiPhenylEther", 
+                               "DiPropylAmine", 
+                               "E-1,2-DiChloroEthene", 
+                               "E-2-Pentene", 
+                               "EthaneThiol", 
+                               "EthylBenzene", 
+                               "EthylEthanoate", 
+                               "EthylMethanoate", 
+                               "EthylPhenylEther", 
+                               "FluoroBenzene", 
+                               "Formamide", 
+                               "FormicAcid", 
+                               "HexanoicAcid", 
+                               "IodoBenzene", 
+                               "IodoEthane", 
+                               "IodoMethane", 
+                               "IsoPropylBenzene", 
+                               "m-Cresol", 
+                               "Mesitylene", 
+                               "MethylBenzoate", 
+                               "MethylButanoate", 
+                               "MethylCycloHexane", 
+                               "MethylEthanoate", 
+                               "MethylMethanoate", 
+                               "MethylPropanoate", 
+                               "m-Xylene", 
+                               "n-ButylBenzene", 
+                               "n-Decane", 
+                               "n-Dodecane", 
+                               "n-Hexadecane", 
+                               "n-Hexane", 
+                               "NitroBenzene", 
+                               "NitroEthane", 
+                               "n-MethylAniline", 
+                               "n-MethylFormamide-mixture", 
+                               "n,n-DiMethylAcetamide", 
+                               "n,n-DiMethylFormamide", 
+                               "n-Nonane", 
+                               "n-Octane", 
+                               "n-Pentadecane", 
+                               "n-Pentane", 
+                               "n-Undecane", 
+                               "o-ChloroToluene", 
+                               "o-Cresol", 
+                               "o-DiChloroBenzene", 
+                               "o-NitroToluene", 
+                               "o-Xylene", 
+                               "Pentanal", 
+                               "PentanoicAcid", 
+                               "PentylAmine", 
+                               "PentylEthanoate", 
+                               "PerFluoroBenzene", 
+                               "p-IsoPropylToluene", 
+                               "Propanal", 
+                               "PropanoicAcid", 
+                               "PropanoNitrile", 
+                               "PropylAmine", 
+                               "PropylEthanoate", 
+                               "p-Xylene", 
+                               "Pyridine", 
+                               "sec-ButylBenzene", 
+                               "tert-ButylBenzene", 
+                               "TetraChloroEthene", 
+                               "TetraHydroThiophene-s,s-dioxide", 
+                               "Tetralin", 
+                               "Thiophene", 
+                               "Thiophenol", 
+                               "trans-Decalin", 
+                               "TriButylPhosphate", 
+                               "TriChloroEthene", 
+                               "TriEthylAmine", 
+                               "Xylene-mixture", 
+                               "Z-1,2-DiChloroEthene"]
+
     def __init__(self, name, solvent):
         self.name = name
         self.solvent = solvent
         
     def get_gaussian09(self):
         warning = None
-        s = "scrf("
+        s = "scrf=("
         if self.name == "Polarizable Continuum Model":
             s += "PCM, "
         elif self.name == "Continuum Solvent with Solute Electron Density":
             s += "SMD, "
-        
-        #available in Orca but not Gaussian
+        #I think this is CPCM...
         elif self.name == "Conductor-like PCM":
-            s += "PCM, "
-            warning = "C-PCM is not available in Gaussian, switching to PCM"
+            s += "CPCM, "
             
         else:
             s += "%s, " % self.name
             
-        s += "%s)" % self.solvent
+        s += "solvent=%s)" % self.solvent
             
         return (s, warning)
         

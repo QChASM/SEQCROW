@@ -44,6 +44,8 @@ class _InputGeneratorSettings(Settings):
         'previous_grid': Value("Default", StringArg),
         'previous_charge': Value(0, IntArg), 
         'previous_mult': Value(1, IntArg), 
+        'previous_gaussian_solvent_model': Value("None", StringArg), 
+        'previous_gaussian_solvent_name': Value("", StringArg), 
     }
 
 
@@ -205,6 +207,7 @@ class BuildQM(ToolInstance):
         self.update_theory()
         
         kw_dict = self.job_widget.getKWDict()
+        self.settings.save()
         
         output, warnings = self.theory.write_gaussian_input(kw_dict)
         
@@ -221,7 +224,8 @@ class BuildQM(ToolInstance):
         self.update_theory()
         
         kw_dict = self.job_widget.getKWDict()
-        
+        self.settings.save()
+
         output, warnings = self.theory.write_gaussian_input(kw_dict)
         
         for warning in warnings:
@@ -360,6 +364,45 @@ class JobTypeOption(QWidget):
 
         self.job_type_opts.addTab(self.freq_opt, "frequency settings")
         
+        solvent_widget = QWidget()
+        solvent_layout = QGridLayout(solvent_widget)
+        
+        solvent_form = QWidget()
+        solvent_form_layout = QFormLayout(solvent_form)
+        
+        self.solvent_option = QComboBox()
+        self.solvent_option.addItems(["None", "PCM", "SMD", "CPCM", "Dipole", "IPCM", "SCIPCM"])
+        #TODO: move to setOptions
+        ndx = self.solvent_option.findText(self.settings.previous_gaussian_solvent_model)
+        if ndx >= 0:
+            self.solvent_option.setCurrentIndex(ndx)
+        self.solvent_option.currentTextChanged.connect(self.change_solvent_model)
+        solvent_form_layout.addRow("implicit solvent model:", self.solvent_option)
+        
+        self.solvent_name_label = QLabel("solvent:")
+        self.solvent_name = QLineEdit()
+        #TODO: move to setOptions
+        self.solvent_name.setText(self.settings.previous_gaussian_solvent_name)
+        self.solvent_name.textChanged.connect(self.filter_solvents)
+        self.solvent_name.setClearButtonEnabled(True)
+        solvent_form_layout.addRow(self.solvent_name_label, self.solvent_name)
+        self.solvent_name_label.setVisible(self.solvent_option.currentText() != "None")
+        self.solvent_name.setVisible(self.solvent_option.currentText() != "None")
+        
+        solvent_layout.addWidget(solvent_form, 0, 0, Qt.AlignTop)
+        
+        self.solvent_names = QListWidget()
+        self.solvent_names.setSelectionMode(self.solvent_names.SingleSelection)
+        self.solvent_names.itemSelectionChanged.connect(self.change_selected_solvent)
+        #TODO: move to setOptions
+        self.solvent_names.addItems(ImplicitSolvent.KNOWN_GAUSSIAN_SOLVENTS)
+        self.solvent_names.sortItems()
+        self.solvent_names.setVisible(self.solvent_option.currentText() != "None")
+        
+        solvent_layout.addWidget(self.solvent_names)
+        
+        self.job_type_opts.addTab(solvent_widget, "solvent options")
+        
         self.layout.addWidget(self.job_type_opts, 1, 0, Qt.AlignTop)
 
         self.layout.setRowStretch(0, 0)
@@ -372,7 +415,43 @@ class JobTypeOption(QWidget):
     def setOptions(self, program):
         #do this when other programs are supported
         pass
+    
+    def change_selected_solvent(self):
+        item = self.solvent_names.selectedItems()
+        if len(item) == 1:
+            name = item[0].text()
+            self.solvent_name.setText(name)
+    
+    def filter_solvents(self, text):
+        if text:
+            #the user doesn't need capturing groups
+            text = text.replace('(', '\(')
+            text = text.replace(')', '\)')
+            m = QRegularExpression(text)
+            if m.isValid():
+                m.setPatternOptions(QRegularExpression.CaseInsensitiveOption)
+                
+                m.optimize()
+                filter = lambda row_num: m.match(self.solvent_names.item(row_num).text()).hasMatch()
+            else:
+                return
         
+        else:
+            filter = lambda row: True
+            
+        for i in range(0, self.solvent_names.count()):
+            self.solvent_names.setRowHidden(i, not filter(i))        
+          
+    def change_solvent_model(self):
+        if self.solvent_option.currentText() != "None":
+            self.solvent_name_label.setVisible(True)
+            self.solvent_name.setVisible(True)
+            self.solvent_names.setVisible(True)
+        else:
+            self.solvent_name_label.setVisible(False)
+            self.solvent_name.setVisible(False)
+            self.solvent_names.setVisible(False)            
+    
     def change_job_type(self, *args):
         self.job_type_opts.setTabEnabled(0, self.do_geom_opt.checkState() == Qt.Checked)
         self.job_type_opts.setTabEnabled(1, self.do_freq.checkState() == Qt.Checked)
@@ -455,6 +534,18 @@ class JobTypeOption(QWidget):
                     
                 if self.hpmodes.checkState() == Qt.Checked:
                     route['freq'].append('hpmodes')
+                    
+            if self.solvent_option.currentText() != "None":
+                solvent_scrf = self.solvent_option.currentText()
+                self.settings.previous_gaussian_solvent_model = solvent_scrf
+                route['scrf'] = [solvent_scrf]
+                
+                solvent_name = self.solvent_name.text()
+                self.settings.previous_gaussian_solvent_name = solvent_name
+                route['scrf'].append("solvent=%s" % solvent_name)
+                
+            else:
+                self.settings.previous_gaussian_solvent_model = "None"
                     
             return {Method.GAUSSIAN_ROUTE:route}
                 
