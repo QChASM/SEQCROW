@@ -9,9 +9,11 @@ from chimerax.core.models import ADD_MODELS, REMOVE_MODELS
 from PyQt5.Qt import QClipboard, QStyle, QIcon
 from PyQt5.QtCore import Qt, QRegularExpression
 from PyQt5.QtGui import QKeySequence, QFontMetrics
-from PyQt5.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, QHBoxLayout, QToolBox, QFormLayout, QDoubleSpinBox
+from PyQt5.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, \
+                            QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, \
+                            QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, \
+                            QHBoxLayout, QFormLayout, QDoubleSpinBox
 from SEQCROW.residue_collection import ResidueCollection
-from SEQCROW.tools.theory_literature import LiteratureBrowser
 from SEQCROW.theory import *
 #TODO: rename tuple2str to iter2str
 from SEQCROW.settings import tuple2str
@@ -40,6 +42,8 @@ class _InputGeneratorSettings(Settings):
         'previous_functional_needs_basis': Value([], ListOf(BoolArg), tuple2str),
         'previous_dispersion': Value("None", StringArg),
         'previous_grid': Value("Default", StringArg),
+        'previous_charge': Value(0, IntArg), 
+        'previous_mult': Value(1, IntArg), 
     }
 
 
@@ -166,12 +170,12 @@ class BuildQM(ToolInstance):
         func = self.functional_widget.getFunctional()        
         basis = self.get_basis_set()
         dispersion = self.functional_widget.getDispersion()
-        grid = self.functional_widget.getGrid()
-        
-        self.settings.save()
-        
+        grid = self.functional_widget.getGrid()      
         charge = self.job_widget.getCharge()
         mult = self.job_widget.getMultiplicity()
+
+        self.settings.save()
+
         constraints = self.job_widget.getConstraints()
         
         self.theory = Method(structure=model, charge=charge, multiplicity=mult, \
@@ -179,18 +183,8 @@ class BuildQM(ToolInstance):
                              grid=grid, constraints=constraints)
 
     def change_job_type(self):
-        if self.file_type.currentText() == "Gaussian":
-            if self.job_type.currentText() in KNOWN_GAUSSIAN_JOB_TYPES:
-                self.other_kw_dict[Method.GAUSSIAN_ROUTE].append(GAUSSIAN_JOB_TYPE_KW[self.job_type.currentText()])
-                self.other_kw_dict[Method.GAUSSIAN_ROUTE] = [option for option in self.other_kw_dict[Method.GAUSSIAN_ROUTE] \
-                                                                    if option not in GAUSSIAN_JOB_TYPE_KW.items() or \
-                                                                    option == GAUSSIAN_JOB_TYPE_KW[self.job_type.currentText()]]
-                    
-            else:  
-                self.other_kw_dict[Method.GAUSSIAN_ROUTE].append(GAUSSIAN_JOB_TYPE_KW['single-point energy'])
-                self.other_kw_dict[Method.GAUSSIAN_ROUTE] = [option for option in self.other_kw_dict[Method.GAUSSIAN_ROUTE] \
-                                                                    if option not in GAUSSIAN_JOB_TYPE_KW.items() or \
-                                                                    option == GAUSSIAN_JOB_TYPE_KW['single-point energy']]
+        #implement later
+        pass
     
     def change_model(self, index):
         if index == -1:
@@ -246,10 +240,14 @@ class BuildQM(ToolInstance):
         self.session.triggers.remove_handler(self._remove_handler)
         super().delete()  
 
+    def display_help(self):
+        """Show the help for this tool in the help viewer."""
+        from chimerax.core.commands import run
+        run(self.session,
+            'open %s' % self.help if self.help is not None else "")
+    
 
 class JobTypeOption(QWidget):
-    KNOWN_GAUSSIAN_JOB_TYPES = ['geometry optimization', 'frequency calculation', 'single-point energy']
-
     def __init__(self, settings, session, init_form, parent=None):
         super().__init__(parent)
         
@@ -268,24 +266,33 @@ class JobTypeOption(QWidget):
         self.charge = QSpinBox()
         self.charge.setRange(-5, 5)
         self.charge.setSingleStep(1)
+        self.charge.setValue(self.settings.previous_charge)
         
         job_type_layout.addRow("charge:", self.charge)
                 
         self.multiplicity = QSpinBox()
         self.multiplicity.setRange(1, 3)
         self.multiplicity.setSingleStep(1)
+        self.multiplicity.setValue(self.settings.previous_mult)
         
         job_type_layout.addRow("multiplicity:", self.multiplicity)
         
-        self.job_type_option = QComboBox()
-        self.job_type_option.currentTextChanged.connect(self.change_job_type)
+        self.do_geom_opt = QCheckBox()
+        self.do_geom_opt.stateChanged.connect(self.change_job_type)
+        job_type_layout.addRow("geometry optimization:", self.do_geom_opt)
         
-        job_type_layout.addRow("job type:", self.job_type_option)
+        self.do_freq = QCheckBox()
+        self.do_freq.stateChanged.connect(self.change_job_type)
+        job_type_layout.addRow("frequency calculation:", self.do_freq)
         
         self.layout.addWidget(job_form, 0, 0, Qt.AlignTop)
         
+        self.job_type_opts = QTabWidget()
+        
         self.geom_opt = QWidget()
-        geom_opt_form = QFormLayout(self.geom_opt)
+        geom_opt_layout = QGridLayout(self.geom_opt)
+        geom_opt_form_widget = QWidget()
+        geom_opt_form = QFormLayout(geom_opt_form_widget)
         
         self.ts_opt = QCheckBox()
         geom_opt_form.addRow("transition state structure:", self.ts_opt)
@@ -294,7 +301,41 @@ class JobTypeOption(QWidget):
         self.use_contraints.stateChanged.connect(self.show_contraints)
         geom_opt_form.addRow("constrained:", self.use_contraints)
         
-        self.layout.addWidget(self.geom_opt, 1, 0, Qt.AlignTop)
+        self.constraints_widget = QWidget()
+        constraints_layout = QGridLayout(self.constraints_widget)
+        
+        geom_opt_layout.addWidget(geom_opt_form_widget, 0, 0, Qt.AlignTop)
+        
+        freeze_atoms = QPushButton("constrain selected atoms")
+        freeze_atoms.clicked.connect(self.constrain_atoms)
+        constraints_layout.addWidget(freeze_atoms, 0, 0, Qt.AlignTop)
+        
+        freeze_bonds = QPushButton("constrain selected bonds")
+        freeze_bonds.clicked.connect(self.constrain_bonds)
+        constraints_layout.addWidget(freeze_bonds, 0, 1, Qt.AlignTop)
+        
+        constraints_viewer = QTabWidget()
+                
+        self.constrained_atom_table = QTableWidget()
+        self.constrained_atom_table.setColumnCount(1)
+        self.constrained_atom_table.setHorizontalHeaderLabels(["atom"])
+        self.constrained_bond_table = QTableWidget()
+        self.constrained_bond_table.setColumnCount(2)
+        self.constrained_bond_table.setHorizontalHeaderLabels(["atom 1", "atom 2"])
+        
+        constraints_viewer.addTab(self.constrained_atom_table, "atoms")
+        constraints_viewer.addTab(self.constrained_bond_table, "bonds")
+        
+        constraints_layout.addWidget(constraints_viewer, 1, 0, 1, 2, Qt.AlignTop)
+
+        constraints_layout.setRowStretch(0, 0)
+        constraints_layout.setRowStretch(1, 1)
+        
+        self.constraints_widget.setVisible(self.use_contraints.checkState() == Qt.Checked)
+
+        geom_opt_layout.addWidget(self.constraints_widget, 1, 0, Qt.AlignTop)
+        
+        self.job_type_opts.addTab(self.geom_opt, "optimization settings")
         
         self.freq_opt = QWidget()
         freq_opt_form = QFormLayout(self.freq_opt)
@@ -317,85 +358,37 @@ class JobTypeOption(QWidget):
         self.raman.setToolTip("ask Gaussian to compute Raman scattering intensities")
         freq_opt_form.addRow("Raman intensities:", self.raman)
 
-        self.layout.addWidget(self.freq_opt, 1, 0, Qt.AlignTop)
+        self.job_type_opts.addTab(self.freq_opt, "frequency settings")
         
-        self.constraints_widget = QWidget()
-        constraints_layout = QGridLayout(self.constraints_widget)
-        
-        freeze_atoms = QPushButton("constrain selected atoms")
-        freeze_atoms.clicked.connect(self.constrain_atoms)
-        constraints_layout.addWidget(freeze_atoms, 0, 1, 1, 1, Qt.AlignTop)
-        
-        freeze_bonds = QPushButton("constrain selected bonds")
-        freeze_bonds.clicked.connect(self.constrain_bonds)
-        constraints_layout.addWidget(freeze_bonds, 1, 1, 1, 1, Qt.AlignTop)
-        
-        constraints_viewer = QTabWidget()
-                
-        self.constrained_atom_table = QTableWidget()
-        self.constrained_atom_table.setColumnCount(1)
-        self.constrained_atom_table.setHorizontalHeaderLabels(["atom"])
-        self.constrained_bond_table = QTableWidget()
-        self.constrained_bond_table.setColumnCount(2)
-        self.constrained_bond_table.setHorizontalHeaderLabels(["atom 1", "atom 2"])
-        
-        constraints_viewer.addTab(self.constrained_atom_table, "atoms")
-        constraints_viewer.addTab(self.constrained_bond_table, "bonds")
-        
-        constraints_layout.addWidget(constraints_viewer, 0, 0, 2, 1, Qt.AlignTop)
-
-        constraints_layout.setRowStretch(0, 0)
-        constraints_layout.setRowStretch(1, 1)
-
-        self.layout.addWidget(self.constraints_widget, 2, 0, Qt.AlignTop)
-
-        self.constraints_widget.setVisible(self.use_contraints.checkState() == Qt.Checked)
+        self.layout.addWidget(self.job_type_opts, 1, 0, Qt.AlignTop)
 
         self.layout.setRowStretch(0, 0)
         self.layout.setRowStretch(1, 1)
-        self.layout.setRowStretch(2, 0)
 
         self.setOptions(self.form)
         
+        self.change_job_type()
+        
     def setOptions(self, program):
         #do this when other programs are supported
-        self.job_type_option.clear()
+        pass
         
-        self.job_type_option.addItems(self.KNOWN_GAUSSIAN_JOB_TYPES)
-
-    def change_job_type(self, job_type):
-        if job_type == "frequency calculation":
-            self.freq_opt.setVisible(True)
-            self.geom_opt.setVisible(False)
-            self.constraints_widget.setVisible(False)
-            self.layout.setRowStretch(0, 0)
-            self.layout.setRowStretch(1, 1)
-            self.layout.setRowStretch(2, 0)
-            
-        elif job_type == "geometry optimization":
-            self.freq_opt.setVisible(False)
-            self.geom_opt.setVisible(True)
-            self.constraints_widget.setVisible(self.use_contraints.checkState() == Qt.Checked)
-            self.layout.setRowStretch(0, 0)
-            self.layout.setRowStretch(1, int(self.use_contraints.checkState() != Qt.Checked))
-            self.layout.setRowStretch(2, int(self.use_contraints.checkState() == Qt.Checked))
-        
-        else:
-            self.freq_opt.setVisible(False)
-            self.geom_opt.setVisible(False)
-            self.constraints_widget.setVisible(False)
-            self.layout.setRowStretch(0, 0)
-            self.layout.setRowStretch(1, 1)
-            self.layout.setRowStretch(2, 0)
+    def change_job_type(self, *args):
+        self.job_type_opts.setTabEnabled(0, self.do_geom_opt.checkState() == Qt.Checked)
+        self.job_type_opts.setTabEnabled(1, self.do_freq.checkState() == Qt.Checked)
           
     def show_contraints(self, value):
         self.constraints_widget.setVisible(bool(value))
         
     def getCharge(self):
-        return self.charge.value()
+        charge = self.charge.value()
+        self.settings.previous_charge = charge
+        return charge
         
     def getMultiplicity(self):
-        return self.multiplicity.value()
+        mult = self.multiplicity.value()
+        self.settings.previous_mult = mult
+        return mult
 
     def setStructure(self, structure):
         self.structure = structure
@@ -408,7 +401,6 @@ class JobTypeOption(QWidget):
         for atom in self.constrained_atoms:
             row = self.constrained_atom_table.rowCount()
             self.constrained_atom_table.insertRow(row)
-            print("adding row", row, atom.atomspec)
             item = QTableWidgetItem()
             item.setData(Qt.DisplayRole, atom.atomspec)
             self.constrained_atom_table.setItem(row, 0, item)
@@ -430,7 +422,7 @@ class JobTypeOption(QWidget):
             self.constrained_bond_table.setItem(row, 1, item2)
 
     def getConstraints(self):
-        if self.job_type_option.currentText() != "geometry optimization":
+        if self.do_geom_opt.checkState() != Qt.Checked:
             return None
             
         elif self.use_contraints.checkState() == Qt.Unchecked:
@@ -442,7 +434,7 @@ class JobTypeOption(QWidget):
     def getKWDict(self):
         if self.form == "Gaussian":
             route = {}
-            if self.job_type_option.currentText() == "geometry optimization":
+            if self.do_geom_opt.checkState() == Qt.Checked:
                 route['opt'] = []
                 if self.use_contraints.checkState() == Qt.Checked:
                     if len(self.constrained_atoms + self.constrained_bonds) > 0:
@@ -451,7 +443,7 @@ class JobTypeOption(QWidget):
                 if self.ts_opt.checkState() == Qt.Checked:
                     route['opt'].append("TS")
                     
-            elif self.job_type_option.currentText() == "frequency calculation":
+            elif self.do_freq.checkState() == Qt.Checked:
                 route['freq'] = []
                 temp = self.temp.value()
                 route['freq'].append("temperature=%.2f" % temp)

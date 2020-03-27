@@ -2,6 +2,7 @@ from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
+from chimerax.core.commands import run
 from chimerax.core.commands.cli import FloatArg, BoolArg
 from chimerax.core.models import ADD_MODELS
 
@@ -11,7 +12,6 @@ from PyQt5.QtGui import QKeySequence
 from PyQt5.QtWidgets import QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, QDoubleSpinBox, QMenuBar, QFileDialog, QAction, QApplication
 
 from SEQCROW.managers.filereader_manager import FILEREADER_CHANGE 
-from SEQCROW.tools.theory_literature import LiteratureBrowser
 
 from AaronTools.comp_output import CompOutput
 
@@ -323,8 +323,7 @@ class Thermochem(ToolInstance):
         
     def open_link(self, theory):
         link = self.theory_helper[theory]
-        title = "%s (%s)" % (theory, link)
-        self.tool_window.create_child_window(title, window_class=LiteratureBrowser, url=link)
+        run(self.session, "open %s" % link)
         
     def save_csv(self):
         filename, _ = QFileDialog.getSaveFileName(filter="CSV Files (*.csv)")
@@ -532,7 +531,13 @@ class Thermochem(ToolInstance):
             self.rrho_g_sum_line.setText("%.6f" % rrho_g)
             self.qrrho_g_sum_line.setText("%.6f" % qrrho_g)
             self.qharm_g_sum_line.setText("%.6f" % qharm_g)
-        
+    
+    def display_help(self):
+        """Show the help for this tool in the help viewer."""
+        from chimerax.core.commands import run
+        run(self.session,
+            'open %s' % self.help if self.help is not None else "")
+            
     def delete(self):
         #overload delete ro de-register handler
         self.session.triggers.remove_handler(self._add_handler)

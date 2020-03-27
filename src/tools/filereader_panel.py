@@ -1,10 +1,10 @@
 import numpy as np
 
 from chimerax.atomic import selected_atoms, selected_residues
+from chimerax.core.commands import run
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow
 from chimerax.core.models import MODEL_ID_CHANGED, MODEL_NAME_CHANGED, ADD_MODELS
-from chimerax.std_commands.coordset_gui import CoordinateSetSlider
         
 from io import BytesIO
 
@@ -175,8 +175,14 @@ class FileReaderPanel(ToolInstance):
         models = list(model_dict.keys())
         for ndx in ndxs:
             mdl = models[ndx]
-            CoordinateSetSlider(self.session, mdl)
-
+            run(self.session, "coordset slider %s" % mdl.atomspec)
+    
+    def display_help(self):
+        """Show the help for this tool in the help viewer."""
+        from chimerax.core.commands import run
+        run(self.session,
+            'open %s' % self.help if self.help is not None else "")
+    
     def delete(self):
         """overload delete"""
         self.session.filereader_manager.triggers.remove_handler(self._fr_change)

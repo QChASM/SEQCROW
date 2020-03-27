@@ -221,6 +221,11 @@ class AaronTools_Library(ToolInstance):
             
                 self.session.models.add(bild_obj, parent=chimera_ring)
     
+    def display_help(self):
+        """Show the help for this tool in the help viewer."""
+        from chimerax.core.commands import run
+        run(self.session,
+            'open %s' % self.help if self.help is not None else "")
     
 def key_atom_highlight(ligand, color, session):
     """returns a bild object with spheres on top on ligand's key atoms"""

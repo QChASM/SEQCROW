@@ -298,7 +298,13 @@ class LibAdd(ToolInstance):
             else:
                 sub.write(outfile=filename)
                 self.tool_window.status("%s added to substituent library" % sub_name)
-
+    
+    def display_help(self):
+        """Show the help for this tool in the help viewer."""
+        from chimerax.core.commands import run
+        run(self.session,
+            'open %s' % self.help if self.help is not None else "")
+    
 def check_aaronlib_dir():
     aaronlib = os.getenv("AARONLIB", False)
     if not aaronlib:

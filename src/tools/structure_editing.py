@@ -348,6 +348,12 @@ class EditStructure(ToolInstance):
     def open_ring_selector(self):
         self.tool_window.create_child_window("select rings", window_class=RingSelection, textBox=self.ringname)
     
+    def display_help(self):
+        """Show the help for this tool in the help viewer."""
+        from chimerax.core.commands import run
+        run(self.session,
+            'open %s' % self.help if self.help is not None else "")
+    
     
 class SubstituentSelection(ChildToolWindow):
     def __init__(self, tool_instance, title, textBox=None, **kwargs):

@@ -336,6 +336,12 @@ class NormalModes(ToolInstance):
         model.seqcrow_freq_slider = CoordinateSetSlider(self.session, model)
         model.seqcrow_freq_slider.play_cb()
 
+    def display_help(self):
+        """Show the help for this tool in the help viewer."""
+        from chimerax.core.commands import run
+        run(self.session,
+            'open %s' % self.help if self.help is not None else "")
+    
     def delete(self):
         """overload delete"""
         self.session.triggers.remove_handler(self._add_handler)

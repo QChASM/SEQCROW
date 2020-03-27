@@ -282,7 +282,13 @@ class EnergyPlot(ToolInstance):
             
             self.drag_prev = event.x, event.y, event.xdata, event.ydata
             self.move(dx, dy)
-            
+
+    def display_help(self):
+        """Show the help for this tool in the help viewer."""
+        from chimerax.core.commands import run
+        run(self.session,
+            'open %s' % self.help if self.help is not None else "")
+
     def check_closed_models(self, name, models):
         if self.structure in models:
             self.delete()
