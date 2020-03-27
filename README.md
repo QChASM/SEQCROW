@@ -7,7 +7,7 @@ These tools enable users to rapidly modify several structures simultaneously, pr
 ## Installation
 1. Download <a href="https://github.com/QChASM/ChimAARON/raw/dev/dist/SEQCROW-0.1-py3-none-any.whl" target="_blank">SEQCROW-0.1-py3-none-any.whl</a>
 2. Open ChimeraX
-3. On the command line, enter `toolshed install /path/to/SEQCROW-0.1-py3-none-any.whl`
+3. On the ChimeraX command line, enter `toolshed install /path/to/SEQCROW-0.1-py3-none-any.whl`
 4. Download [AaronTools.py](https://github.com/QChASM/AaronTools.py/archive/master.zip) and save it in the directory where ChimeraX installed SEQCROW
    * To find where ChimeraX installed SEQCROW, open the python notebook in ChimeraX (Tools &rarr; General &rarr; Shell)
    * Enter the following in the notebook:
