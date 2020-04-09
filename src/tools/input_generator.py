@@ -197,6 +197,17 @@ class BuildQM(ToolInstance):
         elements = set(mdl.atoms.elements.names)
         self.basis_widget.setElements(elements)
         self.job_widget.setStructure(mdl)
+        
+        if mdl in self.session.filereader_manager.filereader_dict:
+            fr = self.session.filereader_manager.filereader_dict[mdl]
+            if 'charge' in fr.other:
+                self.job_widget.setCharge(fr.other['charge'])
+           
+            if 'multiplicity' in fr.other:
+                self.job_widget.setMultiplicity(fr.other['multiplicity'])
+                
+            if 'temperature' in fr.other:
+                self.job_widget.setTemperature(fr.other['temperature'])
     
     def get_basis_set(self):
         basis, ecp = self.basis_widget.get_basis()
@@ -463,11 +474,20 @@ class JobTypeOption(QWidget):
         charge = self.charge.value()
         self.settings.previous_charge = charge
         return charge
+
+    def setCharge(self, value):
+        self.charge.setValue(value)
         
     def getMultiplicity(self):
         mult = self.multiplicity.value()
         self.settings.previous_mult = mult
         return mult
+
+    def setMultiplicity(self, value):
+        self.multiplicity.setValue(value)
+        
+    def setTemperature(self, value):
+        self.temp.setValue(value)
 
     def setStructure(self, structure):
         self.structure = structure
