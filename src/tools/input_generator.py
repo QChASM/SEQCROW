@@ -1661,7 +1661,7 @@ class KeywordWidget(QWidget):
             self.keyword_layout.addWidget(new_kw_widget, 1, 0, 1, 2)
             
 
-            self.option_groupbox = QGroupBox("option")
+            self.option_groupbox = QGroupBox("options")
             option_layout = QGridLayout(self.option_groupbox)
             route_layout.addWidget(self.option_groupbox, 0, 1)
             
@@ -1728,7 +1728,7 @@ class KeywordWidget(QWidget):
             trash_button.setMaximumSize(16, 16)
             trash_button.setScaledContents(False)
             trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(16, 16))
-            trash_button.setToolTip("double click to remove from stored keyword")
+            trash_button.setToolTip("double click to remove from stored keywords")
             widget_layout.addWidget(trash_button)
             self.previous_kw_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
         
@@ -1941,7 +1941,7 @@ class KeywordWidget(QWidget):
                 if key == Method.GAUSSIAN_ROUTE:
                     for kw in self.gaussian_widget.last_dict[key].keys():
                         if kw not in self.gaussian_widget.previous_dict[key].keys():
-                            self.gaussian_widget.previous_dict[key] = []
+                            self.gaussian_widget.previous_dict[key][kw] = []
                             
                         for opt in self.gaussian_widget.last_dict[key][kw]:
                             if opt not in self.gaussian_widget.previous_dict[key][kw]:

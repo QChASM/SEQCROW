@@ -195,7 +195,7 @@ class Method:
             if self.GAUSSIAN_GEN_BASIS in basis_info:
                 s += basis_info[self.GAUSSIAN_GEN_BASIS]
             
-            s += "\n"
+                s += "\n"
             
             if self.GAUSSIAN_GEN_ECP in basis_info:
                 s += basis_info[self.GAUSSIAN_GEN_ECP]
@@ -204,8 +204,10 @@ class Method:
             for key in other_kw_dict[self.GAUSSIAN_POST]:
                 s += other_kw_dict[self.GAUSSIAN_POST][key]
                 s += " "
+                
+            s += '\n'
         
-        s += '\n\n\n'
+        s += '\n\n'
         
         if fname is not None:
             with open(fname, "w") as f:
