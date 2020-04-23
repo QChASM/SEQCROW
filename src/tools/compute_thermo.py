@@ -9,7 +9,7 @@ from chimerax.core.models import ADD_MODELS
 from PyQt5.Qt import QClipboard
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QKeySequence
-from PyQt5.QtWidgets import QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, QDoubleSpinBox, QMenuBar, QFileDialog, QAction, QApplication
+from PyQt5.QtWidgets import QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, QDoubleSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QWidget
 
 from SEQCROW.managers.filereader_manager import FILEREADER_CHANGE 
 
@@ -51,8 +51,8 @@ class Thermochem(ToolInstance):
         self._remove_handler = self.session.filereader_manager.triggers.add_handler(FILEREADER_CHANGE, self.refresh_models)
 
     def _build_ui(self):
-        #TODO:
-        #use QFormLayout for this stuff - labels are positioned better relative to lineedits
+        #each group has an empty widget at the bottom so they resize the way I want while also having the
+        #labels where I want them
         layout = QGridLayout()
 
         #box for sp
@@ -67,19 +67,22 @@ class Thermochem(ToolInstance):
         self.sp_layout.addWidget(self.sp_selector, 0, 1, 1, 2, Qt.AlignTop)
         
         nrg_label = QLabel("E =")
-        self.sp_layout.addWidget(nrg_label, 1, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        self.sp_layout.addWidget(nrg_label, 1, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
         
         self.sp_nrg_line = QLineEdit()
         self.sp_nrg_line.setReadOnly(True)
         self.sp_nrg_line.setToolTip("electronic energy")
         self.sp_layout.addWidget(self.sp_nrg_line, 1, 1, 1, 1, Qt.AlignTop)
         
-        self.sp_layout.addWidget(QLabel("E<sub>h</sub>"), 1, 2, 1, 1, Qt.AlignTop)
+        self.sp_layout.addWidget(QLabel("E<sub>h</sub>"), 1, 2, 1, 1, Qt.AlignVCenter)
+        
+        self.sp_layout.addWidget(QWidget(), 2, 0)
         
         self.sp_layout.setColumnStretch(0, 0)
         self.sp_layout.setColumnStretch(1, 1)
         self.sp_layout.setRowStretch(0, 0)
-        self.sp_layout.setRowStretch(1, 1)
+        self.sp_layout.setRowStretch(1, 0)
+        self.sp_layout.setRowStretch(2, 1)
         sp_area_widget.setFrameStyle(QFrame.StyledPanel)
         
 
@@ -97,7 +100,7 @@ class Thermochem(ToolInstance):
 
         row += 1
 
-        self.thermo_layout.addWidget(QLabel("T ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        self.thermo_layout.addWidget(QLabel("T ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
         
         self.temperature_line = QDoubleSpinBox()
         self.temperature_line.setMaximum(2**31 - 1)
@@ -110,7 +113,7 @@ class Thermochem(ToolInstance):
         
         row += 1
         
-        self.thermo_layout.addWidget(QLabel("𝜔<sub>0</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        self.thermo_layout.addWidget(QLabel("𝜔<sub>0</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
         
         self.v0_edit = QDoubleSpinBox()
         self.v0_edit.setMaximum(2**31 - 1)
@@ -124,36 +127,36 @@ class Thermochem(ToolInstance):
         
         row += 1
     
-        self.thermo_layout.addWidget(QLabel("𝛿ZPE ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        self.thermo_layout.addWidget(QLabel("𝛿ZPE ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
 
         self.zpe_line = QLineEdit()
         self.zpe_line.setReadOnly(True)
         self.zpe_line.setToolTip("zero-point energy correction")
         self.thermo_layout.addWidget(self.zpe_line, row, 1, 1, 1, Qt.AlignTop)
         
-        self.thermo_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)  
+        self.thermo_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignVCenter)  
         
         row += 1
 
-        self.thermo_layout.addWidget(QLabel("𝛿H<sub>RRHO</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        self.thermo_layout.addWidget(QLabel("𝛿H<sub>RRHO</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
 
         self.enthalpy_line = QLineEdit()
         self.enthalpy_line.setReadOnly(True)
         self.enthalpy_line.setToolTip("RRHO enthalpy correction")
         self.thermo_layout.addWidget(self.enthalpy_line, row, 1, 1, 1, Qt.AlignTop)
         
-        self.thermo_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)        
+        self.thermo_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignVCenter)        
 
         row += 1
 
-        self.thermo_layout.addWidget(QLabel("𝛿G<sub>RRHO</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        self.thermo_layout.addWidget(QLabel("𝛿G<sub>RRHO</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
 
         self.rrho_g_line = QLineEdit()
         self.rrho_g_line.setReadOnly(True)
         self.rrho_g_line.setToolTip("""RRHO free energy correction""")
         self.thermo_layout.addWidget(self.rrho_g_line, row, 1, 1, 1, Qt.AlignTop)
         
-        self.thermo_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)        
+        self.thermo_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignVCenter)        
         
         row += 1
         
@@ -165,7 +168,7 @@ class Thermochem(ToolInstance):
         dqrrho_g_label.setToolTip("click to open a relevant reference\n" + \
                                   "see the \"Computation of internal (gas‐phase) entropies\" section for a description of the method")
         
-        self.thermo_layout.addWidget(dqrrho_g_label, row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        self.thermo_layout.addWidget(dqrrho_g_label, row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
         
         self.qrrho_g_line = QLineEdit()
         self.qrrho_g_line.setReadOnly(True)
@@ -174,7 +177,7 @@ class Thermochem(ToolInstance):
         "The weighting is much lower for modes with frequencies less than 𝜔\u2080")        
         self.thermo_layout.addWidget(self.qrrho_g_line, row, 1, 1, 1, Qt.AlignTop)
         
-        self.thermo_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)        
+        self.thermo_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignVCenter)        
         
         row += 1
         
@@ -186,7 +189,7 @@ class Thermochem(ToolInstance):
         dqharm_g_label.setToolTip("click to open a relevant reference\n" + \
                                   "see the \"Computations\" section for a description of the method")
         
-        self.thermo_layout.addWidget(dqharm_g_label, row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        self.thermo_layout.addWidget(dqharm_g_label, row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
         
         self.qharm_g_line = QLineEdit()
         self.qharm_g_line.setReadOnly(True)
@@ -194,14 +197,16 @@ class Thermochem(ToolInstance):
         "For entropy, real vibrational modes lower than 𝜔\u2080 are treated as 𝜔\u2080")
         self.thermo_layout.addWidget(self.qharm_g_line, row, 1, 1, 1, Qt.AlignTop)
         
-        self.thermo_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)
+        self.thermo_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignVCenter)
+
+        self.thermo_layout.addWidget(QWidget(), row + 1, 0)
 
         self.thermo_layout.setColumnStretch(0, 0)
         self.thermo_layout.setColumnStretch(1, 1)
-        for i in range(0, row - 1):
+        for i in range(0, row):
             self.thermo_layout.setRowStretch(i, 0)
         
-        self.thermo_layout.setRowStretch(row, 1)
+        self.thermo_layout.setRowStretch(row + 1, 1)
         therm_area_widget.setFrameStyle(QFrame.StyledPanel)
         
         
@@ -216,40 +221,40 @@ class Thermochem(ToolInstance):
         
         row += 1
         
-        self.sum_layout.addWidget(QLabel("ZPE ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        self.sum_layout.addWidget(QLabel("ZPE ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
         
         self.zpe_sum_line = QLineEdit()
         self.zpe_sum_line.setReadOnly(True)
         self.zpe_sum_line.setToolTip("sum of electronic energy and ZPE correction")
         self.sum_layout.addWidget(self.zpe_sum_line, row, 1, 1, 1, Qt.AlignTop)
         
-        self.sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)      
+        self.sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignVCenter)      
         
         row += 1
                 
-        self.sum_layout.addWidget(QLabel("H<sub>RRHO</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        self.sum_layout.addWidget(QLabel("H<sub>RRHO</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
         
         self.h_sum_line = QLineEdit()
         self.h_sum_line.setReadOnly(True)
         self.h_sum_line.setToolTip("sum of electronic energy and RRHO enthalpy correction")
         self.sum_layout.addWidget(self.h_sum_line, row, 1, 1, 1, Qt.AlignTop)
         
-        self.sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)      
+        self.sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignVCenter)      
         
         row += 1
         
-        self.sum_layout.addWidget(QLabel("G<sub>RRHO</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        self.sum_layout.addWidget(QLabel("G<sub>RRHO</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
         
         self.rrho_g_sum_line = QLineEdit()
         self.rrho_g_sum_line.setReadOnly(True)
         self.rrho_g_sum_line.setToolTip("sum of electronic energy and RRHO free energy correction")
         self.sum_layout.addWidget(self.rrho_g_sum_line, row, 1, 1, 1, Qt.AlignTop)
         
-        self.sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)        
+        self.sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignVCenter)        
         
         row += 1
         
-        self.sum_layout.addWidget(QLabel("G<sub>Quasi-RRHO</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        self.sum_layout.addWidget(QLabel("G<sub>Quasi-RRHO</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
         
         self.qrrho_g_sum_line = QLineEdit()
         self.qrrho_g_sum_line.setReadOnly(True)
@@ -258,11 +263,11 @@ class Thermochem(ToolInstance):
         "The weighting is much lower for modes with frequencies less than 𝜔\u2080")
         self.sum_layout.addWidget(self.qrrho_g_sum_line, row, 1, 1, 1, Qt.AlignTop)
         
-        self.sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)  
+        self.sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignVCenter)  
         
         row += 1
         
-        self.sum_layout.addWidget(QLabel("G<sub>Quasi-Harmonic</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        self.sum_layout.addWidget(QLabel("G<sub>Quasi-Harmonic</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
         
         self.qharm_g_sum_line = QLineEdit()
         self.qharm_g_sum_line.setReadOnly(True)
@@ -270,13 +275,14 @@ class Thermochem(ToolInstance):
         "For entropy, real vibrational modes lower than 𝜔\u2080 are treated as 𝜔\u2080")
         self.sum_layout.addWidget(self.qharm_g_sum_line, row, 1, 1, 1, Qt.AlignTop)
         
-        self.sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignTop)
+        self.sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignVCenter)
+        self.sum_layout.addWidget(QWidget(), row + 1, 0)
         
         self.sum_layout.setColumnStretch(0, 0)
-        for i in range(0, row-1):
+        for i in range(0, row):
             self.sum_layout.setRowStretch(i, 0)
 
-        self.sum_layout.setRowStretch(row, 1)
+        self.sum_layout.setRowStretch(row + 1, 1)
         
         splitter = QSplitter(Qt.Horizontal)
         splitter.setChildrenCollapsible(False)

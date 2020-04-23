@@ -6,7 +6,7 @@ GAUSSIAN_JOB_TYPE_KW = {'geometry optimization':'opt', 'frequency calculation':'
 KNOWN_NUMERICAL_EXCHANGE = ["B3LYP", "Gaussian's B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D", "B3PW91", "B97-D", "BP86", "PBE0"]
 
 KNOWN_SEMI_EMPIRICAL = ["AM1", "PM3", "PM6", "PM7"]
-    
+
 
 class Method:
     """a Method object can be used to create an input file for different QM software
@@ -212,8 +212,8 @@ class Method:
                 f.write(s)
                 
         return s, warnings
+         
 
-        
 class Functional:
     def __init__(self, name, is_semiempirical):
         self.name = name
