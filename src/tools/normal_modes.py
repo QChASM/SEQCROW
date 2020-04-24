@@ -16,7 +16,9 @@ from AaronTools.trajectory import Pathway
 from io import BytesIO
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, QTabWidget, QComboBox, QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, QFormLayout, QCheckBox
+from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, QTabWidget, QComboBox, \
+                            QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, \
+                            QFormLayout, QCheckBox, QHeaderView
 
 from ..managers import FILEREADER_CHANGE
 from SEQCROW.settings import tuple2str
@@ -76,6 +78,10 @@ class NormalModes(ToolInstance):
         table.setEditTriggers(QTableWidget.NoEditTriggers)
         for i in range(0, 2):
             table.resizeColumnToContents(i)
+        
+        table.horizontalHeader().setStretchLastSection(False)            
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)        
         
         layout.addWidget(table)
         self.table = table

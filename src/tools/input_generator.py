@@ -14,7 +14,7 @@ from PyQt5.QtGui import QKeySequence, QFontMetrics
 from PyQt5.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, \
                             QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, \
                             QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, \
-                            QHBoxLayout, QFormLayout, QDoubleSpinBox
+                            QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.theory import *
 #TODO: rename tuple2str to iter2str
@@ -655,7 +655,16 @@ class FunctionalOption(QWidget):
             self.add_previously_used(row, name, basis_required)
 
         self.previously_used_table.cellActivated.connect(lambda *args, s=self: FunctionalOption.remove_saved_func(s, *args))
-
+        
+        self.previously_used_table.verticalHeader().setVisible(False)
+        self.previously_used_table.resizeColumnToContents(0)
+        self.previously_used_table.resizeColumnToContents(1)
+        self.previously_used_table.resizeColumnToContents(2)
+        self.previously_used_table.horizontalHeader().setStretchLastSection(False)            
+        self.previously_used_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.previously_used_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
+        self.previously_used_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
+        
         self.layout.addWidget(self.previously_used_table, 1, 0, Qt.AlignTop)
 
         dft_form = QWidget()
@@ -988,8 +997,13 @@ class BasisOption(QWidget):
             self.add_previously_used(row, name, path, False)
         
         self.previously_used_table.resizeColumnToContents(0)
+        self.previously_used_table.resizeColumnToContents(1)
         self.previously_used_table.resizeColumnToContents(2)
-        
+        self.previously_used_table.horizontalHeader().setStretchLastSection(False)            
+        self.previously_used_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        self.previously_used_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.previously_used_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
+            
         self.previously_used_table.cellActivated.connect(lambda *args, s=self: BasisOption.remove_saved_basis(s, *args))
         self.layout.addWidget(self.previously_used_table, 4, 0, 1, 3, Qt.AlignTop)
         
@@ -1595,6 +1609,8 @@ class BasisWidget(QWidget):
 class KeywordWidget(QWidget):
     class GaussianKeywordOptions(QWidget):
         def __init__(self, settings, parent=None):
+            #TODO: 
+            #display current route
             super().__init__(parent)
             self.settings = settings
             
@@ -1642,7 +1658,7 @@ class KeywordWidget(QWidget):
             
             self.current_kw_table = QTableWidget()
             self.current_kw_table.setColumnCount(2)
-            self.current_kw_table.setHorizontalHeaderLabels(['current', 'trash'])
+            self.current_kw_table.setHorizontalHeaderLabels(['current', 'remove'])
             self.current_kw_table.setSelectionMode(QTableWidget.SingleSelection)
             self.current_kw_table.setEditTriggers(QTableWidget.NoEditTriggers)
             self.current_kw_table.setSelectionBehavior(QTableWidget.SelectRows)
@@ -1676,7 +1692,7 @@ class KeywordWidget(QWidget):
             
             self.current_opt_table = QTableWidget()
             self.current_opt_table.setColumnCount(2)
-            self.current_opt_table.setHorizontalHeaderLabels(['current', 'trash'])
+            self.current_opt_table.setHorizontalHeaderLabels(['current', 'remove'])
             self.current_opt_table.setEditTriggers(QTableWidget.NoEditTriggers)
             self.current_opt_table.setSelectionBehavior(QTableWidget.SelectRows)
             self.current_opt_table.cellActivated.connect(self.clicked_current_keyword_option)
@@ -1704,14 +1720,24 @@ class KeywordWidget(QWidget):
             position_selector.currentTextChanged.connect(self.change_widget)            
             self.change_widget(position_selector.currentText())
             
-            self.previous_kw_table.resizeColumnToContents(0)
+            #columns of tables will get resized so that the trash/remove column has a fixed size 
+            #and the keyword/option stretches
             self.previous_kw_table.resizeColumnToContents(1)
-            self.current_kw_table.resizeColumnToContents(0)
+            self.previous_kw_table.horizontalHeader().setStretchLastSection(False)            
+            self.previous_kw_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+            self.previous_kw_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
             self.current_kw_table.resizeColumnToContents(1)
-            self.previous_opt_table.resizeColumnToContents(0)
+            self.current_kw_table.horizontalHeader().setStretchLastSection(False)            
+            self.current_kw_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+            self.current_kw_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
             self.previous_opt_table.resizeColumnToContents(1)
-            self.current_opt_table.resizeColumnToContents(0)
+            self.previous_opt_table.horizontalHeader().setStretchLastSection(False)            
+            self.previous_opt_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+            self.previous_opt_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
             self.current_opt_table.resizeColumnToContents(1)
+            self.current_opt_table.horizontalHeader().setStretchLastSection(False)            
+            self.current_opt_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+            self.current_opt_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
             
             self.selected_kw = None
 
@@ -1755,7 +1781,7 @@ class KeywordWidget(QWidget):
             trash_button = QLabel()
             trash_button.setMaximumSize(16, 16)
             trash_button.setScaledContents(False)
-            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(16, 16))
+            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
             trash_button.setToolTip("double click to not use this keyword")
             widget_layout.addWidget(trash_button)
             self.current_kw_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
@@ -1804,7 +1830,7 @@ class KeywordWidget(QWidget):
             trash_button = QLabel()
             trash_button.setMaximumSize(16, 16)
             trash_button.setScaledContents(False)
-            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(16, 16))
+            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
             trash_button.setToolTip("double click to not use this option")
             widget_layout.addWidget(trash_button)
             self.current_opt_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
