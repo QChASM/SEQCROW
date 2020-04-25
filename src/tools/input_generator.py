@@ -75,6 +75,12 @@ def combine_dicts(d1, d2):
     return out
 
 
+#TODO
+#figure out how to remove the border/shadow on certain widgets (QTabWidget)
+#QTableWidget also seems to be 1px too wide...
+#especially ones with margins set to 0
+#try this: https://forum.qt.io/topic/85877/remove-shadow-from-qtabwidget
+
 class BuildQM(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False         
@@ -136,7 +142,7 @@ class BuildQM(ToolInstance):
         tabs.addTab(self.job_widget, "job details")
         tabs.addTab(self.functional_widget, "functional")
         tabs.addTab(self.basis_widget, "basis functions")
-        tabs.addTab(self.other_keywords_widget, "other options")
+        tabs.addTab(self.other_keywords_widget, "additional options")
         
         self.model_selector.currentIndexChanged.connect(self.change_model)
 
@@ -148,7 +154,7 @@ class BuildQM(ToolInstance):
         export = menu.addMenu("&Export")
         copy = QAction("&Copy input to clipboard", self.tool_window.ui_area)
         copy.triggered.connect(self.copy_input)
-        shortcut = QKeySequence(Qt.CTRL + Qt.Key_C)
+        shortcut = QKeySequence(QKeySequence.Copy)
         copy.setShortcut(shortcut)
         export.addAction(copy)
         
@@ -161,6 +167,16 @@ class BuildQM(ToolInstance):
         #save.setShortcut(shortcut)
         #save.setShortcutContext(Qt.WidgetShortcut)
         export.addAction(save)
+        
+        #TODO:
+        #add Run ->
+        #       Locally
+        #       Remotely ->
+        #           list of places?
+        #               look at how AARON does jobs
+        #
+        #add View ->
+        #       Preview
         
         menu.setNativeMenuBar(False)
         layout.setMenuBar(menu)
@@ -299,6 +315,8 @@ class BuildQM(ToolInstance):
     
 
 class JobTypeOption(QWidget):
+    #TODO:
+    #make it so when you check geom opt or freq, it switches to that tab
     def __init__(self, settings, session, init_form, parent=None):
         super().__init__(parent)
         
@@ -1006,7 +1024,7 @@ class BasisOption(QWidget):
             
         self.previously_used_table.cellActivated.connect(lambda *args, s=self: BasisOption.remove_saved_basis(s, *args))
         self.layout.addWidget(self.previously_used_table, 4, 0, 1, 3, Qt.AlignTop)
-        
+
         self.custom_basis_options = [keyword_label, self.custom_basis_kw, is_builtin_label, self.is_builtin, self.previously_used_table]
         self.gen_options = [gen_path_label, self.path_to_basis_file, browse_button]
         
@@ -1349,13 +1367,16 @@ class BasisWidget(QWidget):
         valence_side_layout.addWidget(valence_basis_area, 0, 0)
         ecp_side_layout.addWidget(ecp_basis_area, 0, 0)
         
-        self.new_basis_button = QPushButton("new basis...")
+        self.new_basis_button = QPushButton("new basis")
         self.new_basis_button.clicked.connect(self.new_basis)
         valence_side_layout.addWidget(self.new_basis_button, 1, 0)
                 
-        self.new_ecp_button = QPushButton("new ECP...")
+        self.new_ecp_button = QPushButton("new ECP")
         self.new_ecp_button.clicked.connect(self.new_ecp)
         ecp_side_layout.addWidget(self.new_ecp_button, 1, 0)
+        
+        valence_layout.setContentsMargins(0, 0, 0, 0)
+        ecp_layout.setContentsMargins(0, 0, 0, 0)
         
         splitter = QSplitter(Qt.Horizontal)
         splitter.setChildrenCollapsible(True)
@@ -1363,6 +1384,7 @@ class BasisWidget(QWidget):
         splitter.addWidget(ecp_side)
         
         self.layout.addWidget(splitter)
+        self.layout.setContentsMargins(0, 0, 0, 0)
         
         for i in range(0, self.settings.last_number_basis):
             self.new_basis(use_saved=i)        
@@ -1611,6 +1633,12 @@ class KeywordWidget(QWidget):
         def __init__(self, settings, parent=None):
             #TODO: 
             #display current route
+            #maybe open a child window with a preview
+            # - add view -> preview to main tool window menu
+            #allow for modredundant section (GAUSSIAN_CONSTRAINTS) 
+            # - maybe in job type widget combined with constraints 
+            #do link 0 section (GAUSSIAN_PRE_ROUTE)
+            #do post section (i.e. for NBO input) (GAUSSIAN_POST)
             super().__init__(parent)
             self.settings = settings
             
@@ -1640,12 +1668,16 @@ class KeywordWidget(QWidget):
             
             self.route_keyword_area = QWidget()
             route_layout = QGridLayout(self.route_keyword_area)
-            self.layout.addWidget(self.route_keyword_area, 1, 0)
+            self.layout.addWidget(self.route_keyword_area, 1, 0, Qt.AlignTop)
+            
+            self.layout.setRowStretch(0, 0)
+            self.layout.setRowStretch(1, 1)
+            self.layout.setContentsMargins(0, 0, 0, 0)
             
             
             self.keyword_groupbox = QGroupBox("keyword")
             self.keyword_layout = QGridLayout(self.keyword_groupbox)
-            route_layout.addWidget(self.keyword_groupbox, 0, 0)
+            #route_layout.addWidget(self.keyword_groupbox, 0, 0)
             
             self.previous_kw_table = QTableWidget()
             self.previous_kw_table.setColumnCount(2)
@@ -1671,7 +1703,7 @@ class KeywordWidget(QWidget):
             self.new_kw = QLineEdit()
             add_kw_button = QPushButton("add")
             add_kw_button.clicked.connect(self.add_kw)
-            new_kw_widgets_layout.addWidget(QLabel("new:"), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
+            new_kw_widgets_layout.addWidget(QLabel("keyword:"), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
             new_kw_widgets_layout.addWidget(self.new_kw, 0, 1)
             new_kw_widgets_layout.addWidget(add_kw_button, 0, 2)
             self.keyword_layout.addWidget(new_kw_widget, 1, 0, 1, 2)
@@ -1679,7 +1711,7 @@ class KeywordWidget(QWidget):
 
             self.option_groupbox = QGroupBox("options")
             option_layout = QGridLayout(self.option_groupbox)
-            route_layout.addWidget(self.option_groupbox, 0, 1)
+            #route_layout.addWidget(self.option_groupbox, 0, 1)
             
             self.previous_opt_table = QTableWidget()
             self.previous_opt_table.setColumnCount(2)
@@ -1704,7 +1736,7 @@ class KeywordWidget(QWidget):
             self.new_opt = QLineEdit()
             add_opt_button = QPushButton("add")
             add_opt_button.clicked.connect(self.add_opt)
-            new_opt_widgets_layout.addWidget(QLabel("new:"), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
+            new_opt_widgets_layout.addWidget(QLabel("option:"), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
             new_opt_widgets_layout.addWidget(self.new_opt, 0, 1)
             new_opt_widgets_layout.addWidget(add_opt_button, 0, 2)
             option_layout.addWidget(new_opt_widget, 1, 0, 1, 2)
@@ -1738,7 +1770,15 @@ class KeywordWidget(QWidget):
             self.current_opt_table.horizontalHeader().setStretchLastSection(False)            
             self.current_opt_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
             self.current_opt_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
+        
+            splitter = QSplitter(Qt.Horizontal)
+            splitter.setChildrenCollapsible(True)
+            splitter.addWidget(self.keyword_groupbox)
+            splitter.addWidget(self.option_groupbox)
+            route_layout.addWidget(splitter, 0, 0, 1, 1, Qt.AlignTop)
+            route_layout.setContentsMargins(0, 0, 0, 0)
             
+        
             self.selected_kw = None
 
         def add_item_to_previous_kw_table(self, kw):
