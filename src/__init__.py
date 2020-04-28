@@ -123,7 +123,7 @@ class _SEQCROW_API(BundleAPI):
             if name == "Gaussian input file":
                 class Info(OpenerInfo):
                     def open(self, session, data, file_name, **kw):
-                        return open_aarontools(session, file_name, format_name="Gaussian input file", **kw)
+                        return open_aarontools(session, data, format_name="Gaussian input file", **kw)
             
                     @property
                     def open_args(self):
@@ -134,7 +134,7 @@ class _SEQCROW_API(BundleAPI):
             elif name == "Gaussian output file":
                 class Info(OpenerInfo):
                     def open(self, session, data, file_name, **kw):
-                        return open_aarontools(session, file_name, format_name="Gaussian output file", **kw)
+                        return open_aarontools(session, data, format_name="Gaussian output file", **kw)
             
                     @property
                     def open_args(self):
@@ -145,7 +145,7 @@ class _SEQCROW_API(BundleAPI):
             elif name == "Orca output file":
                 class Info(OpenerInfo):
                     def open(self, session, data, file_name, **kw):
-                        return open_aarontools(session, file_name, format_name="Orca output file", **kw)
+                        return open_aarontools(session, data, format_name="Orca output file", **kw)
             
                     @property
                     def open_args(self):
@@ -156,7 +156,7 @@ class _SEQCROW_API(BundleAPI):
             elif name == "XYZ file":
                 class Info(OpenerInfo):
                     def open(self, session, data, file_name, **kw):
-                        return open_aarontools(session, file_name, format_name="XYZ file", **kw)
+                        return open_aarontools(session, data, format_name="XYZ file", **kw)
             
                     @property
                     def open_args(self):
