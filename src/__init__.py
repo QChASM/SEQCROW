@@ -2,6 +2,7 @@ import os
 
 from chimerax.core.toolshed import BundleAPI
 from chimerax.core.toolshed.info import SelectorInfo
+from chimerax.core.commands import BoolArg, ModelsArg, StringArg
 
 class _SEQCROW_API(BundleAPI):
 
@@ -44,11 +45,10 @@ class _SEQCROW_API(BundleAPI):
         coordsets   - bool, load as trajectory"""
         from .io import open_aarontools
 
-        return open_aarontools(session, path, format_name=format_name, trajectory=coordsets)
+        return open_aarontools(session, path, format_name=format_name, coordsets=coordsets)
 
     @staticmethod
     def save_file(session, path, format_name, **kw):
-        #XML_TAG ChimeraX :: Save :: XYZ :: AaronTools :: false :: extra_keywords
         from .io import save_aarontools
         if format_name != "XYZ":
             raise NotImplementedError("SEQCROW can only save XYZ files, not %s files" % format_name)
@@ -59,7 +59,6 @@ class _SEQCROW_API(BundleAPI):
     @staticmethod
     def register_selector(bundle_info, selector_info, logger):
         """select all transition metals with one easy `select` command!"""
-        #XML_TAG ChimeraX :: Selector :: tm :: Transition metals
         
         print(bundle_info.selectors)
         
@@ -102,7 +101,7 @@ class _SEQCROW_API(BundleAPI):
             from .tools import FileReaderPanel
             tool = FileReaderPanel(session, ti.name)
             return tool        
-        elif ti.name == "Process Thermochemistry":
+        elif ti.name == "Process QM Thermochemistry":
             from .tools import Thermochem
             tool = Thermochem(session, ti.name)
             return tool
@@ -113,4 +112,73 @@ class _SEQCROW_API(BundleAPI):
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)
 
+    @staticmethod
+    def run_provider(session, name, mgr, **kw):
+        if mgr == session.open_command:
+            from chimerax.open_command import OpenerInfo
+            from SEQCROW.io import open_aarontools
+            #TODO:
+            #make use of AaronTools' ability to read file-like objects
+            
+            if name == "Gaussian input file":
+                class Info(OpenerInfo):
+                    def open(self, session, data, file_name, **kw):
+                        return open_aarontools(session, file_name, format_name="Gaussian input file", **kw)
+            
+                    @property
+                    def open_args(self):
+                        return {}
+                        
+                return Info()
+                
+            elif name == "Gaussian output file":
+                class Info(OpenerInfo):
+                    def open(self, session, data, file_name, **kw):
+                        return open_aarontools(session, file_name, format_name="Gaussian output file", **kw)
+            
+                    @property
+                    def open_args(self):
+                        return {'coordsets': BoolArg}
+                        
+                return Info()
+                            
+            elif name == "Orca output file":
+                class Info(OpenerInfo):
+                    def open(self, session, data, file_name, **kw):
+                        return open_aarontools(session, file_name, format_name="Orca output file", **kw)
+            
+                    @property
+                    def open_args(self):
+                        return {'coordsets': BoolArg}
+                        
+                return Info()
+                                           
+            elif name == "XYZ file":
+                class Info(OpenerInfo):
+                    def open(self, session, data, file_name, **kw):
+                        return open_aarontools(session, file_name, format_name="XYZ file", **kw)
+            
+                    @property
+                    def open_args(self):
+                        return {'coordsets': BoolArg}
+                        
+                return Info()
+                
+        elif mgr == session.save_command:
+            from chimerax.save_command import SaverInfo
+            from SEQCROW.io import save_aarontools
+            
+            if name == "XYZ file":
+                class Info(SaverInfo):
+                    def save(self, session, path, **kw):
+                        #save_aarontools doesn't actually pay attention to format_name yet
+                        save_aarontools(session, path, "XYZ file", **kw)
+                        
+                    @property
+                    def save_args(self):
+                        return {'models': ModelsArg, 'comment': StringArg}
+                        
+                return Info()
+                            
+                
 bundle_api = _SEQCROW_API()

@@ -1,3 +1,5 @@
+#this is no longer used
+#all info should be in bundle_info.xml
 
 """
 python3 setup.py sdist bdist_wheel
@@ -76,7 +78,7 @@ setup(
     ext_modules=ext_mods,
     install_requires=[
         #TODO: add AaronTools (AaronTools should require scipy)
-        "ChimeraX-Core >= 0.92",
+        "ChimeraX-Core >= 0.93",
         "scipy",
         "numpy", 
     ],
