@@ -1,6 +1,6 @@
 from chimerax.atomic import AtomicStructure, selected_atoms, selected_bonds
 from chimerax.core.tools import ToolInstance
-from chimerax.ui.gui import MainToolWindow
+from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
 from chimerax.core.commands.cli import StringArg, BoolArg, ListOf, IntArg
@@ -9,12 +9,12 @@ from chimerax.core.models import ADD_MODELS, REMOVE_MODELS
 from json import dumps, loads
 
 from PyQt5.Qt import QClipboard, QStyle, QIcon
-from PyQt5.QtCore import Qt, QRegularExpression
-from PyQt5.QtGui import QKeySequence, QFontMetrics
+from PyQt5.QtCore import Qt, QRegularExpression, pyqtSignal
+from PyQt5.QtGui import QKeySequence, QFontMetrics, QFontDatabase
 from PyQt5.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, \
                             QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, \
                             QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, \
-                            QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView
+                            QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView, QTextBrowser
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.theory import *
 #TODO: rename tuple2str to iter2str
@@ -93,14 +93,13 @@ class BuildQM(ToolInstance):
         self.display_name = "QM Input Generator"
         
         self.tool_window = MainToolWindow(self)        
+        self.preview_window = None
 
         self._build_ui()
 
         self.models = []
-        self.other_kw_dict = {1:[], 2:[], 3:[], 4:[], 5:[], 6:[], 7:[]}
         
         self.refresh_models()
-        self.update_theory
 
         self._add_handler = self.session.triggers.add_handler(ADD_MODELS, self.refresh_models)
         self._remove_handler = self.session.triggers.add_handler(REMOVE_MODELS, self.refresh_models)
@@ -128,15 +127,19 @@ class BuildQM(ToolInstance):
         
         #job type stuff
         self.job_widget = JobTypeOption(self.settings, self.session, init_form=self.file_type.currentText())
+        self.job_widget.jobTypeChanged.connect(self.update_preview)
         
         #functional stuff
         self.functional_widget = FunctionalOption(self.settings, init_form=self.file_type.currentText())
+        self.functional_widget.functionalChanged.connect(self.update_preview)
 
         #basis set stuff
         self.basis_widget = BasisWidget(self.settings)
+        self.basis_widget.basisChanged.connect(self.update_preview)
         
         #other keywords
         self.other_keywords_widget = KeywordWidget(self.settings, init_form=self.file_type.currentText())
+        self.other_keywords_widget.additionalOptionsChanged.connect(self.update_preview)
         
         tabs = QTabWidget()
         tabs.addTab(self.job_widget, "job details")
@@ -168,15 +171,17 @@ class BuildQM(ToolInstance):
         #save.setShortcutContext(Qt.WidgetShortcut)
         export.addAction(save)
         
+        view = menu.addMenu("&View")
+        preview = QAction("&Preview", self.tool_window.ui_area)
+        preview.triggered.connect(self.show_preview)
+        view.addAction(preview)
+        
         #TODO:
         #add Run ->
         #       Locally
         #       Remotely ->
         #           list of places?
         #               look at how AARON does jobs
-        #
-        #add View ->
-        #       Preview
         
         menu.setNativeMenuBar(False)
         layout.setMenuBar(menu)
@@ -185,6 +190,24 @@ class BuildQM(ToolInstance):
 
         self.tool_window.manage(None)
 
+    def show_preview(self):
+        if self.preview_window is None:
+            self.preview_window = self.tool_window.create_child_window("Input Preview", window_class=InputPreview)
+            self.update_preview()
+
+    def update_preview(self):
+        if self.preview_window is not None:
+            self.update_theory(False)
+        
+            kw_dict = self.job_widget.getKWDict(False)
+            other_kw_dict = self.other_keywords_widget.getKWDict(False)
+        
+            combined_dict = combine_dicts(kw_dict, other_kw_dict)
+            
+            output, warnings = self.theory.write_gaussian_input(combined_dict)
+            
+            self.preview_window.setPreview(output)
+            
     def refresh_models(self, *args, **kwargs):
         models = [mdl for mdl in self.session.models if isinstance(mdl, AtomicStructure)]
         
@@ -209,20 +232,21 @@ class BuildQM(ToolInstance):
             if self.model_selector.findData(model) == -1:
                 self.model_selector.addItem("%s (%s)" % (model.name, model.atomspec), model)
 
-    def update_theory(self):
+    def update_theory(self, update_settings=True):
         if self.model_selector.currentIndex() >= 0:
             model = self.models[self.model_selector.currentIndex()]
         else:
             model = None
 
-        func = self.functional_widget.getFunctional()        
-        basis = self.get_basis_set()
-        dispersion = self.functional_widget.getDispersion()
-        grid = self.functional_widget.getGrid()      
-        charge = self.job_widget.getCharge()
-        mult = self.job_widget.getMultiplicity()
+        func = self.functional_widget.getFunctional(update_settings)        
+        basis = self.get_basis_set(update_settings)
+        dispersion = self.functional_widget.getDispersion(update_settings)
+        grid = self.functional_widget.getGrid(update_settings)      
+        charge = self.job_widget.getCharge(update_settings)
+        mult = self.job_widget.getMultiplicity(update_settings)
 
-        self.settings.save()
+        if update_settings:
+            self.settings.save()
 
         constraints = self.job_widget.getConstraints()
         
@@ -255,8 +279,8 @@ class BuildQM(ToolInstance):
             if 'temperature' in fr.other:
                 self.job_widget.setTemperature(fr.other['temperature'])
     
-    def get_basis_set(self):
-        basis, ecp = self.basis_widget.get_basis()
+    def get_basis_set(self, update_settings=False):
+        basis, ecp = self.basis_widget.get_basis(update_settings)
         
         return BasisSet(basis, ecp)
 
@@ -317,6 +341,8 @@ class BuildQM(ToolInstance):
 class JobTypeOption(QWidget):
     #TODO:
     #make it so when you check geom opt or freq, it switches to that tab
+    jobTypeChanged = pyqtSignal()
+    
     def __init__(self, settings, session, init_form, parent=None):
         super().__init__(parent)
         
@@ -336,6 +362,7 @@ class JobTypeOption(QWidget):
         self.charge.setRange(-5, 5)
         self.charge.setSingleStep(1)
         self.charge.setValue(self.settings.previous_charge)
+        self.charge.valueChanged.connect(self.something_changed)
         
         job_type_layout.addRow("charge:", self.charge)
                 
@@ -343,6 +370,7 @@ class JobTypeOption(QWidget):
         self.multiplicity.setRange(1, 3)
         self.multiplicity.setSingleStep(1)
         self.multiplicity.setValue(self.settings.previous_mult)
+        self.multiplicity.valueChanged.connect(self.something_changed)
         
         job_type_layout.addRow("multiplicity:", self.multiplicity)
         
@@ -364,6 +392,7 @@ class JobTypeOption(QWidget):
         geom_opt_form = QFormLayout(geom_opt_form_widget)
         
         self.ts_opt = QCheckBox()
+        self.ts_opt.stateChanged.connect(self.something_changed)
         geom_opt_form.addRow("transition state structure:", self.ts_opt)
         
         self.use_contraints = QCheckBox()
@@ -377,10 +406,12 @@ class JobTypeOption(QWidget):
         
         freeze_atoms = QPushButton("constrain selected atoms")
         freeze_atoms.clicked.connect(self.constrain_atoms)
+        freeze_atoms.clicked.connect(self.something_changed)
         constraints_layout.addWidget(freeze_atoms, 0, 0, Qt.AlignTop)
         
         freeze_bonds = QPushButton("constrain selected bonds")
         freeze_bonds.clicked.connect(self.constrain_bonds)
+        freeze_bonds.clicked.connect(self.something_changed)
         constraints_layout.addWidget(freeze_bonds, 0, 1, Qt.AlignTop)
         
         constraints_viewer = QTabWidget()
@@ -414,16 +445,19 @@ class JobTypeOption(QWidget):
         self.temp.setValue(298.15)
         self.temp.setSuffix(" K")
         self.temp.setSingleStep(10)
+        self.temp.valueChanged.connect(self.something_changed)
         
         freq_opt_form.addRow("temperature:", self.temp)
         
         self.hpmodes = QCheckBox()
         self.hpmodes.setCheckState(Qt.Checked)
+        self.hpmodes.stateChanged.connect(self.something_changed)
         self.hpmodes.setToolTip("ask Gaussian to print extra precision on frequencies")
         freq_opt_form.addRow("high-precision modes:", self.hpmodes)
 
         self.raman = QCheckBox()
         self.raman.setCheckState(Qt.Unchecked)
+        self.raman.stateChanged.connect(self.something_changed)
         self.raman.setToolTip("ask Gaussian to compute Raman scattering intensities")
         freq_opt_form.addRow("Raman intensities:", self.raman)
 
@@ -476,7 +510,10 @@ class JobTypeOption(QWidget):
         self.setOptions(self.form)
         
         self.change_job_type()
-        
+    
+    def something_changed(self, *args, **kw):
+        self.jobTypeChanged.emit()
+    
     def setOptions(self, program):
         #do this when other programs are supported
         pass
@@ -486,6 +523,8 @@ class JobTypeOption(QWidget):
         if len(item) == 1:
             name = item[0].text()
             self.solvent_name.setText(name)
+            
+        self.jobTypeChanged.emit()
     
     def filter_solvents(self, text):
         if text:
@@ -515,26 +554,35 @@ class JobTypeOption(QWidget):
         else:
             self.solvent_name_label.setVisible(False)
             self.solvent_name.setVisible(False)
-            self.solvent_names.setVisible(False)            
+            self.solvent_names.setVisible(False)
+
+        self.jobTypeChanged.emit()
     
     def change_job_type(self, *args):
         self.job_type_opts.setTabEnabled(0, self.do_geom_opt.checkState() == Qt.Checked)
         self.job_type_opts.setTabEnabled(1, self.do_freq.checkState() == Qt.Checked)
+        
+        self.jobTypeChanged.emit()
           
     def show_contraints(self, value):
         self.constraints_widget.setVisible(bool(value))
+        self.jobTypeChanged.emit()
         
-    def getCharge(self):
+    def getCharge(self, update_settings=True):
         charge = self.charge.value()
-        self.settings.previous_charge = charge
+        if update_settings:
+            self.settings.previous_charge = charge
+        
         return charge
 
     def setCharge(self, value):
         self.charge.setValue(value)
         
-    def getMultiplicity(self):
+    def getMultiplicity(self, update_settings=True):
         mult = self.multiplicity.value()
-        self.settings.previous_mult = mult
+        if update_settings:
+            self.settings.previous_mult = mult
+        
         return mult
 
     def setMultiplicity(self, value):
@@ -542,11 +590,13 @@ class JobTypeOption(QWidget):
         
     def setTemperature(self, value):
         self.temp.setValue(value)
+        self.jobTypeChanged.emit()
 
     def setStructure(self, structure):
         self.structure = structure
         self.constrained_atoms = []
         self.constrained_bonds = []
+        self.jobTypeChanged.emit()
                 
     def constrain_atoms(self):
         self.constrained_atom_table.setRowCount(0)
@@ -557,6 +607,8 @@ class JobTypeOption(QWidget):
             item = QTableWidgetItem()
             item.setData(Qt.DisplayRole, atom.atomspec)
             self.constrained_atom_table.setItem(row, 0, item)
+        
+        self.jobTypeChanged.emit()
 
     def constrain_bonds(self):
         self.constrained_bond_table.setRowCount(0)
@@ -573,6 +625,8 @@ class JobTypeOption(QWidget):
             item2 = QTableWidgetItem()
             item2.setData(Qt.DisplayRole, atom2.atomspec)
             self.constrained_bond_table.setItem(row, 1, item2)
+            
+        self.jobTypeChanged.emit()
 
     def getConstraints(self):
         if self.do_geom_opt.checkState() != Qt.Checked:
@@ -584,7 +638,7 @@ class JobTypeOption(QWidget):
         else:
             return {'atoms':self.constrained_atoms, 'bonds':self.constrained_bonds, 'angles':[], 'torsions':[]}
             
-    def getKWDict(self):
+    def getKWDict(self, update_settings=True):
         if self.form == "Gaussian":
             route = {}
             if self.do_geom_opt.checkState() == Qt.Checked:
@@ -612,15 +666,20 @@ class JobTypeOption(QWidget):
                     
             if self.solvent_option.currentText() != "None":
                 solvent_scrf = self.solvent_option.currentText()
-                self.settings.previous_gaussian_solvent_model = solvent_scrf
+                if update_settings:
+                    self.settings.previous_gaussian_solvent_model = solvent_scrf
+                
                 route['scrf'] = [solvent_scrf]
                 
                 solvent_name = self.solvent_name.text()
-                self.settings.previous_gaussian_solvent_name = solvent_name
+                if update_settings:
+                    self.settings.previous_gaussian_solvent_name = solvent_name
+                
                 route['scrf'].append("solvent=%s" % solvent_name)
                 
             else:
-                self.settings.previous_gaussian_solvent_model = "None"
+                if update_settings:
+                    self.settings.previous_gaussian_solvent_model = "None"
                     
             return {Method.GAUSSIAN_ROUTE:route}
                 
@@ -630,6 +689,8 @@ class FunctionalOption(QWidget):
     GAUSSIAN_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D", "B3PW91", "B97-D", "BP86", "PBE0", "PM6", "AM1"]
     GAUSSIAN_DISPERSION = ["Grimme D2", "Grimme D3", "Becke-Johnson damped Grimme D3", "Petersson-Frisch"]
     GAUSSIAN_GRIDS = ["Default", "SuperFineGrid", "UltraFine", "FineGrid"]
+    
+    functionalChanged = pyqtSignal()
     
     def __init__(self, settings, init_form, parent=None):
         super().__init__(parent)
@@ -656,6 +717,7 @@ class FunctionalOption(QWidget):
         semi_empirical_label.setToolTip("check if basis set is integral to the functional (e.g. semi-empirical methods)")
         
         self.is_semiemperical = QCheckBox()
+        self.is_semiemperical.stateChanged.connect(self.something_changed) 
         self.is_semiemperical.setToolTip("check if basis set is integral to the functional (e.g. semi-empirical methods)")
 
         func_form_layout.addRow(semi_empirical_label, self.is_semiemperical)
@@ -689,10 +751,12 @@ class FunctionalOption(QWidget):
         disp_form_layout = QFormLayout(dft_form)
 
         self.dispersion = QComboBox()
+        self.dispersion.currentIndexChanged.connect(self.something_changed)
 
         disp_form_layout.addRow("empirical dispersion:", self.dispersion)
         
         self.grid = QComboBox()
+        self.grid.currentIndexChanged.connect(self.something_changed)
         self.grid.setToolTip("integration grid for methods without analytical exchange")
         
         disp_form_layout.addRow("integration grid:", self.grid)
@@ -709,6 +773,9 @@ class FunctionalOption(QWidget):
         self.setOptions(self.form)
         self.setPreviousStuff()
         self.functional_kw.textChanged.connect(self.apply_filter)
+        
+    def something_changed(self, *args, **kw):
+        self.functionalChanged.emit()
         
     def add_previously_used(self, row, name, basis_required):
         """add a basis set to the table of previously used options
@@ -767,9 +834,7 @@ class FunctionalOption(QWidget):
         for option in self.other_options:
             option.setVisible(text == "other")
         
-        #TODO: figure out how to make the previous functionals table grow
-        #self.layout.setRowStretch(1, int(text == "other"))
-        #self.layout.setRowStretch(2, int(text != "other"))
+        self.functionalChanged.emit()
 
     def apply_filter(self, text):
         #text = self.functional_kw.text()
@@ -806,6 +871,8 @@ class FunctionalOption(QWidget):
             
             self.grid.addItems(self.GAUSSIAN_GRIDS)
 
+        self.functionalChanged.emit()
+
     def setPreviousStuff(self):
         func = self.settings.previous_functional
         disp = self.settings.previous_dispersion
@@ -839,7 +906,9 @@ class FunctionalOption(QWidget):
             if grid in self.GAUSSIAN_GRIDS:
                 ndx = self.grid.findText(grid, Qt.MatchExactly)
                 self.grid.setCurrentIndex(ndx)
-                
+        
+        self.functionalChanged.emit()
+        
     def use_previous_from_table(self, row):
         """grabs the functional info from the table of previously used options and 
         sets the current functional name to that"""
@@ -852,17 +921,22 @@ class FunctionalOption(QWidget):
                 self.is_semiemperical.setCheckState(Qt.Unchecked)
             else:
                 self.is_semiemperical.setCheckState(Qt.Checked)            
-                               
-    def getFunctional(self):
+
+        self.functionalChanged.emit()
+
+    def getFunctional(self, update_settings=True):
         if self.form == "Gaussian":
             if self.functional_option.currentText() == "B3LYP":
-                self.settings.previous_functional = "Gaussian's B3LYP"
+                if update_settings:
+                    self.settings.previous_functional = "Gaussian's B3LYP"
+                
                 return Functional("Gaussian's B3LYP", False)
             
         if self.functional_option.currentText() != "other":
             functional = self.functional_option.currentText()
             #omega doesn't get decoded right
-            self.settings.previous_functional = functional.replace('ω', 'w')
+            if update_settings:
+                self.settings.previous_functional = functional.replace('ω', 'w')
             
             if functional in KNOWN_SEMI_EMPIRICAL:
                 is_semiemperical = True
@@ -872,9 +946,12 @@ class FunctionalOption(QWidget):
             return Functional(functional, is_semiemperical)
             
         else:
-            self.settings.previous_functional = "other"
+            if update_settings:
+                self.settings.previous_functional = "other"
+            
             functional = self.functional_kw.text()
-            self.settings.previous_custom_func = functional
+            if update_settings:
+                self.settings.previous_custom_func = functional
             
             is_semiemperical = self.is_semiemperical.checkState() == Qt.Checked
             
@@ -887,16 +964,20 @@ class FunctionalOption(QWidget):
                 
                 if not found_func:
                     #append doesn't seem to call __setattr__, so the setting doesn't get updated
-                    self.settings.previous_functional_names = self.settings.previous_functional_names + [functional]
-                    self.settings.previous_functional_needs_basis = self.settings.previous_functional_needs_basis + [not is_semiemperical]
+                    if update_settings:
+                        self.settings.previous_functional_names = self.settings.previous_functional_names + [functional]
+                        self.settings.previous_functional_needs_basis = self.settings.previous_functional_needs_basis + [not is_semiemperical]
+                    
                     row = self.previously_used_table.rowCount()
                     self.add_previously_used(row, functional, not is_semiemperical)
 
             return Functional(functional, is_semiemperical)
 
-    def getDispersion(self):
+    def getDispersion(self, update_settings=True):
         disp = self.dispersion.currentText()
-        self.settings.previous_dispersion = disp
+        if update_settings:
+            self.settings.previous_dispersion = disp
+        
         if disp == 'None':
             dispersion = None
         else:
@@ -904,9 +985,11 @@ class FunctionalOption(QWidget):
             
         return dispersion   
 
-    def getGrid(self):
+    def getGrid(self, update_settings=True):
         grid = self.grid.currentText()
-        self.settings.previous_grid = grid
+        if update_settings:
+            self.settings.previous_grid = grid
+        
         if grid == "Default":
             return None
         else:
@@ -934,6 +1017,7 @@ class BasisOption(QWidget):
     selecting an element on the list will deselect it on lists for other BasisOptions
     """
     
+    basisChanged = pyqtSignal()
 
     options = ["def2-SVP", "def2-TZVP", "aug-cc-pVDZ", "aug-cc-pVTZ", "6-311+G**", "SDD", "LANL2DZ", "other"]
     name_setting = "previous_basis_names"
@@ -969,6 +1053,7 @@ class BasisOption(QWidget):
         self.elements.setMaximumHeight(int(6*self.fontMetrics().boundingRect("QQ").height()))
         self.elements.setSelectionMode(QListWidget.MultiSelection)
         self.elements.itemSelectionChanged.connect(lambda *args, s=self: self.parent.check_elements(s))
+        self.elements.itemSelectionChanged.connect(lambda *args, s=self: self.parent.something_changed())
         self.layout.addWidget(self.elements, 0, 2, 2, 1, Qt.AlignTop)
         
         self.custom_basis_kw = QLineEdit()
@@ -1087,6 +1172,8 @@ class BasisOption(QWidget):
                 
         if hasattr(self, "parent_toolbox"):
             self.update_tooltab()
+            
+        self.basisChanged.emit()
     
     def setToolBox(self, toolbox):
         self.parent_toolbox = toolbox
@@ -1333,6 +1420,9 @@ class ECPOption(BasisOption):
   
 class BasisWidget(QWidget):
     """widget to store and manage BasisOptions and ECPOptions"""
+    
+    basisChanged = pyqtSignal()
+    
     def __init__(self, settings, parent=None):
         super().__init__(parent)
         self.settings = settings
@@ -1392,17 +1482,25 @@ class BasisWidget(QWidget):
         for i in range(0, self.settings.last_number_ecp):
             self.new_ecp(use_saved=i)
 
+    def something_changed(self, *args, **kw):
+        self.basisChanged.emit()
+
     def close_ecp_tab(self, index):
         self.remove_basis(self.ecp_options[index])
+        
+        self.basisChanged.emit()
     
     def close_basis_tab(self, index):
         self.remove_basis(self.basis_options[index])
+
+        self.basisChanged.emit()
 
     def new_ecp(self, checked=None, use_saved=None):
         """add an ECPOption"""
         new_basis = ECPOption(self, self.settings)
         new_basis.setToolBox(self.ecp_toolbox)
         new_basis.setElements(self.elements)
+        new_basis.basisChanged.connect(self.something_changed)
         if use_saved is None:
             use_saved = len(self.ecp_options)
         if use_saved < len(self.settings.last_ecp):
@@ -1423,12 +1521,15 @@ class BasisWidget(QWidget):
 
         self.refresh_ecp()
         self.refresh_basis()
-                        
+
+        self.basisChanged.emit()
+
     def new_basis(self, checked=None, use_saved=None):
         """add a BasisOption"""
         new_basis = BasisOption(self, self.settings)
         new_basis.setToolBox(self.basis_toolbox)
         new_basis.setElements(self.elements)
+        new_basis.basisChanged.connect(self.something_changed)
         if use_saved is None:
             use_saved = len(self.basis_options)
         if use_saved < len(self.settings.last_basis):
@@ -1460,6 +1561,8 @@ class BasisWidget(QWidget):
 
         self.refresh_basis()
     
+        self.basisChanged.emit()
+    
     def remove_basis(self, basis):
         """removes basis (BasisOption or ECPOption)"""
         if isinstance(basis, ECPOption):
@@ -1480,7 +1583,9 @@ class BasisWidget(QWidget):
             self.basis_options[0].show_elements(False)
             
         self.check_elements()
-    
+        
+        self.basisChanged.emit()
+
     def refresh_basis(self):
         """repositions all BasisOptions and shows element lists if appropriate
         if only one BasisOption (and not ECPOptions) remain, sets the elements too"""
@@ -1519,12 +1624,12 @@ class BasisWidget(QWidget):
             
             basis.show_elements(not (len(self.basis_options) == 1 and len(self.ecp_options) == 0))
         
-    def get_basis(self):
+    def get_basis(self, update_settings=True):
         """returns ([Basis], [ECP]) corresponding to the current settings"""
         basis_set = []
         ecp = []
         for i, basis in enumerate(self.basis_options):
-            basis_name, gen_path = basis.currentBasis(True, index=i)
+            basis_name, gen_path = basis.currentBasis(update_settings, index=i)
             basis_set.append(Basis(basis_name, elements=basis.currentElements(), user_defined=gen_path))
                 
         #self.settings.last_basis = self.settings.last_basis[:len(self.basis_options)]
@@ -1532,13 +1637,14 @@ class BasisWidget(QWidget):
         #self.settings.last_custom_basis_builtin = self.settings.last_custom_basis_builtin[:len(self.basis_options)]
         #self.settings.last_basis_elements = self.settings.last_basis_elements[:len(self.basis_options)]
         
-        self.settings.last_number_basis = len(self.basis_options)
+        if update_settings:
+            self.settings.last_number_basis = len(self.basis_options)
         
         if len(basis_set) == 0:
             basis_set = None
                 
         for i, basis in enumerate(self.ecp_options):
-            basis_name, gen_path = basis.currentBasis(True, index=i)
+            basis_name, gen_path = basis.currentBasis(update_settings, index=i)
             ecp.append(ECP(basis_name, elements=basis.currentElements(), user_defined=gen_path))
         
         #self.settings.last_ecp = self.settings.last_ecp[:len(self.ecp_options)]
@@ -1549,7 +1655,8 @@ class BasisWidget(QWidget):
         if len(ecp) == 0:
             ecp = None
 
-        self.settings.last_number_ecp = len(self.ecp_options)
+        if update_settings:
+            self.settings.last_number_ecp = len(self.ecp_options)
         
         return basis_set, ecp
 
@@ -1627,9 +1734,17 @@ class BasisWidget(QWidget):
                 
         self.check_elements()
         
+        self.basisChanged.emit()
+
 
 class KeywordWidget(QWidget):
+    #TODO:
+    #add new keywords/options to the table as soon as they are used
+    additionalOptionsChanged = pyqtSignal()
+
     class GaussianKeywordOptions(QWidget):
+        gaussianOptionsChanged = pyqtSignal()
+    
         def __init__(self, settings, parent=None):
             #TODO: 
             #display current route
@@ -1829,7 +1944,9 @@ class KeywordWidget(QWidget):
             self.current_kw_table.resizeRowToContents(row)
             self.current_kw_table.resizeColumnToContents(0)
             self.current_kw_table.resizeColumnToContents(1)
-            
+
+            self.gaussianOptionsChanged.emit()
+
         def add_item_to_previous_opt_table(self, opt):
             row = self.previous_opt_table.rowCount()
             self.previous_opt_table.insertRow(row)
@@ -1879,6 +1996,8 @@ class KeywordWidget(QWidget):
             self.current_opt_table.resizeColumnToContents(0)
             self.current_opt_table.resizeColumnToContents(1)
             
+            self.gaussianOptionsChanged.emit()
+
         def add_kw(self):
             kw = self.new_kw.text()
             if kw not in self.last_dict[Method.GAUSSIAN_ROUTE]:
@@ -1933,7 +2052,7 @@ class KeywordWidget(QWidget):
             self.previous_opt_table.resizeColumnToContents(1)
             self.current_opt_table.resizeColumnToContents(0)
             self.current_opt_table.resizeColumnToContents(1)
-        
+                
         def clicked_route_keyword(self, row, column):
             if column == 1:
                 self.remove_previous_kw_row(row)
@@ -1960,6 +2079,8 @@ class KeywordWidget(QWidget):
                 
                 if kw == self.selected_kw:
                     self.update_route_opts()
+                    
+                self.gaussianOptionsChanged.emit()
                 
         def clicked_keyword_option(self, row, column):
             if column == 1:
@@ -1986,6 +2107,8 @@ class KeywordWidget(QWidget):
                 self.settings.last_gaussian_options = dumps(self.last_dict)
                 
                 self.current_opt_table.removeRow(row)
+                
+                self.gaussianOptionsChanged.emit()
 
 
     def __init__(self, settings, init_form, parent=None):
@@ -1996,12 +2119,16 @@ class KeywordWidget(QWidget):
         self.layout = QGridLayout(self)
         
         self.gaussian_widget = self.GaussianKeywordOptions(self.settings)
+        self.gaussian_widget.gaussianOptionsChanged.connect(self.options_changed)
         self.layout.addWidget(self.gaussian_widget)
         
         if init_form == "Gaussian":
             self.gaussian_widget.setVisible(True)
-                        
-    def getKWDict(self):
+    
+    def options_changed(self):
+        self.additionalOptionsChanged.emit()
+    
+    def getKWDict(self, update_settings=True):
         if self.form == "Gaussian":
             for key in self.gaussian_widget.last_dict.keys():
                 if key == Method.GAUSSIAN_ROUTE:
@@ -2012,10 +2139,37 @@ class KeywordWidget(QWidget):
                         for opt in self.gaussian_widget.last_dict[key][kw]:
                             if opt not in self.gaussian_widget.previous_dict[key][kw]:
                                 self.gaussian_widget.previous_dict[key][kw].append(opt)
-                                
-            self.settings.previous_gaussian_options = dumps(self.gaussian_widget.previous_dict)
-            self.settings.last_gaussian_options = dumps(self.gaussian_widget.last_dict)
+
+            if update_settings:
+                self.settings.previous_gaussian_options = dumps(self.gaussian_widget.previous_dict)
+                self.settings.last_gaussian_options = dumps(self.gaussian_widget.last_dict)
                         
             return self.gaussian_widget.last_dict
         
+ 
+class InputPreview(ChildToolWindow):
+    def __init__(self, tool_instance, title, **kwargs):
+        super().__init__(tool_instance, title, **kwargs)
+        
+        self._build_ui()
+        
+    def _build_ui(self):
+        layout = QGridLayout()
+        
+        self.preview = QTextBrowser()
+        font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
+        self.preview.setFont(font)
+        layout.addWidget(self.preview)
+        
+        self.ui_area.setLayout(layout)
+        
+        self.manage(None)
+        
+    def setPreview(self, text):
+        self.preview.setText(text)
+        
+    def cleanup(self):
+        self.tool_instance.preview_window = None
+        
+        super().cleanup()
         
