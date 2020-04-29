@@ -302,6 +302,8 @@ class BuildQM(ToolInstance):
         clipboard = app.clipboard()
         clipboard.setText(output)
     
+        self.update_preview()
+    
         print("copied to clipboard")
     
     def save_input(self):
@@ -322,6 +324,8 @@ class BuildQM(ToolInstance):
         if filename:
             with open(filename, 'w') as f:
                 f.write(output)
+            
+            self.update_preview()
                 
             print("saved to %s" % filename)
     
