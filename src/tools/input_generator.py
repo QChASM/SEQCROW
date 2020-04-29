@@ -968,8 +968,8 @@ class FunctionalOption(QWidget):
                         self.settings.previous_functional_names = self.settings.previous_functional_names + [functional]
                         self.settings.previous_functional_needs_basis = self.settings.previous_functional_needs_basis + [not is_semiemperical]
                     
-                    row = self.previously_used_table.rowCount()
-                    self.add_previously_used(row, functional, not is_semiemperical)
+                        row = self.previously_used_table.rowCount()
+                        self.add_previously_used(row, functional, not is_semiemperical)
 
             return Functional(functional, is_semiemperical)
 
