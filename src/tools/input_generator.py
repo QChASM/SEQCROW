@@ -686,7 +686,7 @@ class JobTypeOption(QWidget):
                     self.settings.previous_gaussian_solvent_model = "None"
                     
             return {Method.GAUSSIAN_ROUTE:route}
-                
+
 
 class FunctionalOption(QWidget):
     #TODO: make checking the "is_semiemperical" box disable the basis functions tab of the parent tab widget
@@ -998,7 +998,7 @@ class FunctionalOption(QWidget):
             return None
         else:
             return IntegrationGrid(grid)
-                    
+
     
 class BasisOption(QWidget):
     """widget for basis set options
@@ -1741,379 +1741,480 @@ class BasisWidget(QWidget):
         self.basisChanged.emit()
 
 
+class TwoLayerKeyWordOption(QWidget):
+    optionChanged = pyqtSignal()
+    settingsChanged = pyqtSignal()
+    
+    def __init__(self, name, last_dict, previous_dict, opt_fmt, \
+                 one_opt_per_kw=False, parent=None):
+        """
+        name                    - name of the left groupbox
+        last_dict               - dict of 'last' setting corresponding to just the target position (i.e. route, blocks)
+        previous_dict           - dict of 'previous' setting
+        one_opt_per_kw          - bool; multiple options per keyword like in Gaussian route
+                                    or just one like Psi4 settings
+        opt_fmt                 - str; format when displaying options for selected keyword
+        """
+        
+        self.name = name
+        self.last_dict = last_dict
+        self.previous_dict = previous_dict
+        self.one_opt_per_kw = one_opt_per_kw
+        self.opt_fmt = opt_fmt
+        
+        super().__init__(parent)
+
+        layout = QGridLayout(self)        
+        
+        self.keyword_groupbox = QGroupBox(self.name)
+        self.keyword_layout = QGridLayout(self.keyword_groupbox)
+        
+        self.previous_kw_table = QTableWidget()
+        self.previous_kw_table.setColumnCount(2)
+        self.previous_kw_table.setHorizontalHeaderLabels(['previous', 'trash'])
+        self.previous_kw_table.cellActivated.connect(self.clicked_route_keyword)
+        self.previous_kw_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.previous_kw_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.previous_kw_table.verticalHeader().setVisible(False)
+        self.keyword_layout.addWidget(self.previous_kw_table, 0, 0)
+        
+        self.current_kw_table = QTableWidget()
+        self.current_kw_table.setColumnCount(2)
+        self.current_kw_table.setHorizontalHeaderLabels(['current', 'remove'])
+        self.current_kw_table.setSelectionMode(QTableWidget.SingleSelection)
+        self.current_kw_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.current_kw_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.current_kw_table.verticalHeader().setVisible(False)
+        self.current_kw_table.cellActivated.connect(self.clicked_current_route_keyword)
+        self.keyword_layout.addWidget(self.current_kw_table, 0, 1)
+
+        new_kw_widget = QWidget()
+        new_kw_widgets_layout = QGridLayout(new_kw_widget)
+        self.new_kw = QLineEdit()
+        add_kw_button = QPushButton("add")
+        add_kw_button.clicked.connect(self.add_kw)
+        new_kw_widgets_layout.addWidget(QLabel("%s:" % self.name), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
+        new_kw_widgets_layout.addWidget(self.new_kw, 0, 1)
+        new_kw_widgets_layout.addWidget(add_kw_button, 0, 2)
+        self.keyword_layout.addWidget(new_kw_widget, 1, 0, 1, 2)
+        
+
+        self.option_groupbox = QGroupBox("options")
+        option_layout = QGridLayout(self.option_groupbox)
+        
+        self.previous_opt_table = QTableWidget()
+        self.previous_opt_table.setColumnCount(2)
+        self.previous_opt_table.setHorizontalHeaderLabels(['previous', 'trash'])
+        self.previous_opt_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.previous_opt_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.previous_opt_table.verticalHeader().setVisible(False)
+        self.previous_opt_table.cellActivated.connect(self.clicked_keyword_option)
+        option_layout.addWidget(self.previous_opt_table, 0, 0)
+        
+        self.current_opt_table = QTableWidget()
+        self.current_opt_table.setColumnCount(2)
+        self.current_opt_table.setHorizontalHeaderLabels(['current', 'remove'])
+        self.current_opt_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.current_opt_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.current_opt_table.cellActivated.connect(self.clicked_current_keyword_option)
+        self.current_opt_table.verticalHeader().setVisible(False)
+        option_layout.addWidget(self.current_opt_table, 0, 1)
+
+        new_opt_widget = QWidget()
+        new_opt_widgets_layout = QGridLayout(new_opt_widget)
+        self.new_opt = QLineEdit()
+        add_opt_button = QPushButton("add")
+        add_opt_button.clicked.connect(self.add_opt)
+        new_opt_widgets_layout.addWidget(QLabel("options:"), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
+        new_opt_widgets_layout.addWidget(self.new_opt, 0, 1)
+        new_opt_widgets_layout.addWidget(add_opt_button, 0, 2)
+        option_layout.addWidget(new_opt_widget, 1, 0, 1, 2)
+
+        self.current_kw_table.itemSelectionChanged.connect(self.update_route_opts)
+
+        for kw in self.previous_dict:
+            self.add_item_to_previous_kw_table(kw)
+                
+        for kw in self.last_dict:
+            self.add_item_to_current_kw_table(kw)
+        
+        #columns of tables will get resized so that the trash/remove column has a fixed size 
+        #and the keyword/option stretches
+        self.previous_kw_table.resizeColumnToContents(1)
+        self.previous_kw_table.horizontalHeader().setStretchLastSection(False)            
+        self.previous_kw_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.previous_kw_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
+        self.current_kw_table.resizeColumnToContents(1)
+        self.current_kw_table.horizontalHeader().setStretchLastSection(False)            
+        self.current_kw_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.current_kw_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
+        self.previous_opt_table.resizeColumnToContents(1)
+        self.previous_opt_table.horizontalHeader().setStretchLastSection(False)            
+        self.previous_opt_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.previous_opt_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
+        self.current_opt_table.resizeColumnToContents(1)
+        self.current_opt_table.horizontalHeader().setStretchLastSection(False)            
+        self.current_opt_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.current_opt_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
+    
+        splitter = QSplitter(Qt.Horizontal)
+        splitter.setChildrenCollapsible(True)
+        splitter.addWidget(self.keyword_groupbox)
+        splitter.addWidget(self.option_groupbox)
+        layout.addWidget(splitter, 0, 0, 1, 1, Qt.AlignTop)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.selected_kw = None
+
+    def add_item_to_previous_kw_table(self, kw):
+        row = self.previous_kw_table.rowCount()
+        self.previous_kw_table.insertRow(row)
+        item = QTableWidgetItem(kw)
+        item.setToolTip("double click to use %s" % kw)
+        self.previous_kw_table.setItem(row, 0, item)
+    
+        widget_that_lets_me_horizontally_align_an_icon = QWidget()
+        widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
+        trash_button = QLabel()
+        trash_button.setMaximumSize(16, 16)
+        trash_button.setScaledContents(False)
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(16, 16))
+        trash_button.setToolTip("double click to remove from stored keywords")
+        widget_layout.addWidget(trash_button)
+        self.previous_kw_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
+    
+        self.previous_kw_table.resizeRowToContents(row)
+
+    def remove_previous_kw_row(self, row):
+        item = self.previous_kw_table.item(row, 0)
+        kw = item.text()
+        del self.previous_dict[kw]
+        
+        current_kw = self.current_kw_table.findItems(kw, Qt.MatchExactly)
+        if len(current_kw) == 1:
+            kw_item = current_kw[0]
+            cur_row = kw_item.row()
+            self.clicked_current_route_keyword(cur_row, 1)
+        
+        self.settingsChanged.emit()
+        
+        self.previous_kw_table.removeRow(row)
+    
+    def add_item_to_current_kw_table(self, kw):
+        row = self.current_kw_table.rowCount()
+        self.current_kw_table.insertRow(row)
+        item = QTableWidgetItem(kw)
+        self.current_kw_table.setItem(row, 0, item)
+    
+        widget_that_lets_me_horizontally_align_an_icon = QWidget()
+        widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
+        trash_button = QLabel()
+        trash_button.setMaximumSize(16, 16)
+        trash_button.setScaledContents(False)
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
+        trash_button.setToolTip("double click to not use this keyword")
+        widget_layout.addWidget(trash_button)
+        self.current_kw_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
+    
+        self.current_kw_table.resizeRowToContents(row)
+        self.current_kw_table.resizeColumnToContents(0)
+        self.current_kw_table.resizeColumnToContents(1)
+
+        self.optionChanged.emit()
+
+    def add_item_to_previous_opt_table(self, opt):
+        row = self.previous_opt_table.rowCount()
+        self.previous_opt_table.insertRow(row)
+        item = QTableWidgetItem(opt)
+        fmt = "double click to use %s" % self.opt_fmt
+        item.setToolTip(fmt % (self.selected_kw, opt))
+        self.previous_opt_table.setItem(row, 0, item)
+        
+        widget_that_lets_me_horizontally_align_an_icon = QWidget()
+        widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
+        trash_button = QLabel()
+        trash_button.setMaximumSize(16, 16)
+        trash_button.setScaledContents(False)
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(16, 16))
+        trash_button.setToolTip("double click to remove from stored options")
+        widget_layout.addWidget(trash_button)
+        self.previous_opt_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
+    
+        self.previous_opt_table.resizeRowToContents(row)
+    
+    def remove_previous_opt_row(self, row):
+        item = self.previous_opt_table.item(row, 0)
+        opt = item.text()
+        self.previous_dict[self.selected_kw].remove(opt)
+        
+        current_opt = self.current_opt_table.findItems(opt, Qt.MatchExactly)
+        if len(current_opt) == 1:
+            opt_item = current_opt[0]
+            cur_row = opt_item.row()
+            self.clicked_current_keyword_option(cur_row, 1)
+            
+        self.settingsChanged.emit()
+
+        self.previous_opt_table.removeRow(row)
+
+    def add_item_to_current_opt_table(self, opt):
+        if self.one_opt_per_kw:
+            for i in range(self.current_opt_table.rowCount(), -1, -1):
+                self.current_opt_table.removeRow(i)
+            
+        row = self.current_opt_table.rowCount()
+        self.current_opt_table.insertRow(row)
+        item = QTableWidgetItem(opt)
+        self.current_opt_table.setItem(row, 0, item)
+        
+        widget_that_lets_me_horizontally_align_an_icon = QWidget()
+        widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
+        trash_button = QLabel()
+        trash_button.setMaximumSize(16, 16)
+        trash_button.setScaledContents(False)
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
+        trash_button.setToolTip("double click to not use this option")
+        widget_layout.addWidget(trash_button)
+        self.current_opt_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
+    
+        self.current_opt_table.resizeRowToContents(row)
+        self.current_opt_table.resizeColumnToContents(0)
+        self.current_opt_table.resizeColumnToContents(1)
+        
+        self.optionChanged.emit()
+
+    def add_kw(self):
+        kw = self.new_kw.text()
+        if kw not in self.last_dict:
+            self.last_dict[kw] = []
+        
+        self.add_item_to_current_kw_table(kw)
+
+    def add_opt(self):
+        opt = self.new_opt.text()
+
+        kw = self.selected_kw
+        if opt not in self.last_dict[kw]:
+            if self.one_opt_per_kw:
+                self.last_dict[kw] = [opt]
+            else:
+                self.last_dict[kw].append(opt)
+
+            self.add_item_to_current_opt_table(opt)
+
+    def update_route_opts(self):
+        for i in range(self.previous_opt_table.rowCount(), -1, -1):
+            self.previous_opt_table.removeRow(i)    
+            
+        for i in range(self.current_opt_table.rowCount(), -1, -1):
+            self.current_opt_table.removeRow(i)
+        
+        selected_items = self.current_kw_table.selectedItems()
+        if len(selected_items) != 1:
+            self.option_groupbox.setTitle("options")
+            return
+        
+        keyword = selected_items[0].text()              
+        self.selected_kw = keyword
+        
+        self.option_groupbox.setTitle("'%s' options" % keyword)
+
+        if keyword in self.previous_dict:
+            for opt in self.previous_dict[keyword]:
+                self.add_item_to_previous_opt_table(opt)
+            
+        if keyword in self.last_dict:
+            for opt in self.last_dict[keyword]:
+                self.add_item_to_current_opt_table(opt)
+        
+        self.previous_opt_table.resizeColumnToContents(0)
+        self.previous_opt_table.resizeColumnToContents(1)
+        self.current_opt_table.resizeColumnToContents(0)
+        self.current_opt_table.resizeColumnToContents(1)
+            
+    def clicked_route_keyword(self, row, column):
+        if column == 1:
+            self.remove_previous_kw_row(row)
+        elif column == 0:
+            item = self.previous_kw_table.item(row, column)
+
+            keyword = item.text()
+            if any(keyword == kw for kw in self.last_dict.keys()):
+                return
+            
+            self.last_dict[keyword] = []
+            
+            self.add_item_to_current_kw_table(keyword)
+
+    def clicked_current_route_keyword(self, row, column):
+        if column == 1:
+            item = self.current_kw_table.item(row, 0)
+            kw = item.text()
+            del self.last_dict[kw]
+
+            self.current_kw_table.removeRow(row)
+            
+            if kw == self.selected_kw:
+                self.update_route_opts()
+                
+            self.optionChanged.emit()
+            self.settingsChanged.emit()
+            
+    def clicked_keyword_option(self, row, column):
+        if column == 1:
+            self.remove_previous_opt_row(row)
+        elif column == 0:
+            item = self.previous_opt_table.item(row, column)
+            option = item.text()
+
+            keyword = self.selected_kw
+            
+            if option in self.last_dict[keyword]:
+                return
+            
+            self.last_dict[keyword].append(option)
+            
+            self.add_item_to_current_opt_table(option)
+  
+    def clicked_current_keyword_option(self, row, column):
+        if column == 1:
+            item = self.current_opt_table.item(row, 0)
+            opt = item.text()
+            self.last_dict[self.selected_kw].remove(opt)
+                        
+            self.current_opt_table.removeRow(row)
+            
+            self.optionChanged.emit()
+            self.settingsChanged.emit()
+    
+    def refresh_previous(self):
+        for item in self.last_dict.keys():
+            if item not in self.previous_dict:
+                self.previous_dict[item] = []
+                
+            for opt in self.last_dict[item]:
+                if opt not in self.previous_dict[item]:
+                    self.previous_dict[item].append(opt)
+
+
+class KeywordOptions(QWidget):
+    """
+    items is a dict that can include
+        route       - enables widget to display route options a la Gaussian or Orca 
+        comment     - comment 
+        link 0      - enables Gaussian's Link 0 commands
+        settings    - enables setting specifications a la Psi4
+        blocks      - enables settings like Orca's namespace-style options
+        
+        the values should be the int map to specify the location in the input file
+        
+    previous_option_name        name of the'previous' setting
+    last_option_name            name of the 'last' setting
+    one_route_opt_per_kw        bool; whether the route accepts multiple settings for keywords (who does this?)
+    route_opt_fmt               str; % style formating to convert two strings (e.g. %s=(%s))
+    """
+    optionsChanged = pyqtSignal()
+    settingsChanged = pyqtSignal()
+    
+    items = {}
+    previous_option_name = None
+    last_option_name = None
+    one_route_opt_per_kw = False
+    route_opt_fmt = "%s %s"
+
+    def __init__(self, settings, parent=None):
+        super().__init__(parent)
+        self.settings = settings
+        
+        self.previous_dict = {}
+        previous_dict = loads(self.settings.__getattr__(self.previous_option_name))
+        for key in previous_dict.keys():
+            self.previous_dict[int(key)] = previous_dict[key]
+        
+        self.last_dict = {}
+        last_dict = loads(self.settings.__getattr__(self.last_option_name))
+        for key in last_dict.keys():
+            self.last_dict[int(key)] = last_dict[key]
+                    
+        self.layout = QGridLayout(self)
+        
+        position_widget = QWidget()
+        position_widget_layout = QFormLayout(position_widget)
+        position_selector = QComboBox()
+        position_selector.addItems([x for x in self.items.keys()])
+        position_widget_layout.addRow("position:", position_selector)
+        
+        self.layout.addWidget(position_widget, 0, 0, 1, 1, Qt.AlignTop)
+        
+        self.widgets = {}
+        for item in self.items.keys():
+            if item == "route":
+                last_dict = self.last_dict[self.items[item]]
+                previous_dict = self.previous_dict[self.items[item]]
+                self.widgets[item] = TwoLayerKeyWordOption("keywords", last_dict, previous_dict, self.route_opt_fmt, one_opt_per_kw=self.one_route_opt_per_kw)
+                self.widgets[item].optionChanged.connect(self.something_changed)
+                self.widgets[item].settingsChanged.connect(self.settings_changed)
+            
+                self.layout.addWidget(self.widgets[item], 1, 0, Qt.AlignTop)
+
+        position_selector.currentTextChanged.connect(self.change_widget)            
+        self.change_widget(position_selector.currentText())
+
+        self.layout.setContentsMargins(0, 0, 0, 0)        
+        self.layout.setRowStretch(0, 0)
+        self.layout.setRowStretch(1, 1)
+
+    def something_changed(self, *args, **kw):
+        """just for updating the preview"""
+        self.optionsChanged.emit()
+        
+    def settings_changed(self, *args, **kw):
+        """update settings"""
+        last_dict = {}
+        previous_dict = {}
+        for item in self.widgets.keys():
+            self.widgets[item].refresh_previous()
+            last_dict[self.items[item]] = self.widgets[item].last_dict
+            previous_dict[self.items[item]] = self.widgets[item].previous_dict
+
+        self.settings.__setattr__(self.last_option_name, dumps(last_dict))
+        self.settings.__setattr__(self.previous_option_name, dumps(previous_dict))
+        self.settings.save()
+
+    def change_widget(self, name):
+        for widget_name in self.widgets.keys():
+            if name != widget_name:
+                self.widgets[widget_name].setVisible(False)
+                
+            else:
+                self.widgets[widget_name].setVisible(True)
+
+    def getKWDict(self, update_settings=True):
+        last_dict = {}
+        for item in self.widgets.keys():
+            last_dict[self.items[item]] = self.widgets[item].last_dict
+        
+        if update_settings:
+            self.settings_changed()
+        
+        return last_dict
+
+
+class GaussianKeywordOptions(KeywordOptions):
+    items = {'link 0': Method.GAUSSIAN_PRE_ROUTE, \
+             'comment': Method.GAUSSIAN_COMMENT, \
+             'route': Method.GAUSSIAN_ROUTE, \
+            }
+    previous_option_name = "previous_gaussian_options"
+    last_option_name = "last_gaussian_options"
+    one_route_opt_per_kw = False
+    route_opt_fmt = "%s=(%s)"
+    
+
 class KeywordWidget(QWidget):
     #TODO:
     #add new keywords/options to the table as soon as they are used
     additionalOptionsChanged = pyqtSignal()
-
-    class GaussianKeywordOptions(QWidget):
-        gaussianOptionsChanged = pyqtSignal()
-    
-        def __init__(self, settings, parent=None):
-            #TODO: 
-            #display current route
-            #maybe open a child window with a preview
-            # - add view -> preview to main tool window menu
-            #allow for modredundant section (GAUSSIAN_CONSTRAINTS) 
-            # - maybe in job type widget combined with constraints 
-            #do link 0 section (GAUSSIAN_PRE_ROUTE)
-            #do post section (i.e. for NBO input) (GAUSSIAN_POST)
-            super().__init__(parent)
-            self.settings = settings
-            
-            self.previous_dict = {}
-            previous_dict = loads(self.settings.previous_gaussian_options)
-            for key in previous_dict.keys():
-                self.previous_dict[int(key)] = previous_dict[key]
-            
-            self.last_dict = {}
-            last_dict = loads(self.settings.last_gaussian_options)
-            for key in last_dict.keys():
-                self.last_dict[int(key)] = last_dict[key]
-                        
-            self.layout = QGridLayout(self)
-            
-            position_widget = QWidget()
-            position_widget_layout = QFormLayout(position_widget)
-            position_selector = QComboBox()
-            position_selector.addItems(['route'])
-            position_widget_layout.addRow("position:", position_selector)
-            
-            self.layout.addWidget(position_widget, 0, 0)
-            
-            self.link0_area = QWidget()
-            link0_layout = QGridLayout(self.link0_area)
-            self.layout.addWidget(self.link0_area, 1, 0)
-            
-            self.route_keyword_area = QWidget()
-            route_layout = QGridLayout(self.route_keyword_area)
-            self.layout.addWidget(self.route_keyword_area, 1, 0, Qt.AlignTop)
-            
-            self.layout.setRowStretch(0, 0)
-            self.layout.setRowStretch(1, 1)
-            self.layout.setContentsMargins(0, 0, 0, 0)
-            
-            
-            self.keyword_groupbox = QGroupBox("keyword")
-            self.keyword_layout = QGridLayout(self.keyword_groupbox)
-            #route_layout.addWidget(self.keyword_groupbox, 0, 0)
-            
-            self.previous_kw_table = QTableWidget()
-            self.previous_kw_table.setColumnCount(2)
-            self.previous_kw_table.setHorizontalHeaderLabels(['previous', 'trash'])
-            self.previous_kw_table.cellActivated.connect(self.clicked_route_keyword)
-            self.previous_kw_table.setEditTriggers(QTableWidget.NoEditTriggers)
-            self.previous_kw_table.setSelectionBehavior(QTableWidget.SelectRows)
-            self.previous_kw_table.verticalHeader().setVisible(False)
-            self.keyword_layout.addWidget(self.previous_kw_table, 0, 0)
-            
-            self.current_kw_table = QTableWidget()
-            self.current_kw_table.setColumnCount(2)
-            self.current_kw_table.setHorizontalHeaderLabels(['current', 'remove'])
-            self.current_kw_table.setSelectionMode(QTableWidget.SingleSelection)
-            self.current_kw_table.setEditTriggers(QTableWidget.NoEditTriggers)
-            self.current_kw_table.setSelectionBehavior(QTableWidget.SelectRows)
-            self.current_kw_table.verticalHeader().setVisible(False)
-            self.current_kw_table.cellActivated.connect(self.clicked_current_route_keyword)
-            self.keyword_layout.addWidget(self.current_kw_table, 0, 1)
-
-            new_kw_widget = QWidget()
-            new_kw_widgets_layout = QGridLayout(new_kw_widget)
-            self.new_kw = QLineEdit()
-            add_kw_button = QPushButton("add")
-            add_kw_button.clicked.connect(self.add_kw)
-            new_kw_widgets_layout.addWidget(QLabel("keyword:"), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
-            new_kw_widgets_layout.addWidget(self.new_kw, 0, 1)
-            new_kw_widgets_layout.addWidget(add_kw_button, 0, 2)
-            self.keyword_layout.addWidget(new_kw_widget, 1, 0, 1, 2)
-            
-
-            self.option_groupbox = QGroupBox("options")
-            option_layout = QGridLayout(self.option_groupbox)
-            #route_layout.addWidget(self.option_groupbox, 0, 1)
-            
-            self.previous_opt_table = QTableWidget()
-            self.previous_opt_table.setColumnCount(2)
-            self.previous_opt_table.setHorizontalHeaderLabels(['previous', 'trash'])
-            self.previous_opt_table.setEditTriggers(QTableWidget.NoEditTriggers)
-            self.previous_opt_table.setSelectionBehavior(QTableWidget.SelectRows)
-            self.previous_opt_table.verticalHeader().setVisible(False)
-            self.previous_opt_table.cellActivated.connect(self.clicked_keyword_option)
-            option_layout.addWidget(self.previous_opt_table, 0, 0)
-            
-            self.current_opt_table = QTableWidget()
-            self.current_opt_table.setColumnCount(2)
-            self.current_opt_table.setHorizontalHeaderLabels(['current', 'remove'])
-            self.current_opt_table.setEditTriggers(QTableWidget.NoEditTriggers)
-            self.current_opt_table.setSelectionBehavior(QTableWidget.SelectRows)
-            self.current_opt_table.cellActivated.connect(self.clicked_current_keyword_option)
-            self.current_opt_table.verticalHeader().setVisible(False)
-            option_layout.addWidget(self.current_opt_table, 0, 1)
-
-            new_opt_widget = QWidget()
-            new_opt_widgets_layout = QGridLayout(new_opt_widget)
-            self.new_opt = QLineEdit()
-            add_opt_button = QPushButton("add")
-            add_opt_button.clicked.connect(self.add_opt)
-            new_opt_widgets_layout.addWidget(QLabel("option:"), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
-            new_opt_widgets_layout.addWidget(self.new_opt, 0, 1)
-            new_opt_widgets_layout.addWidget(add_opt_button, 0, 2)
-            option_layout.addWidget(new_opt_widget, 1, 0, 1, 2)
-
-            self.current_kw_table.itemSelectionChanged.connect(self.update_route_opts)
-
-            for kw in self.previous_dict[Method.GAUSSIAN_ROUTE].keys():
-                self.add_item_to_previous_kw_table(kw)
-                    
-            for kw in self.last_dict[Method.GAUSSIAN_ROUTE].keys():
-                self.add_item_to_current_kw_table(kw)
-                
-            position_selector.currentTextChanged.connect(self.change_widget)            
-            self.change_widget(position_selector.currentText())
-            
-            #columns of tables will get resized so that the trash/remove column has a fixed size 
-            #and the keyword/option stretches
-            self.previous_kw_table.resizeColumnToContents(1)
-            self.previous_kw_table.horizontalHeader().setStretchLastSection(False)            
-            self.previous_kw_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-            self.previous_kw_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
-            self.current_kw_table.resizeColumnToContents(1)
-            self.current_kw_table.horizontalHeader().setStretchLastSection(False)            
-            self.current_kw_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-            self.current_kw_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
-            self.previous_opt_table.resizeColumnToContents(1)
-            self.previous_opt_table.horizontalHeader().setStretchLastSection(False)            
-            self.previous_opt_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-            self.previous_opt_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
-            self.current_opt_table.resizeColumnToContents(1)
-            self.current_opt_table.horizontalHeader().setStretchLastSection(False)            
-            self.current_opt_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-            self.current_opt_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
-        
-            splitter = QSplitter(Qt.Horizontal)
-            splitter.setChildrenCollapsible(True)
-            splitter.addWidget(self.keyword_groupbox)
-            splitter.addWidget(self.option_groupbox)
-            route_layout.addWidget(splitter, 0, 0, 1, 1, Qt.AlignTop)
-            route_layout.setContentsMargins(0, 0, 0, 0)
-            
-        
-            self.selected_kw = None
-
-        def add_item_to_previous_kw_table(self, kw):
-            row = self.previous_kw_table.rowCount()
-            self.previous_kw_table.insertRow(row)
-            item = QTableWidgetItem(kw)
-            item.setToolTip("double click to use %s" % kw)
-            self.previous_kw_table.setItem(row, 0, item)
-        
-            widget_that_lets_me_horizontally_align_an_icon = QWidget()
-            widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
-            trash_button = QLabel()
-            trash_button.setMaximumSize(16, 16)
-            trash_button.setScaledContents(False)
-            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(16, 16))
-            trash_button.setToolTip("double click to remove from stored keywords")
-            widget_layout.addWidget(trash_button)
-            self.previous_kw_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
-        
-            self.previous_kw_table.resizeRowToContents(row)
-
-        def remove_previous_kw_row(self, row):
-            item = self.previous_kw_table.item(row, 0)
-            kw = item.text()
-            del self.previous_dict[Method.GAUSSIAN_ROUTE][kw]
-            
-            self.settings.previous_gaussian_options = dumps(self.previous_dict)
-            self.settings.save()
-            
-            self.previous_kw_table.removeRow(row)
-        
-        def add_item_to_current_kw_table(self, kw):
-            row = self.current_kw_table.rowCount()
-            self.current_kw_table.insertRow(row)
-            item = QTableWidgetItem(kw)
-            self.current_kw_table.setItem(row, 0, item)
-        
-            widget_that_lets_me_horizontally_align_an_icon = QWidget()
-            widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
-            trash_button = QLabel()
-            trash_button.setMaximumSize(16, 16)
-            trash_button.setScaledContents(False)
-            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
-            trash_button.setToolTip("double click to not use this keyword")
-            widget_layout.addWidget(trash_button)
-            self.current_kw_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
-        
-            self.current_kw_table.resizeRowToContents(row)
-            self.current_kw_table.resizeColumnToContents(0)
-            self.current_kw_table.resizeColumnToContents(1)
-
-            self.gaussianOptionsChanged.emit()
-
-        def add_item_to_previous_opt_table(self, opt):
-            row = self.previous_opt_table.rowCount()
-            self.previous_opt_table.insertRow(row)
-            item = QTableWidgetItem(opt)
-            item.setToolTip("double click to use %s=(%s)" % (self.selected_kw, opt))
-            self.previous_opt_table.setItem(row, 0, item)
-            
-            widget_that_lets_me_horizontally_align_an_icon = QWidget()
-            widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
-            trash_button = QLabel()
-            trash_button.setMaximumSize(16, 16)
-            trash_button.setScaledContents(False)
-            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(16, 16))
-            trash_button.setToolTip("double click to remove from stored option")
-            widget_layout.addWidget(trash_button)
-            self.previous_opt_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
-        
-            self.previous_opt_table.resizeRowToContents(row)
-        
-        def remove_previous_opt_row(self, row):
-            item = self.previous_opt_table.item(row, 0)
-            opt = item.text()
-            self.previous_dict[Method.GAUSSIAN_ROUTE][self.selected_kw].remove(opt)
-            
-            self.settings.previous_gaussian_options = dumps(self.previous_dict)
-            self.settings.save()
-            
-            self.previous_opt_table.removeRow(row)
-        
-        def add_item_to_current_opt_table(self, opt):
-            row = self.current_opt_table.rowCount()
-            self.current_opt_table.insertRow(row)
-            item = QTableWidgetItem(opt)
-            self.current_opt_table.setItem(row, 0, item)
-            
-            widget_that_lets_me_horizontally_align_an_icon = QWidget()
-            widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
-            trash_button = QLabel()
-            trash_button.setMaximumSize(16, 16)
-            trash_button.setScaledContents(False)
-            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
-            trash_button.setToolTip("double click to not use this option")
-            widget_layout.addWidget(trash_button)
-            self.current_opt_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
-        
-            self.current_opt_table.resizeRowToContents(row)
-            self.current_opt_table.resizeColumnToContents(0)
-            self.current_opt_table.resizeColumnToContents(1)
-            
-            self.gaussianOptionsChanged.emit()
-
-        def add_kw(self):
-            kw = self.new_kw.text()
-            if kw not in self.last_dict[Method.GAUSSIAN_ROUTE]:
-                self.last_dict[Method.GAUSSIAN_ROUTE][kw] = []
-            
-            self.add_item_to_current_kw_table(kw)
-
-        def add_opt(self):
-            opt = self.new_opt.text()
-
-            kw = self.selected_kw
-            if opt not in self.last_dict[Method.GAUSSIAN_ROUTE][kw]:
-                self.last_dict[Method.GAUSSIAN_ROUTE][kw].append(opt)
-
-                self.add_item_to_current_opt_table(opt)
-
-        def change_widget(self, name):
-            if name == "link 0 commands":
-                self.link0_area.setVisible(True)
-                self.route_keyword_area.setVisible(False)
-                
-            elif name == "route":
-                self.link0_area.setVisible(False)
-                self.route_keyword_area.setVisible(True)
-                
-        def update_route_opts(self):
-            for i in range(self.previous_opt_table.rowCount(), -1, -1):
-                self.previous_opt_table.removeRow(i)    
-                
-            for i in range(self.current_opt_table.rowCount(), -1, -1):
-                self.current_opt_table.removeRow(i)
-            
-            selected_items = self.current_kw_table.selectedItems()
-            if len(selected_items) != 1:
-                self.option_groupbox.setTitle("options")
-                return
-            
-            keyword = selected_items[0].text()              
-            self.selected_kw = keyword
-            
-            self.option_groupbox.setTitle("'%s' options" % keyword)
-
-            if keyword in self.previous_dict[Method.GAUSSIAN_ROUTE]:
-                for opt in self.previous_dict[Method.GAUSSIAN_ROUTE][keyword]:
-                    self.add_item_to_previous_opt_table(opt)
-                
-            if keyword in self.last_dict[Method.GAUSSIAN_ROUTE]:
-                for opt in self.last_dict[Method.GAUSSIAN_ROUTE][keyword]:
-                    self.add_item_to_current_opt_table(opt)
-            
-            self.previous_opt_table.resizeColumnToContents(0)
-            self.previous_opt_table.resizeColumnToContents(1)
-            self.current_opt_table.resizeColumnToContents(0)
-            self.current_opt_table.resizeColumnToContents(1)
-                
-        def clicked_route_keyword(self, row, column):
-            if column == 1:
-                self.remove_previous_kw_row(row)
-            elif column == 0:
-                item = self.previous_kw_table.item(row, column)
-
-                keyword = item.text()
-                if any(keyword == kw for kw in self.last_dict[Method.GAUSSIAN_ROUTE].keys()):
-                    return
-                
-                self.last_dict[Method.GAUSSIAN_ROUTE][keyword] = []
-                
-                self.add_item_to_current_kw_table(keyword)
-    
-        def clicked_current_route_keyword(self, row, column):
-            if column == 1:
-                item = self.current_kw_table.item(row, 0)
-                kw = item.text()
-                del self.last_dict[Method.GAUSSIAN_ROUTE][kw]
-                
-                self.settings.last_gaussian_options = dumps(self.last_dict)  
-                
-                self.current_kw_table.removeRow(row)
-                
-                if kw == self.selected_kw:
-                    self.update_route_opts()
-                    
-                self.gaussianOptionsChanged.emit()
-                
-        def clicked_keyword_option(self, row, column):
-            if column == 1:
-                self.remove_previous_opt_row(row)
-            elif column == 0:
-                item = self.previous_opt_table.item(row, column)
-                option = item.text()
-    
-                keyword = self.selected_kw
-                
-                if option in self.last_dict[Method.GAUSSIAN_ROUTE][keyword]:
-                    return
-                
-                self.last_dict[Method.GAUSSIAN_ROUTE][keyword].append(option)
-                
-                self.add_item_to_current_opt_table(option)
-      
-        def clicked_current_keyword_option(self, row, column):
-            if column == 1:
-                item = self.current_opt_table.item(row, 0)
-                opt = item.text()
-                self.last_dict[Method.GAUSSIAN_ROUTE][self.selected_kw].remove(opt)
-                
-                self.settings.last_gaussian_options = dumps(self.last_dict)
-                
-                self.current_opt_table.removeRow(row)
-                
-                self.gaussianOptionsChanged.emit()
-
 
     def __init__(self, settings, init_form, parent=None):
         super().__init__(parent)
@@ -2122,8 +2223,8 @@ class KeywordWidget(QWidget):
         
         self.layout = QGridLayout(self)
         
-        self.gaussian_widget = self.GaussianKeywordOptions(self.settings)
-        self.gaussian_widget.gaussianOptionsChanged.connect(self.options_changed)
+        self.gaussian_widget = GaussianKeywordOptions(self.settings)
+        self.gaussian_widget.optionsChanged.connect(self.options_changed)
         self.layout.addWidget(self.gaussian_widget)
         
         if init_form == "Gaussian":
@@ -2134,22 +2235,13 @@ class KeywordWidget(QWidget):
     
     def getKWDict(self, update_settings=True):
         if self.form == "Gaussian":
-            for key in self.gaussian_widget.last_dict.keys():
-                if key == Method.GAUSSIAN_ROUTE:
-                    for kw in self.gaussian_widget.last_dict[key].keys():
-                        if kw not in self.gaussian_widget.previous_dict[key].keys():
-                            self.gaussian_widget.previous_dict[key][kw] = []
-                            
-                        for opt in self.gaussian_widget.last_dict[key][kw]:
-                            if opt not in self.gaussian_widget.previous_dict[key][kw]:
-                                self.gaussian_widget.previous_dict[key][kw].append(opt)
+            last_dict = self.gaussian_widget.getKWDict()
 
             if update_settings:
-                self.settings.previous_gaussian_options = dumps(self.gaussian_widget.previous_dict)
-                self.settings.last_gaussian_options = dumps(self.gaussian_widget.last_dict)
+                self.gaussian_widget.settings_changed()
                         
-            return self.gaussian_widget.last_dict
-        
+            return last_dict
+
  
 class InputPreview(ChildToolWindow):
     def __init__(self, tool_instance, title, **kwargs):

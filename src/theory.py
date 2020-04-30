@@ -42,6 +42,7 @@ class Method:
     GAUSSIAN_GEN_BASIS = 5 #gen or genecp basis section
     GAUSSIAN_GEN_ECP = 6 #genecp ECP section
     GAUSSIAN_POST = 7 #after everything else (e.g. NBO options)
+    GAUSSIAN_COMMENT = 8 #comment line after the route
 
     ACCEPTED_INIT_KW = ['functional', \
                         'basis', \
@@ -145,10 +146,16 @@ class Method:
         
         s += "\n\n"
         
-        if self.comment is None:
-            s += "comment\n"
+        if self.GAUSSIAN_COMMENT in other_kw_dict:
+            s += other_kw_dict[self.GAUSSIAN_COMMENT]
+            if not s.endswith('\n'):
+                s += '\n'
+        
         else:
-            s += "%s\n" % self.comment
+            if self.comment is None:
+                s += "comment\n"
+            else:
+                s += "%s\n" % self.comment
             
         s += "\n"
         
@@ -214,7 +221,7 @@ class Method:
                 f.write(s)
                 
         return s, warnings
-         
+
 
 class Functional:
     def __init__(self, name, is_semiempirical):
