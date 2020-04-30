@@ -727,6 +727,7 @@ class FunctionalOption(QWidget):
         keyword_label = QLabel("keyword:")
         
         self.functional_kw = QLineEdit()
+        self.functional_kw.setPlaceholderText("functional name")
         self.functional_kw.setClearButtonEnabled(True)
         
         func_form_layout.addRow(keyword_label, self.functional_kw)
@@ -1069,6 +1070,7 @@ class BasisOption(QWidget):
         #this keeps the widget as narrow as possible so it doesn't take up the entire screen
         scroll_width = self.style().pixelMetric(QStyle.PM_ScrollBarExtent)
         self.elements.setMinimumWidth(scroll_width + int(1.5*self.fontMetrics().boundingRect("QQ").width()))
+        self.elements.setMaximumWidth(scroll_width + int(2*self.fontMetrics().boundingRect("QQ").width()))
         self.elements.setMaximumHeight(int(6*self.fontMetrics().boundingRect("QQ").height()))
         self.elements.setSelectionMode(QListWidget.MultiSelection)
         self.elements.itemSelectionChanged.connect(lambda *args, s=self: self.parent.check_elements(s))
@@ -1078,6 +1080,7 @@ class BasisOption(QWidget):
         self.custom_basis_kw = QLineEdit()
         self.custom_basis_kw.textChanged.connect(self.apply_filter)
         self.custom_basis_kw.textChanged.connect(self.update_tooltab)
+        self.custom_basis_kw.setPlaceholderText("basis name")
         self.custom_basis_kw.setClearButtonEnabled(True)
         
         keyword_label = QLabel("keyword:")
@@ -1131,6 +1134,11 @@ class BasisOption(QWidget):
 
         self.custom_basis_options = [keyword_label, self.custom_basis_kw, is_builtin_label, self.is_builtin, self.previously_used_table]
         self.gen_options = [gen_path_label, self.path_to_basis_file, browse_button]
+
+        #this doesn't seem to do anything?
+        self.layout.setColumnStretch(0, 1)
+        self.layout.setColumnStretch(1, 1)
+        self.layout.setColumnStretch(2, 0)
         
     def open_file_dialog(self):
         """ask user to locate external basis file on their computer"""
@@ -1809,6 +1817,8 @@ class TwoLayerKeyWordOption(QWidget):
         new_kw_widgets_layout = QGridLayout(new_kw_widget)
         self.new_kw = QLineEdit()
         self.new_kw.setPlaceholderText("new %s" % self.name[:-1])
+        self.new_kw.textChanged.connect(self.apply_kw_filter)
+        self.new_kw.setClearButtonEnabled(True)
         add_kw_button = QPushButton("add")
         add_kw_button.clicked.connect(self.add_kw)
         new_kw_widgets_layout.addWidget(QLabel("%s:" % self.name[:-1]), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
@@ -1842,6 +1852,8 @@ class TwoLayerKeyWordOption(QWidget):
         new_opt_widgets_layout = QGridLayout(new_opt_widget)
         self.new_opt = QLineEdit()
         self.new_opt.setPlaceholderText("new option")
+        self.new_opt.textChanged.connect(self.apply_opt_filter)
+        self.new_opt.setClearButtonEnabled(True)
         add_opt_button = QPushButton("add")
         add_opt_button.clicked.connect(self.add_opt)
         new_opt_widgets_layout.addWidget(QLabel("option:"), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
@@ -2114,7 +2126,52 @@ class TwoLayerKeyWordOption(QWidget):
             for opt in self.last_dict[item]:
                 if opt not in self.previous_dict[item]:
                     self.previous_dict[item].append(opt)
-
+    
+    def apply_kw_filter(self, text):
+        #text = self.custom_basis_kw.text()
+        if text:
+            #the user doesn't need capturing groups
+            text = text.replace('(', '\(')
+            text = text.replace(')', '\)')
+            m = QRegularExpression(text)
+            if m.isValid():
+                m.setPatternOptions(QRegularExpression.CaseInsensitiveOption)
+                
+                m.optimize()
+                filter = lambda row_num: m.match(self.previous_kw_table.item(row_num, 0).text()).hasMatch()
+            else:
+                return
+        
+        else:
+            filter = lambda row: True
+            
+        for i in range(0, self.previous_kw_table.rowCount()):
+            self.previous_kw_table.setRowHidden(i, not filter(i))        
+        
+        self.previous_kw_table.resizeColumnToContents(0)    
+    
+    def apply_opt_filter(self, text):
+        #text = self.custom_basis_kw.text()
+        if text:
+            #the user doesn't need capturing groups
+            text = text.replace('(', '\(')
+            text = text.replace(')', '\)')
+            m = QRegularExpression(text)
+            if m.isValid():
+                m.setPatternOptions(QRegularExpression.CaseInsensitiveOption)
+                
+                m.optimize()
+                filter = lambda row_num: m.match(self.previous_opt_table.item(row_num, 0).text()).hasMatch()
+            else:
+                return
+        
+        else:
+            filter = lambda row: True
+            
+        for i in range(0, self.previous_opt_table.rowCount()):
+            self.previous_opt_table.setRowHidden(i, not filter(i))        
+        
+        self.previous_opt_table.resizeColumnToContents(0)
 
 class KeywordOptions(QWidget):
     """
