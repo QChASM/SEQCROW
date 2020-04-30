@@ -284,8 +284,9 @@ class BuildQM(ToolInstance):
     
     def check_elements(self, *args, **kw):
         mdl = self.model_selector.currentData()
-        elements = set(mdl.atoms.elements.names)
-        self.basis_widget.setElements(elements)
+        if mdl is not None:
+            elements = set(mdl.atoms.elements.names)
+            self.basis_widget.setElements(elements)
     
     def get_basis_set(self, update_settings=False):
         basis, ecp = self.basis_widget.get_basis(update_settings)
@@ -1807,9 +1808,10 @@ class TwoLayerKeyWordOption(QWidget):
         new_kw_widget = QWidget()
         new_kw_widgets_layout = QGridLayout(new_kw_widget)
         self.new_kw = QLineEdit()
+        self.new_kw.setPlaceholderText("new %s" % self.name[:-1])
         add_kw_button = QPushButton("add")
         add_kw_button.clicked.connect(self.add_kw)
-        new_kw_widgets_layout.addWidget(QLabel("%s:" % self.name), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
+        new_kw_widgets_layout.addWidget(QLabel("%s:" % self.name[:-1]), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
         new_kw_widgets_layout.addWidget(self.new_kw, 0, 1)
         new_kw_widgets_layout.addWidget(add_kw_button, 0, 2)
         self.keyword_layout.addWidget(new_kw_widget, 1, 0, 1, 2)
@@ -1839,9 +1841,10 @@ class TwoLayerKeyWordOption(QWidget):
         new_opt_widget = QWidget()
         new_opt_widgets_layout = QGridLayout(new_opt_widget)
         self.new_opt = QLineEdit()
+        self.new_opt.setPlaceholderText("new option")
         add_opt_button = QPushButton("add")
         add_opt_button.clicked.connect(self.add_opt)
-        new_opt_widgets_layout.addWidget(QLabel("options:"), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
+        new_opt_widgets_layout.addWidget(QLabel("option:"), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
         new_opt_widgets_layout.addWidget(self.new_opt, 0, 1)
         new_opt_widgets_layout.addWidget(add_opt_button, 0, 2)
         option_layout.addWidget(new_opt_widget, 1, 0, 1, 2)
