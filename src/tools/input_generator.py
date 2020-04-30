@@ -1,4 +1,4 @@
-from chimerax.atomic import AtomicStructure, selected_atoms, selected_bonds
+from chimerax.atomic import AtomicStructure, selected_atoms, selected_bonds, get_triggers
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.core.settings import Settings
@@ -101,8 +101,11 @@ class BuildQM(ToolInstance):
         
         self.refresh_models()
 
+        global_triggers = get_triggers()
+
         self._add_handler = self.session.triggers.add_handler(ADD_MODELS, self.refresh_models)
         self._remove_handler = self.session.triggers.add_handler(REMOVE_MODELS, self.refresh_models)
+        self._changes = global_triggers.add_handler("changes done", self.check_elements)
 
     def _build_ui(self):
         #build an interface with a dropdown menu to select software package
@@ -262,12 +265,12 @@ class BuildQM(ToolInstance):
         if index == -1:
             self.basis_widget.setElements([])
             return
-            
-        mdl = self.model_selector.currentData()
-        elements = set(mdl.atoms.elements.names)
-        self.basis_widget.setElements(elements)
-        self.job_widget.setStructure(mdl)
         
+        mdl = self.model_selector.currentData()
+
+        self.check_elements()
+        self.job_widget.setStructure(mdl)
+
         if mdl in self.session.filereader_manager.filereader_dict:
             fr = self.session.filereader_manager.filereader_dict[mdl]
             if 'charge' in fr.other:
@@ -278,6 +281,11 @@ class BuildQM(ToolInstance):
                 
             if 'temperature' in fr.other:
                 self.job_widget.setTemperature(fr.other['temperature'])
+    
+    def check_elements(self, *args, **kw):
+        mdl = self.model_selector.currentData()
+        elements = set(mdl.atoms.elements.names)
+        self.basis_widget.setElements(elements)
     
     def get_basis_set(self, update_settings=False):
         basis, ecp = self.basis_widget.get_basis(update_settings)
@@ -333,6 +341,10 @@ class BuildQM(ToolInstance):
         #overload delete ro de-register handler
         self.session.triggers.remove_handler(self._add_handler)
         self.session.triggers.remove_handler(self._remove_handler)
+        
+        global_triggers = get_triggers()
+        global_triggers.remove_handler("changes done")
+        
         super().delete()  
 
     def display_help(self):
@@ -434,6 +446,7 @@ class JobTypeOption(QWidget):
 
         constraints_layout.setRowStretch(0, 0)
         constraints_layout.setRowStretch(1, 1)
+        constraints_layout.setContentsMargins(0, 0, 0, 0)
         
         self.constraints_widget.setVisible(self.use_contraints.checkState() == Qt.Checked)
 
@@ -772,6 +785,7 @@ class FunctionalOption(QWidget):
         self.layout.setRowStretch(0, 0)
         self.layout.setRowStretch(1, 0)
         self.layout.setRowStretch(2, 1)
+        self.layout.setContentsMargins(0, 0, 0, 0)
         
         self.functional_option.currentTextChanged.connect(self.functional_changed)
         self.setOptions(self.form)
@@ -1742,6 +1756,8 @@ class BasisWidget(QWidget):
 
 
 class TwoLayerKeyWordOption(QWidget):
+    #TODO:
+    #* tooltip formats
     optionChanged = pyqtSignal()
     settingsChanged = pyqtSignal()
     
@@ -2113,6 +2129,8 @@ class KeywordOptions(QWidget):
     one_route_opt_per_kw        bool; whether the route accepts multiple settings for keywords (who does this?)
     route_opt_fmt               str; % style formating to convert two strings (e.g. %s=(%s))
     """
+    #TODO:
+    #* have attribute that specifies what widget type each item should be
     optionsChanged = pyqtSignal()
     settingsChanged = pyqtSignal()
     
