@@ -344,7 +344,7 @@ class BuildQM(ToolInstance):
         self.session.triggers.remove_handler(self._remove_handler)
         
         global_triggers = get_triggers()
-        global_triggers.remove_handler("changes done")
+        global_triggers.remove_handler(self._changes)
         
         super().delete()  
 
