@@ -1745,7 +1745,10 @@ class BasisWidget(QWidget):
                     
             basis.elements.addItems(new_elements)
             basis.elements.sortItems()
-            basis.setSelectedElements(self.settings.last_basis_elements[j].split(","))
+            if j < len(self.settings.last_basis_elements):
+                previous_elements = self.settings.last_basis_elements[j].split(",")
+                if len(previous_elements) > 0:
+                    basis.setSelectedElements(previous_elements + basis.currentElements())                
 
         for j, basis in enumerate(self.ecp_options):
             for i in range(basis.elements.count()-1, -1, -1):
@@ -1754,7 +1757,10 @@ class BasisWidget(QWidget):
                     
             basis.elements.addItems(new_elements)
             basis.elements.sortItems()
-            basis.setSelectedElements(self.settings.last_ecp_elements[j].split(","))
+            if j < len(self.settings.last_ecp_elements):
+                previous_elements = self.settings.last_ecp_elements[j].split(",")
+                if len(previous_elements) > 0:
+                    basis.setSelectedElements(previous_elements + basis.currentElements())  
 
         if len(self.basis_options) == 1 and len(self.ecp_options) == 0:
             self.basis_options[0].setSelectedElements(self.elements)
