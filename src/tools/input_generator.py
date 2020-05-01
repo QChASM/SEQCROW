@@ -14,7 +14,7 @@ from PyQt5.QtGui import QKeySequence, QFontMetrics, QFontDatabase
 from PyQt5.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, \
                             QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, \
                             QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, \
-                            QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView, QTextBrowser
+                            QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView, QTextBrowser, QStatusBar
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.theory import *
 #TODO: rename tuple2str to iter2str
@@ -105,7 +105,7 @@ class BuildQM(ToolInstance):
 
         self._add_handler = self.session.triggers.add_handler(ADD_MODELS, self.refresh_models)
         self._remove_handler = self.session.triggers.add_handler(REMOVE_MODELS, self.refresh_models)
-        self._changes = global_triggers.add_handler("changes done", self.check_elements)
+        self._changes = global_triggers.add_handler("changes done", self.update_preview)
 
     def _build_ui(self):
         #build an interface with a dropdown menu to select software package
@@ -198,7 +198,8 @@ class BuildQM(ToolInstance):
             self.preview_window = self.tool_window.create_child_window("Input Preview", window_class=InputPreview)
             self.update_preview()
 
-    def update_preview(self):
+    def update_preview(self, *args, **kw):
+        self.check_elements()
         if self.preview_window is not None:
             self.update_theory(False)
         
@@ -208,8 +209,8 @@ class BuildQM(ToolInstance):
             combined_dict = combine_dicts(kw_dict, other_kw_dict)
             
             output, warnings = self.theory.write_gaussian_input(combined_dict)
-            
-            self.preview_window.setPreview(output)
+
+            self.preview_window.setPreview(output, warnings)
             
     def refresh_models(self, *args, **kwargs):
         models = [mdl for mdl in self.session.models if isinstance(mdl, AtomicStructure)]
@@ -281,7 +282,7 @@ class BuildQM(ToolInstance):
                 
             if 'temperature' in fr.other:
                 self.job_widget.setTemperature(fr.other['temperature'])
-    
+        
     def check_elements(self, *args, **kw):
         mdl = self.model_selector.currentData()
         if mdl is not None:
@@ -1468,9 +1469,10 @@ class BasisWidget(QWidget):
         self.basis_toolbox.setTabsClosable(True)
         self.basis_toolbox.tabCloseRequested.connect(self.close_basis_tab)
         valence_layout.addWidget(self.basis_toolbox, 0, 0)
-        self.basis_warning = QLabel()
-        self.basis_warning.setStyleSheet("QLabel { color : red; }")
-        valence_layout.addWidget(self.basis_warning, 1, 0)
+        self.basis_warning = QStatusBar()
+        self.basis_warning.setSizeGripEnabled(False)
+        self.basis_warning.setStyleSheet("color : red")
+        self.layout.addWidget(self.basis_warning, 1, 0, 1, 1)
         
         ecp_side = QWidget()
         ecp_side_layout = QGridLayout(ecp_side)
@@ -1500,8 +1502,10 @@ class BasisWidget(QWidget):
         splitter.addWidget(valence_side)
         splitter.addWidget(ecp_side)
         
-        self.layout.addWidget(splitter)
+        self.layout.addWidget(splitter, 0, 0, 1, 1)
         self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.setRowStretch(0, 1)
+        self.layout.setRowStretch(1, 0)
         
         for i in range(0, self.settings.last_number_basis):
             self.new_basis(use_saved=i)        
@@ -1637,10 +1641,10 @@ class BasisWidget(QWidget):
             basis.update_tooltab()
         
         if len(elements_without_basis) != 0:
-            self.basis_warning.setText("elements with no basis: %s" % ", ".join(elements_without_basis))
+            self.basis_warning.showMessage("elements with no basis: %s" % ", ".join(elements_without_basis))
             self.basis_warning.setVisible(True)
         else:
-            self.basis_warning.setText("elements with no basis: None")
+            self.basis_warning.showMessage("elements with no basis: None")
             self.basis_warning.setVisible(False)
 
     def refresh_ecp(self):
@@ -1737,30 +1741,47 @@ class BasisWidget(QWidget):
         
         new_elements = [element for element in element_list if element not in previous_elements]
         del_elements = [element for element in previous_elements if element not in element_list]
-        
+
+        if len(new_elements) == 0 and len(del_elements) == 0:
+            return
+
         for j, basis in enumerate(self.basis_options):
-            for i in range(basis.elements.count()-1, -1, -1):
-                if basis.elements.item(i).text() in del_elements:
-                    basis.elements.takeItem(i)
-                    
-            basis.elements.addItems(new_elements)
-            basis.elements.sortItems()
-            if j < len(self.settings.last_basis_elements):
-                previous_elements = self.settings.last_basis_elements[j].split(",")
-                if len(previous_elements) > 0:
-                    basis.setSelectedElements(previous_elements + basis.currentElements())                
+            elements_with_different_basis = []
+            for other_basis in self.basis_options:
+                if other_basis is not basis:
+                    elements_with_different_basis.extend(other_basis.currentElements())
+
+            if len(del_elements) > 0:
+                for i in range(basis.elements.count()-1, -1, -1):
+                    if basis.elements.item(i).text() in del_elements:
+                        basis.elements.takeItem(i)
+            
+            if len(new_elements) > 0:
+                basis.elements.addItems(new_elements)
+                basis.elements.sortItems()
+                if j < len(self.settings.last_basis_elements):
+                    previous_elements = self.settings.last_basis_elements[j].split(",")
+                    if len(previous_elements) > 0:
+                        basis.setSelectedElements([x for x in previous_elements + basis.currentElements() if x not in elements_with_different_basis])
 
         for j, basis in enumerate(self.ecp_options):
-            for i in range(basis.elements.count()-1, -1, -1):
-                if basis.elements.item(i).text() in del_elements:
-                    basis.elements.takeItem(i)
+            elements_with_different_basis = []
+            for other_basis in self.ecp_options:
+                if other_basis is not basis:
+                    elements_with_different_basis.extend(other_basis.currentElements())
                     
-            basis.elements.addItems(new_elements)
-            basis.elements.sortItems()
-            if j < len(self.settings.last_ecp_elements):
-                previous_elements = self.settings.last_ecp_elements[j].split(",")
-                if len(previous_elements) > 0:
-                    basis.setSelectedElements(previous_elements + basis.currentElements())  
+            if len(del_elements) > 0:
+                for i in range(basis.elements.count()-1, -1, -1):
+                    if basis.elements.item(i).text() in del_elements:
+                        basis.elements.takeItem(i)
+            
+            if len(new_elements) > 0:
+                basis.elements.addItems(new_elements)
+                basis.elements.sortItems()
+                if j < len(self.settings.last_ecp_elements):
+                    previous_elements = self.settings.last_ecp_elements[j].split(",")
+                    if len(previous_elements) > 0:
+                        basis.setSelectedElements([x for x in previous_elements + basis.currentElements() if x not in elements_with_different_basis])  
 
         if len(self.basis_options) == 1 and len(self.ecp_options) == 0:
             self.basis_options[0].setSelectedElements(self.elements)
@@ -2179,6 +2200,7 @@ class TwoLayerKeyWordOption(QWidget):
         
         self.previous_opt_table.resizeColumnToContents(0)
 
+
 class KeywordOptions(QWidget):
     """
     items is a dict that can include
@@ -2329,7 +2351,7 @@ class KeywordWidget(QWidget):
  
 class InputPreview(ChildToolWindow):
     def __init__(self, tool_instance, title, **kwargs):
-        super().__init__(tool_instance, title, **kwargs)
+        super().__init__(tool_instance, title, statusbar=False, **kwargs)
         
         self._build_ui()
         
@@ -2341,12 +2363,24 @@ class InputPreview(ChildToolWindow):
         self.preview.setFont(font)
         layout.addWidget(self.preview)
         
+        #chimera toolwindows can have a statusbar, but the message goes away after a few seconds
+        #I'll just use a Qt statusbar        
+        self.status = QStatusBar()
+        self.status.setSizeGripEnabled(False)
+        self.status.setStyleSheet("color: red")
+        layout.addWidget(self.status, 1, 0)
+        
         self.ui_area.setLayout(layout)
         
         self.manage(None)
         
-    def setPreview(self, text):
+    def setPreview(self, text, warnings_list):
         self.preview.setText(text)
+        if len(warnings_list) > 0:
+            self.status.setVisible(True)
+            self.status.showMessage("; ".join(warnings_list))
+        else:
+            self.status.setVisible(False)
         
     def cleanup(self):
         self.tool_instance.preview_window = None

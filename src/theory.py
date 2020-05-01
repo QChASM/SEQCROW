@@ -115,10 +115,14 @@ class Method:
                     struc_elements = set([atom.element for atom in self.structure.atoms])
                 elif isinstance(self.structure, AtomicStructure):
                     struc_elements = set(self.structure.atoms.elements.names)
-                    
+
+                elements_wo_basis = []
                 for ele in struc_elements:
                     if ele not in basis_elements:
-                        warnings.append("%s has no basis functions" % ele)
+                        elements_wo_basis.append(ele)
+                        
+                if len(elements_wo_basis) > 0:
+                    warnings.append("no basis set for %s" % ", ".join(elements_wo_basis))
             
             s += "/%s" % basis_info[self.GAUSSIAN_ROUTE]
         
