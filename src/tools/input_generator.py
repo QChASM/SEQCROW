@@ -2354,7 +2354,7 @@ class TwoLayerKeyWordOption(QWidget):
             opt_item = current_opt[0]
             cur_row = opt_item.row()
             self.clicked_current_keyword_option(cur_row, 1)
-            
+        
         self.settingsChanged.emit()
 
         self.previous_opt_table.removeRow(row)
@@ -2487,7 +2487,6 @@ class TwoLayerKeyWordOption(QWidget):
             self.current_opt_table.removeRow(row)
             
             self.optionChanged.emit()
-            self.settingsChanged.emit()
     
     def refresh_previous(self):
         for item in self.last_dict.keys():
@@ -2756,7 +2755,7 @@ class KeywordWidget(QWidget):
     
     def getKWDict(self, update_settings=True):
         if self.form == "Gaussian":
-            last_dict = self.gaussian_widget.getKWDict()
+            last_dict = self.gaussian_widget.getKWDict(update_settings)
 
             if update_settings:
                 self.gaussian_widget.settings_changed()
