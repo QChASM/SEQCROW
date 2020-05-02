@@ -86,7 +86,9 @@ class Method:
         if self.GAUSSIAN_PRE_ROUTE in other_kw_dict:
             for key in other_kw_dict[self.GAUSSIAN_PRE_ROUTE]:
                 if key != "chk":
-                    s += other_kw_dict[self.GAUSSIAN_PRE_ROUTE][key]
+                    s += "%%%s" % key
+                    if len(other_kw_dict[self.GAUSSIAN_PRE_ROUTE][key]) > 0:
+                        s += "=%s" % ",".join(other_kw_dict[self.GAUSSIAN_PRE_ROUTE][key])
                 elif key =="chk":
                     if fname is None:
                         s += "%%chk=DeterminedAtExportTime.chk"
@@ -151,7 +153,11 @@ class Method:
         s += "\n\n"
         
         if self.GAUSSIAN_COMMENT in other_kw_dict:
-            s += other_kw_dict[self.GAUSSIAN_COMMENT]
+            if len(other_kw_dict[self.GAUSSIAN_COMMENT]) > 0:
+                s += "\n".join([x.rstrip() for x in other_kw_dict[self.GAUSSIAN_COMMENT]])
+            else:
+                s += "comment"
+                
             if not s.endswith('\n'):
                 s += '\n'
         
@@ -211,9 +217,11 @@ class Method:
             if self.GAUSSIAN_GEN_ECP in basis_info:
                 s += basis_info[self.GAUSSIAN_GEN_ECP]
                 
+                s += '\n'
+                
         if self.GAUSSIAN_POST in other_kw_dict:
-            for key in other_kw_dict[self.GAUSSIAN_POST]:
-                s += other_kw_dict[self.GAUSSIAN_POST][key]
+            for item in other_kw_dict[self.GAUSSIAN_POST]:
+                s += item
                 s += " "
                 
             s += '\n'
@@ -319,7 +327,7 @@ class BasisSet:
                     s += " ".join([ele for ele in basis.elements])
                     s += " 0\n"
                     s += Basis.map_gaussian09_basis(basis.get_basis_name())
-                    s += "\n****\n"
+                    s += "\n"
                 
             for basis in self.ecp:
                 if len(basis.elements) > 0:
