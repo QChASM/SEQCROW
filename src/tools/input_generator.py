@@ -14,7 +14,8 @@ from PyQt5.QtGui import QKeySequence, QFontMetrics, QFontDatabase
 from PyQt5.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, \
                             QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, \
                             QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, \
-                            QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView, QTextBrowser, QStatusBar
+                            QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView, QTextBrowser, \
+                            QStatusBar, QTextEdit
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.theory import *
 #TODO: rename tuple2str to iter2str
@@ -22,6 +23,11 @@ from SEQCROW.settings import tuple2str
 
 class _InputGeneratorSettings(Settings):
     EXPLICIT_SAVE = {
+        'last_nproc': Value(6, IntArg), 
+        'last_mem': Value(12, IntArg), 
+        'last_opt': Value(False, BoolArg), 
+        'last_ts': Value(False, BoolArg), 
+        'last_freq': Value(False, BoolArg), 
         'previous_basis_names': Value([], ListOf(StringArg), tuple2str),
         'previous_basis_paths': Value([], ListOf(StringArg), tuple2str),        
         'previous_ecp_names': Value([], ListOf(StringArg), tuple2str),
@@ -200,6 +206,18 @@ class BuildQM(ToolInstance):
         #           list of places?
         #               look at how AARON does jobs
         
+        run = menu.addMenu("&Run")
+        locally = QAction("&Locally - coming soon", self.tool_window.ui_area)
+        remotely = QAction("R&emotely - coming eventually", self.tool_window.ui_area)
+        run.addAction(locally)
+        run.addAction(remotely)
+        
+        batch = menu.addMenu("&Batch")
+        multistructure = QAction("&Multiple structures - coming eventually", self.tool_window.ui_area)
+        focal_point = QAction("&Focal point table - coming eventually", self.tool_window.ui_area)
+        batch.addAction(multistructure)
+        batch.addAction(focal_point)
+
         menu.setNativeMenuBar(False)
         layout.setMenuBar(menu)
 
@@ -371,8 +389,6 @@ class BuildQM(ToolInstance):
     
 
 class JobTypeOption(QWidget):
-    #TODO:
-    #make it so when you check geom opt or freq, it switches to that tab
     jobTypeChanged = pyqtSignal()
     
     def __init__(self, settings, session, init_form, parent=None):
@@ -417,6 +433,58 @@ class JobTypeOption(QWidget):
         self.layout.addWidget(job_form, 0, 0, Qt.AlignTop)
         
         self.job_type_opts = QTabWidget()
+        
+        self.runtime = QWidget()
+        #the lineedit + button aligns poorly with a formlayout's label
+        runtime_outer_shell_layout = QGridLayout(self.runtime)
+        runtime_form = QWidget()
+        runtime_layout = QFormLayout(runtime_form)
+        margins = runtime_layout.contentsMargins()
+        new_margins = (margins.left(), 0, margins.right(), 0)
+        runtime_layout.setContentsMargins(*new_margins)
+        
+        self.nprocs = QSpinBox()
+        self.nprocs.setRange(0, 128)
+        self.nprocs.setSingleStep(2)
+        self.nprocs.setToolTip("set to 0 to not specify")
+        self.nprocs.setValue(self.settings.last_nproc)
+        self.nprocs.valueChanged.connect(self.something_changed)
+        runtime_layout.addRow("processors:", self.nprocs)
+        
+        self.mem = QSpinBox()
+        self.mem.setRange(0, 512)
+        self.mem.setSingleStep(4)
+        self.mem.setSuffix(' GB')
+        self.mem.setToolTip("set to 0 to not specify")
+        self.mem.setValue(self.settings.last_mem)
+        self.mem.valueChanged.connect(self.something_changed)
+        runtime_layout.addRow("memory:", self.mem)
+        
+        self.use_checkpoint = QCheckBox()
+        self.use_checkpoint.stateChanged.connect(self.something_changed)
+        runtime_layout.addRow("read checkpoint:", self.use_checkpoint)
+        
+        runtime_outer_shell_layout.addWidget(runtime_form, 0, 0, 1, 1, Qt.AlignTop)
+        
+        file_browse = QWidget()
+        file_browse_layout = QGridLayout(file_browse)
+        margins = file_browse_layout.contentsMargins()
+        new_margins = (margins.left(), 0, margins.right(), 0)
+        file_browse_layout.setContentsMargins(*new_margins)
+        self.chk_file_path = QLineEdit()
+        self.chk_file_path.textChanged.connect(self.something_changed)
+        chk_browse_button = QPushButton("browse")
+        chk_browse_button.clicked.connect(self.open_chk_save)
+        label = QLabel("checkpoint path:")
+        file_browse_layout.addWidget(label, 0, 0, Qt.AlignVCenter)
+        file_browse_layout.addWidget(self.chk_file_path, 0, 1, Qt.AlignVCenter)
+        file_browse_layout.addWidget(chk_browse_button, 0, 2, Qt.AlignVCenter)
+        file_browse_layout.setColumnStretch(0, 0)
+        file_browse_layout.setColumnStretch(1, 1)
+        file_browse_layout.setColumnStretch(2, 0)
+        runtime_outer_shell_layout.addWidget(file_browse, 1, 0, Qt.AlignTop)
+        
+        self.job_type_opts.addTab(self.runtime, "execution")
         
         self.geom_opt = QWidget()
         geom_opt_layout = QGridLayout(self.geom_opt)
@@ -533,7 +601,7 @@ class JobTypeOption(QWidget):
         
         solvent_layout.addWidget(self.solvent_names)
         
-        self.job_type_opts.addTab(solvent_widget, "solvent options")
+        self.job_type_opts.addTab(solvent_widget, "solvent")
         
         self.layout.addWidget(self.job_type_opts, 1, 0, Qt.AlignTop)
 
@@ -543,9 +611,30 @@ class JobTypeOption(QWidget):
         self.setOptions(self.form)
         
         self.change_job_type()
+        
+        self.do_geom_opt.setCheckState(Qt.Checked if self.settings.last_opt else Qt.Unchecked)
+        self.ts_opt.setCheckState(Qt.Checked if self.settings.last_ts else Qt.Unchecked)
+        self.do_freq.setCheckState(Qt.Checked if self.settings.last_freq else Qt.Unchecked)
+        
+        self.do_geom_opt.stateChanged.connect(self.opt_checked)
+        self.do_freq.stateChanged.connect(self.freq_checked)
+        
+    def open_chk_save(self):
+        #TODO: change filter based on software
+        filename, _ = QFileDialog.getSaveFileName(filter="Gaussian checkpoint files (*.chk)")
+        if filename:
+            self.chk_file_path.setText(filename)
     
     def something_changed(self, *args, **kw):
         self.jobTypeChanged.emit()
+    
+    def opt_checked(self, state):
+        if state == Qt.Checked:
+            self.job_type_opts.setCurrentIndex(1)    
+    
+    def freq_checked(self, state):
+        if state == Qt.Checked:
+            self.job_type_opts.setCurrentIndex(2)
     
     def setOptions(self, program):
         #do this when other programs are supported
@@ -592,8 +681,8 @@ class JobTypeOption(QWidget):
         self.jobTypeChanged.emit()
     
     def change_job_type(self, *args):
-        self.job_type_opts.setTabEnabled(0, self.do_geom_opt.checkState() == Qt.Checked)
-        self.job_type_opts.setTabEnabled(1, self.do_freq.checkState() == Qt.Checked)
+        self.job_type_opts.setTabEnabled(1, self.do_geom_opt.checkState() == Qt.Checked)
+        self.job_type_opts.setTabEnabled(2, self.do_freq.checkState() == Qt.Checked)
         
         self.jobTypeChanged.emit()
           
@@ -713,8 +802,34 @@ class JobTypeOption(QWidget):
             else:
                 if update_settings:
                     self.settings.previous_gaussian_solvent_model = "None"
-                    
-            return {Method.GAUSSIAN_ROUTE:route}
+
+            link0 = {}
+            if self.nprocs.value() != 0:
+                link0['NProcShared'] = [str(self.nprocs.value())]
+            
+            if self.mem.value() != 0:
+                link0['Mem'] = ["%iGB" % self.mem.value()]
+
+            if self.use_checkpoint.checkState() == Qt.Checked:
+                for kw in route:
+                    if "CalcFC" in route[kw]:
+                        if kw == "opt" or kw == "irc" :
+                            #apparently, IRC can only read cartesian force constants and not interal coords
+                            #opt can do ReadFC and ReadCartesianFC, but I'm just going to pick ReadCartesianFC
+                            route[kw].remove("CalcFC")
+                            route[kw].append("ReadCartesianFC")
+                            
+            if self.chk_file_path.text() != "":
+                link0["chk"] = [self.chk_file_path.text()]
+
+            if update_settings:
+                self.settings.last_nproc = self.nprocs.value()
+                self.settings.last_mem = self.mem.value()
+                self.settings.last_opt = self.do_geom_opt.checkState() == Qt.Checked
+                self.settings.last_ts = self.ts_opt.checkState() == Qt.Checked
+                self.settings.last_freq = self.do_freq.checkState() == Qt.Checked
+
+            return {Method.GAUSSIAN_PRE_ROUTE:link0, Method.GAUSSIAN_ROUTE:route}
 
 
 class FunctionalOption(QWidget):
@@ -731,10 +846,16 @@ class FunctionalOption(QWidget):
         self.settings = settings
         self.form = init_form
         
-        self.layout = QGridLayout(self)
-        
+        layout = QGridLayout(self)
+        margins = layout.contentsMargins()
+        new_margins = (margins.left(), 0, margins.right(), 0)
+        layout.setContentsMargins(*new_margins)
+
         functional_form = QWidget()
         func_form_layout = QFormLayout(functional_form)
+        margins = func_form_layout.contentsMargins()
+        new_margins = (margins.left(), margins.top(), margins.right(), 0)
+        func_form_layout.setContentsMargins(*new_margins)
         
         self.functional_option = QComboBox()
         func_form_layout.addRow("functional:", self.functional_option)
@@ -756,7 +877,7 @@ class FunctionalOption(QWidget):
 
         func_form_layout.addRow(semi_empirical_label, self.is_semiemperical)
 
-        self.layout.addWidget(functional_form, 0, 0, Qt.AlignTop)
+        layout.addWidget(functional_form, 0, 0, Qt.AlignTop)
 
         self.previously_used_table = QTableWidget()
         self.previously_used_table.setColumnCount(3)
@@ -779,11 +900,14 @@ class FunctionalOption(QWidget):
         self.previously_used_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
         self.previously_used_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
         
-        self.layout.addWidget(self.previously_used_table, 1, 0, Qt.AlignTop)
+        layout.addWidget(self.previously_used_table, 1, 0, Qt.AlignTop)
 
         dft_form = QWidget()
         disp_form_layout = QFormLayout(dft_form)
-
+        margins = disp_form_layout.contentsMargins()
+        new_margins = (margins.left(), 0, margins.right(), 0)
+        disp_form_layout.setContentsMargins(*new_margins)
+        
         self.dispersion = QComboBox()
         self.dispersion.currentIndexChanged.connect(self.something_changed)
 
@@ -795,14 +919,14 @@ class FunctionalOption(QWidget):
         
         disp_form_layout.addRow("integration grid:", self.grid)
         
-        self.layout.addWidget(dft_form, 2, 0, Qt.AlignTop)
+        layout.addWidget(dft_form, 2, 0, Qt.AlignTop)
         
         self.other_options = [keyword_label, self.functional_kw, semi_empirical_label, self.is_semiemperical, self.previously_used_table]
         
-        self.layout.setRowStretch(0, 0)
-        self.layout.setRowStretch(1, 0)
-        self.layout.setRowStretch(2, 1)
-        self.layout.setContentsMargins(0, 0, 0, 0)
+        layout.setRowStretch(0, 0)
+        layout.setRowStretch(1, 0)
+        layout.setRowStretch(2, 1)
+        layout.setContentsMargins(0, 0, 0, 0)
         
         self.functional_option.currentTextChanged.connect(self.functional_changed)
         self.setOptions(self.form)
@@ -1482,7 +1606,7 @@ class BasisWidget(QWidget):
         self.basis_toolbox = QTabWidget()
         self.basis_toolbox.setTabsClosable(True)
         self.basis_toolbox.tabCloseRequested.connect(self.close_basis_tab)
-        self.basis_toolbox.setStyleSheet('QTabWidget::pane {border: 0px;}')
+        self.basis_toolbox.setStyleSheet('QTabWidget::pane {border: 1px;}')
         valence_layout.addWidget(self.basis_toolbox, 0, 0)
         self.basis_warning = QStatusBar()
         self.basis_warning.setSizeGripEnabled(False)
@@ -1496,7 +1620,7 @@ class BasisWidget(QWidget):
         self.ecp_toolbox = QTabWidget()
         self.ecp_toolbox.setTabsClosable(True)
         self.ecp_toolbox.tabCloseRequested.connect(self.close_ecp_tab)
-        self.ecp_toolbox.setStyleSheet('QTabWidget::pane {border: 0px;}')
+        self.ecp_toolbox.setStyleSheet('QTabWidget::pane {border: 1px;}')
         ecp_layout.addWidget(self.ecp_toolbox, 0, 0)
 
         valence_side_layout.addWidget(valence_basis_area, 0, 0)
@@ -1806,13 +1930,14 @@ class BasisWidget(QWidget):
         
         self.basisChanged.emit()
 
+
 class OneLayerKeyWordOption(QWidget):
     #TODO:
     #* tooltip formats
     optionChanged = pyqtSignal()
     settingsChanged = pyqtSignal()
     
-    def __init__(self, name, last_list, previous_list, parent=None):
+    def __init__(self, name, last_list, previous_list, multiline=False, parent=None):
         """
         name                    - name of the left groupbox
         last_list               - list of 'last' setting corresponding to just the target position (i.e. route, blocks)
@@ -1822,6 +1947,7 @@ class OneLayerKeyWordOption(QWidget):
         self.name = name
         self.last_list = last_list
         self.previous_list = previous_list
+        self.multiline = multiline
         
         super().__init__(parent)
 
@@ -1846,15 +1972,21 @@ class OneLayerKeyWordOption(QWidget):
 
         new_kw_widget = QWidget()
         new_kw_widgets_layout = QGridLayout(new_kw_widget)
-        self.new_kw = QLineEdit()
+        if self.multiline:
+            self.new_kw = QTextEdit()
+            self.new_kw.setAcceptRichText(False)
+            self.new_kw.setMaximumHeight(int(6*self.fontMetrics().boundingRect("QQ").height()))
+        else:
+            self.new_kw = QLineEdit()
+            self.new_kw.setClearButtonEnabled(True)
+           
         self.new_kw.setPlaceholderText("new %s" % self.name[:-1])
         self.new_kw.textChanged.connect(self.apply_kw_filter)
-        self.new_kw.setClearButtonEnabled(True)
         add_kw_button = QPushButton("add")
         add_kw_button.clicked.connect(self.add_kw)
-        new_kw_widgets_layout.addWidget(QLabel("%s:" % self.name[:-1]), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
+        new_kw_widgets_layout.addWidget(QLabel("%s:" % self.name[:-1]), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
         new_kw_widgets_layout.addWidget(self.new_kw, 0, 1)
-        new_kw_widgets_layout.addWidget(add_kw_button, 0, 2)
+        new_kw_widgets_layout.addWidget(add_kw_button, 0, 2, 1, 1, Qt.AlignTop)
 
         for kw in self.previous_list:
             self.add_item_to_previous_kw_table(kw)
@@ -1876,6 +2008,8 @@ class OneLayerKeyWordOption(QWidget):
         layout.addWidget(self.previous_kw_table, 0, 0)
         layout.addWidget(self.current_kw_table, 0, 1)
         layout.addWidget(new_kw_widget, 1, 0, 1, 2)
+        layout.setRowStretch(0, 1)
+        layout.setRowStretch(1, 0)
         layout.setContentsMargins(0, 0, 0, 0)
         
     def add_item_to_previous_kw_table(self, kw):
@@ -1935,11 +2069,15 @@ class OneLayerKeyWordOption(QWidget):
         self.optionChanged.emit()
 
     def add_kw(self):
-        kw = self.new_kw.text()
+        if self.multiline:
+            kw = self.new_kw.toPlainText()
+        else:
+            kw = self.new_kw.text()
+
         if kw not in self.last_list:
             self.last_list.append(kw)
         
-        self.add_item_to_current_kw_table(kw)
+            self.add_item_to_current_kw_table(kw)
 
     def clicked_route_keyword(self, row, column):
         if column == 1:
@@ -1964,15 +2102,17 @@ class OneLayerKeyWordOption(QWidget):
             self.current_kw_table.removeRow(row)
 
             self.optionChanged.emit()
-            self.settingsChanged.emit()
  
     def refresh_previous(self):
         for item in self.last_list:
             if item not in self.previous_list:
                 self.previous_list.append(item)
     
-    def apply_kw_filter(self, text):
-        #text = self.custom_basis_kw.text()
+    def apply_kw_filter(self, text=None):
+        if text is None:
+            #QTextEdit's textChanged doesn't give you the text
+            text = self.new_kw.toPlainText()
+        
         if text:
             #the user doesn't need capturing groups
             text = text.replace('(', '\(')
@@ -2250,7 +2390,7 @@ class TwoLayerKeyWordOption(QWidget):
         if kw not in self.last_dict:
             self.last_dict[kw] = []
         
-        self.add_item_to_current_kw_table(kw)
+            self.add_item_to_current_kw_table(kw)
 
     def add_opt(self):
         opt = self.new_opt.text()
@@ -2321,7 +2461,6 @@ class TwoLayerKeyWordOption(QWidget):
                 self.update_route_opts()
                 
             self.optionChanged.emit()
-            self.settingsChanged.emit()
             
     def clicked_keyword_option(self, row, column):
         if column == 1:
@@ -2506,7 +2645,7 @@ class KeywordOptions(QWidget):
                 else:
                     previous_list = self.previous_dict[self.items[item]]
                 
-                self.widgets[item] = OneLayerKeyWordOption("comments", last_list, previous_list)
+                self.widgets[item] = OneLayerKeyWordOption("comments", last_list, previous_list, multiline=True)
                 self.widgets[item].optionChanged.connect(self.something_changed)
                 self.widgets[item].settingsChanged.connect(self.settings_changed)            
                 self.layout.addWidget(self.widgets[item], 1, 0, Qt.AlignTop)
@@ -2522,7 +2661,7 @@ class KeywordOptions(QWidget):
                 else:
                     previous_list = self.previous_dict[self.items[item]]
                 
-                self.widgets[item] = OneLayerKeyWordOption("end lines", last_list, previous_list)
+                self.widgets[item] = OneLayerKeyWordOption("end lines", last_list, previous_list, multiline=True)
                 self.widgets[item].optionChanged.connect(self.something_changed)
                 self.widgets[item].settingsChanged.connect(self.settings_changed)            
                 self.layout.addWidget(self.widgets[item], 1, 0, Qt.AlignTop)

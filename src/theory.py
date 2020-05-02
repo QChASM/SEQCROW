@@ -85,16 +85,10 @@ class Method:
         
         if self.GAUSSIAN_PRE_ROUTE in other_kw_dict:
             for key in other_kw_dict[self.GAUSSIAN_PRE_ROUTE]:
-                if key != "chk":
-                    s += "%%%s" % key
-                    if len(other_kw_dict[self.GAUSSIAN_PRE_ROUTE][key]) > 0:
-                        s += "=%s" % ",".join(other_kw_dict[self.GAUSSIAN_PRE_ROUTE][key])
-                elif key =="chk":
-                    if fname is None:
-                        s += "%%chk=DeterminedAtExportTime.chk"
-                    else:
-                        s += "%%chk=%s" % fname
-                        
+                s += "%%%s" % key
+                if len(other_kw_dict[self.GAUSSIAN_PRE_ROUTE][key]) > 0:
+                    s += "=%s" % ",".join(other_kw_dict[self.GAUSSIAN_PRE_ROUTE][key])
+
                 if not s.endswith('\n'):
                     s += '\n'
         
