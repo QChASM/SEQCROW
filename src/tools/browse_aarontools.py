@@ -18,14 +18,14 @@ from AaronTools.substituent import Substituent
 
 from ..libraries import LigandTable, SubstituentTable, RingTable
 from ..residue_collection import ResidueCollection
-from SEQCROW.settings import tuple2str
+from SEQCROW.utils import iter2str
 
 # TODO: change decorations to use ChimeraX atom/bond defaults
 class _BrowseLibSettings(Settings):
     AUTO_SAVE = {
-        'key_atom_color': Value((0.2, 0.5, 0.8, 0.5), TupleOf(FloatArg, 4), tuple2str),
-        'ghost_connection_color': Value((0.60784, 0.145098, 0.70196, 0.5), TupleOf(FloatArg, 4), tuple2str),
-        'ring_walk_color': Value((0.9, 0.4, 0.3, 0.9), TupleOf(FloatArg, 4), tuple2str),
+        'key_atom_color': Value((0.2, 0.5, 0.8, 0.5), TupleOf(FloatArg, 4), iter2str),
+        'ghost_connection_color': Value((0.60784, 0.145098, 0.70196, 0.5), TupleOf(FloatArg, 4), iter2str),
+        'ring_walk_color': Value((0.9, 0.4, 0.3, 0.9), TupleOf(FloatArg, 4), iter2str),
     }
     
     

@@ -21,14 +21,14 @@ from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, 
                             QFormLayout, QCheckBox, QHeaderView
 
 from ..managers import FILEREADER_CHANGE
-from SEQCROW.settings import tuple2str
+from SEQCROW.utils import iter2str
 
 #TODO:
 #make double clicking something in the table visualize it
 
 class _NormalModeSettings(Settings):
     AUTO_SAVE = {
-        'arrow_color': Value((0.0, 1.0, 0.0, 1.0), TupleOf(FloatArg, 4), tuple2str),
+        'arrow_color': Value((0.0, 1.0, 0.0, 1.0), TupleOf(FloatArg, 4), iter2str),
         'arrow_scale': Value(1.5, FloatArg, str),
         'anim_scale': Value(0.2, FloatArg, str),
         'anim_duration': Value(101, IntArg, str),

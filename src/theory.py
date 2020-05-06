@@ -1,9 +1,6 @@
 import os
 
-KNOWN_GAUSSIAN_PRE_ROUTE_KW = ["chk"]
-GAUSSIAN_JOB_TYPE_KW = {'geometry optimization':'opt', 'frequency calculation':'freq', 'transition state optimization':'opt(ts)', 'single-point energy':'sp'}
-
-KNOWN_NUMERICAL_EXCHANGE = ["B3LYP", "Gaussian's B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D", "B3PW91", "B97-D", "BP86", "PBE0"]
+from SEQCROW.utils import combine_dicts
 
 KNOWN_SEMI_EMPIRICAL = ["AM1", "PM3", "PM6", "PM7"]
 
@@ -34,6 +31,9 @@ class Method:
     CONSTRAINED_TORSION = 3
     
     ORCA_ROUTE = 1
+    ORCA_BLOCKS = 2
+    ORCA_COORDINATES = 3
+    ORCA_COMMENT = 4
     
     GAUSSIAN_PRE_ROUTE = 1 #can be used for things like %chk=some.chk
     GAUSSIAN_ROUTE = 2 #route specifies most options, e.g. #n B3LYP/3-21G opt 
@@ -78,10 +78,10 @@ class Method:
         s = ""
         
         if self.processors is not None:
-            s += "%%nprocshared=%i\n" % self.processors
+            s += "%%NProcShared=%i\n" % self.processors
             
         if self.memory is not None:
-            s += "%%mem=%iGB\n" % self.memory
+            s += "%%Mem=%iGB\n" % self.memory
         
         if self.GAUSSIAN_PRE_ROUTE in other_kw_dict:
             for key in other_kw_dict[self.GAUSSIAN_PRE_ROUTE]:
@@ -120,7 +120,8 @@ class Method:
                 if len(elements_wo_basis) > 0:
                     warnings.append("no basis set for %s" % ", ".join(elements_wo_basis))
             
-            s += "/%s" % basis_info[self.GAUSSIAN_ROUTE]
+            if self.GAUSSIAN_ROUTE in basis_info:
+                s += "%s" % basis_info[self.GAUSSIAN_ROUTE]
         
         s += " "
         
@@ -148,6 +149,7 @@ class Method:
         
         if self.GAUSSIAN_COMMENT in other_kw_dict:
             if len(other_kw_dict[self.GAUSSIAN_COMMENT]) > 0:
+                #TODO: make it impossible to break up te comment with newlines
                 s += "\n".join([x.rstrip() for x in other_kw_dict[self.GAUSSIAN_COMMENT]])
             else:
                 s += "comment"
@@ -228,6 +230,112 @@ class Method:
                 
         return s, warnings
 
+    def write_orca_input(self, other_kw_dict, fname=None):
+        """write Gaussian09/16 input file
+        other_kw_dict is a dictionary with file positions (using GAUSSIAN_* int map)
+        corresponding to options/keywords
+        returns warnings if a certain feature is not available in Gaussian"""
+        #TODO:
+        #add constraints
+        #allow structure to be Geometry
+        #probably other stuff
+
+        from AaronTools.geometry import Geometry
+        from chimerax.atomic import AtomicStructure
+        
+        basis_info = self.basis.get_orca_basis_info()
+        combined_dict = combine_dicts(other_kw_dict, basis_info)
+
+        warnings = []
+        
+        if not self.functional.is_semiempirical:
+            basis_elements = self.basis.elements_in_basis
+            #check if any element is in multiple basis sets
+            for element in basis_elements:
+                if basis_elements.count(element) > 1:
+                    warnings.append("%s is in basis set multiple times" % element)
+                    
+            #check to make sure all elements have a basis set
+            if self.structure is not None:
+                if isinstance(self.structure, Geometry):
+                    struc_elements = set([atom.element for atom in self.structure.atoms])
+                elif isinstance(self.structure, AtomicStructure):
+                    struc_elements = set(self.structure.atoms.elements.names)
+
+                elements_wo_basis = []
+                for ele in struc_elements:
+                    if ele not in basis_elements:
+                        elements_wo_basis.append(ele)
+                        
+                if len(elements_wo_basis) > 0:
+                    warnings.append("no basis set for %s" % ", ".join(elements_wo_basis))
+            
+        s = ""
+
+        s += "!"
+        if self.functional is not None:
+            func, warning = self.functional.get_orca()
+            if warning is not None:
+                warnings.append(warning)
+            s += " %s" % func
+        
+
+        if self.empirical_dispersion is not None:
+            if not s.endswith(' '):
+                s += " "
+                
+            dispersion, warning = self.empirical_dispersion.get_orca()
+            if warning is not None:
+                warnings.append(warning)
+
+            s += "%s" % dispersion
+
+        if self.grid is not None:
+            if not s.endswith(' '):
+                s += " "
+                
+            grid, warning = self.grid.get_orca()
+            if warning is not None:
+                warnings.append(warning)
+
+            s += "%s" % grid
+
+        if self.ORCA_ROUTE in combined_dict:
+            if not s.endswith(' '):
+                s += " "
+                
+                s += " ".join(combined_dict[self.ORCA_ROUTE])
+        
+        s += "\n"
+        
+        if self.processors is not None:
+            s += "%%pal\n    nprocs %i\nend\n" % self.processors
+            
+            if self.memory is not None:
+                s += "%%MaxCore %i\n" % (int(1000 * self.memory / self.processors))
+        
+        if self.ORCA_BLOCKS in combined_dict:
+            for kw in combined_dict[self.ORCA_BLOCKS]:
+                s += "%%%s\n" % kw
+                for opt in combined_dict[self.ORCA_BLOCKS][kw]:
+                    s += "    %s\n" % opt
+                s += "end\n"
+                
+            s += "\n"
+            
+        s += "*xyz %i %i\n" % (self.charge, self.multiplicity)
+        if self.structure is not None:
+            if isinstance(self.structure, AtomicStructure):
+                for atom in self.structure.atoms:
+                    s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element.name, *atom.coord)
+                    
+        s += "*\n"
+        
+        if fname is not None:
+            with open(fname, "w") as f:
+                f.write(s)
+                
+        return s, warnings
 
 class Functional:
     def __init__(self, name, is_semiempirical):
@@ -238,7 +346,8 @@ class Functional:
         """maps proper functional name to one Gaussian accepts
         the following methods are available in other software, but not Gaussian:
         B3LYP (as originally reported)
-        ωB97X-D3"""
+        ωB97X-D3
+        some others that hopefully won't be an issue"""
         if self.name == "ωB97X-D":
             return ("wB97XD", None)
         elif self.name == "Gaussian's B3LYP":
@@ -257,6 +366,21 @@ class Functional:
         else:
             return self.name, None
 
+    def get_orca(self):
+        """maps proper functional name to one Orca accepts"""
+        if self.name == "ωB97X-D":
+            return ("wB97X-D3", "ωB97X-D may refer to ωB97X-D2 or ωB97X-D3 - using the latter")
+        elif self.name == "B97-D":
+            return ("B97-D2", "B97-D may refer to B97-D2 or B97-D3 - using the former")
+        elif self.name == "Gaussian's B3LYP":
+            return ("B3LYP/G", None)
+        elif self.name == "M06-L":
+            #why does M06-2X get a hyphen but not M06-L? 
+            return ("M06L", None)
+        
+        else:
+            return self.name, None
+
 
 class BasisSet:
     def __init__(self, basis, ecp=None):
@@ -266,54 +390,47 @@ class BasisSet:
     @property
     def elements_in_basis(self):
         elements = []
-        for basis in self.basis:
-            elements.extend(basis.elements)
+        if self.basis is not None:
+            for basis in self.basis:
+                elements.extend(basis.elements)
             
         return elements
     
     def get_gaussian09_basis_info(self):
         info = {}
-        #print([basis for basis in self.basis])
-        #if self.ecp is not None:
-        #    print([basis for basis in self.ecp])
-        
-        #for basis in self.basis:
-        #    print(basis == self.basis[0])
-            
-        #print(self.basis[0].user_defined)
-        #print(self.ecp is None)
-        
-        if all([basis == self.basis[0] for basis in self.basis]) and not self.basis[0].user_defined and self.ecp is None:
-            info[Method.GAUSSIAN_ROUTE] = Basis.map_gaussian09_basis(self.basis[0].name)
-        else:
-            if self.ecp is None:
-                info[Method.GAUSSIAN_ROUTE] = "gen"
+
+        if self.basis is not None:
+            if all([basis == self.basis[0] for basis in self.basis]) and not self.basis[0].user_defined and self.ecp is None:
+                info[Method.GAUSSIAN_ROUTE] = "/%s" % Basis.map_gaussian09_basis(self.basis[0].name)
             else:
-                info[Method.GAUSSIAN_ROUTE] = "genecp"
-                
-            s = ""
-            for basis in self.basis:
-                if len(basis.elements) > 0 and not basis.user_defined:
-                    s += " ".join([ele for ele in basis.elements])
-                    s += " 0\n"
-                    s += Basis.map_gaussian09_basis(basis.get_basis_name())
-                    s += "\n****\n"
-                
-            for basis in self.basis:
-                if len(basis.elements) > 0:
-                    if basis.user_defined:
-                        if os.path.exists(basis.user_defined):
-                            with open(basis.user_defined, "r") as f:
-                                lines = f.readlines()
-                            
-                            for line in lines:
-                                if not line.startswith('!') and not len(line.strip()) == 0:
-                                    s += line
-                        else:
-                            s += "@%s\n" % basis.user_defined
-                
-            info[Method.GAUSSIAN_GEN_BASIS] = s
-                
+                if self.ecp is None:
+                    info[Method.GAUSSIAN_ROUTE] = "/gen"
+                else:
+                    info[Method.GAUSSIAN_ROUTE] = "/genecp"
+                    
+                s = ""
+                for basis in self.basis:
+                    if len(basis.elements) > 0 and not basis.user_defined:
+                        s += " ".join([ele for ele in basis.elements])
+                        s += " 0\n"
+                        s += Basis.map_gaussian09_basis(basis.get_basis_name())
+                        s += "\n****\n"
+                    
+                for basis in self.basis:
+                    if len(basis.elements) > 0:
+                        if basis.user_defined:
+                            if os.path.exists(basis.user_defined):
+                                with open(basis.user_defined, "r") as f:
+                                    lines = f.readlines()
+                                
+                                for line in lines:
+                                    if not line.startswith('!') and not len(line.strip()) == 0:
+                                        s += line
+                            else:
+                                s += "@%s\n" % basis.user_defined
+                        
+                    info[Method.GAUSSIAN_GEN_BASIS] = s
+                    
         if self.ecp is not None:
             s = ""
             for basis in self.ecp:
@@ -338,9 +455,50 @@ class BasisSet:
                             
             info[Method.GAUSSIAN_GEN_ECP] = s
             
+            if self.basis is None:
+                info[Method.GAUSSIAN_ROUTE] = " Pseudo=Read"
+            
+        return info    
+    
+    def get_orca_basis_info(self):
+        info = {Method.ORCA_BLOCKS:{'basis':[]}}
+
+        if self.basis is not None:
+            if all([basis == self.basis[0] for basis in self.basis]) and not self.basis[0].user_defined and self.ecp is None:
+                info[Method.ORCA_ROUTE] = Basis.map_orca_basis(self.basis[0].name)
+            else:
+                for basis in self.basis:
+                    s = ""
+                    if len(basis.elements) > 0 and not basis.user_defined:
+                        s += "newGTO            \"%s\" " % " ".join([ele for ele in basis.elements])
+                        s += "%s end" % Basis.map_orca_basis(basis.get_basis_name())
+                    
+                    elif len(basis.elements) > 0 and basis.user_defined:
+                        #I'm not going to insert file contents for Orca b/c the format BSE uses for a file
+                        #seems to be different than what Orca expects in the %basis block
+                        #BSE puts element names where orca expects symbols
+                        s += "GTOName \"%s\"" % basis.user_defined
+                    
+                    if len(basis.elements) > 0:
+                        info[Method.ORCA_BLOCKS]['basis'].append(s)
+                
+        if self.ecp is not None:
+            for basis in self.ecp:
+                s = ""
+                if len(basis.elements) > 0 and not basis.user_defined:
+                    s += "newECP            \"%s\" " % " ".join([ele for ele in basis.elements])
+                    s += "%s end" % Basis.map_orca_basis(basis.get_basis_name())
+                
+                elif len(basis.elements) > 0 and basis.user_defined:
+                    #TODO: check if this works
+                    s += "GTOName \"%s\"" % basis.user_defined                            
+            
+                if len(basis.elements) > 0:
+                    info[Method.ORCA_BLOCKS]['basis'].append(s)
+            
         return info
 
-      
+
 class Basis:
     def __init__(self, name, elements, diffuse=None, polarization=0, user_defined=False):
         """
@@ -411,7 +569,13 @@ class Basis:
         if name.startswith('def2-'):
             return name.replace('def2-', 'def2', 1)
         else:
-            return name
+            return name    
+            
+    @staticmethod
+    def map_orca_basis(name):
+        """returns the Orca name of the basis set
+        currently doesn't do anything"""
+        return name
         
     @staticmethod
     def max_gaussian09_polarizable(name):
@@ -492,7 +656,17 @@ class EmpiricalDispersion:
         #unrecognized
         else:
             raise RuntimeError("unrecognized emperical dispersion: %s" % self.name)
-            
+
+    def get_orca(self):
+        if self.name == "Grimme D2":
+            return ("D2", None)
+        elif self.name == "Undamped Grimme D3":
+            return ("D3", None)
+        elif self.name == "Becke-Johnson damped Grimme D3":
+            return ("D3BJ", None)
+        elif self.name == "Grimme D4":
+            return ("D4", None)
+
 
 class ImplicitSolvent:
     #solvent names look weird, but I'm leaving them this way to make them easier to read 
@@ -682,6 +856,25 @@ class ImplicitSolvent:
                                "Xylene-mixture", 
                                "Z-1,2-DiChloroEthene"]
 
+    KNOWN_ORCA_SOLVENTS = ["Water",
+                           "Acetonitrile", 
+                           "Acetone", 
+                           "Ammonia", 
+                           "Ethanol", 
+                           "Methanol", 
+                           "CH2Cl2", 
+                           "CCl4", 
+                           "DMF", 
+                           "DMSO", 
+                           "Pyridine", 
+                           "THF", 
+                           "Chloroform", 
+                           "Hexane", 
+                           "Benzene", 
+                           "CycloHexane",
+                           "Octanol", 
+                           "Toluene"]
+
     def __init__(self, name, solvent):
         self.name = name
         self.solvent = solvent
@@ -701,44 +894,52 @@ class ImplicitSolvent:
             s += "%s, " % self.name
             
         s += "solvent=%s)" % self.solvent
-            
+
+        if not any(self.solvent.lower() == x.lower() for x in self.KNOWN_GAUSSIAN_SOLVENTS):
+            warning = ["%s might not be a Gaussian solvent"]
+
         return (s, warning)
-        
-        
+
+
 class IntegrationGrid:
     def __init__(self, name):
         self.name = name
         
     def get_gaussian09(self):
         if self.name == "UltraFine":
-            return ("int=(grid=UltraFine)", None)
+            return ("Integral=(grid=UltraFine)", None)
         elif self.name == "FineGrid":
-            return ("int=(grid=FineGrid)", None)
+            return ("Integral=(grid=FineGrid)", None)
         elif self.name == "SuperFineGrid":
-            return ("int=(grid=SuperFineGrid)", None)
+            return ("Integral=(grid=SuperFineGrid)", None)
             
         #Grids available in Orca but not Gaussian
         #uses n_rad from K-Kr as specified in Orca 4.2.1 manual (section 9.3)
         #XXX: there's probably IOp's that can get closer
         elif self.name == "Grid 2":
             n_rad = 45
-            return ("int=(grid=%i110)" % n_rad, "Approximating Orca Grid 2")
+            return ("Integral=(grid=%i110)" % n_rad, "Approximating Orca Grid 2")
         elif self.name == "Grid 3":
             n_rad = 45
-            return ("int=(grid=%i194)" % n_rad, "Approximating Orca Grid 3")
+            return ("Integral=(grid=%i194)" % n_rad, "Approximating Orca Grid 3")
         elif self.name == "Grid 4":
             n_rad = 45
-            return ("int=(grid=%i302)" % n_rad, "Approximating Orca Grid 4")
+            return ("Integral=(grid=%i302)" % n_rad, "Approximating Orca Grid 4")
         elif self.name == "Grid 5":
             n_rad = 50
-            return ("int=(grid=%i434)" % n_rad, "Approximating Orca Grid 5")
+            return ("Integral=(grid=%i434)" % n_rad, "Approximating Orca Grid 5")
         elif self.name == "Grid 6":
             n_rad = 55
-            return ("int=(grid=%i590)" % n_rad, "Approximating Orca Grid 6")
+            return ("Integral=(grid=%i590)" % n_rad, "Approximating Orca Grid 6")
         elif self.name == "Grid 7":
             n_rad = 60
-            return ("int=(grid=%i770)" % n_rad, "Approximating Orca Grid 7")
+            return ("Integral=(grid=%i770)" % n_rad, "Approximating Orca Grid 7")
             
         else:
-            return ("int=(grid=%s)" % self.name, "grid may not be available in Gaussian")
+            return ("Integral=(grid=%s)" % self.name, "grid may not be available in Gaussian")
+            
+    def get_orca(self):
+        """translates grid to something Orca accepts
+        current just returns self.name"""
+        return (self.name, None)
         

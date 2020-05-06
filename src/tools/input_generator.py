@@ -18,8 +18,7 @@ from PyQt5.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter
                             QStatusBar, QTextEdit
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.theory import *
-#TODO: rename tuple2str to iter2str
-from SEQCROW.settings import tuple2str
+from SEQCROW.utils import iter2str, combine_dicts
 
 class _InputGeneratorSettings(Settings):
     EXPLICIT_SAVE = {
@@ -28,26 +27,26 @@ class _InputGeneratorSettings(Settings):
         'last_opt': Value(False, BoolArg), 
         'last_ts': Value(False, BoolArg), 
         'last_freq': Value(False, BoolArg), 
-        'previous_basis_names': Value([], ListOf(StringArg), tuple2str),
-        'previous_basis_paths': Value([], ListOf(StringArg), tuple2str),        
-        'previous_ecp_names': Value([], ListOf(StringArg), tuple2str),
-        'previous_ecp_paths': Value([], ListOf(StringArg), tuple2str),
-        'last_basis': Value(["def2-SVP"], ListOf(StringArg), tuple2str),
-        'last_custom_basis_kw': Value([""], ListOf(StringArg), tuple2str), 
-        'last_custom_basis_builtin': Value([""], ListOf(StringArg), tuple2str),  
-        'last_basis_elements': Value([""], ListOf(StringArg), tuple2str),
+        'previous_basis_names': Value([], ListOf(StringArg), iter2str),
+        'previous_basis_paths': Value([], ListOf(StringArg), iter2str),        
+        'previous_ecp_names': Value([], ListOf(StringArg), iter2str),
+        'previous_ecp_paths': Value([], ListOf(StringArg), iter2str),
+        'last_basis': Value(["def2-SVP"], ListOf(StringArg), iter2str),
+        'last_custom_basis_kw': Value([""], ListOf(StringArg), iter2str), 
+        'last_custom_basis_builtin': Value([""], ListOf(StringArg), iter2str),  
+        'last_basis_elements': Value([""], ListOf(StringArg), iter2str),
         'last_basis_path': Value("", StringArg), 
         'last_number_basis': Value(1, IntArg), 
-        'last_ecp': Value([], ListOf(StringArg), tuple2str), 
-        'last_custom_ecp_kw': Value([], ListOf(StringArg), tuple2str), 
-        'last_custom_ecp_builtin': Value([], ListOf(StringArg), tuple2str), 
-        'last_ecp_elements': Value([], ListOf(StringArg), tuple2str),
+        'last_ecp': Value([], ListOf(StringArg), iter2str), 
+        'last_custom_ecp_kw': Value([], ListOf(StringArg), iter2str), 
+        'last_custom_ecp_builtin': Value([], ListOf(StringArg), iter2str), 
+        'last_ecp_elements': Value([], ListOf(StringArg), iter2str),
         'last_ecp_path': Value("", StringArg),
         'last_number_ecp': Value(0, IntArg), 
         'previous_functional': Value("", StringArg),
         'previous_custom_func': Value("", StringArg), 
-        'previous_functional_names': Value([], ListOf(StringArg), tuple2str),
-        'previous_functional_needs_basis': Value([], ListOf(BoolArg), tuple2str),
+        'previous_functional_names': Value([], ListOf(StringArg), iter2str),
+        'previous_functional_needs_basis': Value([], ListOf(BoolArg), iter2str),
         'previous_dispersion': Value("None", StringArg),
         'previous_grid': Value("Default", StringArg),
         'previous_charge': Value(0, IntArg), 
@@ -71,35 +70,18 @@ class _InputGeneratorSettings(Settings):
                                                   Method.GAUSSIAN_POST: ['$nbo RESONANCE NBOSUM E2PERT=0.0 NLMO BNDIDX $end'], \
                                                  }), StringArg),
         'last_gaussian_options': Value(dumps({Method.GAUSSIAN_ROUTE:{}}), StringArg),
+        'previous_orca_solvent_model': Value("None", StringArg), 
+        'previous_orca_solvent_name': Value("", StringArg), 
+        #shh these are just jsons
+        'previous_orca_options': Value(dumps({}), StringArg),
+        'last_orca_options': Value(dumps({Method.GAUSSIAN_ROUTE:{}}), StringArg),
+        'last_program': Value("Gaussian", StringArg), 
     }
 
+    #def save(self, *args, **kwargs):
+    #    print("saved qm input settings")
+    #    super().save(*args, **kwargs)
 
-def combine_dicts(d1, d2):
-    #TODO
-    #accept any number of input dicts
-    out = {}
-    for key in set(list(d1.keys()) + list(d2.keys())):
-        if key in d1 and not key in d2:
-            out[key] = d1[key]
-            
-        elif key in d2 and key not in d1:
-            out[key] = d2[key]
-            
-        else:
-            if isinstance(d1[key], dict) and isinstance(d2[key], dict):
-                out[key] = combine_dicts(d1[key], d2[key])
-
-            else:
-                out[key] = d1[key] + d2[key]
-                
-    return out
-
-
-#TODO
-#figure out how to remove the border/shadow on certain widgets (QTabWidget)
-#QTableWidget also seems to be 1px too wide...
-#especially ones with margins set to 0
-#try this: https://forum.qt.io/topic/85877/remove-shadow-from-qtabwidget
 
 class BuildQM(ToolInstance):
     SESSION_ENDURING = False
@@ -125,6 +107,9 @@ class BuildQM(ToolInstance):
 
         self._add_handler = self.session.triggers.add_handler(ADD_MODELS, self.refresh_models)
         self._remove_handler = self.session.triggers.add_handler(REMOVE_MODELS, self.refresh_models)
+        #TODO: 
+        #find a better trigger - only need changes to coordinates and elements
+        #'changes done' fires when other things happen like selecting atoms
         self._changes = global_triggers.add_handler("changes done", self.update_preview)
 
     def _build_ui(self):
@@ -139,8 +124,14 @@ class BuildQM(ToolInstance):
         form_layout = QFormLayout(basics_form)
                 
         self.file_type = QComboBox()
-        self.file_type.addItems(['Gaussian'])
-        #self.file_type.currentIndexChanged.connect(self.change_file_type)
+        self.file_type.addItems(['Gaussian', 'Orca'])
+        self.file_type.currentIndexChanged.connect(self.change_file_type)
+        
+        if self.settings.last_program == "Gaussian":
+            self.file_type.setCurrentIndex(0)
+        elif self.settings.last_program == "Orca":
+            self.file_type.setCurrentIndex(1)
+            
         form_layout.addRow("file type:", self.file_type)
         
         self.model_selector = QComboBox()
@@ -206,17 +197,17 @@ class BuildQM(ToolInstance):
         #           list of places?
         #               look at how AARON does jobs
         
-        run = menu.addMenu("&Run")
-        locally = QAction("&Locally - coming soon", self.tool_window.ui_area)
-        remotely = QAction("R&emotely - coming eventually", self.tool_window.ui_area)
-        run.addAction(locally)
-        run.addAction(remotely)
-        
-        batch = menu.addMenu("&Batch")
-        multistructure = QAction("&Multiple structures - coming eventually", self.tool_window.ui_area)
-        focal_point = QAction("&Focal point table - coming eventually", self.tool_window.ui_area)
-        batch.addAction(multistructure)
-        batch.addAction(focal_point)
+        #run = menu.addMenu("&Run")
+        #locally = QAction("&Locally - coming soon", self.tool_window.ui_area)
+        #remotely = QAction("R&emotely - coming eventually", self.tool_window.ui_area)
+        #run.addAction(locally)
+        #run.addAction(remotely)
+        #
+        #batch = menu.addMenu("&Batch")
+        #multistructure = QAction("&Multiple structures - coming eventually", self.tool_window.ui_area)
+        #focal_point = QAction("&Focal point table - coming eventually", self.tool_window.ui_area)
+        #batch.addAction(multistructure)
+        #batch.addAction(focal_point)
 
         menu.setNativeMenuBar(False)
         layout.setMenuBar(menu)
@@ -240,10 +231,31 @@ class BuildQM(ToolInstance):
         
             combined_dict = combine_dicts(kw_dict, other_kw_dict)
             
-            output, warnings = self.theory.write_gaussian_input(combined_dict)
+            if self.file_type.currentText() == "Gaussian":
+                output, warnings = self.theory.write_gaussian_input(combined_dict)
+            elif self.file_type.currentText() == "Orca":
+                output, warnings = self.theory.write_orca_input(combined_dict)
 
             self.preview_window.setPreview(output, warnings)
             
+    def change_file_type(self, *args):
+        self.file_type.blockSignals(True)
+        self.functional_widget.blockSignals(True)
+        self.job_widget.blockSignals(True)
+        self.other_keywords_widget.blockSignals(True)
+    
+        program = self.file_type.currentText()
+        self.functional_widget.setOptions(program)
+        self.job_widget.setOptions(program)
+        self.other_keywords_widget.setOptions(program)
+        
+        self.file_type.blockSignals(False)
+        self.functional_widget.blockSignals(False)
+        self.job_widget.blockSignals(False)
+        self.other_keywords_widget.blockSignals(False)
+        
+        self.update_preview()
+    
     def refresh_models(self, *args, **kwargs):
         models = [mdl for mdl in self.session.models if isinstance(mdl, AtomicStructure)]
         
@@ -280,6 +292,8 @@ class BuildQM(ToolInstance):
         grid = self.functional_widget.getGrid(update_settings)      
         charge = self.job_widget.getCharge(update_settings)
         mult = self.job_widget.getMultiplicity(update_settings)
+        nproc = self.job_widget.getNProc(update_settings)
+        mem = self.job_widget.getMem(update_settings)
 
         if update_settings:
             self.settings.save()
@@ -288,7 +302,8 @@ class BuildQM(ToolInstance):
         
         self.theory = Method(structure=model, charge=charge, multiplicity=mult, \
                              functional=func, basis=basis, empirical_dispersion=dispersion, \
-                             grid=grid, constraints=constraints)
+                             grid=grid, constraints=constraints, \
+                             processors=nproc, memory=mem)
 
     def change_job_type(self):
         #implement later
@@ -335,8 +350,11 @@ class BuildQM(ToolInstance):
         
         combined_dict = combine_dicts(kw_dict, other_kw_dict)
         
-        output, warnings = self.theory.write_gaussian_input(combined_dict)
-        
+        if self.file_type.currentText() == "Gaussian":
+            output, warnings = self.theory.write_gaussian_input(combined_dict)
+        elif self.file_type.currentText() == "Orca":
+            output, warnings = self.theory.write_orca_input(combined_dict)
+                
         for warning in warnings:
             self.session.logger.warning(warning)
 
@@ -357,12 +375,16 @@ class BuildQM(ToolInstance):
         
         combined_dict = combine_dicts(kw_dict, other_kw_dict)
 
-        output, warnings = self.theory.write_gaussian_input(combined_dict)
-        
+        if self.file_type.currentText() == "Gaussian":
+            output, warnings = self.theory.write_gaussian_input(combined_dict)
+            filename, _ = QFileDialog.getSaveFileName(filter="Gaussian input files (*.com)")
+        elif self.file_type.currentText() == "Orca":
+            output, warnings = self.theory.write_orca_input(combined_dict)
+            filename, _ = QFileDialog.getSaveFileName(filter="Orca input files (*.inp)")
+
         for warning in warnings:
             self.session.logger.warning(warning)
 
-        filename, _ = QFileDialog.getSaveFileName(filter="Gaussian input files (*.com)")
         if filename:
             with open(filename, 'w') as f:
                 f.write(output)
@@ -390,6 +412,9 @@ class BuildQM(ToolInstance):
 
 class JobTypeOption(QWidget):
     jobTypeChanged = pyqtSignal()
+    
+    GAUSSIAN_SOLVENT_MODELS = ["PCM", "SMD", "CPCM", "Dipole", "IPCM", "SCIPCM"]
+    ORCA_SOLVENT_MODELS = ["SMD", "CPCM"]
     
     def __init__(self, settings, session, init_form, parent=None):
         super().__init__(parent)
@@ -473,12 +498,12 @@ class JobTypeOption(QWidget):
         file_browse_layout.setContentsMargins(*new_margins)
         self.chk_file_path = QLineEdit()
         self.chk_file_path.textChanged.connect(self.something_changed)
-        chk_browse_button = QPushButton("browse")
-        chk_browse_button.clicked.connect(self.open_chk_save)
+        self.chk_browse_button = QPushButton("browse")
+        self.chk_browse_button.clicked.connect(self.open_chk_save)
         label = QLabel("checkpoint path:")
         file_browse_layout.addWidget(label, 0, 0, Qt.AlignVCenter)
         file_browse_layout.addWidget(self.chk_file_path, 0, 1, Qt.AlignVCenter)
-        file_browse_layout.addWidget(chk_browse_button, 0, 2, Qt.AlignVCenter)
+        file_browse_layout.addWidget(self.chk_browse_button, 0, 2, Qt.AlignVCenter)
         file_browse_layout.setColumnStretch(0, 0)
         file_browse_layout.setColumnStretch(1, 1)
         file_browse_layout.setColumnStretch(2, 0)
@@ -559,7 +584,6 @@ class JobTypeOption(QWidget):
         self.raman = QCheckBox()
         self.raman.setCheckState(Qt.Unchecked)
         self.raman.stateChanged.connect(self.something_changed)
-        self.raman.setToolTip("ask Gaussian to compute Raman scattering intensities")
         freq_opt_form.addRow("Raman intensities:", self.raman)
 
         self.job_type_opts.addTab(self.freq_opt, "frequency settings")
@@ -571,11 +595,7 @@ class JobTypeOption(QWidget):
         solvent_form_layout = QFormLayout(solvent_form)
         
         self.solvent_option = QComboBox()
-        self.solvent_option.addItems(["None", "PCM", "SMD", "CPCM", "Dipole", "IPCM", "SCIPCM"])
         #TODO: move to setOptions
-        ndx = self.solvent_option.findText(self.settings.previous_gaussian_solvent_model)
-        if ndx >= 0:
-            self.solvent_option.setCurrentIndex(ndx)
         self.solvent_option.currentTextChanged.connect(self.change_solvent_model)
         solvent_form_layout.addRow("implicit solvent model:", self.solvent_option)
         
@@ -595,7 +615,6 @@ class JobTypeOption(QWidget):
         self.solvent_names.setSelectionMode(self.solvent_names.SingleSelection)
         self.solvent_names.itemSelectionChanged.connect(self.change_selected_solvent)
         #TODO: move to setOptions
-        self.solvent_names.addItems(ImplicitSolvent.KNOWN_GAUSSIAN_SOLVENTS)
         self.solvent_names.sortItems()
         self.solvent_names.setVisible(self.solvent_option.currentText() != "None")
         
@@ -637,9 +656,38 @@ class JobTypeOption(QWidget):
             self.job_type_opts.setCurrentIndex(2)
     
     def setOptions(self, program):
-        #do this when other programs are supported
-        pass
-    
+        self.form = program
+        self.solvent_option.clear()
+        if program == "Gaussian":
+            self.solvent_option.addItems(["None"])
+            self.solvent_option.addItems(self.GAUSSIAN_SOLVENT_MODELS)
+            self.hpmodes.setEnabled(True)
+            self.raman.setToolTip("ask Gaussian to compute Raman intensities")
+            self.solvent_names.clear()
+            self.solvent_names.addItems(ImplicitSolvent.KNOWN_GAUSSIAN_SOLVENTS)
+            ndx = self.solvent_option.findText(self.settings.previous_gaussian_solvent_model)
+            if ndx >= 0:
+                self.solvent_option.setCurrentIndex(ndx)
+            self.solvent_name.setText(self.settings.previous_gaussian_solvent_name)
+            self.use_checkpoint.setEnabled(True)
+            self.chk_file_path.setEnabled(True)
+            self.chk_browse_button.setEnabled(True)
+        
+        elif program == "Orca":
+            self.solvent_option.addItems(["None"])
+            self.solvent_option.addItems(self.ORCA_SOLVENT_MODELS)
+            self.hpmodes.setEnabled(False)
+            self.raman.setToolTip("ask Orca to compute Raman intensities")
+            self.solvent_names.clear()
+            self.solvent_names.addItems(ImplicitSolvent.KNOWN_ORCA_SOLVENTS)
+            ndx = self.solvent_option.findText(self.settings.previous_orca_solvent_model)
+            if ndx >= 0:
+                self.solvent_option.setCurrentIndex(ndx)
+            self.solvent_name.setText(self.settings.previous_orca_solvent_name)
+            self.use_checkpoint.setEnabled(False)
+            self.chk_file_path.setEnabled(False)
+            self.chk_browse_button.setEnabled(False)
+
     def change_selected_solvent(self):
         item = self.solvent_names.selectedItems()
         if len(item) == 1:
@@ -759,7 +807,25 @@ class JobTypeOption(QWidget):
             
         else:
             return {'atoms':self.constrained_atoms, 'bonds':self.constrained_bonds, 'angles':[], 'torsions':[]}
-            
+
+    def getNProc(self, update_settings=True):
+        if update_settings:
+            self.settings.last_nproc = self.nprocs.value()
+        
+        if self.nprocs.value() != 0:
+            return self.nprocs.value()
+        else:
+            return None
+    
+    def getMem(self, update_settings=True):
+        if update_settings:
+            self.settings.last_mem = self.mem.value()
+        
+        if self.mem.value() != 0:
+            return self.mem.value()
+        else:
+            return None
+    
     def getKWDict(self, update_settings=True):
         if self.form == "Gaussian":
             route = {}
@@ -804,11 +870,7 @@ class JobTypeOption(QWidget):
                     self.settings.previous_gaussian_solvent_model = "None"
 
             link0 = {}
-            if self.nprocs.value() != 0:
-                link0['NProcShared'] = [str(self.nprocs.value())]
-            
-            if self.mem.value() != 0:
-                link0['Mem'] = ["%iGB" % self.mem.value()]
+
 
             if self.use_checkpoint.checkState() == Qt.Checked:
                 for kw in route:
@@ -831,12 +893,61 @@ class JobTypeOption(QWidget):
 
             return {Method.GAUSSIAN_PRE_ROUTE:link0, Method.GAUSSIAN_ROUTE:route}
 
+        if self.form == "Orca":
+            route = []
+            blocks = {}
+            if self.do_geom_opt.checkState() == Qt.Checked:
+                if self.ts_opt.checkState() == Qt.Checked:
+                    route.append("OptTS")
+                else:
+                    route.append("Opt")
+
+            if self.do_freq.checkState() == Qt.Checked:
+                if self.raman.checkState() != Qt.Checked:
+                    route.append("Freq")
+                else:
+                    route.append("NumFreq")
+                    
+                temp = self.temp.value()
+                blocks['freq'] = ["%.2f" % temp]
+ 
+            if self.solvent_option.currentText() != "None":
+                solvent_scrf = self.solvent_option.currentText()
+                if update_settings:
+                    self.settings.previous_gaussian_solvent_model = solvent_scrf
+
+                solvent_name = self.solvent_name.text()
+                if update_settings:
+                    self.settings.previous_gaussian_solvent_name = solvent_name
+                
+                if len(solvent_name) > 0:
+                    route.append("%s(%s)" % (solvent_scrf, solvent_name))
+                else:
+                    route.append("%s" % (solvent_scrf))
+
+            else:
+                if update_settings:
+                    self.settings.previous_gaussian_solvent_model = "None"
+
+            if update_settings:
+                self.settings.last_nproc = self.nprocs.value()
+                self.settings.last_mem = self.mem.value()
+                self.settings.last_opt = self.do_geom_opt.checkState() == Qt.Checked
+                self.settings.last_ts = self.ts_opt.checkState() == Qt.Checked
+                self.settings.last_freq = self.do_freq.checkState() == Qt.Checked
+
+            return {Method.ORCA_ROUTE:route, Method.ORCA_BLOCKS:blocks}
+
 
 class FunctionalOption(QWidget):
     #TODO: make checking the "is_semiemperical" box disable the basis functions tab of the parent tab widget
     GAUSSIAN_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D", "B3PW91", "B97-D", "BP86", "PBE0", "PM6", "AM1"]
     GAUSSIAN_DISPERSION = ["Grimme D2", "Grimme D3", "Becke-Johnson damped Grimme D3", "Petersson-Frisch"]
     GAUSSIAN_GRIDS = ["Default", "SuperFineGrid", "UltraFine", "FineGrid"]
+    
+    ORCA_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D3", "B3PW91", "B97-D", "BP86", "PBE0"]
+    ORCA_DISPERSION = ["Grimme D2", "Undamped Grimme D3", "Becke-Johnson damped Grimme D3", "Grimme D4"]
+    ORCA_GRIDS = ["Default", "Grid7", "Grid6", "Grid5", "Grid4", "Grid3"]
     
     functionalChanged = pyqtSignal()
     
@@ -1029,7 +1140,16 @@ class FunctionalOption(QWidget):
             self.dispersion.addItems(self.GAUSSIAN_DISPERSION)
             
             self.grid.addItems(self.GAUSSIAN_GRIDS)
-
+            
+        elif program == "Orca":
+            self.functional_option.addItems(self.ORCA_FUNCTIONALS)
+            self.functional_option.addItem("other")
+            
+            self.dispersion.addItem("None")
+            self.dispersion.addItems(self.ORCA_DISPERSION)
+            
+            self.grid.addItems(self.ORCA_GRIDS)
+        
         self.functionalChanged.emit()
 
     def setPreviousStuff(self):
@@ -1937,7 +2057,7 @@ class OneLayerKeyWordOption(QWidget):
     optionChanged = pyqtSignal()
     settingsChanged = pyqtSignal()
     
-    def __init__(self, name, last_list, previous_list, multiline=False, parent=None):
+    def __init__(self, name, last_list=[], previous_list=[], multiline=False, parent=None):
         """
         name                    - name of the left groupbox
         last_list               - list of 'last' setting corresponding to just the target position (i.e. route, blocks)
@@ -1980,11 +2100,11 @@ class OneLayerKeyWordOption(QWidget):
             self.new_kw = QLineEdit()
             self.new_kw.setClearButtonEnabled(True)
            
-        self.new_kw.setPlaceholderText("new %s" % self.name[:-1])
+        self.new_kw.setPlaceholderText("new %s" % self.name)
         self.new_kw.textChanged.connect(self.apply_kw_filter)
         add_kw_button = QPushButton("add")
         add_kw_button.clicked.connect(self.add_kw)
-        new_kw_widgets_layout.addWidget(QLabel("%s:" % self.name[:-1]), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        new_kw_widgets_layout.addWidget(QLabel("%s:" % self.name), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
         new_kw_widgets_layout.addWidget(self.new_kw, 0, 1)
         new_kw_widgets_layout.addWidget(add_kw_button, 0, 2, 1, 1, Qt.AlignTop)
 
@@ -2074,6 +2194,9 @@ class OneLayerKeyWordOption(QWidget):
         else:
             kw = self.new_kw.text()
 
+        if len(kw.strip()) == 0:
+            return
+
         if kw not in self.last_list:
             self.last_list.append(kw)
         
@@ -2137,7 +2260,7 @@ class OneLayerKeyWordOption(QWidget):
 
 class TwoLayerKeyWordOption(QWidget):
     #TODO:
-    #* tooltip formats
+    #allow multiline options
     optionChanged = pyqtSignal()
     settingsChanged = pyqtSignal()
     
@@ -2328,8 +2451,7 @@ class TwoLayerKeyWordOption(QWidget):
         row = self.previous_opt_table.rowCount()
         self.previous_opt_table.insertRow(row)
         item = QTableWidgetItem(opt)
-        fmt = "double click to %s" % self.opt_fmt
-        item.setToolTip(fmt % (self.selected_kw, opt))
+        item.setToolTip(self.opt_fmt % (self.selected_kw, opt))
         self.previous_opt_table.setItem(row, 0, item)
         
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
@@ -2387,6 +2509,9 @@ class TwoLayerKeyWordOption(QWidget):
 
     def add_kw(self):
         kw = self.new_kw.text()
+        if len(kw.strip()) == 0:
+            return
+        
         if kw not in self.last_dict:
             self.last_dict[kw] = []
         
@@ -2394,8 +2519,15 @@ class TwoLayerKeyWordOption(QWidget):
 
     def add_opt(self):
         opt = self.new_opt.text()
+        if len(opt.strip()) == 0:
+            return
 
         kw = self.selected_kw
+        if kw is None:
+            #no keyword is selected - do nothing
+            #TODO: raise error so the user doesn't wonder why nothing is happening
+            return
+
         if opt not in self.last_dict[kw]:
             if self.one_opt_per_kw:
                 self.last_dict[kw] = [opt]
@@ -2601,69 +2733,20 @@ class KeywordOptions(QWidget):
         
         self.widgets = {}
         for item in self.items.keys():
-            if item == "route":
-                if self.items[item] not in self.last_dict:
-                    last_dict = {}
-                else:
-                    last_dict = self.last_dict[self.items[item]]
-                
-                if self.items[item] not in self.previous_dict:
-                    previous_dict = {}
-                else:
-                    previous_dict = self.previous_dict[self.items[item]]
-                
-                self.widgets[item] = TwoLayerKeyWordOption("keywords", last_dict, previous_dict, self.route_opt_fmt, one_opt_per_kw=self.one_route_opt_per_kw)
-                self.widgets[item].optionChanged.connect(self.something_changed)
-                self.widgets[item].settingsChanged.connect(self.settings_changed)
-                self.layout.addWidget(self.widgets[item], 1, 0, Qt.AlignTop)
-                
-            elif item == "link 0":
-                if self.items[item] not in self.last_dict:
-                    last_dict = {}
-                else:
-                    last_dict = self.last_dict[self.items[item]]
-                
-                if self.items[item] not in self.previous_dict:
-                    previous_dict = {}
-                else:
-                    previous_dict = self.previous_dict[self.items[item]]
-                
-                self.widgets[item] = TwoLayerKeyWordOption("link 0 commands", last_dict, previous_dict, self.link0_opt_fmt, one_opt_per_kw=self.one_link0_opt_per_kw)
-                self.widgets[item].optionChanged.connect(self.something_changed)
-                self.widgets[item].settingsChanged.connect(self.settings_changed)
-                self.layout.addWidget(self.widgets[item], 1, 0, Qt.AlignTop)
-                
-            elif item == "comment":
-                if self.items[item] not in self.last_dict:
-                    last_list = []
-                else:
-                    last_list = self.last_dict[self.items[item]]
-                
-                if self.items[item] not in self.previous_dict:
-                    previous_list = []
-                else:
-                    previous_list = self.previous_dict[self.items[item]]
-                
-                self.widgets[item] = OneLayerKeyWordOption("comments", last_list, previous_list, multiline=True)
-                self.widgets[item].optionChanged.connect(self.something_changed)
-                self.widgets[item].settingsChanged.connect(self.settings_changed)            
-                self.layout.addWidget(self.widgets[item], 1, 0, Qt.AlignTop)
-                
-            elif item == "end of file":
-                if self.items[item] not in self.last_dict:
-                    last_list = []
-                else:
-                    last_list = self.last_dict[self.items[item]]
-                
-                if self.items[item] not in self.previous_dict:
-                    previous_list = []
-                else:
-                    previous_list = self.previous_dict[self.items[item]]
-                
-                self.widgets[item] = OneLayerKeyWordOption("end lines", last_list, previous_list, multiline=True)
-                self.widgets[item].optionChanged.connect(self.something_changed)
-                self.widgets[item].settingsChanged.connect(self.settings_changed)            
-                self.layout.addWidget(self.widgets[item], 1, 0, Qt.AlignTop)
+            if self.items[item] not in self.last_dict:
+                last = None
+            else:
+                last = self.last_dict[self.items[item]]
+            
+            if self.items[item] not in self.previous_dict:
+                previous = None
+            else:
+                previous = self.previous_dict[self.items[item]]
+            
+            self.widgets[item] = self.get_options_for(item, last, previous)
+            self.widgets[item].optionChanged.connect(self.something_changed)
+            self.widgets[item].settingsChanged.connect(self.settings_changed)
+            self.layout.addWidget(self.widgets[item], 1, 0, Qt.AlignTop)
 
         position_selector.currentTextChanged.connect(self.change_widget)            
         self.change_widget(position_selector.currentText())
@@ -2715,6 +2798,13 @@ class KeywordOptions(QWidget):
             self.settings_changed()
         
         return last_dict
+    
+    @classmethod
+    def get_options_for(cls, item):
+        """returns a OneLayerKeyWordOption or TwoLayerKeyWordOption instance that is 
+        appropriate for item
+        should be overridden by subclasses"""
+        pass
 
 
 class GaussianKeywordOptions(KeywordOptions):
@@ -2725,11 +2815,111 @@ class GaussianKeywordOptions(KeywordOptions):
             }
     previous_option_name = "previous_gaussian_options"
     last_option_name = "last_gaussian_options"
-    one_route_opt_per_kw = False
-    one_link0_opt_per_kw = False
-    route_opt_fmt = "use %s=(%s)"
-    link0_opt_fmt = "add %%%s=%s"
 
+    @classmethod
+    def get_options_for(cls, name, last, previous):
+        if name == "route":
+            if last is None:
+                last_dict = {}
+            else:
+                last_dict = last            
+                
+            if previous is None:
+                previous_dict = {}
+            else:
+                previous_dict = previous
+                
+            return TwoLayerKeyWordOption("keywords", last_dict, previous_dict, "double click to add %s=(%s)", one_opt_per_kw=False)
+            
+        elif name == "comment":
+            if last is None:
+                last_list = []
+            else:
+                last_list = last            
+                
+            if previous is None:
+                previous_list = []
+            else:
+                previous_list = previous
+                
+            return OneLayerKeyWordOption("comment", last_list, previous_list, multiline=True)
+            
+        elif name == "end of file":
+            if last is None:
+                last_list = []
+            else:
+                last_list = last            
+                
+            if previous is None:
+                previous_list = []
+            else:
+                previous_list = previous
+                
+            return OneLayerKeyWordOption("end of file", last_list, previous_list, multiline=True)
+
+        elif name == "link 0":
+            if last is None:
+                last_dict = {}
+            else:
+                last_dict = last            
+                
+            if previous is None:
+                previous_dict = {}
+            else:
+                previous_dict = previous
+                
+            return TwoLayerKeyWordOption("link 0 commands", last_dict, previous_dict, "double click to use %%%s=%s", one_opt_per_kw=False)
+
+
+class OrcaKeywordOptions(KeywordOptions):
+    items = {'route': Method.ORCA_ROUTE, \
+             'comment': Method.ORCA_COMMENT, \
+             'blocks': Method.ORCA_BLOCKS, \
+            }
+
+    previous_option_name = "previous_orca_options"
+    last_option_name = "last_orca_options"
+
+    @classmethod
+    def get_options_for(cls, name, last, previous):
+        if name == "route":
+            if last is None:
+                last_list = []
+            else:
+                last_list = last            
+                
+            if previous is None:
+                previous_list = []
+            else:
+                previous_list = previous
+                
+            return OneLayerKeyWordOption("keyword", last_list, previous_list, multiline=False)
+            
+        elif name == "comment":
+            if last is None:
+                last_list = []
+            else:
+                last_list = last            
+                
+            if previous is None:
+                previous_list = []
+            else:
+                previous_list = previous
+                
+            return OneLayerKeyWordOption("comment", last_list, previous_list, multiline=True)
+
+        elif name == "blocks":
+            if last is None:
+                last_dict = {}
+            else:
+                last_dict = last            
+                
+            if previous is None:
+                previous_dict = {}
+            else:
+                previous_dict = previous
+                
+            return TwoLayerKeyWordOption("blocks", last_dict, previous_dict, "double click to use %%%s %s end", one_opt_per_kw=False)
 
 class KeywordWidget(QWidget):
     #TODO:
@@ -2745,11 +2935,27 @@ class KeywordWidget(QWidget):
         
         self.gaussian_widget = GaussianKeywordOptions(self.settings)
         self.gaussian_widget.optionsChanged.connect(self.options_changed)
-        self.layout.addWidget(self.gaussian_widget)
+        self.layout.addWidget(self.gaussian_widget, 0, 0)
+        
+        self.orca_widget = OrcaKeywordOptions(self.settings)
+        self.orca_widget.optionsChanged.connect(self.options_changed)
+        self.layout.addWidget(self.orca_widget, 0, 0)
+
+        self.setOptions(init_form)
         
         if init_form == "Gaussian":
             self.gaussian_widget.setVisible(True)
     
+    def setOptions(self, program):
+        self.form = program
+        if program == "Gaussian":
+            self.gaussian_widget.setVisible(True)
+            self.orca_widget.setVisible(False)
+        
+        elif program == "Orca":
+            self.gaussian_widget.setVisible(False)
+            self.orca_widget.setVisible(True)
+
     def options_changed(self):
         self.additionalOptionsChanged.emit()
     
@@ -2759,7 +2965,15 @@ class KeywordWidget(QWidget):
 
             if update_settings:
                 self.gaussian_widget.settings_changed()
-                        
+
+            return last_dict        
+        
+        if self.form == "Orca":
+            last_dict = self.orca_widget.getKWDict(update_settings)
+
+            if update_settings:
+                self.orca_widget.settings_changed()
+
             return last_dict
 
  
