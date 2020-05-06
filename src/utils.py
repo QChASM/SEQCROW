@@ -16,7 +16,6 @@ def combine_dicts(d1, d2):
                 out[key] = combine_dicts(d1[key], d2[key])
 
             else:
-                print(d1[key], d2[key])
                 out[key] = d1[key] + d2[key]
                 
     return out

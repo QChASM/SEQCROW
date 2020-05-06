@@ -2508,6 +2508,8 @@ class TwoLayerKeyWordOption(QWidget):
         self.optionChanged.emit()
 
     def add_kw(self):
+        #TODO:
+        #automatically select new kw
         kw = self.new_kw.text()
         if len(kw.strip()) == 0:
             return

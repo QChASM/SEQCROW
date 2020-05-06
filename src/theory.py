@@ -464,30 +464,27 @@ class BasisSet:
         info = {Method.ORCA_BLOCKS:{'basis':[]}}
 
         if self.basis is not None:
-            if all([basis == self.basis[0] for basis in self.basis]) and not self.basis[0].user_defined and self.ecp is None:
-                info[Method.ORCA_ROUTE] = Basis.map_orca_basis(self.basis[0].name)
-            else:
-                for basis in self.basis:
-                    s = ""
-                    if len(basis.elements) > 0 and not basis.user_defined:
-                        s += "newGTO            \"%s\" " % " ".join([ele for ele in basis.elements])
-                        s += "%s end" % Basis.map_orca_basis(basis.get_basis_name())
-                    
-                    elif len(basis.elements) > 0 and basis.user_defined:
-                        #I'm not going to insert file contents for Orca b/c the format BSE uses for a file
-                        #seems to be different than what Orca expects in the %basis block
-                        #BSE puts element names where orca expects symbols
-                        s += "GTOName \"%s\"" % basis.user_defined
-                    
-                    if len(basis.elements) > 0:
-                        info[Method.ORCA_BLOCKS]['basis'].append(s)
+            for basis in self.basis:
+                s = ""
+                if len(basis.elements) > 0 and not basis.user_defined:
+                    s += "newGTO            %s " % " ".join([ele for ele in basis.elements])
+                    s += "\"%s\" end" % Basis.map_orca_basis(basis.get_basis_name())
+                
+                elif len(basis.elements) > 0 and basis.user_defined:
+                    #I'm not going to insert file contents for Orca b/c the format BSE uses for a file
+                    #seems to be different than what Orca expects in the %basis block
+                    #BSE puts element names where orca expects symbols
+                    s += "GTOName \"%s\"" % basis.user_defined
+                
+                if len(basis.elements) > 0:
+                    info[Method.ORCA_BLOCKS]['basis'].append(s)
                 
         if self.ecp is not None:
             for basis in self.ecp:
                 s = ""
                 if len(basis.elements) > 0 and not basis.user_defined:
-                    s += "newECP            \"%s\" " % " ".join([ele for ele in basis.elements])
-                    s += "%s end" % Basis.map_orca_basis(basis.get_basis_name())
+                    s += "newECP            %s " % " ".join([ele for ele in basis.elements])
+                    s += "\"%s\" end" % Basis.map_orca_basis(basis.get_basis_name())
                 
                 elif len(basis.elements) > 0 and basis.user_defined:
                     #TODO: check if this works
