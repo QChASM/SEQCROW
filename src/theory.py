@@ -18,7 +18,7 @@ class Method:
     constraints             -   dictionary of bond, angle, and torsional constraints (keys: atoms, bonds, angles, torsions)
                                     currently, only atoms and bonds are enabled. bonds are only enabled if structure is an AtomicStructure.
     empirical_dispersion    -   EmpiricalDispersion object
-    grid                    -   IntegrationGrid object (should be a 2-long list for Orca, as one is used for SCF and one is used for energy etc)
+    grid                    -   IntegrationGrid object
     
     comment                 -   comment
     
@@ -249,27 +249,16 @@ class Method:
         warnings = []
         
         if not self.functional.is_semiempirical:
-            basis_elements = self.basis.elements_in_basis
-            #check if any element is in multiple basis sets
-            for element in basis_elements:
-                if basis_elements.count(element) > 1:
-                    warnings.append("%s is in basis set multiple times" % element)
-                    
-            #check to make sure all elements have a basis set
             if self.structure is not None:
                 if isinstance(self.structure, Geometry):
                     struc_elements = set([atom.element for atom in self.structure.atoms])
                 elif isinstance(self.structure, AtomicStructure):
                     struc_elements = set(self.structure.atoms.elements.names)
-
-                elements_wo_basis = []
-                for ele in struc_elements:
-                    if ele not in basis_elements:
-                        elements_wo_basis.append(ele)
-                        
-                if len(elements_wo_basis) > 0:
-                    warnings.append("no basis set for %s" % ", ".join(elements_wo_basis))
             
+                warning = self.basis.check_for_elements(struc_elements)
+                if warning is not None:
+                    warnings.append(warning)
+
         s = ""
 
         s += "!"
@@ -337,6 +326,7 @@ class Method:
                 
         return s, warnings
 
+
 class Functional:
     def __init__(self, name, is_semiempirical):
         self.name = name
@@ -357,7 +347,7 @@ class Functional:
         elif self.name.startswith("M06-"):
             return (self.name.replace("M06-", "M06", 1), None)
         
-        #methods available in Orca but not Gaussian
+        #methods available in ORCA but not Gaussian
         elif self.name == "𝜔ωB97X-D3":
             return ("wB97XD", "ωB97X-D3 is not available in Gaussian, switching to ωB97X-D2")
         elif self.name == "B3LYP":
@@ -367,7 +357,7 @@ class Functional:
             return self.name, None
 
     def get_orca(self):
-        """maps proper functional name to one Orca accepts"""
+        """maps proper functional name to one ORCA accepts"""
         if self.name == "ωB97X-D":
             return ("wB97X-D3", "ωB97X-D may refer to ωB97X-D2 or ωB97X-D3 - using the latter")
         elif self.name == "B97-D":
@@ -461,43 +451,145 @@ class BasisSet:
         return info    
     
     def get_orca_basis_info(self):
-        info = {Method.ORCA_BLOCKS:{'basis':[]}}
+        #TODO: warn if basis should be f12
+        info = {Method.ORCA_BLOCKS:{'basis':[]}, Method.ORCA_ROUTE:[]}
+
+        first_basis = []
 
         if self.basis is not None:
             for basis in self.basis:
-                s = ""
                 if len(basis.elements) > 0 and not basis.user_defined:
-                    s += "newGTO            %s " % " ".join([ele for ele in basis.elements])
-                    s += "\"%s\" end" % Basis.map_orca_basis(basis.get_basis_name())
-                
+                    if basis.aux_type is None:
+                        if basis.aux_type not in first_basis:
+                            s = Basis.map_orca_basis(basis.get_basis_name())
+                            info[Method.ORCA_ROUTE].append(s)
+                            first_basis.append(basis.aux_type)
+                            
+                        else:
+                            for ele in basis.elements:
+                                s = "newGTO            %-2s " % ele
+                                s += "\"%s\" end" % Basis.map_orca_basis(basis.get_basis_name())
+                    
+                                info[Method.ORCA_BLOCKS]['basis'].append(s)
+                        
+                    elif basis.aux_type == "C":
+                        if basis.aux_type not in first_basis:
+                            s = "%s/C" % Basis.map_orca_basis(basis.get_basis_name())
+                            info[Method.ORCA_ROUTE].append(s)
+                            first_basis.append(basis.aux_type)
+                        
+                        else:
+                            for ele in basis.elements:
+                                s = "newAuxCGTO        %-2s " % ele
+                                s += "\"%s/C\" end" % Basis.map_orca_basis(basis.get_basis_name())
+                    
+                                info[Method.ORCA_BLOCKS]['basis'].append(s)
+                    
+                    elif basis.aux_type == "J":
+                        if basis.aux_type not in first_basis:
+                            s = "%s/J" % Basis.map_orca_basis(basis.get_basis_name())
+                            info[Method.ORCA_ROUTE].append(s)
+                            first_basis.append(basis.aux_type)
+                        
+                        else:
+                            for ele in basis.elements:
+                                s = "newAuxJGTO        %-2s " % ele
+                                s += "\"%s/J\" end" % Basis.map_orca_basis(basis.get_basis_name())
+                    
+                                info[Method.ORCA_BLOCKS]['basis'].append(s)
+
+                    elif basis.aux_type == "JK":
+                        if basis.aux_type not in first_basis:
+                            s = "%s/JK" % Basis.map_orca_basis(basis.get_basis_name())
+                            info[Method.ORCA_ROUTE].append(s)
+                            first_basis.append(basis.aux_type)
+                        
+                        else:
+                            for ele in basis.elements:
+                                s = "newAuxJKGTO       %-2s " % ele
+                                s += "\"%s/JK\" end" % Basis.map_orca_basis(basis.get_basis_name())
+                    
+                                info[Method.ORCA_BLOCKS]['basis'].append(s)
+
+                    elif basis.aux_type == "CABS":
+                        if basis.aux_type not in first_basis:
+                            s = "%s-CABS" % Basis.map_orca_basis(basis.get_basis_name())
+                            info[Method.ORCA_ROUTE].append(s)
+                            first_basis.append(basis.aux_type)
+                            
+                        else:
+                            for ele in basis.elements:
+                                s = "newCABSGTO        %-2s " % ele
+                                s += "\"%s-CABS\" end" % Basis.map_orca_basis(basis.get_basis_name())
+                    
+                                info[Method.ORCA_BLOCKS]['basis'].append(s)
+
+                    elif basis.aux_type == "OptRI CABS":
+                        if basis.aux_type not in first_basis:
+                            s = "%s-OptRI" % Basis.map_orca_basis(basis.get_basis_name())
+                            info[Method.ORCA_ROUTE].append(s)
+                            first_basis.append(basis.aux_type)
+                        
+                        else:
+                            for ele in basis.elements:
+                                s = "newCABSGTO        %-2s " % ele
+                                s += "\"%s-OptRI\" end" % Basis.map_orca_basis(basis.get_basis_name())
+                    
+                                info[Method.ORCA_BLOCKS]['basis'].append(s)
+
                 elif len(basis.elements) > 0 and basis.user_defined:
-                    #I'm not going to insert file contents for Orca b/c the format BSE uses for a file
-                    #seems to be different than what Orca expects in the %basis block
+                    #I'm not going to insert file contents for ORCA b/c the format BSE uses for a file
+                    #seems to be different than what ORCA expects in the %basis block
                     #BSE puts element names where orca expects symbols
                     s += "GTOName \"%s\"" % basis.user_defined
                 
-                if len(basis.elements) > 0:
-                    info[Method.ORCA_BLOCKS]['basis'].append(s)
+                    if len(basis.elements) > 0:
+                        info[Method.ORCA_BLOCKS]['basis'].append(s)
                 
         if self.ecp is not None:
             for basis in self.ecp:
-                s = ""
                 if len(basis.elements) > 0 and not basis.user_defined:
-                    s += "newECP            %s " % " ".join([ele for ele in basis.elements])
-                    s += "\"%s\" end" % Basis.map_orca_basis(basis.get_basis_name())
-                
+                    for ele in basis.elements:
+                        s = "newECP            %-2s " % ele
+                        s += "\"%s\" end" % Basis.map_orca_basis(basis.get_basis_name())
+                    
+                        info[Method.ORCA_BLOCKS]['basis'].append(s)
+ 
                 elif len(basis.elements) > 0 and basis.user_defined:
                     #TODO: check if this works
-                    s += "GTOName \"%s\"" % basis.user_defined                            
+                    s = "GTOName \"%s\"" % basis.user_defined                            
             
-                if len(basis.elements) > 0:
                     info[Method.ORCA_BLOCKS]['basis'].append(s)
             
         return info
 
+    def check_for_elements(self, elements):
+        warning = ""
+        if self.basis is not None:
+            elements_without_basis = {}
+            for basis in self.basis:
+                if basis.aux_type not in elements_without_basis:
+                    elements_without_basis[basis.aux_type] = elements.copy()
+                    
+                for element in basis.elements:
+                    if element in elements_without_basis[basis.aux_type]:
+                        elements_without_basis[basis.aux_type].remove(element)
+            
+            if any(len(elements_without_basis[aux]) != 0 for aux in elements_without_basis.keys()):
+                for aux in elements_without_basis.keys():
+                    if len(elements_without_basis[aux]) != 0:
+                        if aux != "no":
+                            warning += "%s have no auxiliary %s basis; " % (", ".join(elements_without_basis[aux]), aux)
+                        else:
+                            warning += "%s have no basis; " % (", ".join(elements_without_basis[aux]))
+                            
+                return warning.strip('; ')
+            
+            else:
+                return None
 
 class Basis:
-    def __init__(self, name, elements, diffuse=None, polarization=0, user_defined=False):
+    def __init__(self, name, elements, aux_type=None, diffuse=None, polarization=0, user_defined=False):
         """
         name         -   basis set base name (e.g. 6-31G)
         elements     -   list of element symbols the basis set applies to
@@ -509,7 +601,8 @@ class Basis:
         i.e. name=6-31G* and diffuse=1 results in 6-31G**
         """
         self.name = name
-        self.elements = elements        
+        self.elements = elements
+        self.aux_type = aux_type
         self.diffuse = diffuse
         self.polarization = polarization
         self.user_defined = user_defined
@@ -570,7 +663,7 @@ class Basis:
             
     @staticmethod
     def map_orca_basis(name):
-        """returns the Orca name of the basis set
+        """returns the ORCA name of the basis set
         currently doesn't do anything"""
         return name
         
@@ -644,7 +737,7 @@ class EmpiricalDispersion:
         elif self.name == "Petersson-Frisch":
             return ("EmpiricalDispersion=PFD", None)
             
-        #dispersions in Orca but not Gaussian
+        #dispersions in ORCA but not Gaussian
         elif self.name == "Grimme D4":
             return ("EmpiricalDispersion=GD3BJ", "Grimme's D4 has no keyword in Gaussian, switching to GD3BJ")
         elif self.name == "undampened Grimme D3":
@@ -670,7 +763,7 @@ class ImplicitSolvent:
     #many look similar (dichloromethane and dichloroethane, etc)
     KNOWN_GAUSSIAN_SOLVENTS = ["Water", 
                                "Acetonitrile", 
-                               "Methanol"
+                               "Methanol", 
                                "Ethanol", 
                                "IsoQuinoline", 
                                "Quinoline", 
@@ -910,33 +1003,33 @@ class IntegrationGrid:
         elif self.name == "SuperFineGrid":
             return ("Integral=(grid=SuperFineGrid)", None)
             
-        #Grids available in Orca but not Gaussian
-        #uses n_rad from K-Kr as specified in Orca 4.2.1 manual (section 9.3)
+        #Grids available in ORCA but not Gaussian
+        #uses n_rad from K-Kr as specified in ORCA 4.2.1 manual (section 9.3)
         #XXX: there's probably IOp's that can get closer
         elif self.name == "Grid 2":
             n_rad = 45
-            return ("Integral=(grid=%i110)" % n_rad, "Approximating Orca Grid 2")
+            return ("Integral=(grid=%i110)" % n_rad, "Approximating ORCA Grid 2")
         elif self.name == "Grid 3":
             n_rad = 45
-            return ("Integral=(grid=%i194)" % n_rad, "Approximating Orca Grid 3")
+            return ("Integral=(grid=%i194)" % n_rad, "Approximating ORCA Grid 3")
         elif self.name == "Grid 4":
             n_rad = 45
-            return ("Integral=(grid=%i302)" % n_rad, "Approximating Orca Grid 4")
+            return ("Integral=(grid=%i302)" % n_rad, "Approximating ORCA Grid 4")
         elif self.name == "Grid 5":
             n_rad = 50
-            return ("Integral=(grid=%i434)" % n_rad, "Approximating Orca Grid 5")
+            return ("Integral=(grid=%i434)" % n_rad, "Approximating ORCA Grid 5")
         elif self.name == "Grid 6":
             n_rad = 55
-            return ("Integral=(grid=%i590)" % n_rad, "Approximating Orca Grid 6")
+            return ("Integral=(grid=%i590)" % n_rad, "Approximating ORCA Grid 6")
         elif self.name == "Grid 7":
             n_rad = 60
-            return ("Integral=(grid=%i770)" % n_rad, "Approximating Orca Grid 7")
+            return ("Integral=(grid=%i770)" % n_rad, "Approximating ORCA Grid 7")
             
         else:
             return ("Integral=(grid=%s)" % self.name, "grid may not be available in Gaussian")
             
     def get_orca(self):
-        """translates grid to something Orca accepts
+        """translates grid to something ORCA accepts
         current just returns self.name"""
         return (self.name, None)
         

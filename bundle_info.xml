@@ -15,7 +15,7 @@
 
 SEQCROW adds the following to ChimeraX:
 I/O:
-    read XYZ, Gaussian COM, Gaussian LOG files, and Orca output files
+    read XYZ, Gaussian COM, Gaussian LOG files, and ORCA output files
     save models to XYZ files
 
 tools:
@@ -70,12 +70,12 @@ presets:
                           nicknames="log" 
                           synopsis="Gaussian output file"/>
                           
-                <Provider name="Orca output file" 
+                <Provider name="ORCA output file" 
                           category="Molecular structure" 
                           suffixes=".out" 
                           encoding="utf-8" 
                           nicknames="orca out" 
-                          synopsis="Orca output file"/>
+                          synopsis="ORCA output file"/>
                           
                 <Provider name="XYZ file" 
                           category="Molecular structure" 
@@ -88,7 +88,7 @@ presets:
             <Providers manager="open command">
                 <Provider name="Gaussian input file" want_path="true"/>
                 <Provider name="Gaussian output file" want_path="true"/>
-                <Provider name="Orca output file" want_path="true"/>
+                <Provider name="ORCA output file" want_path="true"/>
                 <Provider name="XYZ file" want_path="true"/>
             </Providers>
             
@@ -116,7 +116,7 @@ presets:
                 <!-- TODO: move tools to appropriate menus -->
                 <!--NOTE:
                 including my own Bundle line will prevent anything after it from being loaded
-                ChimeraX's devel bui
+                ChimeraX's devel build
                 ChimeraXClassifier>ChimeraX :: Bundle :: General,Input/Output,Structure Editing,External Program :: 1,1 :: SEQCROW :: ChimAARON,SEQCRO,SEQCROW :: true</ChimeraXClassifier-->
                 <ChimeraXClassifier>ChimeraX :: Tool :: Build QM Input :: SEQCROW :: Create Gaussian input file</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Structure Modification :: AaronTools :: Modify substituents, swap ligands, and close rings</ChimeraXClassifier>
@@ -132,7 +132,7 @@ presets:
                 <ChimeraXClassifier>ChimeraX :: Open :: COM :: COM ::</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: DataFormat :: LOG :: LOG :: Molecular structure :: .log :: :: :: :: :: Gaussian output file :: utf-8</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Open :: LOG :: LOG :: false :: coordsets:Bool</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: DataFormat :: OUT :: OUT :: Molecular structure :: .out :: :: :: :: :: Orca output file :: utf-8</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: DataFormat :: OUT :: OUT :: Molecular structure :: .out :: :: :: :: :: ORCA output file :: utf-8</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Open :: OUT :: OUT :: false :: coordsets:Bool</ChimeraXClassifier>
         </Classifiers>
             

@@ -32,6 +32,7 @@ class _InputGeneratorSettings(Settings):
         'previous_ecp_names': Value([], ListOf(StringArg), iter2str),
         'previous_ecp_paths': Value([], ListOf(StringArg), iter2str),
         'last_basis': Value(["def2-SVP"], ListOf(StringArg), iter2str),
+        'last_basis_aux': Value(["no"], ListOf(StringArg), iter2str), 
         'last_custom_basis_kw': Value([""], ListOf(StringArg), iter2str), 
         'last_custom_basis_builtin': Value([""], ListOf(StringArg), iter2str),  
         'last_basis_elements': Value([""], ListOf(StringArg), iter2str),
@@ -90,7 +91,7 @@ class BuildQM(ToolInstance):
     def __init__(self, session, name):       
         super().__init__(session, name)
 
-        self.settings = _InputGeneratorSettings(session, name)
+        self.settings = _InputGeneratorSettings(session, name, version="2")
         
         self.display_name = "QM Input Generator"
         
@@ -118,20 +119,19 @@ class BuildQM(ToolInstance):
         #TODO: move everything to do with the tabwidget into a different widget
         #TODO: add a presets tab to save/load presets to aaronrc or to seqcrow 
         #      so it can easily be used in other tools (like one that runs QM software)
+        init_form = self.settings.last_program
+
         layout = QGridLayout()
         
         basics_form = QWidget()
         form_layout = QFormLayout(basics_form)
                 
         self.file_type = QComboBox()
-        self.file_type.addItems(['Gaussian', 'Orca'])
+        self.file_type.addItems(['Gaussian', 'ORCA'])
+        ndx = self.file_type.findText(init_form, Qt.MatchExactly)
+        self.file_type.setCurrentIndex(ndx)
         self.file_type.currentIndexChanged.connect(self.change_file_type)
-        
-        if self.settings.last_program == "Gaussian":
-            self.file_type.setCurrentIndex(0)
-        elif self.settings.last_program == "Orca":
-            self.file_type.setCurrentIndex(1)
-            
+
         form_layout.addRow("file type:", self.file_type)
         
         self.model_selector = QComboBox()
@@ -140,19 +140,19 @@ class BuildQM(ToolInstance):
         layout.addWidget(basics_form, 0, 0)
         
         #job type stuff
-        self.job_widget = JobTypeOption(self.settings, self.session, init_form=self.file_type.currentText())
+        self.job_widget = JobTypeOption(self.settings, self.session, init_form=init_form)
         self.job_widget.jobTypeChanged.connect(self.update_preview)
         
         #functional stuff
-        self.functional_widget = FunctionalOption(self.settings, init_form=self.file_type.currentText())
+        self.functional_widget = FunctionalOption(self.settings, init_form=init_form)
         self.functional_widget.functionalChanged.connect(self.update_preview)
 
         #basis set stuff
-        self.basis_widget = BasisWidget(self.settings)
+        self.basis_widget = BasisWidget(self.settings, init_form=init_form)
         self.basis_widget.basisChanged.connect(self.update_preview)
         
         #other keywords
-        self.other_keywords_widget = KeywordWidget(self.settings, init_form=self.file_type.currentText())
+        self.other_keywords_widget = KeywordWidget(self.settings, init_form=init_form)
         self.other_keywords_widget.additionalOptionsChanged.connect(self.update_preview)
         
         tabs = QTabWidget()
@@ -233,24 +233,30 @@ class BuildQM(ToolInstance):
             
             if self.file_type.currentText() == "Gaussian":
                 output, warnings = self.theory.write_gaussian_input(combined_dict)
-            elif self.file_type.currentText() == "Orca":
+            elif self.file_type.currentText() == "ORCA":
                 output, warnings = self.theory.write_orca_input(combined_dict)
 
             self.preview_window.setPreview(output, warnings)
             
     def change_file_type(self, *args):
+        #if we don't block signals, the preview will try to update before all widgets 
+        #have been updated to give the proper info
         self.file_type.blockSignals(True)
         self.functional_widget.blockSignals(True)
+        self.basis_widget.blockSignals(True)
         self.job_widget.blockSignals(True)
         self.other_keywords_widget.blockSignals(True)
     
         program = self.file_type.currentText()
+        self.settings.last_program = program
         self.functional_widget.setOptions(program)
+        self.basis_widget.setOptions(program)
         self.job_widget.setOptions(program)
         self.other_keywords_widget.setOptions(program)
         
         self.file_type.blockSignals(False)
         self.functional_widget.blockSignals(False)
+        self.basis_widget.blockSignals(False)
         self.job_widget.blockSignals(False)
         self.other_keywords_widget.blockSignals(False)
         
@@ -350,9 +356,11 @@ class BuildQM(ToolInstance):
         
         combined_dict = combine_dicts(kw_dict, other_kw_dict)
         
+        self.settings.last_program = self.file_type.currentText()
+        
         if self.file_type.currentText() == "Gaussian":
             output, warnings = self.theory.write_gaussian_input(combined_dict)
-        elif self.file_type.currentText() == "Orca":
+        elif self.file_type.currentText() == "ORCA":
             output, warnings = self.theory.write_orca_input(combined_dict)
                 
         for warning in warnings:
@@ -374,13 +382,15 @@ class BuildQM(ToolInstance):
         self.settings.save()
         
         combined_dict = combine_dicts(kw_dict, other_kw_dict)
+        
+        self.settings.last_program = self.file_type.currentText()
 
         if self.file_type.currentText() == "Gaussian":
             output, warnings = self.theory.write_gaussian_input(combined_dict)
             filename, _ = QFileDialog.getSaveFileName(filter="Gaussian input files (*.com)")
-        elif self.file_type.currentText() == "Orca":
+        elif self.file_type.currentText() == "ORCA":
             output, warnings = self.theory.write_orca_input(combined_dict)
-            filename, _ = QFileDialog.getSaveFileName(filter="Orca input files (*.inp)")
+            filename, _ = QFileDialog.getSaveFileName(filter="ORCA input files (*.inp)")
 
         for warning in warnings:
             self.session.logger.warning(warning)
@@ -673,11 +683,11 @@ class JobTypeOption(QWidget):
             self.chk_file_path.setEnabled(True)
             self.chk_browse_button.setEnabled(True)
         
-        elif program == "Orca":
+        elif program == "ORCA":
             self.solvent_option.addItems(["None"])
             self.solvent_option.addItems(self.ORCA_SOLVENT_MODELS)
             self.hpmodes.setEnabled(False)
-            self.raman.setToolTip("ask Orca to compute Raman intensities")
+            self.raman.setToolTip("ask ORCA to compute Raman intensities")
             self.solvent_names.clear()
             self.solvent_names.addItems(ImplicitSolvent.KNOWN_ORCA_SOLVENTS)
             ndx = self.solvent_option.findText(self.settings.previous_orca_solvent_model)
@@ -893,7 +903,7 @@ class JobTypeOption(QWidget):
 
             return {Method.GAUSSIAN_PRE_ROUTE:link0, Method.GAUSSIAN_ROUTE:route}
 
-        if self.form == "Orca":
+        if self.form == "ORCA":
             route = []
             blocks = {}
             if self.do_geom_opt.checkState() == Qt.Checked:
@@ -945,7 +955,7 @@ class FunctionalOption(QWidget):
     GAUSSIAN_DISPERSION = ["Grimme D2", "Grimme D3", "Becke-Johnson damped Grimme D3", "Petersson-Frisch"]
     GAUSSIAN_GRIDS = ["Default", "SuperFineGrid", "UltraFine", "FineGrid"]
     
-    ORCA_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D3", "B3PW91", "B97-D", "BP86", "PBE0"]
+    ORCA_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D3", "B3PW91", "B97-D", "BP86", "PBE0", "HF-3c", "AM1"]
     ORCA_DISPERSION = ["Grimme D2", "Undamped Grimme D3", "Becke-Johnson damped Grimme D3", "Grimme D4"]
     ORCA_GRIDS = ["Default", "Grid7", "Grid6", "Grid5", "Grid4", "Grid3"]
     
@@ -975,6 +985,7 @@ class FunctionalOption(QWidget):
         
         self.functional_kw = QLineEdit()
         self.functional_kw.setPlaceholderText("functional name")
+        self.functional_kw.setText(self.settings.previous_custom_func)
         self.functional_kw.setClearButtonEnabled(True)
         
         func_form_layout.addRow(keyword_label, self.functional_kw)
@@ -1128,6 +1139,7 @@ class FunctionalOption(QWidget):
             self.previously_used_table.setRowHidden(i, not filter(i))        
         
     def setOptions(self, program):
+        current_func = self.functional_option.currentText()
         self.functional_option.clear()
         self.dispersion.clear()
         self.grid.clear()
@@ -1141,7 +1153,7 @@ class FunctionalOption(QWidget):
             
             self.grid.addItems(self.GAUSSIAN_GRIDS)
             
-        elif program == "Orca":
+        elif program == "ORCA":
             self.functional_option.addItems(self.ORCA_FUNCTIONALS)
             self.functional_option.addItem("other")
             
@@ -1149,6 +1161,13 @@ class FunctionalOption(QWidget):
             self.dispersion.addItems(self.ORCA_DISPERSION)
             
             self.grid.addItems(self.ORCA_GRIDS)
+            
+        ndx = self.functional_option.findText(current_func, Qt.MatchExactly)
+        if ndx == -1:
+            ndx = self.functional_option.findText(self.settings.previous_functional, Qt.MatchExactly)
+            
+        if ndx != -1:
+            self.functional_option.setCurrentIndex(ndx)
         
         self.functionalChanged.emit()
 
@@ -1306,8 +1325,13 @@ class BasisOption(QWidget):
     last_custom_builtin = "last_custom_basis_builtin"
     last_custom_path = "last_basis_path"
     last_elements = "last_basis_elements"
+    aux_setting = "last_basis_aux"
         
     toolbox_name = "basis_toolbox"
+    
+    aux_available = True
+    
+    basis_class = Basis
         
     def __init__(self, parent, settings):
         self.parent = parent
@@ -1334,8 +1358,14 @@ class BasisOption(QWidget):
         self.elements.setSelectionMode(QListWidget.MultiSelection)
         self.elements.itemSelectionChanged.connect(lambda *args, s=self: self.parent.check_elements(s))
         self.elements.itemSelectionChanged.connect(lambda *args, s=self: self.parent.something_changed())
-        self.layout.addWidget(self.elements, 0, 2, 2, 1, Qt.AlignTop)
+        self.layout.addWidget(self.elements, 0, 2, 3, 1, Qt.AlignTop)
         
+        self.aux_type = QComboBox()
+        self.aux_type.currentIndexChanged.connect(lambda *args, s=self: self.parent.check_elements(s))
+        self.aux_type.addItems(["no", "C", "J", "JK", "CABS", "OptRI CABS"])
+        aux_label = QLabel("auxiliary:")
+        self.basis_name_options.addRow(aux_label, self.aux_type)
+    
         self.custom_basis_kw = QLineEdit()
         self.custom_basis_kw.textChanged.connect(self.apply_filter)
         self.custom_basis_kw.textChanged.connect(self.update_tooltab)
@@ -1348,25 +1378,21 @@ class BasisOption(QWidget):
         self.is_builtin = QCheckBox()
             
         self.is_builtin.stateChanged.connect(self.show_gen_path)
-        self.layout.addWidget(self.is_builtin, 1, 3, 1, 1, Qt.AlignTop)
-    
-        gen_path_label = QLabel("path to basis set file:")
-        self.layout.addWidget(gen_path_label, 3, 0, 1, 1)
         
         is_builtin_label = QLabel("built-in:")
         self.basis_name_options.addRow(is_builtin_label, self.is_builtin)
-
+    
         self.layout.addWidget(self.basis_names, 0, 0, 3, 2)
-                
+        
+        gen_path_label = QLabel("path to basis set file:")
+        self.layout.addWidget(gen_path_label, 3, 0, 1, 1, Qt.AlignVCenter)
+        
         self.path_to_basis_file = QLineEdit()
-        self.layout.addWidget(self.path_to_basis_file, 3, 1, 1, 1, Qt.AlignTop)
+        self.layout.addWidget(self.path_to_basis_file, 3, 1, 1, 1, Qt.AlignVCenter)
         
         browse_button = QPushButton("browse...")
         browse_button.clicked.connect(self.open_file_dialog)
-        self.layout.addWidget(browse_button, 3, 2, 1, 1, Qt.AlignTop)
-        
-        #previously_used_label = QLabel("previously used:")
-        #self.layout.addWidget(previously_used_label, 3, 0, 1, 1, Qt.AlignTop)
+        self.layout.addWidget(browse_button, 3, 2, 1, 1, Qt.AlignVCenter)
         
         self.previously_used_table = QTableWidget()
         self.previously_used_table.setColumnCount(3)
@@ -1394,11 +1420,30 @@ class BasisOption(QWidget):
         self.custom_basis_options = [keyword_label, self.custom_basis_kw, is_builtin_label, self.is_builtin, self.previously_used_table]
         self.gen_options = [gen_path_label, self.path_to_basis_file, browse_button]
 
+        self.aux_options = [aux_label, self.aux_type]
+        
+        if not self.aux_available:
+            for opt in self.aux_options:
+                opt.setVisible(False)
+
         #this doesn't seem to do anything?
         self.layout.setColumnStretch(0, 1)
         self.layout.setColumnStretch(1, 1)
         self.layout.setColumnStretch(2, 0)
-        
+
+    def setOptions(self, program):
+        if program == "Gaussian":                
+            if self.getAuxType() != "no":
+                self.destruct()
+                return 
+                
+            for opt in self.aux_options:
+                opt.setVisible(False)
+
+        elif program == "ORCA":
+            for opt in self.aux_options:
+                opt.setVisible(True)
+
     def open_file_dialog(self):
         """ask user to locate external basis file on their computer"""
         filename, _ = QFileDialog.getOpenFileName(filter="Basis Set Files (*.gbs)")
@@ -1465,7 +1510,7 @@ class BasisOption(QWidget):
         self.parent_toolbox = toolbox
     
     def update_tooltab(self):
-        basis_name, _ = self.currentBasis()
+        basis_name = self.currentBasis().name
         ndx = self.parent_toolbox.indexOf(self)
         if len(self.parent.basis_options) != 1 or len(self.parent.ecp_options) != 0:
             elements = "(%s)" % ", ".join(self.currentElements())
@@ -1517,14 +1562,30 @@ class BasisOption(QWidget):
             cur_last_builtin[index] = "" if self.is_builtin.checkState() == Qt.Checked else self.path_to_basis_file.text()
             cur_last_elements[index] = ",".join(self.currentElements())
 
-              
             self.settings.__setattr__(self.last_used, cur_last_used)
             self.settings.__setattr__(self.last_custom, cur_last_cust)
             self.settings.__setattr__(self.last_custom_builtin, cur_last_builtin)
             self.settings.__setattr__(self.last_elements, cur_last_elements)
 
+        if self.aux_available:
+            aux = self.aux_type.currentText()
+            
+            if update_settings:
+                cur_last_aux = [x for x in self.settings.__getattr__(self.aux_setting)]
+                while len(cur_last_aux) <= index:
+                    cur_last_aux.append(aux)
+                    
+                self.settings.__setattr__(self.aux_setting, cur_last_aux)
+
+            if aux == "no":
+                aux = None
+                
+        else:
+            aux = None
+
         if basis != "other":
-            return basis, False
+            basis_obj = self.basis_class(basis, self.currentElements(), aux_type=aux)
+            return basis_obj
         else:
             basis = self.custom_basis_kw.text()
             if update_settings:
@@ -1577,7 +1638,8 @@ class BasisOption(QWidget):
                     self.previously_used_table.resizeColumnToContents(0)
                     self.previously_used_table.resizeColumnToContents(2)
 
-            return basis, gen_path
+            basis_obj = self.basis_class(basis, self.currentElements(), aux_type=aux, user_defined=gen_path)
+            return basis_obj
 
     def add_previously_used(self, row, name, path, add_to_others=True):
         """add a basis set to the table of previously used options
@@ -1612,6 +1674,9 @@ class BasisOption(QWidget):
         self.previously_used_table.setCellWidget(row, 2, widget_that_lets_me_horizontally_align_an_icon)
         
         self.previously_used_table.resizeRowToContents(row)
+        self.previously_used_table.resizeColumnToContents(0)
+        self.previously_used_table.resizeColumnToContents(1)
+        self.previously_used_table.resizeColumnToContents(2)
         
     def setElements(self, elements):
         """sets the available elements"""
@@ -1620,7 +1685,7 @@ class BasisOption(QWidget):
         
         self.elements.addItems(elements)
         self.elements.sortItems()
-                
+
     def setSelectedElements(self, elements):
         """sets the selected elements"""
         for i in range(0, self.elements.count()):
@@ -1681,6 +1746,13 @@ class BasisOption(QWidget):
             self.is_builtin.setCheckState(Qt.Checked)
             self.path_to_basis_file.setText(self.settings.__getattr__(self.last_custom_path))
 
+    def setAux(self, name):
+        ndx = self.aux_type.findData(name, Qt.MatchExactly)
+        self.aux_type.setCurrentIndex(ndx)
+
+    def getAuxType(self):
+        return self.aux_type.currentText()
+
 
 class ECPOption(BasisOption):
     options = ["SDD", "LANL2DZ", "other"]
@@ -1692,25 +1764,30 @@ class ECPOption(BasisOption):
     last_custom_builtin = "last_custom_ecp_builtin"
     last_custom_path = "last_ecp_path"
     last_elements = "last_ecp_elements"
-    
+
+    aux_available = False
+
+    basis_class = ECP
+
     def __init__(self, parent, settings):
         super().__init__(parent, settings)
 
     def update_tooltab(self):
-        basis_name, _ = self.currentBasis()
+        basis_name = self.currentBasis().name
         elements = "(%s)" % ", ".join(self.currentElements())
         ndx = self.parent_toolbox.indexOf(self)
         
         self.parent_toolbox.setTabText(ndx, "%s %s" % (basis_name, elements))
-  
-  
+
+
 class BasisWidget(QWidget):
     """widget to store and manage BasisOptions and ECPOptions"""
     
     basisChanged = pyqtSignal()
     
-    def __init__(self, settings, parent=None):
+    def __init__(self, settings, init_form="Gaussian", parent=None):
         super().__init__(parent)
+        self.form = init_form
         self.settings = settings
         
         self.basis_options = []
@@ -1728,6 +1805,7 @@ class BasisWidget(QWidget):
         self.basis_toolbox.tabCloseRequested.connect(self.close_basis_tab)
         self.basis_toolbox.setStyleSheet('QTabWidget::pane {border: 1px;}')
         valence_layout.addWidget(self.basis_toolbox, 0, 0)
+        
         self.basis_warning = QStatusBar()
         self.basis_warning.setSizeGripEnabled(False)
         self.basis_warning.setStyleSheet("color : red")
@@ -1824,23 +1902,35 @@ class BasisWidget(QWidget):
         if use_saved is None:
             use_saved = len(self.basis_options)
         if use_saved < len(self.settings.last_basis):
+            #must set auxiliary before selected elements
+            #otherwise elements will be deselected on non-auxiliary basis
+            #if they are selected on a new auxiliary basis
+            if self.form != "Gaussian":
+                aux = self.settings.last_basis_aux[use_saved]
+                new_basis.setAux(aux)
+
             name = self.settings.last_basis[use_saved]
             custom = self.settings.last_custom_basis_kw[use_saved]
             builtin = self.settings.last_custom_basis_builtin[use_saved]
             new_basis.setBasis(name, custom, builtin)
-            #new_basis.setSelectedElements(self.settings.last_basis_elements[use_saved].split(','))
-            
-        new_basis.basis_changed()
+            new_basis.setSelectedElements(self.settings.last_basis_elements[use_saved].split(','))
+        
+        new_aux = new_basis.getAuxType()
 
         elements_without_basis = []
         for element in self.elements:
-            if not any([element in basis.currentElements() for basis in self.basis_options]):
+            if not any([element in basis.currentElements() for basis in self.basis_options if basis.getAuxType() == new_aux]):
                 elements_without_basis.append(element)
         
         new_basis.setSelectedElements(elements_without_basis)
 
         self.basis_options.append(new_basis)
-        
+        #set options needs to be after appending to basis_options
+        #if the basis is not available for whatever program, the
+        #basis might try to delete itself
+        new_basis.setOptions(self.form)
+        new_basis.basis_changed()
+
         if len(self.basis_options) == 1 and len(self.ecp_options) == 0:
             self.basis_options[0].setSelectedElements(self.elements)
             self.basis_warning.setVisible(False)
@@ -1892,16 +1982,33 @@ class BasisWidget(QWidget):
         if child is not None:
             self.remove_elements_from_all_but(child, child.currentElements())
 
-        elements_without_basis = []
-        for element in self.elements:
-            if not any([element in basis.currentElements() for basis in self.basis_options]):
-                elements_without_basis.append(element)
+        elements_without_basis = {"no":self.elements.copy()}
+        for basis in self.basis_options:
+            aux = basis.getAuxType()
+            if aux not in elements_without_basis:
+                elements_without_basis[aux] = self.elements.copy()    
+            
+            for element in basis.currentElements():
+                if element in elements_without_basis[aux]:
+                    elements_without_basis[aux].remove(element)
         
         for basis in self.basis_options + self.ecp_options:
             basis.update_tooltab()
         
-        if len(elements_without_basis) != 0:
-            self.basis_warning.showMessage("elements with no basis: %s" % ", ".join(elements_without_basis))
+        if any(len(elements_without_basis[aux]) != 0 for aux in elements_without_basis):
+            s = ""
+            for aux in elements_without_basis.keys():
+                if len(elements_without_basis[aux]) != 0:
+                    if aux == "no":
+                        s += "elements with no basis: %s" % ", ".join(elements_without_basis[aux])
+                    
+                    else:
+                        s += "elements with no %s auxiliary basis: %s" %  (aux, ", ".join(elements_without_basis[aux]))
+                    
+                    if len(s) != 0:
+                        s += '; \n'
+            
+            self.basis_warning.showMessage(s.strip('; \n'))
             self.basis_warning.setVisible(True)
         else:
             self.basis_warning.showMessage("elements with no basis: None")
@@ -1920,14 +2027,9 @@ class BasisWidget(QWidget):
         basis_set = []
         ecp = []
         for i, basis in enumerate(self.basis_options):
-            basis_name, gen_path = basis.currentBasis(update_settings, index=i)
-            basis_set.append(Basis(basis_name, elements=basis.currentElements(), user_defined=gen_path))
-                
-        #self.settings.last_basis = self.settings.last_basis[:len(self.basis_options)]
-        #self.settings.last_custom_basis_kw = self.settings.last_custom_basis_kw[:len(self.basis_options)]
-        #self.settings.last_custom_basis_builtin = self.settings.last_custom_basis_builtin[:len(self.basis_options)]
-        #self.settings.last_basis_elements = self.settings.last_basis_elements[:len(self.basis_options)]
-        
+            basis_obj = basis.currentBasis(update_settings, index=i)
+            basis_set.append(basis_obj)
+
         if update_settings:
             self.settings.last_number_basis = len(self.basis_options)
         
@@ -1935,13 +2037,8 @@ class BasisWidget(QWidget):
             basis_set = None
                 
         for i, basis in enumerate(self.ecp_options):
-            basis_name, gen_path = basis.currentBasis(update_settings, index=i)
-            ecp.append(ECP(basis_name, elements=basis.currentElements(), user_defined=gen_path))
-        
-        #self.settings.last_ecp = self.settings.last_ecp[:len(self.ecp_options)]
-        #self.settings.last_custom_ecp_kw = self.settings.last_custom_ecp_kw[:len(self.ecp_options)]
-        #self.settings.last_custom_ecp_builtin = self.settings.last_custom_ecp_builtin[:len(self.ecp_options)]
-        #self.settings.last_ecp_elements = self.settings.last_ecp_elements[:len(self.ecp_options)]
+            basis_obj = basis.currentBasis(update_settings, index=i)
+            ecp.append(basis_obj)
 
         if len(ecp) == 0:
             ecp = None
@@ -1987,11 +2084,22 @@ class BasisWidget(QWidget):
                             option.elements.item(i).setSelected(False)
                                 
         else:
+            aux = exclude_option.getAuxType()
             for option in self.basis_options:
-                if option is not exclude_option:
+                if option is not exclude_option and option.getAuxType() == aux:
                     for i in range(0, option.elements.count()):
                         if option.elements.item(i).text() in element_list:
                             option.elements.item(i).setSelected(False)
+
+    def setOptions(self, program):
+        self.form = program
+        #reverse basis options because some might delete themselves
+        #like if auxiliary basis sets aren't available in the program
+        for basis in self.basis_options[::-1]:
+            basis.setOptions(program)
+            
+        for basis in self.ecp_options:
+            basis.setOptions(program)
 
     def setElements(self, element_list):
         """sets the available elements in all child BasisOptions
@@ -2006,9 +2114,10 @@ class BasisWidget(QWidget):
             return
 
         for j, basis in enumerate(self.basis_options):
+            aux = basis.getAuxType()
             elements_with_different_basis = []
             for other_basis in self.basis_options:
-                if other_basis is not basis:
+                if other_basis is not basis and other_basis.getAuxType() == aux:
                     elements_with_different_basis.extend(other_basis.currentElements())
 
             if len(del_elements) > 0:
@@ -2099,12 +2208,13 @@ class OneLayerKeyWordOption(QWidget):
         else:
             self.new_kw = QLineEdit()
             self.new_kw.setClearButtonEnabled(True)
-           
+            self.new_kw.returnPressed.connect(self.add_kw)
+          
         self.new_kw.setPlaceholderText("new %s" % self.name)
         self.new_kw.textChanged.connect(self.apply_kw_filter)
         add_kw_button = QPushButton("add")
         add_kw_button.clicked.connect(self.add_kw)
-        new_kw_widgets_layout.addWidget(QLabel("%s:" % self.name), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
+        new_kw_widgets_layout.addWidget(QLabel("%s:" % self.name), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
         new_kw_widgets_layout.addWidget(self.new_kw, 0, 1)
         new_kw_widgets_layout.addWidget(add_kw_button, 0, 2, 1, 1, Qt.AlignTop)
 
@@ -2312,6 +2422,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.new_kw = QLineEdit()
         self.new_kw.setPlaceholderText("new %s" % self.name[:-1])
         self.new_kw.textChanged.connect(self.apply_kw_filter)
+        self.new_kw.returnPressed.connect(self.add_kw)
         self.new_kw.setClearButtonEnabled(True)
         add_kw_button = QPushButton("add")
         add_kw_button.clicked.connect(self.add_kw)
@@ -2681,11 +2792,11 @@ class TwoLayerKeyWordOption(QWidget):
 class KeywordOptions(QWidget):
     """
     items is a dict that can include
-        route       - enables widget to display route options a la Gaussian or Orca 
+        route       - enables widget to display route options a la Gaussian or ORCA 
         comment     - comment 
         link 0      - enables Gaussian's Link 0 commands
         settings    - enables setting specifications a la Psi4
-        blocks      - enables settings like Orca's namespace-style options
+        blocks      - enables settings like ORCA's namespace-style options
         end of file - some programs throw stuff at the end of the file
         
         the values should be the int map to specify the location in the input file
@@ -2873,7 +2984,7 @@ class GaussianKeywordOptions(KeywordOptions):
             return TwoLayerKeyWordOption("link 0 commands", last_dict, previous_dict, "double click to use %%%s=%s", one_opt_per_kw=False)
 
 
-class OrcaKeywordOptions(KeywordOptions):
+class ORCAKeywordOptions(KeywordOptions):
     items = {'route': Method.ORCA_ROUTE, \
              'comment': Method.ORCA_COMMENT, \
              'blocks': Method.ORCA_BLOCKS, \
@@ -2923,6 +3034,7 @@ class OrcaKeywordOptions(KeywordOptions):
                 
             return TwoLayerKeyWordOption("blocks", last_dict, previous_dict, "double click to use %%%s %s end", one_opt_per_kw=False)
 
+
 class KeywordWidget(QWidget):
     #TODO:
     #add new keywords/options to the table as soon as they are used
@@ -2939,7 +3051,7 @@ class KeywordWidget(QWidget):
         self.gaussian_widget.optionsChanged.connect(self.options_changed)
         self.layout.addWidget(self.gaussian_widget, 0, 0)
         
-        self.orca_widget = OrcaKeywordOptions(self.settings)
+        self.orca_widget = ORCAKeywordOptions(self.settings)
         self.orca_widget.optionsChanged.connect(self.options_changed)
         self.layout.addWidget(self.orca_widget, 0, 0)
 
@@ -2954,7 +3066,7 @@ class KeywordWidget(QWidget):
             self.gaussian_widget.setVisible(True)
             self.orca_widget.setVisible(False)
         
-        elif program == "Orca":
+        elif program == "ORCA":
             self.gaussian_widget.setVisible(False)
             self.orca_widget.setVisible(True)
 
@@ -2970,7 +3082,7 @@ class KeywordWidget(QWidget):
 
             return last_dict        
         
-        if self.form == "Orca":
+        if self.form == "ORCA":
             last_dict = self.orca_widget.getKWDict(update_settings)
 
             if update_settings:
