@@ -242,13 +242,11 @@ class Method:
 
         from AaronTools.geometry import Geometry
         from chimerax.atomic import AtomicStructure
-        
-        basis_info = self.basis.get_orca_basis_info()
-        combined_dict = combine_dicts(other_kw_dict, basis_info)
 
         warnings = []
         
         if not self.functional.is_semiempirical:
+            basis_info = self.basis.get_orca_basis_info()
             if self.structure is not None:
                 if isinstance(self.structure, Geometry):
                     struc_elements = set([atom.element for atom in self.structure.atoms])
@@ -258,6 +256,11 @@ class Method:
                 warning = self.basis.check_for_elements(struc_elements)
                 if warning is not None:
                     warnings.append(warning)
+        
+        else:
+            basis_info = {}
+        
+        combined_dict = combine_dicts(other_kw_dict, basis_info)
 
         s = ""
 
@@ -579,9 +582,9 @@ class BasisSet:
                 for aux in elements_without_basis.keys():
                     if len(elements_without_basis[aux]) != 0:
                         if aux != "no":
-                            warning += "%s have no auxiliary %s basis; " % (", ".join(elements_without_basis[aux]), aux)
+                            warning += "%s ha%s no auxiliary %s basis; " % (", ".join(elements_without_basis[aux]), "s" if len(elements_without_basis[aux]) == 1 else "ve", aux)
                         else:
-                            warning += "%s have no basis; " % (", ".join(elements_without_basis[aux]))
+                            warning += "%s ha%s no basis; " % (", ".join(elements_without_basis[aux]), "s" if len(elements_without_basis[aux]) == 1 else "ve")
                             
                 return warning.strip('; ')
             

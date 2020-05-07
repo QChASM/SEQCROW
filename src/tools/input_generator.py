@@ -1363,6 +1363,7 @@ class BasisOption(QWidget):
         self.aux_type = QComboBox()
         self.aux_type.currentIndexChanged.connect(lambda *args, s=self: self.parent.check_elements(s))
         self.aux_type.addItems(["no", "C", "J", "JK", "CABS", "OptRI CABS"])
+        self.aux_type.currentIndexChanged.connect(self.basis_changed)
         aux_label = QLabel("auxiliary:")
         self.basis_name_options.addRow(aux_label, self.aux_type)
     
