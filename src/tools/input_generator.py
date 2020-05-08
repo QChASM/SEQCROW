@@ -75,9 +75,9 @@ class _InputGeneratorSettings(Settings):
         'previous_orca_solvent_model': Value("None", StringArg), 
         'previous_orca_solvent_name': Value("", StringArg), 
         #shh these are just jsons
-        'previous_orca_options': Value(dumps({}), StringArg),
+        'previous_orca_options': Value(dumps({Method.ORCA_BLOCKS:{'basis':['decontract true'], 'elprop':[], 'freq':[], 'geom':[]}}), StringArg),
         #just the blocks that are used by the tool
-        'last_orca_options': Value(dumps({Method.ORCA_BLOCKS:{'basis':['decontract true'], 'elprop':[], 'freq':[], 'geom':[]}}), StringArg),
+        'last_orca_options': Value(dumps({}), StringArg),
         'last_program': Value("Gaussian", StringArg), 
     }
 
@@ -954,7 +954,8 @@ class JobTypeOption(QWidget):
             atom1, atom2 = bond.atoms
             for bond in self.constrained_bonds:
                 if atom1 in bond and atom2 in bond:
-                    return
+                    continue
+
             self.constrained_bonds.append((atom1, atom2))
             
             row = self.constrained_bond_table.rowCount()
