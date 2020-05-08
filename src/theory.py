@@ -195,12 +195,27 @@ class Method:
         
         s += "\n"
         
-        if self.constraints is not None:
+        if self.constraints is not None and self.structure is not None:
             for constraint in self.constraints['bonds']:
-                atom1, atom2 = constraint.atoms
+                atom1, atom2 = constraint
                 ndx1 = self.structure.atoms.index(atom1) + 1
                 ndx2 = self.structure.atoms.index(atom2) + 1
-                s += "B %i %i F\n" % (ndx1, ndx2)
+                s += "B %2i %2i F\n" % (ndx1, ndx2)
+
+            for constraint in self.constraints['angles']:
+                atom1, atom2, atom3 = constraint
+                ndx1 = self.structure.atoms.index(atom1) + 1
+                ndx2 = self.structure.atoms.index(atom2) + 1
+                ndx3 = self.structure.atoms.index(atom3) + 1
+                s += "A %2i %2i %2i F\n" % (ndx1, ndx2, ndx3)
+            
+            for constraint in self.constraints['torsions']:
+                atom1, atom2, atom3, atom4 = constraint
+                ndx1 = self.structure.atoms.index(atom1) + 1
+                ndx2 = self.structure.atoms.index(atom2) + 1
+                ndx3 = self.structure.atoms.index(atom3) + 1
+                ndx4 = self.structure.atoms.index(atom4) + 1
+                s += "D %2i %2i %2i %2i F\n" % (ndx1, ndx2, ndx3, ndx4)
                 
             s += '\n'
         
@@ -262,7 +277,49 @@ class Method:
         
         combined_dict = combine_dicts(other_kw_dict, basis_info)
 
+        if self.constraints is not None and self.structure is not None:
+            if 'geom' not in combined_dict[self.ORCA_BLOCKS]:
+                combined_dict[self.ORCA_BLOCKS]['geom'] = []
+            
+            combined_dict[self.ORCA_BLOCKS]['geom'].append("constraints")
+            for constraint in self.constraints['atoms']:
+                atom1 = constraint
+                ndx1 = self.structure.atoms.index(atom1)
+                s = "    {C %2i C}" % (ndx1)
+                combined_dict[self.ORCA_BLOCKS]['geom'].append(s)
+            
+            for constraint in self.constraints['bonds']:
+                atom1, atom2 = constraint
+                ndx1 = self.structure.atoms.index(atom1)
+                ndx2 = self.structure.atoms.index(atom2)
+                s = "    {B %2i %2i C}" % (ndx1, ndx2)
+                combined_dict[self.ORCA_BLOCKS]['geom'].append(s)
+
+            for constraint in self.constraints['angles']:
+                atom1, atom2, atom3 = constraint
+                ndx1 = self.structure.atoms.index(atom1)
+                ndx2 = self.structure.atoms.index(atom2)
+                ndx3 = self.structure.atoms.index(atom3)
+                s = "    {A %2i %2i %2i C}" % (ndx1, ndx2, ndx3)
+                combined_dict[self.ORCA_BLOCKS]['geom'].append(s)
+
+            for constraint in self.constraints['torsions']:
+                atom1, atom2, atom3, atom4 = constraint
+                ndx1 = self.structure.atoms.index(atom1)
+                ndx2 = self.structure.atoms.index(atom2)
+                ndx3 = self.structure.atoms.index(atom3)
+                ndx4 = self.structure.atoms.index(atom4)
+                s = "    {D %2i %2i %2i %2i C}" % (ndx1, ndx2, ndx3, ndx4)
+                combined_dict[self.ORCA_BLOCKS]['geom'].append(s)
+                
+            combined_dict[self.ORCA_BLOCKS]['geom'].append("end")
+
         s = ""
+
+        if self.ORCA_COMMENT in combined_dict:
+            for comment in combined_dict[self.ORCA_COMMENT]:
+                for line in comment.split('\n'):
+                    s += "#%s\n" % line
 
         s += "!"
         if self.functional is not None:
