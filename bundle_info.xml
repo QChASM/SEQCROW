@@ -74,7 +74,7 @@ presets:
                           category="Molecular structure" 
                           suffixes=".out" 
                           encoding="utf-8" 
-                          nicknames="orca out" 
+                          nicknames="out" 
                           synopsis="ORCA output file"/>
                           
                 <Provider name="XYZ file" 

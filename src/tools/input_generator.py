@@ -428,6 +428,13 @@ class JobTypeOption(QWidget):
     GAUSSIAN_SOLVENT_MODELS = ["PCM", "SMD", "CPCM", "Dipole", "IPCM", "SCIPCM"]
     ORCA_SOLVENT_MODELS = ["SMD", "CPCM"]
     
+    #TODO:
+    #remove constraints checkbox
+    #put constraints widget in a groupbox
+    #have either this or Method check to see if anything is actually constrained
+    #set margins to 0 like with basis stuff
+    #this should save a little space
+    
     def __init__(self, settings, session, init_form, parent=None):
         super().__init__(parent)
         
@@ -1639,8 +1646,9 @@ class FunctionalOption(QWidget):
                     self.is_semiemperical.setCheckState(func in KNOWN_SEMI_EMPIRICAL)
             
             #omegas don't get decoded right
-            elif func == "wB97X-D":
-                ndx = self.functional_option.findText("ωB97X-D", Qt.MatchExactly)
+            elif func.startswith("wB97"):
+                func = func.replace("ω", "w", 1)
+                ndx = self.functional_option.findText(func, Qt.MatchExactly)
                 self.functional_option.setCurrentIndex(ndx)
     
             #update_dispersion
@@ -1789,6 +1797,7 @@ class BasisOption(QWidget):
         
         self.basis_names = QWidget()
         self.basis_name_options = QFormLayout(self.basis_names)
+        self.basis_name_options.setContentsMargins(0, 0, 0, 0)
         
         self.basis_option = QComboBox()
         self.basis_option.addItems(self.options)
@@ -1801,6 +1810,7 @@ class BasisOption(QWidget):
         scroll_width = self.style().pixelMetric(QStyle.PM_ScrollBarExtent)
         self.elements.setMinimumWidth(scroll_width + int(1.5*self.fontMetrics().boundingRect("QQ").width()))
         self.elements.setMaximumWidth(scroll_width + int(2*self.fontMetrics().boundingRect("QQ").width()))
+        #set the max. height too b/c I can't seem to get it to respect setRowStretch
         self.elements.setMaximumHeight(int(6*self.fontMetrics().boundingRect("QQ").height()))
         self.elements.setSelectionMode(QListWidget.MultiSelection)
         self.elements.itemSelectionChanged.connect(lambda *args, s=self: self.parent.check_elements(s))
@@ -1830,7 +1840,7 @@ class BasisOption(QWidget):
         is_builtin_label = QLabel("built-in:")
         self.basis_name_options.addRow(is_builtin_label, self.is_builtin)
     
-        self.layout.addWidget(self.basis_names, 0, 0, 3, 2)
+        self.layout.addWidget(self.basis_names, 0, 0, 4, 2)
         
         gen_path_label = QLabel("path to basis set file:")
         self.layout.addWidget(gen_path_label, 3, 0, 1, 1, Qt.AlignVCenter)
@@ -1878,6 +1888,8 @@ class BasisOption(QWidget):
         self.layout.setColumnStretch(0, 1)
         self.layout.setColumnStretch(1, 1)
         self.layout.setColumnStretch(2, 0)
+        self.layout.setRowStretch(0, 0)
+        self.layout.setRowStretch(4, 1)
 
     def setOptions(self, program):
         if program == "Gaussian":                
@@ -1966,7 +1978,7 @@ class BasisOption(QWidget):
             elements = ""
                 
         self.parent_toolbox.setTabText(ndx, "%s %s" % (basis_name, elements))
-            
+
     def show_elements(self, value):
         """hides/shows element list"""
         if value:
@@ -1974,7 +1986,7 @@ class BasisOption(QWidget):
         else:
             self.layout.addWidget(self.basis_names, 0, 0, 3, 3)
         self.elements.setVisible(value)
-                
+
     def destruct(self):
         """removes self from parent
         calls parent.remove_basis(self)"""
@@ -1983,7 +1995,7 @@ class BasisOption(QWidget):
     def currentElements(self):
         """returns a list of element names that are selected"""
         return [self.elements.item(i).text() for i in range(0, self.elements.count()) if self.elements.item(i).isSelected()]
-        
+
     def allElements(self):
         """returns a list of all available element names"""
         return [self.elements.item(i).text() for i in range(0, self.elements.count())]
@@ -2125,7 +2137,7 @@ class BasisOption(QWidget):
         self.previously_used_table.resizeColumnToContents(0)
         self.previously_used_table.resizeColumnToContents(1)
         self.previously_used_table.resizeColumnToContents(2)
-        
+
     def setElements(self, elements):
         """sets the available elements"""
         for i in range(self.elements.count(), -1, -1):
@@ -2146,7 +2158,7 @@ class BasisOption(QWidget):
             
             row = self.elements.findItems(element, Qt.MatchExactly)[0]
             row.setSelected(True)
-                
+
     def remove_saved_basis(self, row, column):
         """removes the row from the table of previously used basis sets
         also deletes the corresponding entry in the settings"""              
@@ -2183,10 +2195,13 @@ class BasisOption(QWidget):
                 self.is_builtin.setCheckState(Qt.Unchecked)            
                 self.path_to_basis_file.setText(path)
 
-    def setBasis(self, name, custom_kw="", builtin=""):
-        ndx = self.basis_option.findData(name, Qt.MatchExactly)
-        self.basis_option.setCurrentIndex(ndx)
+    def setBasis(self, name=None, custom_kw="", builtin=""):
+        if name is not None:
+            ndx = self.basis_option.findData(name, Qt.MatchExactly)
+            self.basis_option.setCurrentIndex(ndx)
+        
         self.custom_basis_kw.setText(custom_kw)
+
         if len(builtin) > 0:
             self.is_builtin.setCheckState(Qt.Unchecked)
             self.path_to_basis_file.setText(builtin)
@@ -2362,6 +2377,9 @@ class BasisWidget(QWidget):
             builtin = self.settings.last_custom_basis_builtin[use_saved]
             new_basis.setBasis(name, custom, builtin)
             new_basis.setSelectedElements(self.settings.last_basis_elements[use_saved].split(','))
+        
+        else:
+            new_basis.setBasis()
         
         new_aux = new_basis.getAuxType()
 
@@ -2662,7 +2680,10 @@ class OneLayerKeyWordOption(QWidget):
         self.new_kw.textChanged.connect(self.apply_kw_filter)
         add_kw_button = QPushButton("add")
         add_kw_button.clicked.connect(self.add_kw)
-        new_kw_widgets_layout.addWidget(QLabel("%s:" % self.name), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
+        if not self.multiline:
+            new_kw_widgets_layout.addWidget(QLabel("%s:" % self.name), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
+        else:
+            new_kw_widgets_layout.addWidget(QLabel("%s:" % self.name), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignTop)
         new_kw_widgets_layout.addWidget(self.new_kw, 0, 1)
         new_kw_widgets_layout.addWidget(add_kw_button, 0, 2, 1, 1, Qt.AlignTop)
 
@@ -2906,6 +2927,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.new_opt = QLineEdit()
         self.new_opt.setPlaceholderText("new option")
         self.new_opt.textChanged.connect(self.apply_opt_filter)
+        self.new_opt.returnPressed.connect(self.add_opt)
         self.new_opt.setClearButtonEnabled(True)
         add_opt_button = QPushButton("add")
         add_opt_button.clicked.connect(self.add_opt)

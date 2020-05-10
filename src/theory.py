@@ -2,7 +2,7 @@ import os
 
 from SEQCROW.utils import combine_dicts
 
-KNOWN_SEMI_EMPIRICAL = ["AM1", "PM3", "PM6", "PM7"]
+KNOWN_SEMI_EMPIRICAL = ["AM1", "PM3", "PM6", "PM7", "HF-3c"]
 
 
 class Method:
@@ -25,10 +25,6 @@ class Method:
     memory                  -   allocated memory (GB)
     processors              -   allocated cores
         """
-    #integer map for position of things in input file
-    CONSTRAINED_BOND = 1
-    CONSTRAINED_ANGLE = 2
-    CONSTRAINED_TORSION = 3
     
     ORCA_ROUTE = 1
     ORCA_BLOCKS = 2
@@ -280,14 +276,14 @@ class Method:
         if self.constraints is not None and self.structure is not None:
             if 'geom' not in combined_dict[self.ORCA_BLOCKS]:
                 combined_dict[self.ORCA_BLOCKS]['geom'] = []
-            
+
             combined_dict[self.ORCA_BLOCKS]['geom'].append("constraints")
             for constraint in self.constraints['atoms']:
                 atom1 = constraint
                 ndx1 = self.structure.atoms.index(atom1)
                 s = "    {C %2i C}" % (ndx1)
                 combined_dict[self.ORCA_BLOCKS]['geom'].append(s)
-            
+
             for constraint in self.constraints['bonds']:
                 atom1, atom2 = constraint
                 ndx1 = self.structure.atoms.index(atom1)
@@ -311,7 +307,7 @@ class Method:
                 ndx4 = self.structure.atoms.index(atom4)
                 s = "    {D %2i %2i %2i %2i C}" % (ndx1, ndx2, ndx3, ndx4)
                 combined_dict[self.ORCA_BLOCKS]['geom'].append(s)
-                
+
             combined_dict[self.ORCA_BLOCKS]['geom'].append("end")
 
         s = ""
@@ -420,6 +416,8 @@ class Functional:
         """maps proper functional name to one ORCA accepts"""
         if self.name == "ωB97X-D":
             return ("wB97X-D3", "ωB97X-D may refer to ωB97X-D2 or ωB97X-D3 - using the latter")
+        elif self.name == "ωB97X-D3":
+            return ("wB97X-D3", None)
         elif self.name == "B97-D":
             return ("B97-D2", "B97-D may refer to B97-D2 or B97-D3 - using the former")
         elif self.name == "Gaussian's B3LYP":
@@ -429,7 +427,7 @@ class Functional:
             return ("M06L", None)
         
         else:
-            return self.name, None
+            return self.name.replace('ω', 'w'), None
 
 
 class BasisSet:
@@ -647,6 +645,7 @@ class BasisSet:
             
             else:
                 return None
+
 
 class Basis:
     def __init__(self, name, elements, aux_type=None, diffuse=None, polarization=0, user_defined=False):
