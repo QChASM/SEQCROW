@@ -24,12 +24,17 @@ class Method:
     
     memory                  -   allocated memory (GB)
     processors              -   allocated cores
-        """
+    """
     
     ORCA_ROUTE = 1
     ORCA_BLOCKS = 2
     ORCA_COORDINATES = 3
     ORCA_COMMENT = 4
+    
+    PSI4_SETTINGS = 1
+    PSI4_BEFORE_GEOM = 2
+    PSI4_AFTER_GEOM = 3
+    PSI4_COMMENT = 4
     
     GAUSSIAN_PRE_ROUTE = 1 #can be used for things like %chk=some.chk
     GAUSSIAN_ROUTE = 2 #route specifies most options, e.g. #n B3LYP/3-21G opt 
@@ -242,10 +247,10 @@ class Method:
         return s, warnings
 
     def write_orca_input(self, other_kw_dict, fname=None):
-        """write Gaussian09/16 input file
-        other_kw_dict is a dictionary with file positions (using GAUSSIAN_* int map)
+        """write ORCA input file
+        other_kw_dict is a dictionary with file positions (using ORCA_* int map)
         corresponding to options/keywords
-        returns warnings if a certain feature is not available in Gaussian"""
+        returns file content and warnings e.g. if a certain feature is not available in ORCA"""
         #TODO:
         #add constraints
         #allow structure to be Geometry
@@ -382,7 +387,109 @@ class Method:
                 
         return s, warnings
 
+    def write_psi4_input(self, other_kw_dict, fname=None):
+        """write Psi4 input file
+        other_kw_dict is a dictionary with file positions (using PSI4_* int map)
+        corresponding to options/keywords
+        returns file content and warnings e.g. if a certain feature is not available in Psi4"""
+        #TODO:
+        #add constraints
+        #allow structure to be Geometry
+        #probably other stuff
 
+        from AaronTools.geometry import Geometry
+        from chimerax.atomic import AtomicStructure
+
+        warnings = []
+        
+        if not self.functional.is_semiempirical:
+            basis_info = self.basis.get_psi4_basis_info()
+            if self.structure is not None:
+                if isinstance(self.structure, Geometry):
+                    struc_elements = set([atom.element for atom in self.structure.atoms])
+                elif isinstance(self.structure, AtomicStructure):
+                    struc_elements = set(self.structure.atoms.elements.names)
+            
+                warning = self.basis.check_for_elements(struc_elements)
+                if warning is not None:
+                    warnings.append(warning)
+            
+            if "%s" in basis_info[self.PSI4_BEFORE_GEOM][0]:
+                if 'cc' in self.functional.lower():
+                    basis_info[self.PSI4_BEFORE_GEOM][0] = basis_info[self.PSI4_BEFORE_GEOM][0].replace("%s", "CC")
+                
+                elif 'dct' in self.functional.lower():
+                    basis_info[self.PSI4_BEFORE_GEOM][0] = basis_info[self.PSI4_BEFORE_GEOM][0].replace("%s", "DCT")
+                
+                elif 'mp2' in self.functional.lower():
+                    basis_info[self.PSI4_BEFORE_GEOM][0] = basis_info[self.PSI4_BEFORE_GEOM][0].replace("%s", "MP2")
+
+                elif 'sapt' in self.functional.lower():
+                    basis_info[self.PSI4_BEFORE_GEOM][0] = basis_info[self.PSI4_BEFORE_GEOM][0].replace("%s", "SAPT")
+
+                elif 'scf' in self.functional.lower():
+                    basis_info[self.PSI4_BEFORE_GEOM][0] = basis_info[self.PSI4_BEFORE_GEOM][0].replace("%s", "SCF")
+            
+                elif 'ci' in self.functional.lower():
+                    basis_info[self.PSI4_BEFORE_GEOM][0] = basis_info[self.PSI4_BEFORE_GEOM][0].replace("%s", "MCSCF")
+            
+        else:
+            basis_info = {}
+        
+        combined_dict = combine_dicts(other_kw_dict, basis_info)
+
+        s = ""
+
+        if self.PSI4_COMMENT in combined_dict:
+            for comment in combined_dict[self.PSI4_COMMENT]:
+                for line in comment.split('\n'):
+                    s += "#%s\n" % line
+
+        if self.processors is not None:
+            s += "set_num_threads(%i)\n" % self.processors
+            
+        if self.memory is not None:
+            s += "memory %i GB\n" % self.memory
+
+        if self.PSI4_BEFORE_GEOM in combined_dict:
+            for opt in combined_dict[self.PSI4_BEFORE_GEOM]:
+                s += opt
+                s += '\n'
+        
+        s += '\n'
+        
+        s += "molecule {\n"
+        s += "%2i %i\n" % (self.charge, self.multiplicity)
+        if self.structure is not None:
+            if isinstance(self.structure, AtomicStructure):
+                for atom in self.structure.atoms:
+                    s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element.name, *atom.coord)
+                    
+        s += "}\n\n"
+        
+        if self.PSI4_SETTINGS in combined_dict:
+            s += "set {\n"
+            for setting in combined_dict[self.PSI4_SETTINGS]:
+                if len(combined_dict[self.PSI4_SETTINGS][setting]) > 0:
+                    s += "    %-16s    %-16s\n" % (setting, combined_dict[self.PSI4_SETTINGS][setting][0])
+            
+            s += "}\n\n"
+
+        if self.PSI4_AFTER_GEOM in combined_dict:
+            for opt in combined_dict[self.PSI4_AFTER_GEOM]:
+                if "%s" in opt:
+                    opt = opt.replace("%s", self.functional.get_psi4()[0])
+                
+                s += opt
+                s += '\n'
+                
+        if fname is not None:
+            with open(fname, "w") as f:
+                f.write(s)
+                
+        return s, warnings
+
+        
 class Functional:
     def __init__(self, name, is_semiempirical):
         self.name = name
@@ -428,9 +535,16 @@ class Functional:
         
         else:
             return self.name.replace('ω', 'w'), None
+    
+    def get_psi4(self):
+        """maps proper functional name to one Psi4 accepts"""
+        return self.name.replace('ω', 'w'), None
 
 
 class BasisSet:
+    ORCA_AUX = ["C", "J", "JK", "CABS", "OptRI CABS"]
+    PSI4_AUX = ["JK", "RI"]
+
     def __init__(self, basis, ecp=None):
         self.basis = basis
         self.ecp = ecp
@@ -621,6 +735,61 @@ class BasisSet:
             
         return info
 
+    def get_psi4_basis_info(self):
+        s = "basis {\n"
+        s2 = None
+
+        first_basis = []
+
+        basis_list = []
+        if self.basis is not None:
+            basis_list.extend(self.basis)
+            
+        if self.ecp is not None:
+            basis_list.extend(self.ecp)
+            
+        for basis in basis_list:
+            if len(basis.elements) > 0 and not basis.user_defined:
+                if basis.aux_type not in first_basis:
+                    if basis.aux_type is None:
+                        s += "    assign %s\n" % Basis.map_psi4_basis(basis.get_basis_name())
+                        
+                    elif basis.aux_type == "JK":
+                        s2 = "df_basis_%s {\n"
+                        s2 += "    assign %s-jkfit\n" % Basis.map_psi4_basis(basis.get_basis_name())
+                    
+                    elif basis.aux_type == "RI":
+                        s2 = "df_basis_%s {\n"
+                        if basis.name.lower() == "sto-3g" or basis.name.lower() == "3-21g":
+                            s2 += "    assign %s-rifit\n" % Basis.map_psi4_basis(basis.get_basis_name())
+                        else:
+                            s2 += "    assign %s-ri\n" % Basis.map_psi4_basis(basis.get_basis_name())
+
+                else:
+                    if basis.aux_type is None:
+                        for ele in basis.elements:
+                            s += "    assign %2s %s\n" % (ele, Basis.map_psi4_basis(basis.get_basis_name()))
+                    
+                    elif basis.aux_type == "JK":
+                        for ele in basis.elements:
+                            s2 += "    assign %2s %s-jkfit\n" % (ele, Basis.map_psi4_basis(basis.get_basis_name()))
+                            
+                    elif basis.aux_type == "RI":
+                        for ele in basis.elements:
+                            if basis.name.lower() == "sto-3g" or basis.name.lower() == "3-21g":
+                                s2 += "    assign %2s %s-rifit\n" % (ele, Basis.map_psi4_basis(basis.get_basis_name()))
+                            else:
+                                s2 += "    assign %2s %s-ri\n" % (ele, Basis.map_psi4_basis(basis.get_basis_name()))
+
+        s += "}\n\n"
+        
+        if s2 is not None:
+            s2 += "}\n\n"
+            
+            s += s2
+            
+        return {Method.PSI4_BEFORE_GEOM:[s]}
+        
     def check_for_elements(self, elements):
         warning = ""
         if self.basis is not None:
@@ -677,6 +846,8 @@ class Basis:
             
     def get_basis_name(self):
         """returns basis set name taking into account diffusion and polarization"""
+        #this isn't used
+        #I wrote it before I had any use for the Basis class
         name = self.name
         upper_name = name.upper()
         if self.diffuse is not None:
@@ -714,7 +885,7 @@ class Basis:
     @staticmethod
     def map_gaussian09_basis(name):
         """returns the Gaussian09/16 name of the basis set
-        currently just removed the hyphen from the Karlsruhe def2 sets"""
+        currently just removes the hyphen from the Karlsruhe def2 ones"""
         if name.startswith('def2-'):
             return name.replace('def2-', 'def2', 1)
         else:
@@ -726,6 +897,11 @@ class Basis:
         currently doesn't do anything"""
         return name
         
+    def map_psi4_basis(name):
+        """returns the Psi4 name of the basis set
+        currently doesn't do anything"""
+        return name
+
     @staticmethod
     def max_gaussian09_polarizable(name):
         name = name.upper()

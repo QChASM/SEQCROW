@@ -78,6 +78,22 @@ class _InputGeneratorSettings(Settings):
         'previous_orca_options': Value(dumps({Method.ORCA_BLOCKS:{'basis':['decontract true'], 'elprop':[], 'freq':[], 'geom':[]}}), StringArg),
         #just the blocks that are used by the tool
         'last_orca_options': Value(dumps({}), StringArg),
+        'previous_psi4_options': Value(dumps({Method.PSI4_SETTINGS:{'reference': \
+                                                                                ['rhf', 'rohf', 'uhf', 'cuhf', 'rks', 'uks'], \
+                                                                    'diag_method': \
+                                                                                #the psi4 manual seems to imply that davidson and sem are
+                                                                                #the same and different
+                                                                                ['rsp', 'olsen', 'mitrushenkov', 'davidson', 'sem'], \
+                                                                    'ex_level': \
+                                                                                ['1', '2', '3'], \
+                                                                    'fci': \
+                                                                                ['true', 'false'], \
+                                                                   }, \
+                                                                   Method.PSI4_BEFORE_GEOM: {}, \
+                                                                   Method.PSI4_AFTER_GEOM: {}, \
+                                                                   Method.PSI4_COMMENT: {}, \
+                                             }), StringArg), 
+        'last_psi4_options': Value(dumps({}), StringArg),
         'last_program': Value("Gaussian", StringArg), 
     }
 
@@ -129,7 +145,7 @@ class BuildQM(ToolInstance):
         form_layout = QFormLayout(basics_form)
                 
         self.file_type = QComboBox()
-        self.file_type.addItems(['Gaussian', 'ORCA'])
+        self.file_type.addItems(['Gaussian', 'ORCA', 'Psi4'])
         ndx = self.file_type.findText(init_form, Qt.MatchExactly)
         self.file_type.setCurrentIndex(ndx)
         self.file_type.currentIndexChanged.connect(self.change_file_type)
@@ -237,6 +253,8 @@ class BuildQM(ToolInstance):
                 output, warnings = self.theory.write_gaussian_input(combined_dict)
             elif self.file_type.currentText() == "ORCA":
                 output, warnings = self.theory.write_orca_input(combined_dict)
+            elif self.file_type.currentText() == "Psi4":
+                output, warnings = self.theory.write_psi4_input(combined_dict)
 
             self.preview_window.setPreview(output, warnings)
             
@@ -296,7 +314,12 @@ class BuildQM(ToolInstance):
 
         func = self.functional_widget.getFunctional(update_settings)        
         basis = self.get_basis_set(update_settings)
-        dispersion = self.functional_widget.getDispersion(update_settings)
+        
+        if self.file_type.currentText() != "Psi4":
+            dispersion = self.functional_widget.getDispersion(update_settings)
+        else:
+            dispersion = None
+        
         grid = self.functional_widget.getGrid(update_settings)      
         charge = self.job_widget.getCharge(update_settings)
         mult = self.job_widget.getMultiplicity(update_settings)
@@ -360,11 +383,14 @@ class BuildQM(ToolInstance):
         
         self.settings.last_program = self.file_type.currentText()
         
-        if self.file_type.currentText() == "Gaussian":
+        program = self.file_type.currentText()
+        if program == "Gaussian":
             output, warnings = self.theory.write_gaussian_input(combined_dict)
-        elif self.file_type.currentText() == "ORCA":
+        elif program == "ORCA":
             output, warnings = self.theory.write_orca_input(combined_dict)
-                
+        elif program == "Psi4":
+            output, warnings = self.theory.write_psi4_input(combined_dict)
+
         for warning in warnings:
             self.session.logger.warning(warning)
 
@@ -387,19 +413,24 @@ class BuildQM(ToolInstance):
         
         self.settings.last_program = self.file_type.currentText()
 
-        if self.file_type.currentText() == "Gaussian":
-            output, warnings = self.theory.write_gaussian_input(combined_dict)
+        program = self.file_type.currentText()
+        if program == "Gaussian":
             filename, _ = QFileDialog.getSaveFileName(filter="Gaussian input files (*.com)")
-        elif self.file_type.currentText() == "ORCA":
-            output, warnings = self.theory.write_orca_input(combined_dict)
+            if filename:
+                output, warnings = self.theory.write_gaussian_input(combined_dict, fname=filename)
+        
+        elif program == "ORCA":
             filename, _ = QFileDialog.getSaveFileName(filter="ORCA input files (*.inp)")
+            if filename:
+                output, warnings = self.theory.write_orca_input(combined_dict, fname=filename)
+        
+        elif program == "Psi4":
+            filename, _ = QFileDialog.getSaveFileName(filter="Psi4 input files (*.in4)")
+            if filename:
+                output, warnings = self.theory.write_psi4_input(combined_dict, fname=filename)
 
         for warning in warnings:
             self.session.logger.warning(warning)
-
-        if filename:
-            with open(filename, 'w') as f:
-                f.write(output)
             
             self.update_preview()
                 
@@ -760,16 +791,19 @@ class JobTypeOption(QWidget):
     def setOptions(self, program):
         self.form = program
         self.solvent_option.clear()
+        self.solvent_names.clear()
         if program == "Gaussian":
             self.solvent_option.addItems(["None"])
             self.solvent_option.addItems(self.GAUSSIAN_SOLVENT_MODELS)
+            self.solvent_option.setEnabled(True)
             self.hpmodes.setEnabled(True)
             self.raman.setToolTip("ask Gaussian to compute Raman intensities")
-            self.solvent_names.clear()
+            self.raman.setEnabled(True)
             self.solvent_names.addItems(ImplicitSolvent.KNOWN_GAUSSIAN_SOLVENTS)
             ndx = self.solvent_option.findText(self.settings.previous_gaussian_solvent_model)
             if ndx >= 0:
                 self.solvent_option.setCurrentIndex(ndx)
+            self.solvent_name.setEnabled(True)
             self.solvent_name.setText(self.settings.previous_gaussian_solvent_name)
             self.use_checkpoint.setEnabled(True)
             self.chk_file_path.setEnabled(True)
@@ -778,9 +812,10 @@ class JobTypeOption(QWidget):
         elif program == "ORCA":
             self.solvent_option.addItems(["None"])
             self.solvent_option.addItems(self.ORCA_SOLVENT_MODELS)
+            self.solvent_option.setEnabled(True)
             self.hpmodes.setEnabled(False)
             self.raman.setToolTip("ask ORCA to compute Raman intensities")
-            self.solvent_names.clear()
+            self.raman.setEnabled(True)
             self.solvent_names.addItems(ImplicitSolvent.KNOWN_ORCA_SOLVENTS)
             ndx = self.solvent_option.findText(self.settings.previous_orca_solvent_model)
             if ndx >= 0:
@@ -789,7 +824,16 @@ class JobTypeOption(QWidget):
             self.use_checkpoint.setEnabled(False)
             self.chk_file_path.setEnabled(False)
             self.chk_browse_button.setEnabled(False)
-        
+            
+        elif program == "Psi4":
+            self.solvent_option.addItems(["None"])
+            self.solvent_option.setEnabled(False)
+            self.hpmodes.setEnabled(False)
+            self.raman.setEnabled(False)
+            self.use_checkpoint.setEnabled(False)
+            self.chk_file_path.setEnabled(False)
+            self.chk_browse_button.setEnabled(False)
+
         self.solvent_names.sortItems()
 
     def change_selected_solvent(self):
@@ -1401,6 +1445,29 @@ class JobTypeOption(QWidget):
                 self.settings.last_freq = self.do_freq.checkState() == Qt.Checked
 
             return {Method.ORCA_ROUTE:route, Method.ORCA_BLOCKS:blocks}
+            
+        elif self.form == "Psi4":
+            settings = {}
+            after_geom = []
+            
+            if self.do_geom_opt.checkState() == Qt.Checked:
+                after_geom.append('nrg, wfn = optimize("%s", return_wfn=True)')
+                
+                if self.ts_opt.checkState() == Qt.Checked:
+                    settings['opt_type'] = ['ts']
+                    
+            
+            if self.do_freq.checkState() == Qt.Checked:
+                after_geom.append('nrg, wfn = frequencies("%s", return_wfn=True)')
+
+            if update_settings:
+                self.settings.last_nproc = self.nprocs.value()
+                self.settings.last_mem = self.mem.value()
+                self.settings.last_opt = self.do_geom_opt.checkState() == Qt.Checked
+                self.settings.last_ts = self.ts_opt.checkState() == Qt.Checked
+                self.settings.last_freq = self.do_freq.checkState() == Qt.Checked
+                
+            return {Method.PSI4_SETTINGS:settings, Method.PSI4_AFTER_GEOM:after_geom}
 
 
 class FunctionalOption(QWidget):
@@ -1412,7 +1479,10 @@ class FunctionalOption(QWidget):
     ORCA_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D3", "B3PW91", "B97-D", "BP86", "PBE0", "HF-3c", "AM1"]
     ORCA_DISPERSION = ["Grimme D2", "Undamped Grimme D3", "Becke-Johnson damped Grimme D3", "Grimme D4"]
     ORCA_GRIDS = ["Default", "Grid7", "Grid6", "Grid5", "Grid4", "Grid3"]
-    
+
+    PSI4_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D", "B3PW91", "B97-D", "BP86", "PBE0", "CCSD", "CCSD(T)"]
+    PSI4_GRIDS = ["Default", "(175, 974)", "(99, 590)", "(75, 302)"]
+
     functionalChanged = pyqtSignal()
     
     def __init__(self, settings, init_form, parent=None):
@@ -1602,6 +1672,7 @@ class FunctionalOption(QWidget):
             self.functional_option.addItems(self.GAUSSIAN_FUNCTIONALS)
             self.functional_option.addItem("other")
             
+            self.dispersion.setEnabled(True)
             self.dispersion.addItem("None")
             self.dispersion.addItems(self.GAUSSIAN_DISPERSION)
             
@@ -1611,10 +1682,19 @@ class FunctionalOption(QWidget):
             self.functional_option.addItems(self.ORCA_FUNCTIONALS)
             self.functional_option.addItem("other")
             
+            self.dispersion.setEnabled(True)
             self.dispersion.addItem("None")
             self.dispersion.addItems(self.ORCA_DISPERSION)
             
             self.grid.addItems(self.ORCA_GRIDS)
+            
+        elif program == "Psi4":
+            self.functional_option.addItems(self.PSI4_FUNCTIONALS)
+            self.functional_option.addItem("other")
+            #Psi4 doesn't seem to have an 'empirical dispersion' keyword like Gaussian or ORCA
+            self.dispersion.setEnabled(False)
+            
+            self.grid.addItems(self.PSI4_GRIDS)
             
         ndx = self.functional_option.findText(current_func, Qt.MatchExactly)
         if ndx == -1:
@@ -1788,9 +1868,10 @@ class BasisOption(QWidget):
     
     basis_class = Basis
         
-    def __init__(self, parent, settings):
+    def __init__(self, parent, settings, form):
         self.parent = parent
         self.settings = settings
+        self.form = form
         super().__init__(parent)
 
         self.layout = QGridLayout(self)
@@ -1819,8 +1900,7 @@ class BasisOption(QWidget):
         
         self.aux_type = QComboBox()
         self.aux_type.currentIndexChanged.connect(lambda *args, s=self: self.parent.check_elements(s))
-        self.aux_type.addItems(["no", "C", "J", "JK", "CABS", "OptRI CABS"])
-        self.aux_type.currentIndexChanged.connect(self.basis_changed)
+        self.aux_type.addItem("no")
         aux_label = QLabel("auxiliary:")
         self.basis_name_options.addRow(aux_label, self.aux_type)
     
@@ -1890,6 +1970,9 @@ class BasisOption(QWidget):
         self.layout.setColumnStretch(2, 0)
         self.layout.setRowStretch(0, 0)
         self.layout.setRowStretch(4, 1)
+        
+        self.setOptions(self.form)
+        self.aux_type.currentIndexChanged.connect(self.basis_changed)
 
     def setOptions(self, program):
         if program == "Gaussian":                
@@ -1901,8 +1984,20 @@ class BasisOption(QWidget):
                 opt.setVisible(False)
 
         elif program == "ORCA":
+            self.aux_type.clear()
             for opt in self.aux_options:
                 opt.setVisible(True)
+            
+            self.aux_type.addItem("no")
+            self.aux_type.addItems(BasisSet.ORCA_AUX)
+
+        elif program == "Psi4":
+            self.aux_type.clear()
+            for opt in self.aux_options:
+                opt.setVisible(True)
+                
+            self.aux_type.addItem("no")
+            self.aux_type.addItems(BasisSet.PSI4_AUX)
 
     def open_file_dialog(self):
         """ask user to locate external basis file on their computer"""
@@ -2358,7 +2453,7 @@ class BasisWidget(QWidget):
 
     def new_basis(self, checked=None, use_saved=None):
         """add a BasisOption"""
-        new_basis = BasisOption(self, self.settings)
+        new_basis = BasisOption(self, self.settings, form=self.form)
         new_basis.setToolBox(self.basis_toolbox)
         new_basis.setElements(self.elements)
         new_basis.basisChanged.connect(self.something_changed)
@@ -2628,7 +2723,7 @@ class BasisWidget(QWidget):
 
 class OneLayerKeyWordOption(QWidget):
     #TODO:
-    #* tooltip formats
+    #* add option to not save (who wants to save a comment? some people might, but I don't)
     optionChanged = pyqtSignal()
     settingsChanged = pyqtSignal()
     
@@ -3066,9 +3161,13 @@ class TwoLayerKeyWordOption(QWidget):
 
     def add_item_to_current_opt_table(self, opt):
         if self.one_opt_per_kw:
+            self.last_dict[self.selected_kw] = [opt]
             for i in range(self.current_opt_table.rowCount(), -1, -1):
                 self.current_opt_table.removeRow(i)
-            
+
+        else:
+            self.last_dict[self.selected_kw].append(opt)
+
         row = self.current_opt_table.rowCount()
         self.current_opt_table.insertRow(row)
         item = QTableWidgetItem(opt)
@@ -3115,11 +3214,6 @@ class TwoLayerKeyWordOption(QWidget):
             return
 
         if opt not in self.last_dict[kw]:
-            if self.one_opt_per_kw:
-                self.last_dict[kw] = [opt]
-            else:
-                self.last_dict[kw].append(opt)
-
             self.add_item_to_current_opt_table(opt)
 
     def update_route_opts(self):
@@ -3191,9 +3285,7 @@ class TwoLayerKeyWordOption(QWidget):
             
             if option in self.last_dict[keyword]:
                 return
-            
-            self.last_dict[keyword].append(option)
-            
+
             self.add_item_to_current_opt_table(option)
   
     def clicked_current_keyword_option(self, row, column):
@@ -3508,6 +3600,71 @@ class ORCAKeywordOptions(KeywordOptions):
             return TwoLayerKeyWordOption("blocks", last_dict, previous_dict, "double click to use %%%s %s end", one_opt_per_kw=False)
 
 
+class Psi4KeywordOptions(KeywordOptions):
+    items = {'settings': Method.PSI4_SETTINGS, \
+             'before geometry': Method.PSI4_BEFORE_GEOM, \
+             'after job': Method.PSI4_AFTER_GEOM, \
+             'comment': Method.PSI4_COMMENT, \
+            }
+
+    previous_option_name = "previous_psi4_options"
+    last_option_name = "last_psi4_options"
+
+    @classmethod
+    def get_options_for(cls, name, last, previous):
+        if name == "after job":
+            if last is None:
+                last_list = []
+            else:
+                last_list = last            
+                
+            if previous is None:
+                previous_list = []
+            else:
+                previous_list = previous
+                
+            return OneLayerKeyWordOption("after job", last_list, previous_list, multiline=True)
+            
+        elif name == "before geometry":
+            if last is None:
+                last_list = []
+            else:
+                last_list = last            
+                
+            if previous is None:
+                previous_list = []
+            else:
+                previous_list = previous
+                
+            return OneLayerKeyWordOption("before geometry", last_list, previous_list, multiline=True)
+            
+        elif name == "comment":
+            if last is None:
+                last_list = []
+            else:
+                last_list = last            
+                
+            if previous is None:
+                previous_list = []
+            else:
+                previous_list = previous
+                
+            return OneLayerKeyWordOption("comment", last_list, previous_list, multiline=True)
+
+        elif name == "settings":
+            if last is None:
+                last_dict = {}
+            else:
+                last_dict = last            
+                
+            if previous is None:
+                previous_dict = {}
+            else:
+                previous_dict = previous
+                
+            return TwoLayerKeyWordOption("settings", last_dict, previous_dict, "double click to use set %s %s end", one_opt_per_kw=True)
+
+
 class KeywordWidget(QWidget):
     #TODO:
     #add new keywords/options to the table as soon as they are used
@@ -3528,20 +3685,28 @@ class KeywordWidget(QWidget):
         self.orca_widget.optionsChanged.connect(self.options_changed)
         self.layout.addWidget(self.orca_widget, 0, 0)
 
+        self.psi4_widget = Psi4KeywordOptions(self.settings)
+        self.psi4_widget.optionsChanged.connect(self.options_changed)
+        self.layout.addWidget(self.psi4_widget, 0, 0)
+
         self.setOptions(init_form)
-        
-        if init_form == "Gaussian":
-            self.gaussian_widget.setVisible(True)
     
     def setOptions(self, program):
         self.form = program
         if program == "Gaussian":
             self.gaussian_widget.setVisible(True)
             self.orca_widget.setVisible(False)
+            self.psi4_widget.setVisible(False)
         
         elif program == "ORCA":
             self.gaussian_widget.setVisible(False)
             self.orca_widget.setVisible(True)
+            self.psi4_widget.setVisible(False)
+        
+        elif program == "Psi4":
+            self.gaussian_widget.setVisible(False)
+            self.orca_widget.setVisible(False)
+            self.psi4_widget.setVisible(True)
 
     def options_changed(self):
         self.additionalOptionsChanged.emit()
@@ -3555,11 +3720,19 @@ class KeywordWidget(QWidget):
 
             return last_dict        
         
-        if self.form == "ORCA":
+        elif self.form == "ORCA":
             last_dict = self.orca_widget.getKWDict(update_settings)
 
             if update_settings:
                 self.orca_widget.settings_changed()
+
+            return last_dict        
+        
+        elif self.form == "Psi4":
+            last_dict = self.psi4_widget.getKWDict(update_settings)
+
+            if update_settings:
+                self.psi4_widget.settings_changed()
 
             return last_dict
 

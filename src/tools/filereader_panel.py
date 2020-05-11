@@ -5,7 +5,8 @@ from chimerax.core.commands import run
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow
 from chimerax.core.models import MODEL_ID_CHANGED, MODEL_NAME_CHANGED, ADD_MODELS
-        
+from chimerax.std_commands.coordset_gui import CoordinateSetSlider
+
 from io import BytesIO
 
 from PyQt5.QtCore import Qt
@@ -46,7 +47,6 @@ class FileReaderPanel(ToolInstance):
             lambda *args: self.fill_tree(*args))
         self._molname_change = self.session.triggers.add_handler(MODEL_NAME_CHANGED,
             lambda *args: self.fill_tree(*args))
-            
         
     def _build_ui(self):
         layout = QGridLayout()
@@ -175,7 +175,12 @@ class FileReaderPanel(ToolInstance):
         models = list(model_dict.keys())
         for ndx in ndxs:
             mdl = models[ndx]
-            run(self.session, "coordset slider %s" % mdl.atomspec)
+            #coordset doesn't start out with the current coordset id
+            #it looks like it should, but it doesn't
+            #it starts at 1 instead
+            slider = CoordinateSetSlider(self.session, mdl)
+            slider.set_slider(mdl.active_coordset_id)
+            #run(self.session, "coordset slider %s" % mdl.atomspec)
     
     def display_help(self):
         """Show the help for this tool in the help viewer."""
