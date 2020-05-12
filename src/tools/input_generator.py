@@ -89,11 +89,11 @@ class _InputGeneratorSettings(Settings):
                                                                     'fci': \
                                                                                 ['true', 'false'], \
                                                                    }, \
-                                                                   Method.PSI4_BEFORE_GEOM: {}, \
-                                                                   Method.PSI4_AFTER_GEOM: {}, \
-                                                                   Method.PSI4_COMMENT: {}, \
+                                                                   Method.PSI4_BEFORE_GEOM: [], \
+                                                                   Method.PSI4_AFTER_GEOM: ["nrg, wfn = energy('$FUNCTIONAL', return_wfn=True)"], \
+                                                                   Method.PSI4_COMMENT: [], \
                                              }), StringArg), 
-        'last_psi4_options': Value(dumps({}), StringArg),
+        'last_psi4_options': Value(dumps({Method.PSI4_AFTER_GEOM: ["nrg, wfn = energy('$FUNCTIONAL', return_wfn=True)"]}), StringArg),
         'last_program': Value("Gaussian", StringArg), 
     }
 
@@ -257,7 +257,7 @@ class BuildQM(ToolInstance):
                 output, warnings = self.theory.write_psi4_input(combined_dict)
 
             self.preview_window.setPreview(output, warnings)
-            
+
     def change_file_type(self, *args):
         #if we don't block signals, the preview will try to update before all widgets 
         #have been updated to give the proper info
@@ -335,10 +335,6 @@ class BuildQM(ToolInstance):
                              functional=func, basis=basis, empirical_dispersion=dispersion, \
                              grid=grid, constraints=constraints, \
                              processors=nproc, memory=mem)
-
-    def change_job_type(self):
-        #implement later
-        pass
     
     def change_model(self, index):
         if index == -1:
@@ -360,7 +356,7 @@ class BuildQM(ToolInstance):
                 
             if 'temperature' in fr.other:
                 self.job_widget.setTemperature(fr.other['temperature'])
-        
+
     def check_elements(self, *args, **kw):
         mdl = self.model_selector.currentData()
         if mdl is not None:
@@ -802,8 +798,9 @@ class JobTypeOption(QWidget):
             self.do_freq.setCheckState(Qt.Checked)
     
     def open_chk_save(self):
-        #TODO: change filter based on software
-        filename, _ = QFileDialog.getSaveFileName(filter="Gaussian checkpoint files (*.chk)")
+        if self.form == "Gaussian":
+            filename, _ = QFileDialog.getSaveFileName(filter="Gaussian checkpoint files (*.chk)")
+        
         if filename:
             self.chk_file_path.setText(filename)
     
@@ -893,7 +890,7 @@ class JobTypeOption(QWidget):
             
         for i in range(0, self.solvent_names.count()):
             self.solvent_names.setRowHidden(i, not filter(i))        
-          
+
     def change_solvent_model(self):
         if self.solvent_option.currentText() != "None":
             self.solvent_name_label.setVisible(True)
@@ -911,11 +908,11 @@ class JobTypeOption(QWidget):
         self.job_type_opts.setTabEnabled(2, self.do_freq.checkState() == Qt.Checked)
         
         self.jobTypeChanged.emit()
-          
+
     def show_contraints(self, value):
         self.constraints_widget.setEnabled(bool(value))
         self.jobTypeChanged.emit()
-        
+
     def getCharge(self, update_settings=True):
         charge = self.charge.value()
         if update_settings:
@@ -925,7 +922,7 @@ class JobTypeOption(QWidget):
 
     def setCharge(self, value):
         self.charge.setValue(value)
-        
+
     def getMultiplicity(self, update_settings=True):
         mult = self.multiplicity.value()
         if update_settings:
@@ -935,7 +932,7 @@ class JobTypeOption(QWidget):
 
     def setMultiplicity(self, value):
         self.multiplicity.setValue(value)
-        
+
     def setTemperature(self, value):
         self.temp.setValue(value)
         self.jobTypeChanged.emit()
@@ -960,7 +957,7 @@ class JobTypeOption(QWidget):
             self.constrained_torsion_table.removeRow(i)    
 
         self.jobTypeChanged.emit()
-                
+
     def constrain_atoms(self):
         current_atoms = [atom for atom in selected_atoms(self.session) if atom.structure is self.structure]
         for atom in current_atoms:
@@ -1537,7 +1534,7 @@ class FunctionalOption(QWidget):
         func_form_layout.setContentsMargins(*new_margins)
         
         self.functional_option = QComboBox()
-        func_form_layout.addRow("functional:", self.functional_option)
+        func_form_layout.addRow(self.functional_option)
         
         keyword_label = QLabel("keyword:")
         
@@ -1612,10 +1609,10 @@ class FunctionalOption(QWidget):
         self.setOptions(self.form)
         self.setPreviousStuff()
         self.functional_kw.textChanged.connect(self.apply_filter)
-        
+
     def something_changed(self, *args, **kw):
         self.functionalChanged.emit()
-        
+
     def add_previously_used(self, row, name, basis_required):
         """add a basis set to the table of previously used options
         name            - name of basis set
@@ -1668,7 +1665,7 @@ class FunctionalOption(QWidget):
         self.settings.save()
         
         self.previously_used_table.removeRow(row)
-                    
+
     def functional_changed(self, text):
         for option in self.other_options:
             option.setVisible(text == "other")
@@ -1695,7 +1692,7 @@ class FunctionalOption(QWidget):
             
         for i in range(0, self.previously_used_table.rowCount()):
             self.previously_used_table.setRowHidden(i, not filter(i))        
-        
+
     def setOptions(self, program):
         current_func = self.functional_option.currentText()
         self.functional_option.clear()
@@ -1775,7 +1772,7 @@ class FunctionalOption(QWidget):
                 self.grid.setCurrentIndex(ndx)
         
         self.functionalChanged.emit()
-        
+
     def use_previous_from_table(self, row):
         """grabs the functional info from the table of previously used options and 
         sets the current functional name to that"""
@@ -1886,7 +1883,10 @@ class BasisOption(QWidget):
     
     basisChanged = pyqtSignal()
 
+    #for psi4, ECP's are included in basis set definitions
     options = ["def2-SVP", "def2-TZVP", "aug-cc-pVDZ", "aug-cc-pVTZ", "6-311+G**", "SDD", "LANL2DZ", "other"]
+    psi4_options = ["def2-SVP", "def2-TZVP", "aug-cc-pVDZ", "aug-cc-pVTZ", "6-311+G**", "other"]
+    
     name_setting = "previous_basis_names"
     path_setting = "previous_basis_paths"
     last_used = "last_basis"
@@ -1956,8 +1956,8 @@ class BasisOption(QWidget):
     
         self.layout.addWidget(self.basis_names, 0, 0, 4, 2)
         
-        gen_path_label = QLabel("path to basis set file:")
-        self.layout.addWidget(gen_path_label, 3, 0, 1, 1, Qt.AlignVCenter)
+        gen_path_label = QLabel("basis file:")
+        self.layout.addWidget(gen_path_label, 3, 0, 1, 1, Qt.AlignVCenter | Qt.AlignLeft)
         
         self.path_to_basis_file = QLineEdit()
         self.layout.addWidget(self.path_to_basis_file, 3, 1, 1, 1, Qt.AlignVCenter)
@@ -1999,7 +1999,7 @@ class BasisOption(QWidget):
                 opt.setVisible(False)
 
         #this doesn't seem to do anything?
-        self.layout.setColumnStretch(0, 1)
+        self.layout.setColumnStretch(0, 0)
         self.layout.setColumnStretch(1, 1)
         self.layout.setColumnStretch(2, 0)
         self.layout.setRowStretch(0, 0)
@@ -2009,7 +2009,20 @@ class BasisOption(QWidget):
         self.aux_type.currentIndexChanged.connect(self.basis_changed)
 
     def setOptions(self, program):
-        if program == "Gaussian":                
+        self.blockSignals(True)
+        
+        basis = self.basis_option.currentText()
+        aux = self.aux_type.currentText()
+        self.basis_option.clear()
+        
+        if program == "Gaussian":
+            self.basis_option.addItems(self.options)
+            ndx = self.basis_option.findText(basis, Qt.MatchExactly)
+            if ndx != -1:
+                self.basis_option.setCurrentIndex(ndx)
+            else:
+                self.basis_option.setCurrentIndex(len(self.options) - 1)
+                
             if self.getAuxType() != "no":
                 self.destruct()
                 return 
@@ -2018,6 +2031,13 @@ class BasisOption(QWidget):
                 opt.setVisible(False)
 
         elif program == "ORCA":
+            self.basis_option.addItems(self.options)
+            ndx = self.basis_option.findText(basis, Qt.MatchExactly)
+            if ndx != -1:
+                self.basis_option.setCurrentIndex(ndx)
+            else:
+                self.basis_option.setCurrentIndex(len(self.options) - 1)
+                
             self.aux_type.clear()
             if self.aux_available:
                 for opt in self.aux_options:
@@ -2027,6 +2047,13 @@ class BasisOption(QWidget):
             self.aux_type.addItems(BasisSet.ORCA_AUX)
 
         elif program == "Psi4":
+            self.basis_option.addItems(self.psi4_options)
+            ndx = self.basis_option.findText(basis, Qt.MatchExactly)
+            if ndx != -1:
+                self.basis_option.setCurrentIndex(ndx)
+            else:
+                self.basis_option.setCurrentIndex(len(self.psi4_options) - 1)
+                
             self.aux_type.clear()
             if self.aux_available:
                 for opt in self.aux_options:
@@ -2034,10 +2061,20 @@ class BasisOption(QWidget):
                 
             self.aux_type.addItem("no")
             self.aux_type.addItems(BasisSet.PSI4_AUX)
+        
+        self.setAux(aux)
+        
+        self.blockSignals(False)
 
     def open_file_dialog(self):
         """ask user to locate external basis file on their computer"""
-        filename, _ = QFileDialog.getOpenFileName(filter="Basis Set Files (*.gbs)")
+        if self.form == "Gaussian":
+            filename, _ = QFileDialog.getOpenFileName(filter="Basis Set Files (*.gbs)")
+        elif self.form == "Psi4":
+            filename, _ = QFileDialog.getOpenFileName(filter="Basis Set Files (*.gbs)")
+        elif self.form == "ORCA":
+            filename, _ = QFileDialog.getOpenFileName(filter="Basis Set Files (*.basis)")
+        
         if filename:
             self.path_to_basis_file.setText(filename)
 
@@ -2248,12 +2285,7 @@ class BasisOption(QWidget):
         basis.setData(Qt.DisplayRole, name)
         basis.setToolTip("double click to use")
         self.previously_used_table.setItem(row, 0, basis)
-        
-        gbs_file = QTableWidgetItem()
-        gbs_file.setData(Qt.DisplayRole, path)
-        gbs_file.setToolTip("double click to use")
-        self.previously_used_table.setItem(row, 1, gbs_file)
-        
+
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
@@ -2265,6 +2297,12 @@ class BasisOption(QWidget):
         self.previously_used_table.setCellWidget(row, 2, widget_that_lets_me_horizontally_align_an_icon)
         
         self.previously_used_table.resizeRowToContents(row)
+        
+        gbs_file = QTableWidgetItem()
+        gbs_file.setData(Qt.DisplayRole, path)
+        gbs_file.setToolTip("double click to use")
+        self.previously_used_table.setItem(row, 1, gbs_file)
+        
         self.previously_used_table.resizeColumnToContents(0)
         self.previously_used_table.resizeColumnToContents(1)
         self.previously_used_table.resizeColumnToContents(2)
@@ -2342,7 +2380,8 @@ class BasisOption(QWidget):
 
     def setAux(self, name):
         ndx = self.aux_type.findData(name, Qt.MatchExactly)
-        self.aux_type.setCurrentIndex(ndx)
+        if ndx >= 0:
+            self.aux_type.setCurrentIndex(ndx)
 
     def getAuxType(self):
         return self.aux_type.currentText()
@@ -2350,6 +2389,7 @@ class BasisOption(QWidget):
 
 class ECPOption(BasisOption):
     options = ["SDD", "LANL2DZ", "other"]
+    psi4_options = options
     label_text = "ECP:"
     name_setting = "previous_ecp_names"
     path_setting = "previous_ecp_paths"
@@ -2403,6 +2443,7 @@ class BasisWidget(QWidget):
         self.layout.addWidget(self.basis_warning, 1, 0, 1, 1)
         
         ecp_side = QWidget()
+        self.ecp_widget = ecp_side
         ecp_side_layout = QGridLayout(ecp_side)
         ecp_basis_area = QGroupBox("effective core potential")        
         ecp_layout = QGridLayout(ecp_basis_area)
@@ -2441,6 +2482,8 @@ class BasisWidget(QWidget):
         
         for i in range(0, self.settings.last_number_ecp):
             self.new_ecp(use_saved=i)
+            
+        self.setOptions(self.form)
 
     def something_changed(self, *args, **kw):
         self.basisChanged.emit()
@@ -2498,13 +2541,14 @@ class BasisWidget(QWidget):
             #if they are selected on a new auxiliary basis
             if self.form != "Gaussian":
                 aux = self.settings.last_basis_aux[use_saved]
+                print("tried to set aux to %s" % aux)
                 new_basis.setAux(aux)
 
             name = self.settings.last_basis[use_saved]
             custom = self.settings.last_custom_basis_kw[use_saved]
             builtin = self.settings.last_custom_basis_builtin[use_saved]
             new_basis.setBasis(name, custom, builtin)
-            new_basis.setSelectedElements(self.settings.last_basis_elements[use_saved].split(','))
+            #new_basis.setSelectedElements(self.settings.last_basis_elements[use_saved].split(','))
         
         else:
             new_basis.setBasis()
@@ -2522,7 +2566,7 @@ class BasisWidget(QWidget):
         #set options needs to be after appending to basis_options
         #if the basis is not available for whatever program, the
         #basis might try to delete itself
-        new_basis.setOptions(self.form)
+        #new_basis.setOptions(self.form)
         new_basis.basis_changed()
 
         if len(self.basis_options) == 1 and len(self.ecp_options) == 0:
@@ -2568,7 +2612,7 @@ class BasisWidget(QWidget):
             basis.update_tooltab()
             
             basis.show_elements(not (len(self.basis_options) == 1 and len(self.ecp_options) == 0))
-        
+
     def check_elements(self, child=None):
         """check to see if any elements don't have a (valence) basis set
         if child is not None, all selected elements from child will be deselected from
@@ -2615,7 +2659,7 @@ class BasisWidget(QWidget):
             basis.update_tooltab()
             
             basis.show_elements(not (len(self.basis_options) == 1 and len(self.ecp_options) == 0))
-        
+
     def get_basis(self, update_settings=True):
         """returns ([Basis], [ECP]) corresponding to the current settings"""
         basis_set = []
@@ -2694,6 +2738,13 @@ class BasisWidget(QWidget):
             
         for basis in self.ecp_options:
             basis.setOptions(program)
+            
+        if program == "Psi4":
+            self.ecp_widget.setVisible(False)
+            for ecp in self.ecp_options:
+                self.remove_basis(ecp)
+        else:
+            self.ecp_widget.setVisible(True)
 
     def setElements(self, element_list):
         """sets the available elements in all child BasisOptions
@@ -2842,9 +2893,6 @@ class OneLayerKeyWordOption(QWidget):
     def add_item_to_previous_kw_table(self, kw):
         row = self.previous_kw_table.rowCount()
         self.previous_kw_table.insertRow(row)
-        item = QTableWidgetItem(kw)
-        item.setToolTip("double click to use %s" % kw)
-        self.previous_kw_table.setItem(row, 0, item)
     
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
@@ -2856,6 +2904,10 @@ class OneLayerKeyWordOption(QWidget):
         widget_layout.addWidget(trash_button)
         self.previous_kw_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
     
+        item = QTableWidgetItem(kw)
+        item.setToolTip("double click to use \"%s\"" % kw)
+        self.previous_kw_table.setItem(row, 0, item)
+        
         self.previous_kw_table.resizeRowToContents(row)
 
     def remove_previous_kw_row(self, row):
@@ -2876,22 +2928,21 @@ class OneLayerKeyWordOption(QWidget):
     def add_item_to_current_kw_table(self, kw):
         row = self.current_kw_table.rowCount()
         self.current_kw_table.insertRow(row)
-        item = QTableWidgetItem(kw)
-        self.current_kw_table.setItem(row, 0, item)
-    
+
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
         trash_button.setMaximumSize(16, 16)
         trash_button.setScaledContents(False)
         trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
-        trash_button.setToolTip("double click to not use this %s" % self.name[:-1])
+        trash_button.setToolTip("double click to not use this %s" % self.name)
         widget_layout.addWidget(trash_button)
         self.current_kw_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
-    
+
+        item = QTableWidgetItem(kw)
+        self.current_kw_table.setItem(row, 0, item)
+        
         self.current_kw_table.resizeRowToContents(row)
-        self.current_kw_table.resizeColumnToContents(0)
-        self.current_kw_table.resizeColumnToContents(1)
 
         self.optionChanged.emit()
 
@@ -3279,7 +3330,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.previous_opt_table.resizeColumnToContents(1)
         self.current_opt_table.resizeColumnToContents(0)
         self.current_opt_table.resizeColumnToContents(1)
-            
+
     def clicked_route_keyword(self, row, column):
         if column == 1:
             self.remove_previous_kw_row(row)
@@ -3306,7 +3357,7 @@ class TwoLayerKeyWordOption(QWidget):
                 self.update_route_opts()
                 
             self.optionChanged.emit()
-            
+
     def clicked_keyword_option(self, row, column):
         if column == 1:
             self.remove_previous_opt_row(row)
@@ -3775,26 +3826,36 @@ class InputPreview(ChildToolWindow):
         super().__init__(tool_instance, title, statusbar=False, **kwargs)
         
         self._build_ui()
-        
+
     def _build_ui(self):
         layout = QGridLayout()
         
         self.preview = QTextBrowser()
         font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
         self.preview.setFont(font)
-        layout.addWidget(self.preview)
+        layout.addWidget(self.preview, 0, 0, 1, 2)
         
         #chimera toolwindows can have a statusbar, but the message goes away after a few seconds
         #I'll just use a Qt statusbar        
         self.status = QStatusBar()
         self.status.setSizeGripEnabled(False)
         self.status.setStyleSheet("color: red")
-        layout.addWidget(self.status, 1, 0)
+        layout.addWidget(self.status, 1, 1, 1, 1)
+        
+        refresh_button = QPushButton()
+        refresh_button.setIcon(QIcon(refresh_button.style().standardIcon(QStyle.SP_BrowserReload)))
+        refresh_button.clicked.connect(self.tool_instance.update_preview)
+        layout.addWidget(refresh_button, 1, 0, 1, 1, Qt.AlignLeft)
+        
+        layout.setRowStretch(0, 1)
+        layout.setRowStretch(1, 0)
+        layout.setColumnStretch(0, 0)
+        layout.setColumnStretch(1, 1)
         
         self.ui_area.setLayout(layout)
         
         self.manage(None)
-        
+
     def setPreview(self, text, warnings_list):
         self.preview.setText(text)
         if len(warnings_list) > 0:
@@ -3802,7 +3863,7 @@ class InputPreview(ChildToolWindow):
             self.status.showMessage("; ".join(warnings_list))
         else:
             self.status.setVisible(False)
-        
+
     def cleanup(self):
         self.tool_instance.preview_window = None
         

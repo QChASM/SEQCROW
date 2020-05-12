@@ -414,25 +414,27 @@ class Method:
                 if warning is not None:
                     warnings.append(warning)
             
-            if "%s" in basis_info[self.PSI4_BEFORE_GEOM][0]:
-                if 'cc' in self.functional.name.lower():
-                    basis_info[self.PSI4_BEFORE_GEOM][0] = basis_info[self.PSI4_BEFORE_GEOM][0].replace("%s", "CC")
-                
-                elif 'dct' in self.functional.name.lower():
-                    basis_info[self.PSI4_BEFORE_GEOM][0] = basis_info[self.PSI4_BEFORE_GEOM][0].replace("%s", "DCT")
-                
-                elif 'mp2' in self.functional.name.lower():
-                    basis_info[self.PSI4_BEFORE_GEOM][0] = basis_info[self.PSI4_BEFORE_GEOM][0].replace("%s", "MP2")
+            for key in basis_info:
+                for i in range(0, len(basis_info[key])):
+                    if "%s" in basis_info[key][i]:
+                        if 'cc' in self.functional.name.lower():
+                            basis_info[key][i] = basis_info[key][i].replace("%s", "CC")
+                        
+                        elif 'dct' in self.functional.name.lower():
+                            basis_info[key][i] = basis_info[key][i].replace("%s", "DCT")
+                        
+                        elif 'mp2' in self.functional.name.lower():
+                            basis_info[key][i] = basis_info[key][i].replace("%s", "MP2")
+        
+                        elif 'sapt' in self.functional.name.lower():
+                            basis_info[key][i] = basis_info[key][i].replace("%s", "SAPT")
+        
+                        elif 'scf' in self.functional.name.lower():
+                            basis_info[key][i] = basis_info[key][i].replace("%s", "SCF")
+                    
+                        elif 'ci' in self.functional.name.lower():
+                            basis_info[key][i] = basis_info[key][i].replace("%s", "MCSCF")
 
-                elif 'sapt' in self.functional.name.lower():
-                    basis_info[self.PSI4_BEFORE_GEOM][0] = basis_info[self.PSI4_BEFORE_GEOM][0].replace("%s", "SAPT")
-
-                elif 'scf' in self.functional.name.lower():
-                    basis_info[self.PSI4_BEFORE_GEOM][0] = basis_info[self.PSI4_BEFORE_GEOM][0].replace("%s", "SCF")
-            
-                elif 'ci' in self.functional.name.lower():
-                    basis_info[self.PSI4_BEFORE_GEOM][0] = basis_info[self.PSI4_BEFORE_GEOM][0].replace("%s", "MCSCF")
-            
         else:
             basis_info = {}
         
@@ -515,8 +517,8 @@ class Method:
 
         if self.PSI4_AFTER_GEOM in combined_dict:
             for opt in combined_dict[self.PSI4_AFTER_GEOM]:
-                if "%s" in opt:
-                    opt = opt.replace("%s", self.functional.get_psi4()[0])
+                if "$FUNCTIONAL" in opt:
+                    opt = opt.replace("$FUNCTIONAL", self.functional.get_psi4()[0])
                 
                 s += opt
                 s += '\n'
@@ -668,94 +670,145 @@ class BasisSet:
 
         if self.basis is not None:
             for basis in self.basis:
-                if len(basis.elements) > 0 and not basis.user_defined:
+                if len(basis.elements) > 0:
                     if basis.aux_type is None:
                         if basis.aux_type not in first_basis:
-                            s = Basis.map_orca_basis(basis.get_basis_name())
-                            info[Method.ORCA_ROUTE].append(s)
-                            first_basis.append(basis.aux_type)
+                            if not basis.user_defined:
+                                s = Basis.map_orca_basis(basis.get_basis_name())
+                                info[Method.ORCA_ROUTE].append(s)
+                                first_basis.append(basis.aux_type)
+                                
+                            else:
+                                s = "GTOName \"%s\"" % basis.user_defined
+                                info[Method.ORCA_BLOCKS]['basis'].append(s)
+                                first_basis.append(basis.aux_type)
                             
                         else:
                             for ele in basis.elements:
                                 s = "newGTO            %-2s " % ele
-                                s += "\"%s\" end" % Basis.map_orca_basis(basis.get_basis_name())
-                    
-                                info[Method.ORCA_BLOCKS]['basis'].append(s)
+                                
+                                if not basis.user_defined:
+                                    s += "\"%s\" end" % Basis.map_orca_basis(basis.get_basis_name())
+                                else:
+                                    s += "\"%s\" end" % basis.user_defined
                         
+                                info[Method.ORCA_BLOCKS]['basis'].append(s)
+
                     elif basis.aux_type == "C":
                         if basis.aux_type not in first_basis:
-                            s = "%s/C" % Basis.map_orca_basis(basis.get_basis_name())
-                            info[Method.ORCA_ROUTE].append(s)
-                            first_basis.append(basis.aux_type)
+                            if not basis.user_defined:
+                                s = "%s/C" % Basis.map_orca_basis(basis.get_basis_name())
+                                info[Method.ORCA_ROUTE].append(s)
+                                first_basis.append(basis.aux_type)
                         
+                            else:
+                                s = "AuxCGTOName \"%s\"" % basis.user_defined
+                                info[Method.ORCA_BLOCKS]['basis'].append(s)
+                                first_basis.append(basis.aux_type)
+                                                    
                         else:
                             for ele in basis.elements:
                                 s = "newAuxCGTO        %-2s " % ele
-                                s += "\"%s/C\" end" % Basis.map_orca_basis(basis.get_basis_name())
-                    
+                                
+                                if not basis.user_defined:
+                                    s += "\"%s/C\" end" % Basis.map_orca_basis(basis.get_basis_name())
+                                else:
+                                    s += "\"%s\" end" % basis.user_defined
+                                            
                                 info[Method.ORCA_BLOCKS]['basis'].append(s)
                     
                     elif basis.aux_type == "J":
                         if basis.aux_type not in first_basis:
-                            s = "%s/J" % Basis.map_orca_basis(basis.get_basis_name())
-                            info[Method.ORCA_ROUTE].append(s)
-                            first_basis.append(basis.aux_type)
-                        
+                            if not basis.user_defined:
+                                s = "%s/J" % Basis.map_orca_basis(basis.get_basis_name())
+                                info[Method.ORCA_ROUTE].append(s)
+                                first_basis.append(basis.aux_type)
+                            
+                            else:
+                                s = "AuxJGTOName \"%s\"" % basis.user_defined
+                                info[Method.ORCA_BLOCKS]['basis'].append(s)
+                                first_basis.append(basis.aux_type)
+
                         else:
                             for ele in basis.elements:
                                 s = "newAuxJGTO        %-2s " % ele
-                                s += "\"%s/J\" end" % Basis.map_orca_basis(basis.get_basis_name())
-                    
+                                
+                                if not basis.user_defined:
+                                    s += "\"%s/J\" end" % Basis.map_orca_basis(basis.get_basis_name())
+                                else:
+                                    s += "\"%s\" end" % basis.user_defined
+
                                 info[Method.ORCA_BLOCKS]['basis'].append(s)
 
                     elif basis.aux_type == "JK":
                         if basis.aux_type not in first_basis:
-                            s = "%s/JK" % Basis.map_orca_basis(basis.get_basis_name())
-                            info[Method.ORCA_ROUTE].append(s)
-                            first_basis.append(basis.aux_type)
+                            if not basis.user_defined:
+                                s = "%s/JK" % Basis.map_orca_basis(basis.get_basis_name())
+                                info[Method.ORCA_ROUTE].append(s)
+                                first_basis.append(basis.aux_type)
+                            
+                            else:
+                                s = "AuxJKGTOName \"%s\"" % basis.user_defined
+                                info[Method.ORCA_BLOCKS]['basis'].append(s)
+                                first_basis.append(basis.aux_type)
                         
                         else:
                             for ele in basis.elements:
                                 s = "newAuxJKGTO       %-2s " % ele
-                                s += "\"%s/JK\" end" % Basis.map_orca_basis(basis.get_basis_name())
-                    
+                                
+                                if not basis.user_defined:
+                                    s += "\"%s/JK\" end" % Basis.map_orca_basis(basis.get_basis_name())
+                                else:
+                                    s += "\"%s\" end" % basis.user_defined
+                                
                                 info[Method.ORCA_BLOCKS]['basis'].append(s)
 
                     elif basis.aux_type == "CABS":
                         if basis.aux_type not in first_basis:
-                            s = "%s-CABS" % Basis.map_orca_basis(basis.get_basis_name())
-                            info[Method.ORCA_ROUTE].append(s)
-                            first_basis.append(basis.aux_type)
+                            if not basis.user_defined:
+                                s = "%s-CABS" % Basis.map_orca_basis(basis.get_basis_name())
+                                info[Method.ORCA_ROUTE].append(s)
+                                first_basis.append(basis.aux_type)
                             
+                            else:
+                                s = "CABSGTOName \"%s\"" % basis.user_defined
+                                info[Method.ORCA_BLOCKS]['basis'].append(s)
+                                first_basis.append(basis.aux_type)
+
                         else:
                             for ele in basis.elements:
                                 s = "newCABSGTO        %-2s " % ele
-                                s += "\"%s-CABS\" end" % Basis.map_orca_basis(basis.get_basis_name())
-                    
+                                
+                                if not basis.user_defined:
+                                    s += "\"%s-CABS\" end" % Basis.map_orca_basis(basis.get_basis_name())
+                                else:
+                                    s += "\"%s\" end" % basis.user_defined
+                                
                                 info[Method.ORCA_BLOCKS]['basis'].append(s)
 
                     elif basis.aux_type == "OptRI CABS":
                         if basis.aux_type not in first_basis:
-                            s = "%s-OptRI" % Basis.map_orca_basis(basis.get_basis_name())
-                            info[Method.ORCA_ROUTE].append(s)
-                            first_basis.append(basis.aux_type)
+                            if not basis.user_defined:
+                                s = "%s-OptRI" % Basis.map_orca_basis(basis.get_basis_name())
+                                info[Method.ORCA_ROUTE].append(s)
+                                first_basis.append(basis.aux_type)
+                                
+                            else:
+                                s = "CABSGTOName \"%s\"" % basis.user_defined
+                                info[Method.ORCA_BLOCKS]['basis'].append(s)
+                                first_basis.append(basis.aux_type)
                         
                         else:
                             for ele in basis.elements:
                                 s = "newCABSGTO        %-2s " % ele
-                                s += "\"%s-OptRI\" end" % Basis.map_orca_basis(basis.get_basis_name())
-                    
+                                
+                                if not basis.user_defined:
+                                    s += "\"%s-OptRI\" end" % Basis.map_orca_basis(basis.get_basis_name())
+                                else:
+                                    s += "\"%s\" end" % basis.user_defined
+                                
                                 info[Method.ORCA_BLOCKS]['basis'].append(s)
 
-                elif len(basis.elements) > 0 and basis.user_defined:
-                    #I'm not going to insert file contents for ORCA b/c the format BSE uses for a file
-                    #seems to be different than what ORCA expects in the %basis block
-                    #BSE puts element names where orca expects symbols
-                    s += "GTOName \"%s\"" % basis.user_defined
-                
-                    if len(basis.elements) > 0:
-                        info[Method.ORCA_BLOCKS]['basis'].append(s)
-                
         if self.ecp is not None:
             for basis in self.ecp:
                 if len(basis.elements) > 0 and not basis.user_defined:
@@ -774,60 +827,74 @@ class BasisSet:
         return info
 
     def get_psi4_basis_info(self):
-        s = "basis {\n"
+        #for psi4, ecp info should be included in basis definitions
+        #ecp is ignored
+        s = ""
         s2 = None
+        s3 = None
 
         first_basis = []
 
-        basis_list = []
         if self.basis is not None:
-            basis_list.extend(self.basis)
-            
-        if self.ecp is not None:
-            basis_list.extend(self.ecp)
-            
-        for basis in basis_list:
-            if len(basis.elements) > 0 and not basis.user_defined:
-                if basis.aux_type not in first_basis:
-                    first_basis.append(basis.aux_type)
-                    if basis.aux_type is None:
-                        s += "    assign    %s\n" % Basis.map_psi4_basis(basis.get_basis_name())
-                        
-                    elif basis.aux_type == "JK":
-                        s2 = "df_basis_%s {\n"
-                        s2 += "    assign %s-jkfit\n" % Basis.map_psi4_basis(basis.get_basis_name())
-                    
-                    elif basis.aux_type == "RI":
-                        s2 = "df_basis_%s {\n"
-                        if basis.name.lower() == "sto-3g" or basis.name.lower() == "3-21g":
-                            s2 += "    assign %s-rifit\n" % Basis.map_psi4_basis(basis.get_basis_name())
-                        else:
-                            s2 += "    assign %s-ri\n" % Basis.map_psi4_basis(basis.get_basis_name())
-
-                else:
-                    if basis.aux_type is None:
-                        for ele in basis.elements:
-                            s += "    assign %2s %s\n" % (ele, Basis.map_psi4_basis(basis.get_basis_name()))
-                    
-                    elif basis.aux_type == "JK":
-                        for ele in basis.elements:
-                            s2 += "    assign %2s %s-jkfit\n" % (ele, Basis.map_psi4_basis(basis.get_basis_name()))
+            s += "basis {\n"
+            for basis in self.basis:
+                if len(basis.elements) > 0:
+                    if basis.aux_type not in first_basis:
+                        first_basis.append(basis.aux_type)
+                        if basis.aux_type is None or basis.user_defined:
+                            s += "    assign    %s\n" % Basis.map_psi4_basis(basis.get_basis_name())
                             
-                    elif basis.aux_type == "RI":
-                        for ele in basis.elements:
+                        elif basis.aux_type == "JK":
+                            s2 = "df_basis_%s {\n"
+                            s2 += "    assign %s-jkfit\n" % Basis.map_psi4_basis(basis.get_basis_name())
+                        
+                        elif basis.aux_type == "RI":
+                            s2 = "df_basis_%s {\n"
                             if basis.name.lower() == "sto-3g" or basis.name.lower() == "3-21g":
-                                s2 += "    assign %2s %s-rifit\n" % (ele, Basis.map_psi4_basis(basis.get_basis_name()))
+                                s2 += "    assign %s-rifit\n" % Basis.map_psi4_basis(basis.get_basis_name())
                             else:
-                                s2 += "    assign %2s %s-ri\n" % (ele, Basis.map_psi4_basis(basis.get_basis_name()))
-
-        s += "}"
+                                s2 += "    assign %s-ri\n" % Basis.map_psi4_basis(basis.get_basis_name())
+    
+                    else:
+                        if basis.aux_type is None or basis.user_defined:
+                            for ele in basis.elements:
+                                s += "    assign %2s %s\n" % (ele, Basis.map_psi4_basis(basis.get_basis_name()))
+                        
+                        elif basis.aux_type == "JK":
+                            for ele in basis.elements:
+                                s2 += "    assign %2s %s-jkfit\n" % (ele, Basis.map_psi4_basis(basis.get_basis_name()))
+                                
+                        elif basis.aux_type == "RI":
+                            for ele in basis.elements:
+                                if basis.name.lower() == "sto-3g" or basis.name.lower() == "3-21g":
+                                    s2 += "    assign %2s %s-rifit\n" % (ele, Basis.map_psi4_basis(basis.get_basis_name()))
+                                else:
+                                    s2 += "    assign %2s %s-ri\n" % (ele, Basis.map_psi4_basis(basis.get_basis_name()))
+                                    
+            if any(basis.user_defined for basis in self.basis):
+                s3 = ""
+                for basis in self.basis:
+                    if basis.user_defined:
+                        if os.path.exists(basis.user_defined):
+                            s3 += "\n[%s]\n" % basis.name
+                            with open(basis.user_defined, 'r') as f:
+                                lines = [line.rstrip() for line in f.readlines() if len(line.strip()) > 0 and not line.startswith('!')]
+                                s3 += '\n'.join(lines)
+                                s3 += '\n\n'
+    
+            if s3 is not None:
+                s += s3
+    
+            s += "}"
+            
+            if s2 is not None:
+                s2 += "}"
+                
+                s += "\n\n%s" % s2
         
-        if s2 is not None:
-            s2 += "}"
-            
-            s += "\n\n%s" % s2
-            
-        return {Method.PSI4_BEFORE_GEOM:[s]}
+        info = {Method.PSI4_BEFORE_GEOM:[s]}
+
+        return info
         
     def check_for_elements(self, elements):
         warning = ""
