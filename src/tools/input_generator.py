@@ -460,11 +460,12 @@ class JobTypeOption(QWidget):
     ORCA_SOLVENT_MODELS = ["SMD", "CPCM"]
     
     #TODO:
-    #remove constraints checkbox
-    #put constraints widget in a groupbox
-    #have either this or Method check to see if anything is actually constrained
-    #set margins to 0 like with basis stuff
-    #this should save a little space
+    #remove constraints checkbox and put constraints widget in a groupbox
+    #   have either this or Method check to see if anything is actually constrained
+    #   set margins to 0 like with basis stuff
+    #   this should save a little space
+    #
+    #make selecting a row in one of the contraints tables select the atoms
     
     def __init__(self, settings, session, init_form, parent=None):
         super().__init__(parent)
@@ -506,9 +507,7 @@ class JobTypeOption(QWidget):
         self.do_freq = QCheckBox()
         self.do_freq.stateChanged.connect(self.change_job_type)
         job_type_layout.addRow("frequency calculation:", self.do_freq)
-        
-        self.layout.addWidget(job_form, 0, 0, Qt.AlignTop)
-        
+
         self.job_type_opts = QTabWidget()
         
         self.runtime = QWidget()
@@ -561,10 +560,18 @@ class JobTypeOption(QWidget):
         file_browse_layout.setColumnStretch(2, 0)
         runtime_outer_shell_layout.addWidget(file_browse, 1, 0, Qt.AlignTop)
         
+        align_widget = QWidget()
+        runtime_outer_shell_layout.addWidget(align_widget, 2, 0, Qt.AlignTop)
+        
+        runtime_outer_shell_layout.setRowStretch(0, 0)
+        runtime_outer_shell_layout.setRowStretch(1, 0)
+        runtime_outer_shell_layout.setRowStretch(2, 1)
+        
         self.job_type_opts.addTab(self.runtime, "execution")
         
         self.geom_opt = QWidget()
         geom_opt_layout = QGridLayout(self.geom_opt)
+        geom_opt_layout.setContentsMargins(0, 0, 0, 0)
         geom_opt_form_widget = QWidget()
         geom_opt_form = QFormLayout(geom_opt_form_widget)
         
@@ -583,6 +590,7 @@ class JobTypeOption(QWidget):
         
         atom_constraints = QWidget()
         atom_constraints_layout = QGridLayout(atom_constraints)
+        atom_constraints_layout.setContentsMargins(0, 0, 0, 0)
         
         freeze_atoms = QPushButton("add selected atoms")
         freeze_atoms.clicked.connect(self.constrain_atoms)
@@ -598,6 +606,7 @@ class JobTypeOption(QWidget):
         
         bond_constraints = QWidget()
         bond_constraints_layout = QGridLayout(bond_constraints)
+        bond_constraints_layout.setContentsMargins(0, 0, 0, 0)
 
         freeze_bonds = QPushButton("add selected bonds")
         freeze_bonds.clicked.connect(self.constrain_bonds)
@@ -618,7 +627,8 @@ class JobTypeOption(QWidget):
         
         angle_constraints = QWidget()
         angle_constraints_layout = QGridLayout(angle_constraints)
-        
+        angle_constraints_layout.setContentsMargins(0, 0, 0, 0)
+
         freeze_bond_pair = QPushButton("add selected bond pair")
         freeze_bond_pair.clicked.connect(self.constrain_bond_pair)
         freeze_bond_pair.clicked.connect(self.something_changed)
@@ -638,7 +648,8 @@ class JobTypeOption(QWidget):
 
         torsion_constrains = QWidget()
         torsion_constrains_layout = QGridLayout(torsion_constrains)
-        
+        torsion_constrains_layout.setContentsMargins(0, 0, 0, 0)
+
         freeze_bond_trio = QPushButton("add selected bond trio")
         freeze_bond_trio.clicked.connect(self.constrain_bond_trio)
         freeze_bond_trio.clicked.connect(self.something_changed)
@@ -662,16 +673,19 @@ class JobTypeOption(QWidget):
         constraints_viewer.addTab(bond_constraints, "bonds")
         constraints_viewer.addTab(angle_constraints, "angles")
         constraints_viewer.addTab(torsion_constrains, "torsions")
-        
+        constraints_viewer.setStyleSheet('QTabWidget::pane {border: 1px;}')
+
         constraints_layout.addWidget(constraints_viewer, 1, 0, 1, 2, Qt.AlignTop)
 
         constraints_layout.setRowStretch(0, 0)
         constraints_layout.setRowStretch(1, 1)
         constraints_layout.setContentsMargins(0, 0, 0, 0)
         
-        self.constraints_widget.setVisible(self.use_contraints.checkState() == Qt.Checked)
+        self.constraints_widget.setEnabled(self.use_contraints.checkState() == Qt.Checked)
 
         geom_opt_layout.addWidget(self.constraints_widget, 1, 0, Qt.AlignTop)
+        geom_opt_layout.setRowStretch(0, 0)
+        geom_opt_layout.setRowStretch(1, 1)
         
         self.job_type_opts.addTab(self.geom_opt, "optimization settings")
         
@@ -729,10 +743,18 @@ class JobTypeOption(QWidget):
         
         self.job_type_opts.addTab(solvent_widget, "solvent")
         
-        self.layout.addWidget(self.job_type_opts, 1, 0, Qt.AlignTop)
-
-        self.layout.setRowStretch(0, 0)
-        self.layout.setRowStretch(1, 1)
+        self.job_type_opts.tabBarDoubleClicked.connect(self.tab_dble_click)
+        
+        splitter = QSplitter(Qt.Vertical)
+        splitter.setChildrenCollapsible(True)
+        splitter.addWidget(job_form)
+        splitter.addWidget(self.job_type_opts)
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        self.layout.addWidget(splitter)
+        
+        #self.layout.addWidget(job_form, 0, 0, Qt.AlignTop)
+        #self.layout.addWidget(self.job_type_opts, 1, 0, Qt.AlignTop)
 
         self.setOptions(self.form)
         
@@ -770,6 +792,14 @@ class JobTypeOption(QWidget):
         self.constrained_torsion_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.constrained_torsion_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
         self.constrained_torsion_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Fixed)
+    
+    def tab_dble_click(self, ndx):
+        """select geom opt or freq when that tab is clicked"""
+        if ndx == 1:
+            self.do_geom_opt.setCheckState(Qt.Checked)        
+        
+        elif ndx == 2:
+            self.do_freq.setCheckState(Qt.Checked)
     
     def open_chk_save(self):
         #TODO: change filter based on software
@@ -883,7 +913,7 @@ class JobTypeOption(QWidget):
         self.jobTypeChanged.emit()
           
     def show_contraints(self, value):
-        self.constraints_widget.setVisible(bool(value))
+        self.constraints_widget.setEnabled(bool(value))
         self.jobTypeChanged.emit()
         
     def getCharge(self, update_settings=True):
@@ -1466,8 +1496,12 @@ class JobTypeOption(QWidget):
                 self.settings.last_opt = self.do_geom_opt.checkState() == Qt.Checked
                 self.settings.last_ts = self.ts_opt.checkState() == Qt.Checked
                 self.settings.last_freq = self.do_freq.checkState() == Qt.Checked
-                
-            return {Method.PSI4_SETTINGS:settings, Method.PSI4_AFTER_GEOM:after_geom}
+            
+            info = {Method.PSI4_AFTER_GEOM:after_geom}
+            if len(settings.keys()) > 0:
+                info[Method.PSI4_SETTINGS] = settings
+            
+            return info
 
 
 class FunctionalOption(QWidget):
@@ -1985,16 +2019,18 @@ class BasisOption(QWidget):
 
         elif program == "ORCA":
             self.aux_type.clear()
-            for opt in self.aux_options:
-                opt.setVisible(True)
+            if self.aux_available:
+                for opt in self.aux_options:
+                    opt.setVisible(True)
             
             self.aux_type.addItem("no")
             self.aux_type.addItems(BasisSet.ORCA_AUX)
 
         elif program == "Psi4":
             self.aux_type.clear()
-            for opt in self.aux_options:
-                opt.setVisible(True)
+            if self.aux_available:
+                for opt in self.aux_options:
+                    opt.setVisible(True)
                 
             self.aux_type.addItem("no")
             self.aux_type.addItems(BasisSet.PSI4_AUX)
@@ -2327,9 +2363,6 @@ class ECPOption(BasisOption):
 
     basis_class = ECP
 
-    def __init__(self, parent, settings):
-        super().__init__(parent, settings)
-
     def update_tooltab(self):
         basis_name = self.currentBasis().name
         elements = "(%s)" % ", ".join(self.currentElements())
@@ -2424,7 +2457,7 @@ class BasisWidget(QWidget):
 
     def new_ecp(self, checked=None, use_saved=None):
         """add an ECPOption"""
-        new_basis = ECPOption(self, self.settings)
+        new_basis = ECPOption(self, self.settings, self.form)
         new_basis.setToolBox(self.ecp_toolbox)
         new_basis.setElements(self.elements)
         new_basis.basisChanged.connect(self.something_changed)
@@ -3662,7 +3695,7 @@ class Psi4KeywordOptions(KeywordOptions):
             else:
                 previous_dict = previous
                 
-            return TwoLayerKeyWordOption("settings", last_dict, previous_dict, "double click to use set %s %s end", one_opt_per_kw=True)
+            return TwoLayerKeyWordOption("settings", last_dict, previous_dict, "double click to use \"set { %s %s }\"", one_opt_per_kw=True)
 
 
 class KeywordWidget(QWidget):

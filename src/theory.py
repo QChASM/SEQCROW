@@ -415,28 +415,31 @@ class Method:
                     warnings.append(warning)
             
             if "%s" in basis_info[self.PSI4_BEFORE_GEOM][0]:
-                if 'cc' in self.functional.lower():
+                if 'cc' in self.functional.name.lower():
                     basis_info[self.PSI4_BEFORE_GEOM][0] = basis_info[self.PSI4_BEFORE_GEOM][0].replace("%s", "CC")
                 
-                elif 'dct' in self.functional.lower():
+                elif 'dct' in self.functional.name.lower():
                     basis_info[self.PSI4_BEFORE_GEOM][0] = basis_info[self.PSI4_BEFORE_GEOM][0].replace("%s", "DCT")
                 
-                elif 'mp2' in self.functional.lower():
+                elif 'mp2' in self.functional.name.lower():
                     basis_info[self.PSI4_BEFORE_GEOM][0] = basis_info[self.PSI4_BEFORE_GEOM][0].replace("%s", "MP2")
 
-                elif 'sapt' in self.functional.lower():
+                elif 'sapt' in self.functional.name.lower():
                     basis_info[self.PSI4_BEFORE_GEOM][0] = basis_info[self.PSI4_BEFORE_GEOM][0].replace("%s", "SAPT")
 
-                elif 'scf' in self.functional.lower():
+                elif 'scf' in self.functional.name.lower():
                     basis_info[self.PSI4_BEFORE_GEOM][0] = basis_info[self.PSI4_BEFORE_GEOM][0].replace("%s", "SCF")
             
-                elif 'ci' in self.functional.lower():
+                elif 'ci' in self.functional.name.lower():
                     basis_info[self.PSI4_BEFORE_GEOM][0] = basis_info[self.PSI4_BEFORE_GEOM][0].replace("%s", "MCSCF")
             
         else:
             basis_info = {}
         
         combined_dict = combine_dicts(other_kw_dict, basis_info)
+        if self.grid is not None:
+            grid_info = self.grid.get_psi4()
+            combined_dict = combine_dicts(combined_dict, grid_info)
 
         s = ""
 
@@ -467,12 +470,47 @@ class Method:
                     
         s += "}\n\n"
         
-        if self.PSI4_SETTINGS in combined_dict:
+        if self.PSI4_SETTINGS in combined_dict and any(len(combined_dict[self.PSI4_SETTINGS][setting]) > 0 for setting in combined_dict[self.PSI4_SETTINGS]):
             s += "set {\n"
             for setting in combined_dict[self.PSI4_SETTINGS]:
                 if len(combined_dict[self.PSI4_SETTINGS][setting]) > 0:
-                    s += "    %-16s    %-16s\n" % (setting, combined_dict[self.PSI4_SETTINGS][setting][0])
+                    s += "    %-20s    %s\n" % (setting, combined_dict[self.PSI4_SETTINGS][setting][0])
             
+            s += "}\n\n"
+
+        if self.constraints is not None:
+            s += "set optking {\n"
+            if len(self.constraints['atoms']) > 0 and self.structure is not None:
+                s += "    frozen_cartesian = (\"\n"
+                for atom in self.constraints['atoms']:
+                    s += "        %2i xyz\n" % (self.structure.atoms.index(atom) + 1)
+                
+                s += "    \")\n"
+
+            if len(self.constraints['bonds']) > 0 and self.structure is not None:
+                s += "    frozen_distance = (\"\n"
+                for bond in self.constraints['bonds']:
+                    atom1, atom2 = bond
+                    s += "        %2i %2i\n" % (self.structure.atoms.index(atom1) + 1, self.structure.atoms.index(atom2) + 1)
+                    
+                s += "    \")\n"
+
+            if len(self.constraints['angles']) > 0 and self.structure is not None:
+                s += "    frozen_bend = (\"\n"
+                for angle in self.constraints['angles']:
+                    atom1, atom2, atom3 = angle
+                    s += "        %2i %2i %2i\n" % (self.structure.atoms.index(atom1) + 1, self.structure.atoms.index(atom2) + 1, self.structure.atoms.index(atom3) + 1)
+                    
+                s += "    \")\n"
+            
+            if len(self.constraints['torsions']) > 0 and self.structure is not None:
+                s += "    frozen_dihedral = (\"\n"
+                for torsion in self.constraints['torsions']:
+                    atom1, atom2, atom3 = torsion
+                    s += "        %2i %2i %2i %2i\n" % (self.structure.atoms.index(atom1) + 1, self.structure.atoms.index(atom2) + 1, self.structure.atoms.index(atom3) + 1, self.structure.atoms.index(atom4) + 1)
+                    
+                s += "    \")\n"
+                
             s += "}\n\n"
 
         if self.PSI4_AFTER_GEOM in combined_dict:
@@ -751,8 +789,9 @@ class BasisSet:
         for basis in basis_list:
             if len(basis.elements) > 0 and not basis.user_defined:
                 if basis.aux_type not in first_basis:
+                    first_basis.append(basis.aux_type)
                     if basis.aux_type is None:
-                        s += "    assign %s\n" % Basis.map_psi4_basis(basis.get_basis_name())
+                        s += "    assign    %s\n" % Basis.map_psi4_basis(basis.get_basis_name())
                         
                     elif basis.aux_type == "JK":
                         s2 = "df_basis_%s {\n"
@@ -781,12 +820,12 @@ class BasisSet:
                             else:
                                 s2 += "    assign %2s %s-ri\n" % (ele, Basis.map_psi4_basis(basis.get_basis_name()))
 
-        s += "}\n\n"
+        s += "}"
         
         if s2 is not None:
-            s2 += "}\n\n"
+            s2 += "}"
             
-            s += s2
+            s += "\n\n%s" % s2
             
         return {Method.PSI4_BEFORE_GEOM:[s]}
         
@@ -805,7 +844,7 @@ class BasisSet:
             if any(len(elements_without_basis[aux]) != 0 for aux in elements_without_basis.keys()):
                 for aux in elements_without_basis.keys():
                     if len(elements_without_basis[aux]) != 0:
-                        if aux != "no":
+                        if aux is not None and aux != "no":
                             warning += "%s ha%s no auxiliary %s basis; " % (", ".join(elements_without_basis[aux]), "s" if len(elements_without_basis[aux]) == 1 else "ve", aux)
                         else:
                             warning += "%s ha%s no basis; " % (", ".join(elements_without_basis[aux]), "s" if len(elements_without_basis[aux]) == 1 else "ve")
@@ -1268,3 +1307,6 @@ class IntegrationGrid:
         current just returns self.name"""
         return (self.name, None)
         
+    def get_psi4(self):
+        radial, spherical = [x.strip() for x in self.name[1:-1].split(', ')]
+        return {Method.PSI4_SETTINGS:{'dft_radial_points':[radial], 'dft_spherical_points':[spherical]}}
