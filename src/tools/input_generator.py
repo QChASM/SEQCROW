@@ -1478,14 +1478,14 @@ class JobTypeOption(QWidget):
             after_geom = []
             
             if self.do_geom_opt.checkState() == Qt.Checked:
-                after_geom.append('nrg, wfn = optimize("%s", return_wfn=True)')
+                after_geom.append("nrg, wfn = optimize('$FUNCTIONAL', return_wfn=True)")
                 
                 if self.ts_opt.checkState() == Qt.Checked:
                     settings['opt_type'] = ['ts']
                     
             
             if self.do_freq.checkState() == Qt.Checked:
-                after_geom.append('nrg, wfn = frequencies("%s", return_wfn=True)')
+                after_geom.append("nrg, wfn = frequencies('$FUNCTIONAL', return_wfn=True)")
 
             if update_settings:
                 self.settings.last_nproc = self.nprocs.value()
