@@ -792,10 +792,10 @@ class JobTypeOption(QWidget):
     def tab_dble_click(self, ndx):
         """select geom opt or freq when that tab is clicked"""
         if ndx == 1:
-            self.do_geom_opt.setCheckState(Qt.Checked)        
+            self.do_geom_opt.setChecked(not self.do_geom_opt.checkState() == Qt.Checked)
         
         elif ndx == 2:
-            self.do_freq.setCheckState(Qt.Checked)
+            self.do_freq.setChecked(not self.do_freq.checkState() == Qt.Checked)
     
     def open_chk_save(self):
         if self.form == "Gaussian":
@@ -2541,7 +2541,6 @@ class BasisWidget(QWidget):
             #if they are selected on a new auxiliary basis
             if self.form != "Gaussian":
                 aux = self.settings.last_basis_aux[use_saved]
-                print("tried to set aux to %s" % aux)
                 new_basis.setAux(aux)
 
             name = self.settings.last_basis[use_saved]
