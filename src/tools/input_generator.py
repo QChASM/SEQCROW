@@ -106,6 +106,8 @@ class BuildQM(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False         
 
+    help = "https://github.com/QChASM/ChimAARON/wiki/Build-QM-Input-Tool"
+
     def __init__(self, session, name):       
         super().__init__(session, name)
 
@@ -3243,13 +3245,16 @@ class TwoLayerKeyWordOption(QWidget):
         self.previous_opt_table.removeRow(row)
 
     def add_item_to_current_opt_table(self, opt):
-        if self.one_opt_per_kw:
-            self.last_dict[self.selected_kw] = [opt]
-            for i in range(self.current_opt_table.rowCount(), -1, -1):
-                self.current_opt_table.removeRow(i)
-
-        else:
-            self.last_dict[self.selected_kw].append(opt)
+        if opt not in self.last_dict[self.selected_kw]:
+            if self.one_opt_per_kw:
+                self.last_dict[self.selected_kw] = [opt]
+                for i in range(self.current_opt_table.rowCount(), -1, -1):
+                    self.current_opt_table.removeRow(i)
+            
+            else:
+                self.last_dict[self.selected_kw].append(opt)
+        
+            self.optionChanged.emit()
 
         row = self.current_opt_table.rowCount()
         self.current_opt_table.insertRow(row)
@@ -3269,8 +3274,6 @@ class TwoLayerKeyWordOption(QWidget):
         self.current_opt_table.resizeRowToContents(row)
         self.current_opt_table.resizeColumnToContents(0)
         self.current_opt_table.resizeColumnToContents(1)
-        
-        self.optionChanged.emit()
 
     def add_kw(self):
         #TODO:
@@ -3340,9 +3343,9 @@ class TwoLayerKeyWordOption(QWidget):
             if any(keyword == kw for kw in self.last_dict.keys()):
                 return
             
-            self.last_dict[keyword] = []
-            
-            self.add_item_to_current_kw_table(keyword)
+            else:
+                self.last_dict[keyword] = []
+                self.add_item_to_current_kw_table(keyword)
 
     def clicked_current_route_keyword(self, row, column):
         if column == 1:
