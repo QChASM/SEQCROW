@@ -16,24 +16,28 @@ from AaronTools.trajectory import Pathway
 from io import BytesIO
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, QTabWidget, QComboBox, QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, QFormLayout, QCheckBox
+from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, QTabWidget, QComboBox, \
+                            QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, \
+                            QFormLayout, QCheckBox, QHeaderView
 
 from ..managers import FILEREADER_CHANGE
-from ChimAARON.settings import tuple2str
+from SEQCROW.utils import iter2str
+
+#TODO:
+#make double clicking something in the table visualize it
 
 class _NormalModeSettings(Settings):
     AUTO_SAVE = {
-        'arrow_color': Value((0.0, 1.0, 0.0, 1.0), TupleOf(FloatArg, 4), tuple2str),
+        'arrow_color': Value((0.0, 1.0, 0.0, 1.0), TupleOf(FloatArg, 4), iter2str),
         'arrow_scale': Value(1.5, FloatArg, str),
         'anim_scale': Value(0.2, FloatArg, str),
         'anim_duration': Value(101, IntArg, str),
     }
 
 class NormalModes(ToolInstance):
-    #XML_TAG ChimeraX :: Tool :: Visualize Normal Modes :: AaronTools :: Visualize normal modes from a Gaussian output file as displacement vectors or as an animation
     SESSION_ENDURING = False
     SESSION_SAVE = False         
-    display_name = "Visualize normal modes"
+    help = "https://github.com/QChASM/ChimAARON/wiki/Visualize-Normal-Modes-Tool"
     
     def __init__(self, session, name):       
         super().__init__(session, name)
@@ -74,6 +78,10 @@ class NormalModes(ToolInstance):
         table.setEditTriggers(QTableWidget.NoEditTriggers)
         for i in range(0, 2):
             table.resizeColumnToContents(i)
+        
+        table.horizontalHeader().setStretchLastSection(False)            
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)        
         
         layout.addWidget(table)
         self.table = table
@@ -186,8 +194,9 @@ class NormalModes(ToolInstance):
     def refresh_models(self, *args, **kwargs):
         """refresh the list of models with frequency data and add or remove items from the combobox"""
         self.models_with_freq = self.session.filereader_manager.frequency_models
-            
-        for i in range(0, self.model_selector.count()):
+        
+        #remove in reverse order b/c sometimes they don't get removed in forwards order
+        for i in range(self.model_selector.count(), -1, -1):
             if self.model_selector.itemData(i) not in self.models_with_freq:
                 self.model_selector.removeItem(i)
                 
@@ -244,8 +253,8 @@ class NormalModes(ToolInstance):
         
         #reset coordinates b/c movie maight be playing
         geom = Geometry(fr)
-        coords = np.array([geom.coords()])
-        model.add_coordsets(coords, replace=True)
+        for atom, coord in zip(model.atoms, geom.coords()):
+            atom.coord = coord
         
         vector = fr.other['frequency'].data[mode].vector
 
@@ -269,9 +278,11 @@ class NormalModes(ToolInstance):
 
         self.session.models.add(bild_obj, parent=model)
         
-        if hasattr(model, "chimaaron_freq_slider") and model.chimaaron_freq_slider.structure is not None:
+        if hasattr(model, "seqcrow_freq_slider") and model.seqcrow_freq_slider.structure is not None:
             #close animation slider
-            model.chimaaron_freq_slider.delete()
+            #TODO:
+            #put this in a manager - not an attribute on the model
+            model.seqcrow_freq_slider.delete()
     
     def show_anim(self):
         """play selected modes as an animation"""
@@ -325,12 +336,18 @@ class NormalModes(ToolInstance):
         for atom, chix_atom in zip(geom.atoms, model.atoms):
             atom.chix_atom = chix_atom
         
-        if hasattr(model, "chimaaron_freq_slider") and model.chimaaron_freq_slider.structure is not None:
-            model.chimaaron_freq_slider.delete()
+        if hasattr(model, "seqcrow_freq_slider") and model.seqcrow_freq_slider.structure is not None:
+            model.seqcrow_freq_slider.delete()
             
-        model.chimaaron_freq_slider = CoordinateSetSlider(self.session, model)
-        model.chimaaron_freq_slider.play_cb()
+        model.seqcrow_freq_slider = CoordinateSetSlider(self.session, model)
+        model.seqcrow_freq_slider.play_cb()
 
+    def display_help(self):
+        """Show the help for this tool in the help viewer."""
+        from chimerax.core.commands import run
+        run(self.session,
+            'open %s' % self.help if self.help is not None else "")
+    
     def delete(self):
         """overload delete"""
         self.session.triggers.remove_handler(self._add_handler)

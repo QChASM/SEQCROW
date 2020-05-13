@@ -1,0 +1,140 @@
+<BundleInfo name="SEQCROW" 
+            customInit="true"
+            minSessionVersion="1"
+            maxSessionVersion="1"
+            package="SEQCROW"
+            purePython="true"
+            version="0.1">
+            
+            <Author>QChASM</Author>
+            <Email>catalysttrends@uga.edu</Email>
+            <URL>catalysttrends.org</URL>
+            <License>license.txt</License>
+            <Synopsis>Structure Editing and Quantum Chemical Representation and Organization for Workflows</Synopsis>
+            <Description>An AaronTools-based plugin for ChimeraX. 
+
+SEQCROW adds the following to ChimeraX:
+I/O:
+    read XYZ, Gaussian COM, Gaussian LOG files, and ORCA output files
+    save models to XYZ files
+
+tools:
+    AaronTools
+        Add to Personal Library  - add substituents, ligands, or rings to your personal AaronTools library
+        Browse AaronTools        - browse substituents, ligands, and rings in the AaronTools library
+        Process Thermochemistry  - compute thermal corrections for models with vibrational mode information
+        Structure Modification   - modify your structure using pieces from the AaronTools library
+        Visualize Normal Modes   - display normal modes for models with vibrational mode information as vectors or an animation
+
+    SEQCROW
+        Managed Models           - restore models opened through SEQCROW to their original state
+        Build QM Input           - build Gaussian input file
+
+selectors:
+    tm  - select all transition metals
+
+presets:
+    ball-stick-endcap       - all non-H atoms are represented as balls and sticks; H atoms are represented as sticks/endcaps
+    index labels            - label each atom with its index (1-indexed)
+    sticks                  - all atoms are represented as sticks/endcaps
+            </Description>
+            
+            <Dependencies>
+                <Dependency name="ChimeraX-Core" version=">=0.93"/>
+                <Dependency name="scipy"/>
+                <Dependency name="numpy"/>
+            </Dependencies>
+            
+            <Categories>
+                <Category name="General"/>
+                <Category name="Input/Output"/>
+            </Categories>
+            
+            <Managers>
+                <Manager name="filereader_manager" uiOnly="true"/>
+                <Manager name="seqcrow_ordered_selection_manager" uiOnly="true"/>
+            </Managers>
+            
+            <Providers manager="data formats">
+                <Provider name="Gaussian input file" 
+                          category="Molecular structure" 
+                          suffixes=".com,.gjf" 
+                          encoding="utf-8" 
+                          nicknames="com" 
+                          synopsis="Gaussian input file"/>
+                          
+                <Provider name="Gaussian output file" 
+                          category="Molecular structure" 
+                          suffixes=".log" 
+                          encoding="utf-8" 
+                          nicknames="log" 
+                          synopsis="Gaussian output file"/>
+                          
+                <Provider name="ORCA output file" 
+                          category="Molecular structure" 
+                          suffixes=".out" 
+                          encoding="utf-8" 
+                          nicknames="out" 
+                          synopsis="ORCA output file"/>
+                          
+                <Provider name="XYZ file" 
+                          category="Molecular structure" 
+                          suffixes=".xyz" 
+                          encoding="utf-8" 
+                          nicknames="xyz" 
+                          synopsis="XYZ coordinate file"/>
+            </Providers>
+            
+            <Providers manager="open command">
+                <Provider name="Gaussian input file" want_path="true"/>
+                <Provider name="Gaussian output file" want_path="true"/>
+                <Provider name="ORCA output file" want_path="true"/>
+                <Provider name="XYZ file" want_path="true"/>
+            </Providers>
+            
+            <!--we can save Gaussian input files, but not with the save command-->
+            <Providers manager="save command">
+                <Provider name="XYZ file"/>
+            </Providers>
+            
+            <Classifiers>
+                <PythonClassifier>Development Status :: 2 - Pre-Alpha</PythonClassifier>
+                <PythonClassifier>License :: OSI Approved :: GNU General Public License v3 (GPLv3)</PythonClassifier>
+                <PythonClassifier>Environment :: Win32 (MS Windows)</PythonClassifier>
+                <PythonClassifier>Environment :: MacOS X</PythonClassifier>
+                <PythonClassifier>Environment :: X11 Applications :: Qt</PythonClassifier>
+                <PythonClassifier>Framework :: ChimeraX</PythonClassifier>
+                <PythonClassifier>Intended Audience :: Science/Research</PythonClassifier>
+                <PythonClassifier>Natural Language :: English</PythonClassifier>
+                <PythonClassifier>Operating System :: MacOS</PythonClassifier>
+                <PythonClassifier>Operating System :: Microsoft :: Windows</PythonClassifier>
+                <PythonClassifier>Operating System :: POSIX :: Linux</PythonClassifier>
+                <PythonClassifier>Programming Language :: Python :: 3</PythonClassifier>
+                <PythonClassifier>Topic :: Scientific/Engineering :: Chemistry</PythonClassifier>
+                <PythonClassifier>Topic :: Scientific/Engineering :: Visualization</PythonClassifier>
+                
+                <!-- TODO: move tools to appropriate menus -->
+                <!--NOTE:
+                including my own Bundle line will prevent anything after it from being loaded
+                ChimeraX's devel build
+                ChimeraXClassifier>ChimeraX :: Bundle :: General,Input/Output,Structure Editing,External Program :: 1,1 :: SEQCROW :: ChimAARON,SEQCRO,SEQCROW :: true</ChimeraXClassifier-->
+                <ChimeraXClassifier>ChimeraX :: Tool :: Build QM Input :: SEQCROW :: Create Gaussian input file</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Structure Modification :: AaronTools :: Modify substituents, swap ligands, and close rings</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Browse AaronTools Libraries :: AaronTools :: Browse the AaronTools ligand, substituent, and ring libraries"</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Process QM Thermochemistry :: AaronTools :: Compute the free energy of a molecule with frequency data</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Managed Models :: SEQCROW :: see models managed by SEQCROW</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Add to Personal Library :: AaronTools :: Add to your personal ligand, substituent, and ring libraries</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Visualize Normal Modes :: AaronTools :: Visualize normal modes from a Gaussian output file as displacement vectors or as an animation</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: tm :: Transition metals</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: DataFormat :: XYZ :: XYZ :: Molecular structure :: .xyz :: :: :: :: :: XYZ Format :: utf-8</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Open :: XYZ :: AaronTools :: false :: coordsets:Bool</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: DataFormat :: COM :: COM :: Molecular structure :: .com,.gjf :: :: :: :: :: Gaussian input file :: utf-8</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Open :: COM :: COM ::</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: DataFormat :: LOG :: LOG :: Molecular structure :: .log :: :: :: :: :: Gaussian output file :: utf-8</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Open :: LOG :: LOG :: false :: coordsets:Bool</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: DataFormat :: OUT :: OUT :: Molecular structure :: .out :: :: :: :: :: ORCA output file :: utf-8</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Open :: OUT :: OUT :: false :: coordsets:Bool</ChimeraXClassifier>
+        </Classifiers>
+            
+</BundleInfo>
+            

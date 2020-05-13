@@ -5,3 +5,4 @@ from .libadd import LibAdd
 from .per_frame_plot import EnergyPlot
 from .filereader_panel import FileReaderPanel
 from .compute_thermo import Thermochem
+from .input_generator import BuildQM

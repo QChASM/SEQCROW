@@ -1,25 +1,18 @@
-def open_aarontools(session, path, format_name=None, trajectory=False):
+def open_aarontools(session, path, format_name=None, coordsets=False):
     from AaronTools.fileIO import FileReader
     from AaronTools.geometry import Geometry
-    from ChimAARON.residue_collection import ResidueCollection
-    from ChimAARON.managers import FILEREADER_ADDED
+    from SEQCROW.residue_collection import ResidueCollection
+    from SEQCROW.managers import FILEREADER_ADDED
     from os.path import split as path_split
     from warnings import warn
-    #XML_TAG ChimeraX :: DataFormat :: XYZ :: XYZ :: Molecular structure :: .xyz :: :: :: :: :: XYZ Format :: utf-8
-    #XML_TAG ChimeraX :: Open :: XYZ :: AaronTools :: false :: coordsets:Bool
-    #XML_TAG ChimeraX :: DataFormat :: COM :: Gaussian input file :: Molecular structure :: .com,.gjf :: :: :: :: :: Gaussian input file :: utf-8
-    #XML_TAG ChimeraX :: Open :: COM :: Gaussian input file ::
-    #XML_TAG ChimeraX :: DataFormat :: LOG :: Gaussian output file :: Molecular structure :: .log :: :: :: :: :: Gaussian output file :: utf-8
-    #XML_TAG ChimeraX :: Open :: LOG :: Gaussian output file :: false :: coordsets:Bool
-    #XML_TAG ChimeraX :: DataFormat :: OUT :: Orca output file :: Molecular structure :: .out :: :: :: :: :: Orca output file :: utf-8
-    #XML_TAG ChimeraX :: Open :: OUT :: Orca output file :: false :: coordsets:Bool
+
     if format_name == "Gaussian input file":
         fmt = "com"
     elif format_name == "Gaussian output file":
         fmt = "log"    
-    elif format_name == "Orca output file":
+    elif format_name == "ORCA output file":
         fmt = "out"
-    elif format_name == "XYZ":
+    elif format_name == "XYZ file":
         fmt = "xyz"
     else:
         fmt = path.split('.')[-1]
@@ -34,11 +27,11 @@ def open_aarontools(session, path, format_name=None, trajectory=False):
     #associate the AaronTools FileReader with each structure
     session.filereader_manager.triggers.activate_trigger(FILEREADER_ADDED, ([structure], [f]))
 
-    if trajectory:
+    if coordsets:
         from chimerax.std_commands.coordset_gui import CoordinateSetSlider
-        from ChimAARON.tools import EnergyPlot
+        from SEQCROW.tools import EnergyPlot
         
-        CoordinateSetSlider(session, structure)
+        slider = CoordinateSetSlider(session, structure)
         if "energy" in f.other:
             nrg_plot = EnergyPlot(session, structure)
             if not nrg_plot.opened:
@@ -46,7 +39,12 @@ def open_aarontools(session, path, format_name=None, trajectory=False):
                      "there might be a mismatch between energy entries and structure entries in %s" % path)
                 nrg_plot.delete()                    
 
-    status = "Opened %s as a %s %s" % (path, fmt, "trajectory" if trajectory else "file")
+    if f.all_geom is not None and len(f.all_geom) > 1:
+        structure.active_coordset_id = len(f.all_geom)
+        if coordsets:
+            slider.set_slider(len(f.all_geom))
+
+    status = "Opened %s as a %s %s" % (path, fmt, "movie" if coordsets else "file")
 
     return [structure], status
 
@@ -58,7 +56,7 @@ def save_aarontools(session, path, format_name, **kwargs):
     """
     #XML: ChimeraX :: Save -> extra_keywords=models:Models
     #^ this doesn't do anything b/c save doesn't expect a 'comment' keyword
-    from ChimAARON.residue_collection import ResidueCollection
+    from SEQCROW.residue_collection import ResidueCollection
     from AaronTools.geometry import Geometry
     from chimerax.atomic import AtomicStructure
     

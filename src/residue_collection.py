@@ -173,7 +173,7 @@ class Residue(Geometry):
                 bond.delete()
         
 class ResidueCollection(Geometry):
-    """geometry object used for ChimAARON to easily convert to AaronTools but keep residue info"""
+    """geometry object used for SEQCROW to easily convert to AaronTools but keep residue info"""
     def __init__(self, molecule, refresh_connected=False, **kwargs):
         """molecule     - chimerax AtomicStructure or [AtomicStructure] or AaronTools Geometry (for easy compatibility stuff)"""
         if isinstance(molecule, Catalyst):

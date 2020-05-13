@@ -1,26 +1,27 @@
 import numpy as np
 
 from chimerax.atomic import selected_atoms, selected_residues
+from chimerax.core.commands import run
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow
 from chimerax.core.models import MODEL_ID_CHANGED, MODEL_NAME_CHANGED, ADD_MODELS
 from chimerax.std_commands.coordset_gui import CoordinateSetSlider
-        
+
 from io import BytesIO
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QLabel, QGridLayout, QPushButton, QTreeWidget, QWidget, QVBoxLayout, QTreeWidgetItem, QCheckBox
 
-from ChimAARON.residue_collection import ResidueCollection
-from ChimAARON.managers.filereader_manager import FILEREADER_CHANGE 
-from ChimAARON.tools import EnergyPlot
+from SEQCROW.residue_collection import ResidueCollection
+from SEQCROW.managers.filereader_manager import FILEREADER_CHANGE 
+from SEQCROW.tools import EnergyPlot
 
 from AaronTools.catalyst import Catalyst
 
 class FileReaderPanel(ToolInstance):
-    #XML_TAG ChimeraX :: Tool :: Managed Models :: ChimAARON :: see models managed by ChimAARON
     SESSION_ENDURING = False
     SESSION_SAVE = False         
+    help = "https://github.com/QChASM/ChimAARON/wiki/Model-Manager-Tool"
     
     NAME_COL = 0
     ID_COL = 1
@@ -31,8 +32,7 @@ class FileReaderPanel(ToolInstance):
     def __init__(self, session, name):       
         super().__init__(session, name)
         
-        # a lot of this is basically copy pasta from the model panel
-        self.display_name = "ChimAARON Models"
+        self.display_name = "SEQCROW Models"
         
         self.tool_window = MainToolWindow(self)        
         
@@ -47,7 +47,6 @@ class FileReaderPanel(ToolInstance):
             lambda *args: self.fill_tree(*args))
         self._molname_change = self.session.triggers.add_handler(MODEL_NAME_CHANGED,
             lambda *args: self.fill_tree(*args))
-            
         
     def _build_ui(self):
         layout = QGridLayout()
@@ -176,8 +175,19 @@ class FileReaderPanel(ToolInstance):
         models = list(model_dict.keys())
         for ndx in ndxs:
             mdl = models[ndx]
-            CoordinateSetSlider(self.session, mdl)
-
+            #coordset doesn't start out with the current coordset id
+            #it looks like it should, but it doesn't
+            #it starts at 1 instead
+            slider = CoordinateSetSlider(self.session, mdl)
+            slider.set_slider(mdl.active_coordset_id)
+            #run(self.session, "coordset slider %s" % mdl.atomspec)
+    
+    def display_help(self):
+        """Show the help for this tool in the help viewer."""
+        from chimerax.core.commands import run
+        run(self.session,
+            'open %s' % self.help if self.help is not None else "")
+    
     def delete(self):
         """overload delete"""
         self.session.filereader_manager.triggers.remove_handler(self._fr_change)

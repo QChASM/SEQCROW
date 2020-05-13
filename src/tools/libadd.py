@@ -12,16 +12,17 @@ from AaronTools.ring import Ring
 from AaronTools.substituent import Substituent
 from AaronTools.const import AARONLIB
 
-from ChimAARON.residue_collection import ResidueCollection
-from ChimAARON.tools import key_atom_highlight, ghost_connection_highlight, show_walk_highlight
+from SEQCROW.residue_collection import ResidueCollection
+from SEQCROW.tools import key_atom_highlight, ghost_connection_highlight, show_walk_highlight
+
+from warnings import warn
 
 # TODO: change decorations to use ChimeraX atom/bond defaults
 
 class LibAdd(ToolInstance):
-    #XML_TAG ChimeraX :: Tool :: Add to Personal Library :: AaronTools :: Add to your personal ligand, substituent, and ring libraries
     SESSION_ENDURING = False
     SESSION_SAVE = False         
-    display_name = "Add to Personal AaronTools Library"
+    help = "https://github.com/QChASM/ChimAARON/wiki/Add-to-Personal-Library-Tool"
     
     def __init__(self, session, name):       
         super().__init__(session, name)
@@ -181,7 +182,7 @@ class LibAdd(ToolInstance):
         
     def libadd_ring(self):
         """add ring to library or open it in a new model"""
-        selection = self.session.chimaaron_ordered_selection_manager.selection
+        selection = self.session.seqcrow_ordered_selection_manager.selection
         
         if not selection.single_structure:
             raise RuntimeError("selected atoms must be on the same model")
@@ -297,12 +298,18 @@ class LibAdd(ToolInstance):
             else:
                 sub.write(outfile=filename)
                 self.tool_window.status("%s added to substituent library" % sub_name)
-
+    
+    def display_help(self):
+        """Show the help for this tool in the help viewer."""
+        from chimerax.core.commands import run
+        run(self.session,
+            'open %s' % self.help if self.help is not None else "")
+    
 def check_aaronlib_dir():
     aaronlib = os.getenv("AARONLIB", False)
     if not aaronlib:
         aaronlib = AARONLIB
-        raise RuntimeWarning("AARONLIB environment variable not set, using %s" % aaronlib)
+        warn("AARONLIB environment variable not set, using %s" % aaronlib)
         
     libs = ["Subs", "Ligands", "Rings"]
     for d in libs:

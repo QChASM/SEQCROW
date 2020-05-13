@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QTableWidgetItem
 from PyQt5.QtCore import Qt, QSortFilterProxyModel, QRegularExpression
-from PyQt5.QtWidgets import QWidget, QTableWidget, QGridLayout, QLineEdit, QComboBox, QLabel
+from PyQt5.QtWidgets import QWidget, QTableWidget, QGridLayout, QLineEdit, QComboBox, QLabel, QHeaderView
 
 from glob import glob
 
@@ -82,6 +82,11 @@ class LigandTable(QWidget):
         
         for i in range(0, 3):
             self.table.resizeColumnToContents(i)
+            
+        self.table.horizontalHeader().setStretchLastSection(False)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         
         self.table.setSortingEnabled(True)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
@@ -89,6 +94,7 @@ class LigandTable(QWidget):
         
         self.filterEdit = QLineEdit()
         self.filterEdit.textChanged.connect(self.apply_filter)
+        self.filterEdit.setClearButtonEnabled(True)
         
         self.filter_columns = QComboBox()
         self.filter_columns.addItem("name")
@@ -218,12 +224,18 @@ class SubstituentTable(QWidget):
         for i in range(0, 3):
             self.table.resizeColumnToContents(i)
         
+        self.table.horizontalHeader().setStretchLastSection(False)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        
         self.table.setSortingEnabled(True)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         
         self.filterEdit = QLineEdit()
         self.filterEdit.textChanged.connect(self.apply_filter)
+        self.filterEdit.setClearButtonEnabled(True)
         
         self.filter_columns = QComboBox()
         self.filter_columns.addItem("name")
@@ -327,6 +339,8 @@ class RingTable(QWidget):
 
         for i in range(0, 1):
             self.table.resizeColumnToContents(i)
+
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         
         self.table.setSortingEnabled(True)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
@@ -334,7 +348,8 @@ class RingTable(QWidget):
         
         self.filterEdit = QLineEdit()
         self.filterEdit.textChanged.connect(self.apply_filter)
-        
+        self.filterEdit.setClearButtonEnabled(True)
+
         self.filter_columns = QComboBox()
         self.filter_columns.addItem("name")
         self.filter_columns.currentTextChanged.connect(self.change_filter_method)

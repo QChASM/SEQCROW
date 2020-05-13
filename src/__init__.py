@@ -2,30 +2,31 @@ import os
 
 from chimerax.core.toolshed import BundleAPI
 from chimerax.core.toolshed.info import SelectorInfo
+from chimerax.core.commands import BoolArg, ModelsArg, StringArg
 
-class _QChaSM_API(BundleAPI):
+class _SEQCROW_API(BundleAPI):
 
     api_version = 1
     
     @staticmethod
     def initialize(session, bundle_info):
         #TODO set AaronTools environment variables
-        from . import settings as chimaaron_settings
-        chimaaron_settings.settings = settings._ChimAARONSettings(session, "ChimAARON")
+        from SEQCROW import settings as seqcrow_settings
+        seqcrow_settings.settings = settings._SEQCROWSettings(session, "SEQCROW")
         if session.ui.is_gui:
-            from .presets import chimaaron_bse, chimaaron_s\
+            from .presets import seqcrow_bse, seqcrow_s\
                 ,indexLabel \
                     
-            session.presets.add_presets("ChimAARON", {"ball-stick-endcap":lambda p=chimaaron_bse: p(session)})
-            session.presets.add_presets("ChimAARON", {"sticks":lambda p=chimaaron_s: p(session)})
-            session.presets.add_presets("ChimAARON", {"index labels":lambda p=indexLabel: p(session)})
+            session.presets.add_presets("SEQCROW", {"ball-stick-endcap":lambda p=seqcrow_bse: p(session)})
+            session.presets.add_presets("SEQCROW", {"sticks":lambda p=seqcrow_s: p(session)})
+            session.presets.add_presets("SEQCROW", {"index labels":lambda p=indexLabel: p(session)})
 
             session.ui.triggers.add_handler('ready',
                 lambda *args, ses=session: settings.register_settings_options(ses))
         
         #apply AARONLIB setting
-        if chimaaron_settings.settings.AARONLIB is not None:
-            os.environ['AARONLIB'] = chimaaron_settings.settings.AARONLIB
+        if seqcrow_settings.settings.AARONLIB is not None:
+            os.environ['AARONLIB'] = seqcrow_settings.settings.AARONLIB
 
         ##register selectors from the user's personal library
         #from AaronTools.substituent import Substituent
@@ -44,14 +45,13 @@ class _QChaSM_API(BundleAPI):
         coordsets   - bool, load as trajectory"""
         from .io import open_aarontools
 
-        return open_aarontools(session, path, format_name=format_name, trajectory=coordsets)
+        return open_aarontools(session, path, format_name=format_name, coordsets=coordsets)
 
     @staticmethod
     def save_file(session, path, format_name, **kw):
-        #XML_TAG ChimeraX :: Save :: XYZ :: AaronTools :: false :: extra_keywords
         from .io import save_aarontools
         if format_name != "XYZ":
-            raise NotImplementedError("ChimAARON can only save XYZ files, not %s files" % format_name)
+            raise NotImplementedError("SEQCROW can only save XYZ files, not %s files" % format_name)
             
         elif format_name == "XYZ":
             return save_aarontools(session, path, format_name, **kw)
@@ -59,7 +59,6 @@ class _QChaSM_API(BundleAPI):
     @staticmethod
     def register_selector(bundle_info, selector_info, logger):
         """select all transition metals with one easy `select` command!"""
-        #XML_TAG ChimeraX :: Selector :: tm :: Transition metals
         
         print(bundle_info.selectors)
         
@@ -73,12 +72,12 @@ class _QChaSM_API(BundleAPI):
             from .managers import FileReaderManager
             session.filereader_manager = FileReaderManager(session)
             return session.filereader_manager
-        elif name == "chimaaron_ordered_selection_manager":
-            from ChimAARON.managers import OrderedSelectionManager
-            session.chimaaron_ordered_selection_manager = OrderedSelectionManager(session)
-            return session.chimaaron_ordered_selection_manager
+        elif name == "seqcrow_ordered_selection_manager":
+            from SEQCROW.managers import OrderedSelectionManager
+            session.seqcrow_ordered_selection_manager = OrderedSelectionManager(session)
+            return session.seqcrow_ordered_selection_manager
         else:
-            raise RuntimeError("manager named '%s' is unknown to ChimAARON" % name)
+            raise RuntimeError("manager named '%s' is unknown to SEQCROW" % name)
   
     @staticmethod
     def start_tool(session, bi, ti):
@@ -102,11 +101,84 @@ class _QChaSM_API(BundleAPI):
             from .tools import FileReaderPanel
             tool = FileReaderPanel(session, ti.name)
             return tool        
-        elif ti.name == "Process Thermochemistry":
+        elif ti.name == "Process QM Thermochemistry":
             from .tools import Thermochem
             tool = Thermochem(session, ti.name)
             return tool
+        elif ti.name == "Build QM Input":
+            from .tools import BuildQM
+            tool = BuildQM(session, ti.name)
+            return tool
         else:
-            raise RuntimeError("tool named '%s' is unknown to ChimAARON" % ti.name)
+            raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)
 
-bundle_api = _QChaSM_API()
+    @staticmethod
+    def run_provider(session, name, mgr, **kw):
+        if mgr == session.open_command:
+            from chimerax.open_command import OpenerInfo
+            from SEQCROW.io import open_aarontools
+            #TODO:
+            #make use of AaronTools' ability to read file-like objects
+            
+            if name == "Gaussian input file":
+                class Info(OpenerInfo):
+                    def open(self, session, data, file_name, **kw):
+                        return open_aarontools(session, data, format_name="Gaussian input file", **kw)
+            
+                    @property
+                    def open_args(self):
+                        return {}
+                        
+                return Info()
+                
+            elif name == "Gaussian output file":
+                class Info(OpenerInfo):
+                    def open(self, session, data, file_name, **kw):
+                        return open_aarontools(session, data, format_name="Gaussian output file", **kw)
+            
+                    @property
+                    def open_args(self):
+                        return {'coordsets': BoolArg}
+                        
+                return Info()
+                            
+            elif name == "ORCA output file":
+                class Info(OpenerInfo):
+                    def open(self, session, data, file_name, **kw):
+                        return open_aarontools(session, data, format_name="ORCA output file", **kw)
+            
+                    @property
+                    def open_args(self):
+                        return {'coordsets': BoolArg}
+                        
+                return Info()
+                                           
+            elif name == "XYZ file":
+                class Info(OpenerInfo):
+                    def open(self, session, data, file_name, **kw):
+                        return open_aarontools(session, data, format_name="XYZ file", **kw)
+            
+                    @property
+                    def open_args(self):
+                        return {'coordsets': BoolArg}
+                        
+                return Info()
+                
+        elif mgr == session.save_command:
+            from chimerax.save_command import SaverInfo
+            from SEQCROW.io import save_aarontools
+            
+            if name == "XYZ file":
+                class Info(SaverInfo):
+                    def save(self, session, path, **kw):
+                        #save_aarontools doesn't actually pay attention to format_name yet
+                        save_aarontools(session, path, "XYZ file", **kw)
+                        
+                    @property
+                    def save_args(self):
+                        return {'models': ModelsArg, 'comment': StringArg}
+                        
+                return Info()
+                            
+                
+bundle_api = _SEQCROW_API()

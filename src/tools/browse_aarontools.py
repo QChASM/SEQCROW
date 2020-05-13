@@ -18,22 +18,27 @@ from AaronTools.substituent import Substituent
 
 from ..libraries import LigandTable, SubstituentTable, RingTable
 from ..residue_collection import ResidueCollection
-from ChimAARON.settings import tuple2str
+from SEQCROW.utils import iter2str
 
 # TODO: change decorations to use ChimeraX atom/bond defaults
 class _BrowseLibSettings(Settings):
     AUTO_SAVE = {
-        'key_atom_color': Value((0.2, 0.5, 0.8, 0.5), TupleOf(FloatArg, 4), tuple2str),
-        'ghost_connection_color': Value((0.60784, 0.145098, 0.70196, 0.5), TupleOf(FloatArg, 4), tuple2str),
-        'ring_walk_color': Value((0.9, 0.4, 0.3, 0.9), TupleOf(FloatArg, 4), tuple2str),
+        'key_atom_color': Value((0.2, 0.5, 0.8, 0.5), TupleOf(FloatArg, 4), iter2str),
+        'ghost_connection_color': Value((0.60784, 0.145098, 0.70196, 0.5), TupleOf(FloatArg, 4), iter2str),
+        'ring_walk_color': Value((0.9, 0.4, 0.3, 0.9), TupleOf(FloatArg, 4), iter2str),
     }
     
     
+#TODO:
+#make double clicking things in the library tables open them
+
+#TODO:
+#make the AaronTools 'database' be discoverable (so open Me AaronTools works or whatever)
+    
 class AaronTools_Library(ToolInstance):
-    #XML_TAG ChimeraX :: Tool :: Browse AaronTools Libraries :: AaronTools :: Browse the AaronTools ligand, substituent, and ring libraries
     SESSION_ENDURING = False
     SESSION_SAVE = False         
-    display_name = "Browse AaronTools Libraries"
+    help = "https://github.com/QChASM/ChimAARON/wiki/Browse-AaronTools-Libraries-Tool"
     
     def __init__(self, session, name):       
         super().__init__(session, name)
@@ -216,6 +221,11 @@ class AaronTools_Library(ToolInstance):
             
                 self.session.models.add(bild_obj, parent=chimera_ring)
     
+    def display_help(self):
+        """Show the help for this tool in the help viewer."""
+        from chimerax.core.commands import run
+        run(self.session,
+            'open %s' % self.help if self.help is not None else "")
     
 def key_atom_highlight(ligand, color, session):
     """returns a bild object with spheres on top on ligand's key atoms"""
