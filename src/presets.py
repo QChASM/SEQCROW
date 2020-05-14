@@ -105,5 +105,5 @@ def indexLabel(session):
         for i, atom in enumerate(m.atoms):
             l = str(i+1)
             label(session, objects=Objects(atoms=Atoms([atom])), object_type='atoms', \
-                text=l, offset=(-0.2,-0.2,-0.2), height=0.4, on_top=True)
+                text=l, offset=(-0.11*len(l),-0.2,-0.2), height=0.4, on_top=True)
 
