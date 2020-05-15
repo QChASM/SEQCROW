@@ -366,10 +366,11 @@ class Method:
         
         if self.ORCA_BLOCKS in combined_dict:
             for kw in combined_dict[self.ORCA_BLOCKS]:
-                s += "%%%s\n" % kw
-                for opt in combined_dict[self.ORCA_BLOCKS][kw]:
-                    s += "    %s\n" % opt
-                s += "end\n"
+                if any(len(x) > 0 for x in combined_dict[self.ORCA_BLOCKS][kw]):
+                    s += "%%%s\n" % kw
+                    for opt in combined_dict[self.ORCA_BLOCKS][kw]:
+                        s += "    %s\n" % opt
+                    s += "end\n"
                 
             s += "\n"
             

@@ -75,7 +75,8 @@ class _InputGeneratorSettings(Settings):
         'previous_orca_solvent_model': Value("None", StringArg), 
         'previous_orca_solvent_name': Value("", StringArg), 
         #shh these are just jsons
-        'previous_orca_options': Value(dumps({Method.ORCA_BLOCKS:{'basis':['decontract true'], 'elprop':[], 'freq':[], 'geom':[]}}), StringArg),
+        'previous_orca_options': Value(dumps({Method.ORCA_ROUTE:['TightSCF'], \
+                                              Method.ORCA_BLOCKS:{'basis':['decontract true'], 'elprop':[], 'freq':[], 'geom':[]}}), StringArg),
         #just the blocks that are used by the tool
         'last_orca_options': Value(dumps({}), StringArg),
         'previous_psi4_options': Value(dumps({Method.PSI4_SETTINGS:{'reference': \
@@ -93,7 +94,7 @@ class _InputGeneratorSettings(Settings):
                                                                    Method.PSI4_AFTER_GEOM: ["nrg, wfn = energy('$FUNCTIONAL', return_wfn=True)"], \
                                                                    Method.PSI4_COMMENT: [], \
                                              }), StringArg), 
-        'last_psi4_options': Value(dumps({Method.PSI4_AFTER_GEOM: ["nrg, wfn = energy('$FUNCTIONAL', return_wfn=True)"]}), StringArg),
+        'last_psi4_options': Value(dumps({}), StringArg),
         'last_program': Value("Gaussian", StringArg), 
     }
 
@@ -2017,6 +2018,8 @@ class BasisOption(QWidget):
         aux = self.aux_type.currentText()
         self.basis_option.clear()
         
+        elements = self.currentElements()
+        
         if program == "Gaussian":
             self.basis_option.addItems(self.options)
             ndx = self.basis_option.findText(basis, Qt.MatchExactly)
@@ -2065,6 +2068,7 @@ class BasisOption(QWidget):
             self.aux_type.addItems(BasisSet.PSI4_AUX)
         
         self.setAux(aux)
+        self.setSelectedElements(elements)
         
         self.blockSignals(False)
 
@@ -2198,13 +2202,15 @@ class BasisOption(QWidget):
             self.settings.__setattr__(self.last_elements, cur_last_elements)
 
         if self.aux_available:
-            aux = self.aux_type.currentText()
+            aux = self.getAuxType()
             
             if update_settings:
                 cur_last_aux = [x for x in self.settings.__getattr__(self.aux_setting)]
                 while len(cur_last_aux) <= index:
                     cur_last_aux.append(aux)
-                    
+                
+                cur_last_aux[index] = aux
+                
                 self.settings.__setattr__(self.aux_setting, cur_last_aux)
 
             if aux == "no":
