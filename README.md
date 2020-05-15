@@ -5,7 +5,7 @@ SEQCROW extends ChimeraX by adding tools to build and modify complex molecular s
 These tools enable users to rapidly modify several structures simultaneously, providing an intuitive interface to build libraries of the complex molecular structures frequently encountered in modern quantum chemistry applications.
 
 ## Installation
-1. Download <a href="https://github.com/QChASM/ChimAARON/raw/dev/dist/SEQCROW-0.1-py3-none-any.whl" target="_blank">SEQCROW-0.1-py3-none-any.whl</a>
+1. Download <a href="https://github.com/QChASM/ChimAARON/raw/master/dist/SEQCROW-0.1-py3-none-any.whl" target="_blank">SEQCROW-0.1-py3-none-any.whl</a>
 2. Open ChimeraX
 3. On the ChimeraX command line, enter `toolshed install /path/to/SEQCROW-0.1-py3-none-any.whl`
 4. Download [AaronTools.py](https://github.com/QChASM/AaronTools.py/archive/master.zip) and save it in the directory where ChimeraX installed SEQCROW
