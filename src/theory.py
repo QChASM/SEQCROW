@@ -1207,7 +1207,7 @@ class ImplicitSolvent:
                                "CycloPentanol", 
                                "CycloPentanone", 
                                "Decalin-mixture", 
-                               "DiBromomEthane", 
+                               "DiBromoMethane", 
                                "DiButylEther", 
                                "DiEthylAmine", 
                                "DiEthylSulfide", 

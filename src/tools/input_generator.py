@@ -21,6 +21,8 @@ from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.theory import *
 from SEQCROW.utils import iter2str, combine_dicts
 
+from AaronTools.const import TMETAL
+
 class _InputGeneratorSettings(Settings):
     EXPLICIT_SAVE = {
         'last_nproc': Value(6, IntArg), 
@@ -29,32 +31,32 @@ class _InputGeneratorSettings(Settings):
         'last_ts': Value(False, BoolArg), 
         'last_freq': Value(False, BoolArg), 
         'previous_basis_names': Value([], ListOf(StringArg), iter2str),
-        'previous_basis_paths': Value([], ListOf(StringArg), iter2str),        
+        'previous_basis_paths': Value([], ListOf(StringArg), iter2str),
         'previous_ecp_names': Value([], ListOf(StringArg), iter2str),
         'previous_ecp_paths': Value([], ListOf(StringArg), iter2str),
         'last_basis': Value(["def2-SVP"], ListOf(StringArg), iter2str),
-        'last_basis_aux': Value(["no"], ListOf(StringArg), iter2str), 
-        'last_custom_basis_kw': Value([""], ListOf(StringArg), iter2str), 
-        'last_custom_basis_builtin': Value([""], ListOf(StringArg), iter2str),  
+        'last_basis_aux': Value(["no"], ListOf(StringArg), iter2str),
+        'last_custom_basis_kw': Value([""], ListOf(StringArg), iter2str),
+        'last_custom_basis_builtin': Value([""], ListOf(StringArg), iter2str),
         'last_basis_elements': Value([""], ListOf(StringArg), iter2str),
-        'last_basis_path': Value("", StringArg), 
-        'last_number_basis': Value(1, IntArg), 
-        'last_ecp': Value([], ListOf(StringArg), iter2str), 
-        'last_custom_ecp_kw': Value([], ListOf(StringArg), iter2str), 
-        'last_custom_ecp_builtin': Value([], ListOf(StringArg), iter2str), 
+        'last_basis_path': Value("", StringArg),
+        'last_number_basis': Value(1, IntArg),
+        'last_ecp': Value([], ListOf(StringArg), iter2str),
+        'last_custom_ecp_kw': Value([], ListOf(StringArg), iter2str),
+        'last_custom_ecp_builtin': Value([], ListOf(StringArg), iter2str),
         'last_ecp_elements': Value([], ListOf(StringArg), iter2str),
         'last_ecp_path': Value("", StringArg),
-        'last_number_ecp': Value(0, IntArg), 
+        'last_number_ecp': Value(0, IntArg),
         'previous_functional': Value("", StringArg),
-        'previous_custom_func': Value("", StringArg), 
+        'previous_custom_func': Value("", StringArg),
         'previous_functional_names': Value([], ListOf(StringArg), iter2str),
         'previous_functional_needs_basis': Value([], ListOf(BoolArg), iter2str),
         'previous_dispersion': Value("None", StringArg),
         'previous_grid': Value("Default", StringArg),
-        'previous_charge': Value(0, IntArg), 
-        'previous_mult': Value(1, IntArg), 
-        'previous_gaussian_solvent_model': Value("None", StringArg), 
-        'previous_gaussian_solvent_name': Value("", StringArg), 
+        'previous_charge': Value(0, IntArg),
+        'previous_mult': Value(1, IntArg),
+        'previous_gaussian_solvent_model': Value("None", StringArg),
+        'previous_gaussian_solvent_name': Value("", StringArg),
         #shh these are just jsons
         'previous_gaussian_options': Value(dumps({Method.GAUSSIAN_ROUTE: {'opt': \
                                                                                 ['NoEigenTest', 'Tight', 'VeryTight'], \
@@ -72,8 +74,8 @@ class _InputGeneratorSettings(Settings):
                                                   Method.GAUSSIAN_POST: ['$nbo RESONANCE NBOSUM E2PERT=0.0 NLMO BNDIDX $end'], \
                                                  }), StringArg),
         'last_gaussian_options': Value(dumps({Method.GAUSSIAN_ROUTE:{}}), StringArg),
-        'previous_orca_solvent_model': Value("None", StringArg), 
-        'previous_orca_solvent_name': Value("", StringArg), 
+        'previous_orca_solvent_model': Value("None", StringArg),
+        'previous_orca_solvent_name': Value("", StringArg),
         #shh these are just jsons
         'previous_orca_options': Value(dumps({Method.ORCA_ROUTE:['TightSCF'], \
                                               Method.ORCA_BLOCKS:{'basis':['decontract true'], 'elprop':[], 'freq':[], 'geom':[]}}), StringArg),
@@ -93,11 +95,78 @@ class _InputGeneratorSettings(Settings):
                                                                    Method.PSI4_BEFORE_GEOM: [], \
                                                                    Method.PSI4_AFTER_GEOM: ["nrg, wfn = energy('$FUNCTIONAL', return_wfn=True)"], \
                                                                    Method.PSI4_COMMENT: [], \
-                                             }), StringArg), 
+                                             }), StringArg),
         'last_psi4_options': Value(dumps({}), StringArg),
-        'last_program': Value("Gaussian", StringArg), 
+        'last_program': Value("Gaussian", StringArg),
+        }
+        
+    AUTO_SAVE = {
+        'presets': Value(dumps({"Gaussian":{"quick optimize":{"nproc":1, \
+                                                          "mem":0, \
+                                                          "opt":True, \
+                                                          "ts":False, \
+                                                          "freq":False, \
+                                                          "semi-empirical":False, \
+                                                          "solvent model":'None', \
+                                                          "solvent":'', \
+                                                          "functional":'PM6', \
+                                                          "grid":None, \
+                                                          "disp":None, \
+                                                          "basis": {'name':[], 'auxiliary':[], 'file':[], 'elements':[]}, \
+                                                          "ecp": {'name':[], 'file':[], 'elements':[]}, \
+                                                          "other": {}, \
+                                                         }, \
+                                            }, \
+                                "ORCA":{"quick optimize":{"nproc":1, \
+                                                          "mem":0, \
+                                                          "opt":True, \
+                                                          "ts":False, \
+                                                          "freq":False, \
+                                                          "semi-empirical":False, \
+                                                          "solvent model":'None', \
+                                                          "solvent":'', \
+                                                          "functional":'HF-3c', \
+                                                          "grid":None, \
+                                                          "disp":None, \
+                                                          "basis": {'name':[], 'auxiliary':[], 'file':[], 'elements':[]}, \
+                                                          "ecp": {'name':[], 'file':[], 'elements':[]}, \
+                                                          "other": {}, \
+                                                         }, \
+                                       "DLPNO single-point":{"nproc":2, \
+                                                   "mem":12, \
+                                                   "opt":False, \
+                                                   "ts":False, \
+                                                   "freq":False, \
+                                                   "semi-empirical":False, \
+                                                   "solvent model":'None', \
+                                                   "solvent":'', \
+                                                   "functional":'DLPNO-CCSD(T)', \
+                                                   "grid":None, \
+                                                   "disp":None, \
+                                                   "basis": {'name':["cc-pVTZ", "cc-pVTZ"], 'auxiliary':[None, "C"], 'file':[False, False], 'elements':['all', 'all']}, \
+                                                   "ecp": {'name':[], 'file':[], 'elements':['all']}, \
+                                                   "other": {Method.ORCA_ROUTE:['TightSCF']}, \
+                                                  }, \
+                                       }, \
+                                "Psi4":{"quick optimize":{"nproc":1, \
+                                                          "mem":0, \
+                                                          "opt":True, \
+                                                          "ts":False, \
+                                                          "freq":False, \
+                                                          "semi-empirical":False, \
+                                                          "solvent model":'None', \
+                                                          "solvent":'', \
+                                                          "functional":'HF', \
+                                                          "grid":None, \
+                                                          "disp":None, \
+                                                          "basis": {'name':['sto-3g'], 'auxiliary':[None], 'file':[False], 'elements':['all']}, \
+                                                          "ecp": {'name':[], 'file':[], 'elements':[]}, \
+                                                          "other": {}, \
+                                                         }, \
+                                        },\
+                                }), StringArg),
     }
-
+    
     #def save(self, *args, **kwargs):
     #    print("saved qm input settings")
     #    super().save(*args, **kwargs)
@@ -123,7 +192,10 @@ class BuildQM(ToolInstance):
 
         self.models = []
         
+        self.presets = loads(self.settings.presets)
+        
         self.refresh_models()
+        self.refresh_presets()
 
         global_triggers = get_triggers()
 
@@ -230,12 +302,99 @@ class BuildQM(ToolInstance):
         #batch.addAction(multistructure)
         #batch.addAction(focal_point)
 
+        self.presets_menu = menu.addMenu("Presets")
+        self.new_preset = QAction("Save Preset...", self.tool_window.ui_area)
+        self.new_preset.triggered.connect(self.show_new_preset)
+        self.presets_menu.addAction(self.new_preset)
+
         menu.setNativeMenuBar(False)
         layout.setMenuBar(menu)
 
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(None)
+
+    def refresh_presets(self):
+        self.presets_menu.clear()
+        
+        for program in self.presets:
+            program_submenu = self.presets_menu.addMenu(program)
+            for preset in self.presets[program]:
+                preset_action = QAction(preset, self.tool_window.ui_area)
+                preset_action.triggered.connect(lambda *args, program=program, name=preset: self.apply_preset(program, name))
+                program_submenu.addAction(preset_action)
+                
+        self.settings.presets = dumps(self.presets)
+
+        sep = self.presets_menu.addSeparator()
+        self.presets_menu.addAction(sep)
+        self.presets_menu.addAction(self.new_preset)
+
+    def show_new_preset(self):
+        self.tool_window.create_child_window("New Preset", window_class=SavePreset)
+
+    def apply_preset(self, program, preset_name):
+        preset = self.presets[program][preset_name]
+        
+        ndx = self.file_type.findText(program, Qt.MatchExactly)
+        self.file_type.setCurrentIndex(ndx)
+        
+        self.file_type.blockSignals(True)
+        self.functional_widget.blockSignals(True)
+        self.basis_widget.blockSignals(True)
+        self.job_widget.blockSignals(True)
+        self.other_keywords_widget.blockSignals(True)
+    
+        self.job_widget.do_geom_opt.setChecked(preset['opt'])
+        self.job_widget.ts_opt.setChecked(preset['ts'])
+        self.job_widget.do_freq.setChecked(preset['freq'])
+        self.job_widget.setProcessors(preset['nproc'])
+        self.job_widget.setMemory(preset['mem'])
+        
+        solvent = ImplicitSolvent(preset['solvent model'], preset['solvent'])
+        self.job_widget.setSolvent(solvent)
+        
+        func = Functional(preset['functional'], preset['semi-empirical'])
+        self.functional_widget.setFunctional(func)
+        
+        self.functional_widget.setGrid(preset['grid'])
+        self.functional_widget.setDispersion(preset['disp'])
+
+        basis_list = []
+        for i, name in enumerate(preset['basis']['name']):
+            elements = preset['basis']['elements'][i]
+            aux_type = preset['basis']['auxiliary'][i]
+            user_defined = preset['basis']['file'][i]
+            
+            basis_list.append(Basis(name, elements, aux_type=aux_type, user_defined=user_defined))
+            
+        ecp_list = []
+        for i, name in enumerate(preset['ecp']['name']):
+            elements = preset['ecp']['elements'][i]
+            user_defined = preset['ecp']['file'][i]
+            
+            ecp_list.append(ECP(name, elements, user_defined=user_defined))
+
+        basis_set = BasisSet(basis_list, ecp_list)
+        
+        self.basis_widget.setBasis(basis_set)
+        
+        raw_kw_dict = preset['other']
+        kw_dict = {}
+        for kw in raw_kw_dict.keys():
+            kw_dict[int(kw)] = raw_kw_dict[kw]
+        
+        self.other_keywords_widget.setKeywords(kw_dict)
+        
+        self.file_type.blockSignals(False)
+        self.functional_widget.blockSignals(False)
+        self.basis_widget.blockSignals(False)
+        self.job_widget.blockSignals(False)
+        self.other_keywords_widget.blockSignals(False)
+    
+        self.update_preview()
+        
+        self.session.logger.info("applied QM preset %s (%s)"% (preset_name, program))
 
     def show_preview(self):
         if self.preview_window is None:
@@ -435,15 +594,15 @@ class BuildQM(ToolInstance):
                 
             print("saved to %s" % filename)
     
-    def delete(self):
-        #overload delete ro de-register handler
+    def cleanup(self):
+        #overload cleanup to de-register handler
         self.session.triggers.remove_handler(self._add_handler)
         self.session.triggers.remove_handler(self._remove_handler)
         
         global_triggers = get_triggers()
         global_triggers.remove_handler(self._changes)
         
-        super().delete()  
+        super().cleanup()  
 
     def display_help(self):
         """Show the help for this tool in the help viewer."""
@@ -940,6 +1099,9 @@ class JobTypeOption(QWidget):
         self.temp.setValue(value)
         self.jobTypeChanged.emit()
 
+    def getTemperature(self):
+        return self.temp.value()
+
     def setStructure(self, structure):
         self.structure = structure
         self.constrained_atoms = []
@@ -960,6 +1122,51 @@ class JobTypeOption(QWidget):
             self.constrained_torsion_table.removeRow(i)    
 
         self.jobTypeChanged.emit()
+
+    def setGeometryOptimization(self, value):
+        self.do_geom_opt.setChecked(value)
+    
+    def setTSOptimization(self, value):
+        self.ts_opt.setChecked(value)
+    
+    def setFrequencyCalculation(self, value):
+        self.do_freq.setChecked(value)
+        
+    def setProcessors(self, value):
+        self.nprocs.setValue(value)
+        
+    def setMemory(self, value):
+        self.mem.setValue(value)
+        
+    def setSolventModel(self, value):
+        ndx = self.solvent_option.findText(value, Qt.MatchExactly)
+        if ndx >= 0:
+            self.solvent_option.setCurrentIndex(ndx)
+            
+    def setSolvent(self, value):
+        self.solvent_name.setText(value)
+
+    def getGeometryOptimization(self):
+        return self.do_geom_opt.checkState() == Qt.Checked
+    
+    def getTSOptimization(self):
+        return self.ts_opt.checkState() == Qt.Checked
+    
+    def getFrequencyCalculation(self):
+        return self.do_freq.checkState() == Qt.Checked
+
+    def getSolvent(self):
+        model = self.solvent_option.currentText()
+        solvent = self.solvent_name.text()
+        
+        return ImplicitSolvent(model, solvent)
+
+    def setSolvent(self, solvent):
+        ndx = self.solvent_option.findText(solvent.name)
+        if ndx >= 0:
+            self.solvent_option.setCurrentIndex(ndx)
+            
+        self.solvent_name.setText(solvent.solvent)
 
     def constrain_atoms(self):
         current_atoms = [atom for atom in selected_atoms(self.session) if atom.structure is self.structure]
@@ -1505,7 +1712,7 @@ class JobTypeOption(QWidget):
 
 
 class FunctionalOption(QWidget):
-    #TODO: make checking the "is_semiemperical" box disable the basis functions tab of the parent tab widget
+    #TODO: make checking the "is_semiempirical" box disable the basis functions tab of the parent tab widget
     GAUSSIAN_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D", "B3PW91", "B97-D", "BP86", "PBE0", "PM6", "AM1"]
     GAUSSIAN_DISPERSION = ["Grimme D2", "Grimme D3", "Becke-Johnson damped Grimme D3", "Petersson-Frisch"]
     GAUSSIAN_GRIDS = ["Default", "SuperFineGrid", "UltraFine", "FineGrid"]
@@ -1551,11 +1758,11 @@ class FunctionalOption(QWidget):
         semi_empirical_label = QLabel("basis set is integral:")
         semi_empirical_label.setToolTip("check if basis set is integral to the functional (e.g. semi-empirical methods)")
         
-        self.is_semiemperical = QCheckBox()
-        self.is_semiemperical.stateChanged.connect(self.something_changed) 
-        self.is_semiemperical.setToolTip("check if basis set is integral to the functional (e.g. semi-empirical methods)")
+        self.is_semiempirical = QCheckBox()
+        self.is_semiempirical.stateChanged.connect(self.something_changed) 
+        self.is_semiempirical.setToolTip("check if basis set is integral to the functional (e.g. semi-empirical methods)")
 
-        func_form_layout.addRow(semi_empirical_label, self.is_semiemperical)
+        func_form_layout.addRow(semi_empirical_label, self.is_semiempirical)
 
         layout.addWidget(functional_form, 0, 0, Qt.AlignTop)
 
@@ -1601,7 +1808,7 @@ class FunctionalOption(QWidget):
         
         layout.addWidget(dft_form, 2, 0, Qt.AlignTop)
         
-        self.other_options = [keyword_label, self.functional_kw, semi_empirical_label, self.is_semiemperical, self.previously_used_table]
+        self.other_options = [keyword_label, self.functional_kw, semi_empirical_label, self.is_semiempirical, self.previously_used_table]
         
         layout.setRowStretch(0, 0)
         layout.setRowStretch(1, 0)
@@ -1757,7 +1964,7 @@ class FunctionalOption(QWidget):
             elif func in self.GAUSSIAN_FUNCTIONALS:
                     ndx = self.functional_option.findText(func, Qt.MatchExactly)
                     self.functional_option.setCurrentIndex(ndx)
-                    self.is_semiemperical.setCheckState(func in KNOWN_SEMI_EMPIRICAL)
+                    self.is_semiempirical.setCheckState(func in KNOWN_SEMI_EMPIRICAL)
             
             #omegas don't get decoded right
             elif func.startswith("wB97"):
@@ -1785,9 +1992,9 @@ class FunctionalOption(QWidget):
             
             needs_basis = self.previously_used_table.item(row, 1).text()
             if needs_basis == "yes":
-                self.is_semiemperical.setCheckState(Qt.Unchecked)
+                self.is_semiempirical.setCheckState(Qt.Unchecked)
             else:
-                self.is_semiemperical.setCheckState(Qt.Checked)            
+                self.is_semiempirical.setCheckState(Qt.Checked)            
 
         self.functionalChanged.emit()
 
@@ -1806,11 +2013,11 @@ class FunctionalOption(QWidget):
                 self.settings.previous_functional = functional.replace('ω', 'w')
             
             if functional in KNOWN_SEMI_EMPIRICAL:
-                is_semiemperical = True
+                is_semiempirical = True
             else:
-                is_semiemperical = False
+                is_semiempirical = False
                 
-            return Functional(functional, is_semiemperical)
+            return Functional(functional, is_semiempirical)
             
         else:
             if update_settings:
@@ -1820,25 +2027,25 @@ class FunctionalOption(QWidget):
             if update_settings:
                 self.settings.previous_custom_func = functional
             
-            is_semiemperical = self.is_semiemperical.checkState() == Qt.Checked
+            is_semiempirical = self.is_semiempirical.checkState() == Qt.Checked
             
             if len(functional) > 0:
                 found_func = False
                 for i in range(0, len(self.settings.previous_functional_names)):
                     if self.settings.previous_functional_names[i] == functional and \
-                        self.settings.previous_functional_needs_basis[i] != is_semiemperical:
+                        self.settings.previous_functional_needs_basis[i] != is_semiempirical:
                         found_func = True
                 
                 if not found_func:
                     #append doesn't seem to call __setattr__, so the setting doesn't get updated
                     if update_settings:
                         self.settings.previous_functional_names = self.settings.previous_functional_names + [functional]
-                        self.settings.previous_functional_needs_basis = self.settings.previous_functional_needs_basis + [not is_semiemperical]
+                        self.settings.previous_functional_needs_basis = self.settings.previous_functional_needs_basis + [not is_semiempirical]
                     
                         row = self.previously_used_table.rowCount()
-                        self.add_previously_used(row, functional, not is_semiemperical)
+                        self.add_previously_used(row, functional, not is_semiempirical)
 
-            return Functional(functional, is_semiemperical)
+            return Functional(functional, is_semiempirical)
 
     def getDispersion(self, update_settings=True):
         disp = self.dispersion.currentText()
@@ -1862,7 +2069,40 @@ class FunctionalOption(QWidget):
         else:
             return IntegrationGrid(grid)
 
-    
+    def setGrid(self, grid):
+        if grid is None:
+            ndx = self.grid.findText("Default")
+        else:
+            ndx = self.grid.findText(grid)
+
+        self.grid.setCurrentIndex(ndx)
+        
+    def setDispersion(self, dispersion):
+        if dispersion is None:
+            ndx = self.dispersion.findText("None")
+        else:
+            ndx = self.dispersion.findText(dispersion)
+
+        self.dispersion.setCurrentIndex(ndx)
+        
+    def setFunctional(self, func):
+        test_value = func.name
+        if test_value in ["wB97X-D", "wB97X-D3"]:
+            test_value = value.replace('w', 'ω')
+        
+        if self.form == "Gaussian" and test_value == "Gaussian's B3LYP":
+            test_value = "B3LYP"
+        
+        ndx = self.functional_option.findText(test_value, Qt.MatchExactly)
+        if ndx < 0:
+            ndx = self.functional_option.findText("other", Qt.MatchExactly)
+            self.functional_kw.setText(func.name)
+
+        self.functional_option.setCurrentIndex(ndx)
+            
+        self.is_semiempirical.setChecked(func.is_semiempirical)
+
+
 class BasisOption(QWidget):
     """widget for basis set options
     requires a parent object and a Settings object with 
@@ -2331,6 +2571,19 @@ class BasisOption(QWidget):
             
         for element in elements:
             if element not in self.allElements():
+                if element.lower() == "tm" or elements == "tm":
+                    #all transition metals
+                    for element in TMETAL.keys():
+                        items = self.elements.findItems(element, Qt.MatchExactly)[0]
+                        if len(items) > 0:
+                            for item in items:
+                                item.setSelected(True)
+                                
+                elif element.lower() == "all" or elements == "all":
+                    for i in range(0, self.elements.count()):
+                        item = self.elements.item(i)
+                        item.setSelected(True)
+            
                 continue
             
             row = self.elements.findItems(element, Qt.MatchExactly)[0]
@@ -2372,21 +2625,31 @@ class BasisOption(QWidget):
                 self.is_builtin.setCheckState(Qt.Unchecked)            
                 self.path_to_basis_file.setText(path)
 
-    def setBasis(self, name=None, custom_kw="", builtin=""):
+    def setBasis(self, name=None, custom_kw=None, basis_path=False):
         if name is not None:
             ndx = self.basis_option.findData(name, Qt.MatchExactly)
+            if ndx < 0:
+                ndx = self.basis_option.findData("other", Qt.MatchExactly)
+                self.custom_basis_kw.setText(name)
+            
             self.basis_option.setCurrentIndex(ndx)
-        
-        self.custom_basis_kw.setText(custom_kw)
 
-        if len(builtin) > 0:
+        if custom_kw is not None:
+            self.custom_basis_kw.setText(custom_kw)
+
+        if basis_path is False:
+            self.is_builtin.setCheckState(Qt.Checked)
+        elif len(basis_path) > 0:
             self.is_builtin.setCheckState(Qt.Unchecked)
-            self.path_to_basis_file.setText(builtin)
+            self.path_to_basis_file.setText(basis_path)
         else:
             self.is_builtin.setCheckState(Qt.Checked)
             self.path_to_basis_file.setText(self.settings.__getattr__(self.last_custom_path))
 
     def setAux(self, name):
+        if name is None:
+            name = "no"
+
         ndx = self.aux_type.findData(name, Qt.MatchExactly)
         if ndx >= 0:
             self.aux_type.setCurrentIndex(ndx)
@@ -2692,7 +2955,34 @@ class BasisWidget(QWidget):
             self.settings.last_number_ecp = len(self.ecp_options)
         
         return basis_set, ecp
+        
+    def getBasis(self):
+        """returns BasisSet object corresponding to the current settings"""
+        basis, ecp = self.get_basis()
+        
+        return BasisSet(basis, ecp)
 
+    def setBasis(self, basis_set):
+        for i in range(len(self.basis_options)-1, -1, -1):
+            self.close_basis_tab(i)        
+        
+        for i in range(len(self.ecp_options)-1, -1, -1):
+            self.close_ecp_tab(i)
+
+        for i, basis in enumerate(basis_set.basis):
+            self.new_basis()
+
+            self.basis_options[i].setBasis(basis.name, basis_path=basis.user_defined)
+            self.basis_options[i].setAux(basis.aux_type)
+            self.basis_options[i].setSelectedElements(basis.elements)
+            
+        if basis_set.ecp is not None:
+            for i, basis in enumerate(basis_set.ecp):
+                self.new_ecp()
+    
+                self.ecp_options[i].setBasis(basis.name, basis_path=basis.user_defined)
+                self.ecp_options[i].setSelectedElements(basis.elements)
+            
     def add_to_all_but(self, exclude_option, row, name, path):
         """called by child BasisOption
         adds a previously-used basis set to the previously-used basis set table of all other child BasisOptions"""
@@ -3022,6 +3312,15 @@ class OneLayerKeyWordOption(QWidget):
         
         self.previous_kw_table.resizeColumnToContents(0)    
     
+    def setCurrentSettings(self, kw_list):
+        self.last_list = kw_list
+        
+        for i in range(self.current_kw_table.rowCount(), -1, -1):
+            self.current_kw_table.removeRow(i)
+            
+        for kw in self.last_list:
+            self.add_item_to_current_kw_table(kw)
+
 
 class TwoLayerKeyWordOption(QWidget):
     #TODO:
@@ -3444,6 +3743,17 @@ class TwoLayerKeyWordOption(QWidget):
             self.previous_opt_table.setRowHidden(i, not filter(i))        
         
         self.previous_opt_table.resizeColumnToContents(0)
+    
+    def setCurrentSettings(self, kw_dict):
+        self.last_dict = kw_dict
+        for i in range(self.current_opt_table.rowCount(), -1, -1):
+            self.current_opt_table.removeRow(i)
+            
+        for i in range(self.current_kw_table.rowCount(), -1, -1):
+            self.current_kw_table.removeRow(i)
+            
+        for kw in self.last_dict:
+            self.add_item_to_current_kw_table(kw)
 
 
 class KeywordOptions(QWidget):
@@ -3524,7 +3834,12 @@ class KeywordOptions(QWidget):
         self.layout.setContentsMargins(0, 0, 0, 0)        
         self.layout.setRowStretch(0, 0)
         self.layout.setRowStretch(1, 1)
-
+    
+    def setKeywords(self, current_dict):
+        for item in self.widgets.keys():
+            if self.items[item] in current_dict:
+                self.widgets[item].setCurrentSettings(current_dict[self.items[item]])
+    
     def something_changed(self, *args, **kw):
         """just for updating the preview"""
         self.optionsChanged.emit()
@@ -3639,7 +3954,7 @@ class GaussianKeywordOptions(KeywordOptions):
                 previous_dict = previous
                 
             return TwoLayerKeyWordOption("link 0 commands", last_dict, previous_dict, "double click to use %%%s=%s", one_opt_per_kw=False)
-
+    
 
 class ORCAKeywordOptions(KeywordOptions):
     items = {'route': Method.ORCA_ROUTE, \
@@ -3802,6 +4117,16 @@ class KeywordWidget(QWidget):
 
     def options_changed(self):
         self.additionalOptionsChanged.emit()
+
+    def setKeywords(self, current_dict):
+        if self.form == "Gaussian":
+            self.gaussian_widget.setKeywords(current_dict)
+        
+        elif self.form == "ORCA":
+            self.orca_widget.setKeywords(current_dict)        
+        
+        elif self.form == "Psi4":
+            self.psi4_widget.setKeywords(current_dict)
     
     def getKWDict(self, update_settings=True):
         if self.form == "Gaussian":
@@ -3876,4 +4201,105 @@ class InputPreview(ChildToolWindow):
         self.tool_instance.preview_window = None
         
         super().cleanup()
+
+
+class SavePreset(ChildToolWindow):
+    def __init__(self, tool_instance, title, **kwargs):
+        super().__init__(tool_instance, title, statusbar=False, **kwargs)
         
+        self._build_ui()
+        
+    def _build_ui(self):
+        layout = QGridLayout()
+        
+        preset_name_label = QLabel("name:")
+        
+        self.preset_name = QLineEdit()
+        self.preset_name.setPlaceholderText("preset name")
+        self.preset_name.returnPressed.connect(self.add_preset)
+        
+        layout.addWidget(preset_name_label, 0, 0, Qt.AlignVCenter | Qt.AlignLeft)
+        layout.addWidget(self.preset_name, 0, 1, Qt.AlignVCenter)
+        
+        add_preset_button = QPushButton("add")
+        add_preset_button.clicked.connect(self.add_preset)
+        layout.addWidget(add_preset_button, 1, 0, 1, 2, Qt.AlignTop)
+        
+        layout.setRowStretch(0, 0)
+        layout.setRowStretch(1, 1)
+        
+        self.ui_area.setLayout(layout)
+        self.manage(None)
+
+    def add_preset(self):
+        preset = {}
+        
+        name = self.preset_name.text()
+        program = self.tool_instance.file_type.currentText()
+        
+        geom_opt = self.tool_instance.job_widget.getGeometryOptimization()
+        preset['opt'] = geom_opt
+        
+        ts_opt = self.tool_instance.job_widget.getTSOptimization()
+        preset['ts'] = ts_opt
+        
+        freq = self.tool_instance.job_widget.getFrequencyCalculation()
+        preset['freq'] = freq
+        
+        nproc = self.tool_instance.job_widget.getNProc()
+        if nproc is None:
+            nproc = 0
+        preset['nproc'] = nproc
+        
+        mem = self.tool_instance.job_widget.getMem()
+        if mem is None:
+            mem = 0
+        preset['mem'] = mem
+        
+        solvent = self.tool_instance.job_widget.getSolvent()
+        preset['solvent model'] = solvent.name
+        preset['solvent'] = solvent.solvent
+        
+        functional = self.tool_instance.functional_widget.getFunctional(update_settings=False)
+        preset['functional'] = functional.name
+        preset['semi-empirical'] = functional.is_semiempirical
+        
+        dispersion = self.tool_instance.functional_widget.getDispersion(update_settings=False)
+        if dispersion is not None:
+            preset['disp'] = dispersion.name
+        else:
+            preset['disp'] = dispersion
+        
+        grid = self.tool_instance.functional_widget.getGrid(update_settings=False)
+        if grid is not None:
+            preset['grid'] = grid.name
+        else:
+            preset['grid'] = grid
+        
+        basis_set = self.tool_instance.basis_widget.getBasis()
+        preset['basis'] = {'name':[], 'file':[], 'auxiliary':[], 'elements':[]}
+        for basis in basis_set.basis:
+            preset['basis']['name'].append(basis.name)
+            preset['basis']['file'].append(basis.user_defined)
+            preset['basis']['auxiliary'].append(basis.aux_type)
+            if basis.elements == basis_set.elements_in_basis:
+                preset['basis']['elements'].append('all')
+            else:
+                preset['basis']['elements'].append(basis.elements)
+            
+        preset['ecp'] = {'name':[], 'file':[], 'elements':[]}
+        if basis_set.ecp is not None:
+            for basis in basis_set.ecp:
+                preset['ecp']['name'].append(basis.name)
+                preset['ecp']['file'].append(basis.user_defined)
+                if basis.elements == basis_set.elements_in_basis:
+                    preset['ecp']['elements'].append('all')
+                else:
+                    preset['ecp']['elements'].append(basis.elements)
+        
+        preset["other"] = self.tool_instance.other_keywords_widget.getKWDict(update_settings=False)
+        
+        self.tool_instance.presets[program][name] = preset
+        self.tool_instance.refresh_presets()
+        
+        self.destroy()
