@@ -345,46 +345,59 @@ class BuildQM(ToolInstance):
         self.job_widget.blockSignals(True)
         self.other_keywords_widget.blockSignals(True)
     
-        self.job_widget.do_geom_opt.setChecked(preset['opt'])
-        self.job_widget.ts_opt.setChecked(preset['ts'])
-        self.job_widget.do_freq.setChecked(preset['freq'])
-        self.job_widget.setProcessors(preset['nproc'])
-        self.job_widget.setMemory(preset['mem'])
+        if 'opt' in preset:
+            self.job_widget.do_geom_opt.setChecked(preset['opt'])
+            self.job_widget.ts_opt.setChecked(preset['ts'])
+            self.job_widget.do_freq.setChecked(preset['freq'])
+            
+        if 'temp' in preset:
+            self.job_widget.temp.setValue(float(preset['temp']))
         
-        solvent = ImplicitSolvent(preset['solvent model'], preset['solvent'])
-        self.job_widget.setSolvent(solvent)
+        if 'raman' in preset:
+            self.job_widget.raman.setChecked(preset['raman'])
         
-        func = Functional(preset['functional'], preset['semi-empirical'])
-        self.functional_widget.setFunctional(func)
+        if 'nproc' in preset:
+            self.job_widget.setProcessors(preset['nproc'])
+            self.job_widget.setMemory(preset['mem'])
         
-        self.functional_widget.setGrid(preset['grid'])
-        self.functional_widget.setDispersion(preset['disp'])
+        if 'solvent' in preset:
+            solvent = ImplicitSolvent(preset['solvent model'], preset['solvent'])
+            self.job_widget.setSolvent(solvent)
+        
+        if 'functional' in preset:
+            func = Functional(preset['functional'], preset['semi-empirical'])
+            self.functional_widget.setFunctional(func)
+        
+            self.functional_widget.setGrid(preset['grid'])
+            self.functional_widget.setDispersion(preset['disp'])
 
-        basis_list = []
-        for i, name in enumerate(preset['basis']['name']):
-            elements = preset['basis']['elements'][i]
-            aux_type = preset['basis']['auxiliary'][i]
-            user_defined = preset['basis']['file'][i]
+        if 'basis' in preset:
+            basis_list = []
+            for i, name in enumerate(preset['basis']['name']):
+                elements = preset['basis']['elements'][i]
+                aux_type = preset['basis']['auxiliary'][i]
+                user_defined = preset['basis']['file'][i]
+                
+                basis_list.append(Basis(name, elements, aux_type=aux_type, user_defined=user_defined))
+                
+            ecp_list = []
+            for i, name in enumerate(preset['ecp']['name']):
+                elements = preset['ecp']['elements'][i]
+                user_defined = preset['ecp']['file'][i]
+                
+                ecp_list.append(ECP(name, elements, user_defined=user_defined))
+    
+            basis_set = BasisSet(basis_list, ecp_list)
             
-            basis_list.append(Basis(name, elements, aux_type=aux_type, user_defined=user_defined))
+            self.basis_widget.setBasis(basis_set)
+        
+        if 'other' in preset:
+            raw_kw_dict = preset['other']
+            kw_dict = {}
+            for kw in raw_kw_dict.keys():
+                kw_dict[int(kw)] = raw_kw_dict[kw]
             
-        ecp_list = []
-        for i, name in enumerate(preset['ecp']['name']):
-            elements = preset['ecp']['elements'][i]
-            user_defined = preset['ecp']['file'][i]
-            
-            ecp_list.append(ECP(name, elements, user_defined=user_defined))
-
-        basis_set = BasisSet(basis_list, ecp_list)
-        
-        self.basis_widget.setBasis(basis_set)
-        
-        raw_kw_dict = preset['other']
-        kw_dict = {}
-        for kw in raw_kw_dict.keys():
-            kw_dict[int(kw)] = raw_kw_dict[kw]
-        
-        self.other_keywords_widget.setKeywords(kw_dict)
+            self.other_keywords_widget.setKeywords(kw_dict)
         
         self.file_type.blockSignals(False)
         self.functional_widget.blockSignals(False)
@@ -394,7 +407,7 @@ class BuildQM(ToolInstance):
     
         self.update_preview()
         
-        self.session.logger.info("applied QM preset %s (%s)"% (preset_name, program))
+        self.session.logger.info("applied \"%s\" (%s)"% (preset_name, program))
 
     def show_preview(self):
         if self.preview_window is None:
@@ -750,7 +763,7 @@ class JobTypeOption(QWidget):
         atom_constraints_layout = QGridLayout(atom_constraints)
         atom_constraints_layout.setContentsMargins(0, 0, 0, 0)
         
-        freeze_atoms = QPushButton("add selected atoms")
+        freeze_atoms = QPushButton("constrain selected atoms")
         freeze_atoms.clicked.connect(self.constrain_atoms)
         freeze_atoms.clicked.connect(self.something_changed)
         atom_constraints_layout.addWidget(freeze_atoms, 0, 0)
@@ -766,12 +779,12 @@ class JobTypeOption(QWidget):
         bond_constraints_layout = QGridLayout(bond_constraints)
         bond_constraints_layout.setContentsMargins(0, 0, 0, 0)
 
-        freeze_bonds = QPushButton("add selected bonds")
+        freeze_bonds = QPushButton("constrain selected bonds")
         freeze_bonds.clicked.connect(self.constrain_bonds)
         freeze_bonds.clicked.connect(self.something_changed)
         bond_constraints_layout.addWidget(freeze_bonds, 0, 0)
 
-        freeze_atom_pair = QPushButton("add selected atom pair")
+        freeze_atom_pair = QPushButton("constrain selected atom pair")
         freeze_atom_pair.clicked.connect(self.constrain_atom_pair)
         freeze_atom_pair.clicked.connect(self.something_changed)
         bond_constraints_layout.addWidget(freeze_atom_pair, 0, 1)
@@ -787,12 +800,12 @@ class JobTypeOption(QWidget):
         angle_constraints_layout = QGridLayout(angle_constraints)
         angle_constraints_layout.setContentsMargins(0, 0, 0, 0)
 
-        freeze_bond_pair = QPushButton("add selected bond pair")
+        freeze_bond_pair = QPushButton("constrain selected bond pair")
         freeze_bond_pair.clicked.connect(self.constrain_bond_pair)
         freeze_bond_pair.clicked.connect(self.something_changed)
         angle_constraints_layout.addWidget(freeze_bond_pair, 0, 0)
         
-        freeze_atom_trio = QPushButton("add selected atom trio")
+        freeze_atom_trio = QPushButton("constrain selected atom trio")
         freeze_atom_trio.clicked.connect(self.constrain_atom_trio)
         freeze_atom_trio.clicked.connect(self.something_changed)
         angle_constraints_layout.addWidget(freeze_atom_trio, 0, 1)
@@ -808,12 +821,12 @@ class JobTypeOption(QWidget):
         torsion_constrains_layout = QGridLayout(torsion_constrains)
         torsion_constrains_layout.setContentsMargins(0, 0, 0, 0)
 
-        freeze_bond_trio = QPushButton("add selected bond trio")
+        freeze_bond_trio = QPushButton("constrain selected bond trio")
         freeze_bond_trio.clicked.connect(self.constrain_bond_trio)
         freeze_bond_trio.clicked.connect(self.something_changed)
         torsion_constrains_layout.addWidget(freeze_bond_trio, 0, 0)
         
-        freeze_atom_quartet = QPushButton("add selected atom quartet")
+        freeze_atom_quartet = QPushButton("constrain selected atom quartet")
         freeze_atom_quartet.clicked.connect(self.constrain_atom_quartet)
         freeze_atom_quartet.clicked.connect(self.something_changed)
         torsion_constrains_layout.addWidget(freeze_atom_quartet, 0, 1)
@@ -862,7 +875,7 @@ class JobTypeOption(QWidget):
         self.hpmodes = QCheckBox()
         self.hpmodes.setCheckState(Qt.Checked)
         self.hpmodes.stateChanged.connect(self.something_changed)
-        self.hpmodes.setToolTip("ask Gaussian to print extra precision on frequencies")
+        self.hpmodes.setToolTip("ask Gaussian to print extra precision on normal mode displacements")
         freq_opt_form.addRow("high-precision modes:", self.hpmodes)
 
         self.raman = QCheckBox()
@@ -4210,23 +4223,55 @@ class SavePreset(ChildToolWindow):
         self._build_ui()
         
     def _build_ui(self):
-        layout = QGridLayout()
         
-        preset_name_label = QLabel("name:")
+        layout = QFormLayout()
         
+        layout.addRow(QLabel("select what to save in the preset and enter a name"))
+        
+        self.job_type = QCheckBox()
+        self.job_type.setChecked(True)
+        self.job_type.setToolTip("geometry optimization and frequency calculation settings")
+        layout.addRow("job type:", self.job_type)
+        
+        self.job_resources = QCheckBox()
+        self.job_resources.setChecked(True)
+        self.job_resources.setToolTip("processors and memory")
+        layout.addRow("job resources:", self.job_resources)
+        
+        self.solvent = QCheckBox()
+        self.solvent.setChecked(True)
+        self.solvent.setToolTip("implicit solvent")
+        layout.addRow("solvent:", self.solvent)
+        
+        self.functional = QCheckBox()
+        self.functional.setChecked(True)
+        self.functional.setToolTip("functional")
+        layout.addRow("functional:", self.functional)
+        
+        
+        self.basis = QCheckBox()
+        self.basis.setChecked(True)
+        self.basis.setToolTip("basis functions and ECP")
+        layout.addRow("basis set:", self.basis)
+
+        self.additional = QCheckBox()
+        self.additional.setChecked(True)
+        self.additional.setToolTip("options, keywords, etc. on the 'additional options' tab")
+        layout.addRow("additional options:", self.additional)
+
         self.preset_name = QLineEdit()
         self.preset_name.setPlaceholderText("preset name")
         self.preset_name.returnPressed.connect(self.add_preset)
         
-        layout.addWidget(preset_name_label, 0, 0, Qt.AlignVCenter | Qt.AlignLeft)
-        layout.addWidget(self.preset_name, 0, 1, Qt.AlignVCenter)
+        layout.addRow("name:", self.preset_name)
         
         add_preset_button = QPushButton("add")
         add_preset_button.clicked.connect(self.add_preset)
-        layout.addWidget(add_preset_button, 1, 0, 1, 2, Qt.AlignTop)
+        layout.addRow(add_preset_button)
         
-        layout.setRowStretch(0, 0)
-        layout.setRowStretch(1, 1)
+        self.status = QStatusBar()
+        self.status.setSizeGripEnabled(False)
+        layout.addRow(self.status)
         
         self.ui_area.setLayout(layout)
         self.manage(None)
@@ -4235,71 +4280,91 @@ class SavePreset(ChildToolWindow):
         preset = {}
         
         name = self.preset_name.text()
+        if len(name.strip()) == 0:
+            raise RuntimeError("no preset name")
+            return
+        
         program = self.tool_instance.file_type.currentText()
         
-        geom_opt = self.tool_instance.job_widget.getGeometryOptimization()
-        preset['opt'] = geom_opt
-        
-        ts_opt = self.tool_instance.job_widget.getTSOptimization()
-        preset['ts'] = ts_opt
-        
-        freq = self.tool_instance.job_widget.getFrequencyCalculation()
-        preset['freq'] = freq
-        
-        nproc = self.tool_instance.job_widget.getNProc()
-        if nproc is None:
-            nproc = 0
-        preset['nproc'] = nproc
-        
-        mem = self.tool_instance.job_widget.getMem()
-        if mem is None:
-            mem = 0
-        preset['mem'] = mem
-        
-        solvent = self.tool_instance.job_widget.getSolvent()
-        preset['solvent model'] = solvent.name
-        preset['solvent'] = solvent.solvent
-        
-        functional = self.tool_instance.functional_widget.getFunctional(update_settings=False)
-        preset['functional'] = functional.name
-        preset['semi-empirical'] = functional.is_semiempirical
-        
-        dispersion = self.tool_instance.functional_widget.getDispersion(update_settings=False)
-        if dispersion is not None:
-            preset['disp'] = dispersion.name
-        else:
-            preset['disp'] = dispersion
-        
-        grid = self.tool_instance.functional_widget.getGrid(update_settings=False)
-        if grid is not None:
-            preset['grid'] = grid.name
-        else:
-            preset['grid'] = grid
-        
-        basis_set = self.tool_instance.basis_widget.getBasis()
-        preset['basis'] = {'name':[], 'file':[], 'auxiliary':[], 'elements':[]}
-        for basis in basis_set.basis:
-            preset['basis']['name'].append(basis.name)
-            preset['basis']['file'].append(basis.user_defined)
-            preset['basis']['auxiliary'].append(basis.aux_type)
-            if basis.elements == basis_set.elements_in_basis:
-                preset['basis']['elements'].append('all')
-            else:
-                preset['basis']['elements'].append(basis.elements)
+        if self.job_type.checkState() == Qt.Checked:
+            geom_opt = self.tool_instance.job_widget.getGeometryOptimization()
+            preset['opt'] = geom_opt
             
-        preset['ecp'] = {'name':[], 'file':[], 'elements':[]}
-        if basis_set.ecp is not None:
-            for basis in basis_set.ecp:
-                preset['ecp']['name'].append(basis.name)
-                preset['ecp']['file'].append(basis.user_defined)
-                if basis.elements == basis_set.elements_in_basis:
-                    preset['ecp']['elements'].append('all')
-                else:
-                    preset['ecp']['elements'].append(basis.elements)
+            ts_opt = self.tool_instance.job_widget.getTSOptimization()
+            preset['ts'] = ts_opt
+            
+            freq = self.tool_instance.job_widget.getFrequencyCalculation()
+            preset['freq'] = freq
+            
+            raman = self.tool_instance.job_widget.raman.checkState() == Qt.Checked
+            preset['raman'] = raman
+            
+            temp = self.tool_instance.job_widget.temp.value()
+            preset['temp'] = temp
         
-        preset["other"] = self.tool_instance.other_keywords_widget.getKWDict(update_settings=False)
+        if self.job_resources.checkState() == Qt.Checked:
+            nproc = self.tool_instance.job_widget.getNProc()
+            if nproc is None:
+                nproc = 0
+            preset['nproc'] = nproc
+            
+            mem = self.tool_instance.job_widget.getMem()
+            if mem is None:
+                mem = 0
+            preset['mem'] = mem
+        
+        if self.solvent.checkState() == Qt.Checked:
+            solvent = self.tool_instance.job_widget.getSolvent()
+            preset['solvent model'] = solvent.name
+            preset['solvent'] = solvent.solvent
+        
+        if self.functional.checkState() == Qt.Checked:
+            functional = self.tool_instance.functional_widget.getFunctional(update_settings=False)
+            preset['functional'] = functional.name
+            preset['semi-empirical'] = functional.is_semiempirical
+            
+            dispersion = self.tool_instance.functional_widget.getDispersion(update_settings=False)
+            if dispersion is not None:
+                preset['disp'] = dispersion.name
+            else:
+                preset['disp'] = dispersion
+            
+            grid = self.tool_instance.functional_widget.getGrid(update_settings=False)
+            if grid is not None:
+                preset['grid'] = grid.name
+            else:
+                preset['grid'] = grid
+        
+        if self.basis.checkState() == Qt.Checked:
+            basis_set = self.tool_instance.basis_widget.getBasis()
+            preset['basis'] = {'name':[], 'file':[], 'auxiliary':[], 'elements':[]}
+            for basis in basis_set.basis:
+                preset['basis']['name'].append(basis.name)
+                preset['basis']['file'].append(basis.user_defined)
+                preset['basis']['auxiliary'].append(basis.aux_type)
+                if basis.elements == basis_set.elements_in_basis:
+                    preset['basis']['elements'].append('all')
+                else:
+                    preset['basis']['elements'].append(basis.elements)
+                
+            preset['ecp'] = {'name':[], 'file':[], 'elements':[]}
+            if basis_set.ecp is not None:
+                for basis in basis_set.ecp:
+                    preset['ecp']['name'].append(basis.name)
+                    preset['ecp']['file'].append(basis.user_defined)
+                    if basis.elements == basis_set.elements_in_basis:
+                        preset['ecp']['elements'].append('all')
+                    else:
+                        preset['ecp']['elements'].append(basis.elements)
+        
+        if self.additional.checkState() == Qt.Checked:
+            preset["other"] = self.tool_instance.other_keywords_widget.getKWDict(update_settings=False)
         
         self.tool_instance.presets[program][name] = preset
         self.tool_instance.refresh_presets()
         
-        self.destroy()
+        self.status.showMessage("saved \"%s\"" % name)
+        
+        #sometimes this causes an error
+        #I haven't seen any pattern
+        #self.destroy()
