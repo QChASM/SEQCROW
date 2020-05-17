@@ -334,6 +334,7 @@ class BuildQM(ToolInstance):
         self.tool_window.create_child_window("New Preset", window_class=SavePreset)
 
     def apply_preset(self, program, preset_name):
+        #TODO: change basis sets listed in 'save preset' when this goes
         preset = self.presets[program][preset_name]
         
         ndx = self.file_type.findText(program, Qt.MatchExactly)
@@ -2587,11 +2588,17 @@ class BasisOption(QWidget):
                 if element.lower() == "tm" or elements == "tm":
                     #all transition metals
                     for element in TMETAL.keys():
-                        items = self.elements.findItems(element, Qt.MatchExactly)[0]
+                        items = self.elements.findItems(element, Qt.MatchExactly)
                         if len(items) > 0:
                             for item in items:
                                 item.setSelected(True)
                                 
+                elif element.lower() == "!tm" or elements == "!tm":
+                    for i in range(0, self.elements.count()):
+                        item = self.elements.item(i)
+                        if item.text() not in TMETAL:
+                            item.setSelected(True)
+                
                 elif element.lower() == "all" or elements == "all":
                     for i in range(0, self.elements.count()):
                         item = self.elements.item(i)
@@ -2969,9 +2976,9 @@ class BasisWidget(QWidget):
         
         return basis_set, ecp
         
-    def getBasis(self):
+    def getBasis(self, update_settings=True):
         """returns BasisSet object corresponding to the current settings"""
-        basis, ecp = self.get_basis()
+        basis, ecp = self.get_basis(update_settings=update_settings)
         
         return BasisSet(basis, ecp)
 
@@ -4217,6 +4224,86 @@ class InputPreview(ChildToolWindow):
 
 
 class SavePreset(ChildToolWindow):
+    class BasisElements(QWidget):
+        def __init__(self, parent=None, tool_instance=None):
+            super().__init__(parent)
+            self.tool_instance = tool_instance
+
+            self.basis_form = QFormLayout(self)
+            
+            self.basis_elements = []
+            self.ecp_elements = []
+            
+            self.basis_form.setContentsMargins(0, 0, 0, 0)
+
+        def refresh_basis(self):
+            basis_set = self.tool_instance.basis_widget.getBasis(update_settings=False)
+            self.setBasis(basis_set)
+            
+        def setBasis(self, basis_set):
+            self.basis_elements = []
+            self.ecp_elements = []
+            for i in range(self.basis_form.rowCount()-1, -1, -1):
+                self.basis_form.removeRow(i)
+            
+            for basis in basis_set.basis:
+                element_selector = QComboBox()
+                self.basis_elements.append(element_selector)
+                element_selector.addItems(["current elements", "all elements", "transition metals", "non-transition metals"])
+                basis_name = basis.name
+                aux = basis.aux_type
+                if aux is not None:
+                    label = "    %s/%s" % (basis_name, aux)
+                else:
+                    label = "    %s" % basis_name
+                    
+                self.basis_form.addRow(label, element_selector)
+                
+            if basis_set.ecp is not None:
+                for ecp in basis_set.ecp:
+                    element_selector = QComboBox()
+                    self.ecp_elements.append(element_selector)
+                    element_selector.addItems(["current elements", "all elements", "transition metals", "non-transition metals"])
+                    basis_name = ecp.name
+                    aux = basis.aux_type
+                    label = "    %s" % basis_name
+                        
+                    self.basis_form.addRow(label, element_selector)
+                    
+        def getElements(self):
+            basis = []
+            ecp = []
+            for selector in self.basis_elements:
+                elements = selector.currentText()
+                if elements == "current elements":
+                    basis.append("current")
+                
+                elif elements == "all elements":
+                    basis.append("all")
+                
+                elif elements == "transition metals":
+                    basis.append("tm")
+                    
+                elif elements == "non-transition metals":
+                    basis.append("!tm")
+            
+            for selector in self.ecp_elements:
+                elements = selector.currentText()
+                if elements == "current elements":
+                    ecp.append("current")
+                
+                elif elements == "all elements":
+                    ecp.append("all")
+                
+                elif elements == "transition metals":
+                    ecp.append("tm")
+                    
+                elif elements == "non-transition metals":
+                    ecp.append("!tm")
+                    
+            return basis, ecp
+
+
     def __init__(self, tool_instance, title, **kwargs):
         super().__init__(tool_instance, title, statusbar=False, **kwargs)
         
@@ -4253,6 +4340,11 @@ class SavePreset(ChildToolWindow):
         self.basis.setChecked(True)
         self.basis.setToolTip("basis functions and ECP")
         layout.addRow("basis set:", self.basis)
+        
+        self.basis_elements = self.BasisElements(tool_instance=self.tool_instance)
+        self.tool_instance.basis_widget.basisChanged.connect(self.basis_elements.refresh_basis)
+        self.basis_elements.refresh_basis()
+        layout.addRow(self.basis_elements)
 
         self.additional = QCheckBox()
         self.additional.setChecked(True)
@@ -4336,26 +4428,28 @@ class SavePreset(ChildToolWindow):
                 preset['grid'] = grid
         
         if self.basis.checkState() == Qt.Checked:
-            basis_set = self.tool_instance.basis_widget.getBasis()
+            basis_elements, ecp_elements = self.basis_elements.getElements()
+            
+            basis_set = self.tool_instance.basis_widget.getBasis(update_settings=False)
             preset['basis'] = {'name':[], 'file':[], 'auxiliary':[], 'elements':[]}
-            for basis in basis_set.basis:
+            for basis, elements in zip(basis_set.basis, basis_elements):
                 preset['basis']['name'].append(basis.name)
                 preset['basis']['file'].append(basis.user_defined)
                 preset['basis']['auxiliary'].append(basis.aux_type)
-                if basis.elements == basis_set.elements_in_basis:
-                    preset['basis']['elements'].append('all')
-                else:
+                if elements == "current":
                     preset['basis']['elements'].append(basis.elements)
-                
+                else:
+                    preset['basis']['elements'].append([elements])
+                        
             preset['ecp'] = {'name':[], 'file':[], 'elements':[]}
             if basis_set.ecp is not None:
-                for basis in basis_set.ecp:
+                for basis, elements in zip(basis_set.ecp, ecp_elements):
                     preset['ecp']['name'].append(basis.name)
                     preset['ecp']['file'].append(basis.user_defined)
-                    if basis.elements == basis_set.elements_in_basis:
-                        preset['ecp']['elements'].append('all')
-                    else:
+                    if elements == "current":
                         preset['ecp']['elements'].append(basis.elements)
+                    else:
+                        preset['ecp']['elements'].append([elements])
         
         if self.additional.checkState() == Qt.Checked:
             preset["other"] = self.tool_instance.other_keywords_widget.getKWDict(update_settings=False)
