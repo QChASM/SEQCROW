@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter
                             QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, \
                             QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, \
                             QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView, QTextBrowser, \
-                            QStatusBar, QTextEdit
+                            QStatusBar, QTextEdit, QMessageBox
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.theory import *
@@ -187,6 +187,7 @@ class BuildQM(ToolInstance):
         
         self.tool_window = MainToolWindow(self)        
         self.preview_window = None
+        self.preset_window = None
 
         self._build_ui()
 
@@ -209,8 +210,7 @@ class BuildQM(ToolInstance):
     def _build_ui(self):
         #build an interface with a dropdown menu to select software package
         #change from one software widget to another when the dropdown menu changes
-        #TODO: move everything to do with the tabwidget into a different widget
-        #TODO: add a presets tab to save/load presets to aaronrc or to seqcrow 
+        #TODO: add a presets tab to save/load presets to aaronrc
         #      so it can easily be used in other tools (like one that runs QM software)
         init_form = self.settings.last_program
 
@@ -331,10 +331,10 @@ class BuildQM(ToolInstance):
         self.presets_menu.addAction(self.new_preset)
 
     def show_new_preset(self):
-        self.tool_window.create_child_window("New Preset", window_class=SavePreset)
+        if self.preset_window is None:
+            self.preset_window = self.tool_window.create_child_window("New Preset", window_class=SavePreset)
 
     def apply_preset(self, program, preset_name):
-        #TODO: change basis sets listed in 'save preset' when this goes
         preset = self.presets[program][preset_name]
         
         ndx = self.file_type.findText(program, Qt.MatchExactly)
@@ -409,6 +409,9 @@ class BuildQM(ToolInstance):
         self.update_preview()
         
         self.session.logger.info("applied \"%s\" (%s)"% (preset_name, program))
+        
+        if self.preset_window is not None:
+            self.preset_window.basis_elements.refresh_basis()
 
     def show_preview(self):
         if self.preview_window is None:
@@ -632,11 +635,6 @@ class JobTypeOption(QWidget):
     ORCA_SOLVENT_MODELS = ["SMD", "CPCM"]
     
     #TODO:
-    #remove constraints checkbox and put constraints widget in a groupbox
-    #   have either this or Method check to see if anything is actually constrained
-    #   set margins to 0 like with basis stuff
-    #   this should save a little space
-    #
     #make selecting a row in one of the contraints tables select the atoms
     
     def __init__(self, settings, session, init_form, parent=None):
@@ -893,13 +891,11 @@ class JobTypeOption(QWidget):
         solvent_form_layout = QFormLayout(solvent_form)
         
         self.solvent_option = QComboBox()
-        #TODO: move to setOptions
         self.solvent_option.currentTextChanged.connect(self.change_solvent_model)
         solvent_form_layout.addRow("implicit solvent model:", self.solvent_option)
         
         self.solvent_name_label = QLabel("solvent:")
         self.solvent_name = QLineEdit()
-        #TODO: move to setOptions
         self.solvent_name.setText(self.settings.previous_gaussian_solvent_name)
         self.solvent_name.textChanged.connect(self.filter_solvents)
         self.solvent_name.setClearButtonEnabled(True)
@@ -3343,8 +3339,6 @@ class OneLayerKeyWordOption(QWidget):
 
 
 class TwoLayerKeyWordOption(QWidget):
-    #TODO:
-    #allow multiline options
     optionChanged = pyqtSignal()
     settingsChanged = pyqtSignal()
     
@@ -3794,8 +3788,6 @@ class KeywordOptions(QWidget):
     route_opt_fmt               str; % style formating to convert two strings (e.g. %s=(%s))
     comment_opt_fmt             str; % style formating to convert two strings (e.g. %s=(%s))
     """
-    #TODO:
-    #* have attribute that specifies what widget type each item should be
     optionsChanged = pyqtSignal()
     settingsChanged = pyqtSignal()
     
@@ -4246,18 +4238,19 @@ class SavePreset(ChildToolWindow):
             for i in range(self.basis_form.rowCount()-1, -1, -1):
                 self.basis_form.removeRow(i)
             
-            for basis in basis_set.basis:
-                element_selector = QComboBox()
-                self.basis_elements.append(element_selector)
-                element_selector.addItems(["current elements", "all elements", "transition metals", "non-transition metals"])
-                basis_name = basis.name
-                aux = basis.aux_type
-                if aux is not None:
-                    label = "    %s/%s" % (basis_name, aux)
-                else:
-                    label = "    %s" % basis_name
-                    
-                self.basis_form.addRow(label, element_selector)
+            if basis_set.basis is not None:
+                for basis in basis_set.basis:
+                    element_selector = QComboBox()
+                    self.basis_elements.append(element_selector)
+                    element_selector.addItems(["current elements", "all elements", "transition metals", "non-transition metals"])
+                    basis_name = basis.name
+                    aux = basis.aux_type
+                    if aux is not None:
+                        label = "    %s/%s" % (basis_name, aux)
+                    else:
+                        label = "    %s" % basis_name
+                        
+                    self.basis_form.addRow(label, element_selector)
                 
             if basis_set.ecp is not None:
                 for ecp in basis_set.ecp:
@@ -4346,6 +4339,8 @@ class SavePreset(ChildToolWindow):
         self.basis_elements.refresh_basis()
         layout.addRow(self.basis_elements)
 
+        self.basis.stateChanged.connect(lambda state, widget=self.basis_elements: widget.setEnabled(state == Qt.Checked))
+
         self.additional = QCheckBox()
         self.additional.setChecked(True)
         self.additional.setToolTip("options, keywords, etc. on the 'additional options' tab")
@@ -4370,13 +4365,20 @@ class SavePreset(ChildToolWindow):
 
     def add_preset(self):
         preset = {}
-        
+        program = self.tool_instance.file_type.currentText()
+
         name = self.preset_name.text()
         if len(name.strip()) == 0:
             raise RuntimeError("no preset name")
             return
-        
-        program = self.tool_instance.file_type.currentText()
+            
+        elif name in self.tool_instance.presets[program]:
+            yes = QMessageBox.question(self.preset_name, "\"%s\" is already saved" % name, \
+                                        "would you like to overwrite \"%s\"?" % name, \
+                                        QMessageBox.Yes | QMessageBox.No)
+                                                
+            if yes != QMessageBox.Yes:
+                return
         
         if self.job_type.checkState() == Qt.Checked:
             geom_opt = self.tool_instance.job_widget.getGeometryOptimization()
@@ -4462,3 +4464,8 @@ class SavePreset(ChildToolWindow):
         #sometimes this causes an error
         #I haven't seen any pattern
         #self.destroy()
+        
+    def cleanup(self):
+        self.tool_instance.preset_window = None
+        
+        super().cleanup()
