@@ -101,37 +101,37 @@ class _InputGeneratorSettings(Settings):
         }
         
     AUTO_SAVE = {
-        'presets': Value(dumps({"Gaussian":{"quick optimize":{"nproc":1, \
-                                                          "mem":0, \
-                                                          "opt":True, \
-                                                          "ts":False, \
-                                                          "freq":False, \
-                                                          "semi-empirical":False, \
-                                                          "solvent model":'None', \
-                                                          "solvent":'', \
-                                                          "functional":'PM6', \
-                                                          "grid":None, \
-                                                          "disp":None, \
-                                                          "basis": {'name':[], 'auxiliary':[], 'file':[], 'elements':[]}, \
-                                                          "ecp": {'name':[], 'file':[], 'elements':[]}, \
-                                                          "other": {}, \
+        'gaussian_presets': Value(dumps({"quick optimize":{"nproc":1, \
+                                                           "mem":0, \
+                                                           "opt":True, \
+                                                           "ts":False, \
+                                                           "freq":False, \
+                                                           "semi-empirical":False, \
+                                                           "solvent model":'None', \
+                                                           "solvent":'', \
+                                                           "functional":'PM6', \
+                                                           "grid":None, \
+                                                           "disp":None, \
+                                                           "basis": {'name':[], 'auxiliary':[], 'file':[], 'elements':[]}, \
+                                                           "ecp": {'name':[], 'file':[], 'elements':[]}, \
+                                                           "other": {}, \
                                                          }, \
-                                            }, \
-                                "ORCA":{"quick optimize":{"nproc":1, \
-                                                          "mem":0, \
-                                                          "opt":True, \
-                                                          "ts":False, \
-                                                          "freq":False, \
-                                                          "semi-empirical":False, \
-                                                          "solvent model":'None', \
-                                                          "solvent":'', \
-                                                          "functional":'HF-3c', \
-                                                          "grid":None, \
-                                                          "disp":None, \
-                                                          "basis": {'name':[], 'auxiliary':[], 'file':[], 'elements':[]}, \
-                                                          "ecp": {'name':[], 'file':[], 'elements':[]}, \
-                                                          "other": {}, \
-                                                         }, \
+                                        }), StringArg), \
+        'orca_presets':Value(dumps({"quick optimize":{"nproc":1, \
+                                                       "mem":0, \
+                                                       "opt":True, \
+                                                       "ts":False, \
+                                                       "freq":False, \
+                                                       "semi-empirical":False, \
+                                                       "solvent model":'None', \
+                                                       "solvent":'', \
+                                                       "functional":'HF-3c', \
+                                                       "grid":None, \
+                                                       "disp":None, \
+                                                       "basis": {'name':[], 'auxiliary':[], 'file':[], 'elements':[]}, \
+                                                       "ecp": {'name':[], 'file':[], 'elements':[]}, \
+                                                       "other": {}, \
+                                                      }, \
                                        "DLPNO single-point":{"nproc":2, \
                                                    "mem":12, \
                                                    "opt":False, \
@@ -147,24 +147,24 @@ class _InputGeneratorSettings(Settings):
                                                    "ecp": {'name':[], 'file':[], 'elements':['all']}, \
                                                    "other": {Method.ORCA_ROUTE:['TightSCF']}, \
                                                   }, \
-                                       }, \
-                                "Psi4":{"quick optimize":{"nproc":1, \
-                                                          "mem":0, \
-                                                          "opt":True, \
-                                                          "ts":False, \
-                                                          "freq":False, \
-                                                          "semi-empirical":False, \
-                                                          "solvent model":'None', \
-                                                          "solvent":'', \
-                                                          "functional":'HF', \
-                                                          "grid":None, \
-                                                          "disp":None, \
-                                                          "basis": {'name':['sto-3g'], 'auxiliary':[None], 'file':[False], 'elements':['all']}, \
-                                                          "ecp": {'name':[], 'file':[], 'elements':[]}, \
-                                                          "other": {}, \
-                                                         }, \
+                                       }), StringArg), \
+         'psi4_presets':Value(dumps({"quick optimize":{"nproc":1, \
+                                                       "mem":0, \
+                                                       "opt":True, \
+                                                       "ts":False, \
+                                                       "freq":False, \
+                                                       "semi-empirical":False, \
+                                                       "solvent model":'None', \
+                                                       "solvent":'', \
+                                                       "functional":'HF', \
+                                                       "grid":None, \
+                                                       "disp":None, \
+                                                       "basis": {'name':['sto-3g'], 'auxiliary':[None], 'file':[False], 'elements':['all']}, \
+                                                       "ecp": {'name':[], 'file':[], 'elements':[]}, \
+                                                       "other": {}, \
+                                                      }, \
                                         },\
-                                }), StringArg),
+                                ), StringArg),
     }
     
     #def save(self, *args, **kwargs):
@@ -193,7 +193,10 @@ class BuildQM(ToolInstance):
 
         self.models = []
         
-        self.presets = loads(self.settings.presets)
+        self.presets = {}
+        self.presets['Gaussian'] = loads(self.settings.gaussian_presets)
+        self.presets['ORCA'] = loads(self.settings.orca_presets)
+        self.presets['Psi4'] = loads(self.settings.psi4_presets)
         
         self.refresh_models()
         self.refresh_presets()
@@ -211,7 +214,7 @@ class BuildQM(ToolInstance):
         #build an interface with a dropdown menu to select software package
         #change from one software widget to another when the dropdown menu changes
         #TODO: add a presets tab to save/load presets to aaronrc
-        #      so it can easily be used in other tools (like one that runs QM software)
+        #      so it can easily be used in other tools (like one that makes AARON input files)
         init_form = self.settings.last_program
 
         layout = QGridLayout()
@@ -315,6 +318,7 @@ class BuildQM(ToolInstance):
         self.tool_window.manage(None)
 
     def refresh_presets(self):
+        """cleans and repopulates the "presets" dropdown on the tool's ribbon"""
         self.presets_menu.clear()
         
         for program in self.presets:
@@ -324,17 +328,21 @@ class BuildQM(ToolInstance):
                 preset_action.triggered.connect(lambda *args, program=program, name=preset: self.apply_preset(program, name))
                 program_submenu.addAction(preset_action)
                 
-        self.settings.presets = dumps(self.presets)
+        self.settings.gaussian_presets = dumps(self.presets['Gaussian'])
+        self.settings.orca_presets = dumps(self.presets['ORCA'])
+        self.settings.psi4_presets = dumps(self.presets['Psi4'])
 
         sep = self.presets_menu.addSeparator()
         self.presets_menu.addAction(sep)
         self.presets_menu.addAction(self.new_preset)
 
     def show_new_preset(self):
+        """open 'save preset' child tool"""
         if self.preset_window is None:
             self.preset_window = self.tool_window.create_child_window("New Preset", window_class=SavePreset)
 
     def apply_preset(self, program, preset_name):
+        """apply preset named 'preset_name' for 'program'"""
         preset = self.presets[program][preset_name]
         
         ndx = self.file_type.findText(program, Qt.MatchExactly)
@@ -414,11 +422,13 @@ class BuildQM(ToolInstance):
             self.preset_window.basis_elements.refresh_basis()
 
     def show_preview(self):
+        """open child tool that showns contents of input file"""
         if self.preview_window is None:
             self.preview_window = self.tool_window.create_child_window("Input Preview", window_class=InputPreview)
             self.update_preview()
 
     def update_preview(self, *args, **kw):
+        """whenever a setting is changed, this should be called to update the preview"""
         self.check_elements()
         if self.preview_window is not None:
             self.update_theory(False)
@@ -438,6 +448,8 @@ class BuildQM(ToolInstance):
             self.preview_window.setPreview(output, warnings)
 
     def change_file_type(self, *args):
+        """change the file type
+        args are ignored, only the contents of self.file_type matters"""
         #if we don't block signals, the preview will try to update before all widgets 
         #have been updated to give the proper info
         self.file_type.blockSignals(True)
@@ -462,6 +474,7 @@ class BuildQM(ToolInstance):
         self.update_preview()
     
     def refresh_models(self, *args, **kwargs):
+        """refresh the list of models on the model selector"""
         models = [mdl for mdl in self.session.models if isinstance(mdl, AtomicStructure)]
         
         #purge old models
@@ -486,6 +499,8 @@ class BuildQM(ToolInstance):
                 self.model_selector.addItem("%s (%s)" % (model.name, model.atomspec), model)
 
     def update_theory(self, update_settings=True):
+        """grabs the current settings and updates self.theory
+        always called before creating an input file"""
         if self.model_selector.currentIndex() >= 0:
             model = self.models[self.model_selector.currentIndex()]
         else:
@@ -516,6 +531,7 @@ class BuildQM(ToolInstance):
                              processors=nproc, memory=mem)
     
     def change_model(self, index):
+        """changes model to the one selected in self.model_selector (index is basically ignored"""
         if index == -1:
             self.basis_widget.setElements([])
             return
@@ -537,17 +553,20 @@ class BuildQM(ToolInstance):
                 self.job_widget.setTemperature(fr.other['temperature'])
 
     def check_elements(self, *args, **kw):
+        """ask self.basis_widget to check the elements"""
         mdl = self.model_selector.currentData()
         if mdl is not None:
             elements = set(mdl.atoms.elements.names)
             self.basis_widget.setElements(elements)
     
     def get_basis_set(self, update_settings=False):
+        """get BasisSet object from the basis widget"""
         basis, ecp = self.basis_widget.get_basis(update_settings)
         
         return BasisSet(basis, ecp)
 
     def copy_input(self):
+        """copies input file to the clipboard"""
         self.update_theory()
         
         kw_dict = self.job_widget.getKWDict()
@@ -578,6 +597,8 @@ class BuildQM(ToolInstance):
         print("copied to clipboard")
     
     def save_input(self):
+        """save input to a file
+        a file dialog will open asking for a file location"""
         self.update_theory()
         
         kw_dict = self.job_widget.getKWDict()
@@ -612,6 +633,7 @@ class BuildQM(ToolInstance):
             print("saved to %s" % filename)
     
     def cleanup(self):
+        """deregister trigger handlers"""
         #overload cleanup to de-register handler
         self.session.triggers.remove_handler(self._add_handler)
         self.session.triggers.remove_handler(self._remove_handler)
@@ -629,6 +651,13 @@ class BuildQM(ToolInstance):
     
 
 class JobTypeOption(QWidget):
+    """widget that controls job type and misc. options
+        - charge & multiplicity
+        - job resources
+        - optimization/frequencies
+        - contrained optimization
+        - solvent
+    """
     jobTypeChanged = pyqtSignal()
     
     GAUSSIAN_SOLVENT_MODELS = ["PCM", "SMD", "CPCM", "Dipole", "IPCM", "SCIPCM"]
@@ -638,6 +667,19 @@ class JobTypeOption(QWidget):
     #make selecting a row in one of the contraints tables select the atoms
     
     def __init__(self, settings, session, init_form, parent=None):
+        """layout has charge, multiplicity, and job type options up top
+        with more detailed options in the lower half on a tab widget
+            - execution
+                - job resources
+                - checkpoint
+            - optimization
+                - ts?
+                - contrained?
+                - table of contraints
+            - frequencies
+                - temperature
+                - raman?
+            - solvent"""
         super().__init__(parent)
         
         self.settings = settings
@@ -962,7 +1004,8 @@ class JobTypeOption(QWidget):
         self.constrained_torsion_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Fixed)
     
     def tab_dble_click(self, ndx):
-        """select geom opt or freq when that tab is clicked"""
+        """toggle job type when optimization or frequency tab is clicked
+        this is done so that the job type can be changed when the top half has been collapsed"""
         if ndx == 1:
             self.do_geom_opt.setChecked(not self.do_geom_opt.checkState() == Qt.Checked)
         
@@ -970,6 +1013,7 @@ class JobTypeOption(QWidget):
             self.do_freq.setChecked(not self.do_freq.checkState() == Qt.Checked)
     
     def open_chk_save(self):
+        """open file dialog to locate chk file"""
         if self.form == "Gaussian":
             filename, _ = QFileDialog.getSaveFileName(filter="Gaussian checkpoint files (*.chk)")
         
@@ -977,17 +1021,21 @@ class JobTypeOption(QWidget):
             self.chk_file_path.setText(filename)
     
     def something_changed(self, *args, **kw):
+        """called whenever a setting has changed to notify the main tool"""
         self.jobTypeChanged.emit()
     
     def opt_checked(self, state):
+        """when optimization is checked, switch the tab widget to show optimization settings"""
         if state == Qt.Checked:
             self.job_type_opts.setCurrentIndex(1)    
     
     def freq_checked(self, state):
+        """when frequency is checked, switch the tab widget to show freq settings"""
         if state == Qt.Checked:
             self.job_type_opts.setCurrentIndex(2)
     
     def setOptions(self, program):
+        """change all options to show the ones available for 'program'"""
         self.form = program
         self.solvent_option.clear()
         self.solvent_names.clear()
@@ -1036,6 +1084,7 @@ class JobTypeOption(QWidget):
         self.solvent_names.sortItems()
 
     def change_selected_solvent(self):
+        """when a solvent is selected in the list, the solvent is set to that"""
         item = self.solvent_names.selectedItems()
         if len(item) == 1:
             name = item[0].text()
@@ -1044,6 +1093,8 @@ class JobTypeOption(QWidget):
         self.jobTypeChanged.emit()
     
     def filter_solvents(self, text):
+        """case-insensitive regex to filter solvent list based on what the user
+        has typed for a solvent name"""
         if text:
             #the user doesn't need capturing groups
             text = text.replace('(', '\(')
@@ -1064,6 +1115,7 @@ class JobTypeOption(QWidget):
             self.solvent_names.setRowHidden(i, not filter(i))        
 
     def change_solvent_model(self):
+        """hide solvent options when solvent model changes to 'None'"""
         if self.solvent_option.currentText() != "None":
             self.solvent_name_label.setVisible(True)
             self.solvent_name.setVisible(True)
@@ -1076,16 +1128,19 @@ class JobTypeOption(QWidget):
         self.jobTypeChanged.emit()
     
     def change_job_type(self, *args):
+        """disables tabs when they don't apply to the job type"""
         self.job_type_opts.setTabEnabled(1, self.do_geom_opt.checkState() == Qt.Checked)
         self.job_type_opts.setTabEnabled(2, self.do_freq.checkState() == Qt.Checked)
         
         self.jobTypeChanged.emit()
 
     def show_contraints(self, value):
+        """enable contraints table when doing contrainted optimization"""
         self.constraints_widget.setEnabled(bool(value))
         self.jobTypeChanged.emit()
 
     def getCharge(self, update_settings=True):
+        """returns charge"""
         charge = self.charge.value()
         if update_settings:
             self.settings.previous_charge = charge
@@ -1093,9 +1148,11 @@ class JobTypeOption(QWidget):
         return charge
 
     def setCharge(self, value):
+        """sets charge"""
         self.charge.setValue(value)
 
     def getMultiplicity(self, update_settings=True):
+        """returns multiplicity"""
         mult = self.multiplicity.value()
         if update_settings:
             self.settings.previous_mult = mult
@@ -1103,16 +1160,20 @@ class JobTypeOption(QWidget):
         return mult
 
     def setMultiplicity(self, value):
+        """sets multiplicity"""
         self.multiplicity.setValue(value)
 
     def setTemperature(self, value):
+        """sets temperature"""
         self.temp.setValue(value)
         self.jobTypeChanged.emit()
 
     def getTemperature(self):
+        """returns temperature"""
         return self.temp.value()
 
     def setStructure(self, structure):
+        """changes the structure and clears contraints"""
         self.structure = structure
         self.constrained_atoms = []
         self.constrained_bonds = []
@@ -1134,44 +1195,56 @@ class JobTypeOption(QWidget):
         self.jobTypeChanged.emit()
 
     def setGeometryOptimization(self, value):
+        """changes job type to opt"""
         self.do_geom_opt.setChecked(value)
     
     def setTSOptimization(self, value):
+        """sets job type to ts opt"""
         self.ts_opt.setChecked(value)
     
     def setFrequencyCalculation(self, value):
+        """sets job type to freq"""
         self.do_freq.setChecked(value)
         
     def setProcessors(self, value):
+        """sets nproc"""
         self.nprocs.setValue(value)
         
     def setMemory(self, value):
+        """sets memory"""
         self.mem.setValue(value)
         
     def setSolventModel(self, value):
+        """sets solvent model if model is available"""
         ndx = self.solvent_option.findText(value, Qt.MatchExactly)
         if ndx >= 0:
             self.solvent_option.setCurrentIndex(ndx)
             
     def setSolvent(self, value):
+        """sets solvent to value"""
         self.solvent_name.setText(value)
 
     def getGeometryOptimization(self):
+        """returns whether the job type is opt"""
         return self.do_geom_opt.checkState() == Qt.Checked
     
     def getTSOptimization(self):
+        """returns whether the job is opt ts"""
         return self.ts_opt.checkState() == Qt.Checked
     
     def getFrequencyCalculation(self):
+        """returns whether the job is freq"""
         return self.do_freq.checkState() == Qt.Checked
 
     def getSolvent(self):
+        """returns ImplicitSolvent for the current solvent settings"""
         model = self.solvent_option.currentText()
         solvent = self.solvent_name.text()
         
         return ImplicitSolvent(model, solvent)
 
     def setSolvent(self, solvent):
+        """sets solvent to match the given ImplicitSolvent"""
         ndx = self.solvent_option.findText(solvent.name)
         if ndx >= 0:
             self.solvent_option.setCurrentIndex(ndx)
@@ -1179,6 +1252,7 @@ class JobTypeOption(QWidget):
         self.solvent_name.setText(solvent.solvent)
 
     def constrain_atoms(self):
+        """add selected atoms to list of contrained atoms"""
         current_atoms = [atom for atom in selected_atoms(self.session) if atom.structure is self.structure]
         for atom in current_atoms:
             #ignore atoms already constrained
@@ -1208,6 +1282,7 @@ class JobTypeOption(QWidget):
         self.jobTypeChanged.emit()
 
     def constrain_atom_pair(self):
+        """adds selected atoms to list of constrained bonds"""
         current_atoms = [atom for atom in selected_atoms(self.session) if atom.structure is self.structure]
         if len(current_atoms) != 2:
             session.logger.error("can only select two atoms on %s" % self.structure.atomspec)
@@ -1246,6 +1321,7 @@ class JobTypeOption(QWidget):
         self.jobTypeChanged.emit()
 
     def constrain_bonds(self):
+        """adds selected bonds to list of constrained bonds"""
         current_bonds = [bond for bond in selected_bonds(self.session) if bond.structure is self.structure]
         for bond in current_bonds:
 
@@ -1282,6 +1358,7 @@ class JobTypeOption(QWidget):
         self.jobTypeChanged.emit()
 
     def constrain_atom_trio(self):
+        """adds selected atoms to constrained angles"""
         #try to use ordered selection so that if the user selected 1 -> 2 -> 3, they appear in that order
         current_atoms = [atom for atom in self.session.seqcrow_ordered_selection_manager.selection if atom.structure is self.structure]
         #if the user didn't pick the atoms one by one, fall back on selected_atoms
@@ -1332,6 +1409,7 @@ class JobTypeOption(QWidget):
         self.jobTypeChanged.emit()
     
     def constrain_bond_pair(self):
+        """adds selected bonds to list of contrained angles"""
         #try to use ordered selection so that if the user selected 1 -> 2 -> 3, they appear in that order
         current_bonds = [bond for bond in selected_bonds(self.session) if bond.structure is self.structure]
         #if the user didn't pick the atoms one by one, fall back on selected_atoms
@@ -1395,6 +1473,7 @@ class JobTypeOption(QWidget):
         self.jobTypeChanged.emit()
     
     def constrain_atom_quartet(self):
+        """adds selected atoms to list of contrained torsions"""
         #try to use ordered selection so that if the user selected 1 -> 2 -> 3, they appear in that order
         current_atoms = [atom for atom in self.session.seqcrow_ordered_selection_manager.selection if atom.structure is self.structure]
         #if the user didn't pick the atoms one by one, fall back on selected_atoms
@@ -1449,6 +1528,7 @@ class JobTypeOption(QWidget):
         self.jobTypeChanged.emit()
     
     def constrain_bond_trio(self):
+        """adds selected bonds to list of constrained torsions"""
         current_bonds = [bond for bond in selected_bonds(self.session) if bond.structure is self.structure]
         #if the user didn't pick the atoms one by one, fall back on selected_atoms
         if len(current_bonds) != 3:
@@ -1522,6 +1602,7 @@ class JobTypeOption(QWidget):
         self.jobTypeChanged.emit()
 
     def clicked_atom_table(self, row, column):
+        """remove atom from constraints if 'X' is clicked"""
         if column == 1:
             self.constrained_atoms.pop(row)
             self.constrained_atom_table.removeRow(row)
@@ -1529,6 +1610,7 @@ class JobTypeOption(QWidget):
             self.jobTypeChanged.emit()
 
     def clicked_bond_table(self, row, column):
+        """remove bond from constraints if 'X' is clicked"""
         if column == 2:
             self.constrained_bonds.pop(row)
             self.constrained_bond_table.removeRow(row)
@@ -1536,6 +1618,7 @@ class JobTypeOption(QWidget):
             self.jobTypeChanged.emit()
 
     def clicked_angle_table(self, row, column):
+        """remove angle from constraints if 'X' is clicked"""
         if column == 3:
             self.constrained_angles.pop(row)
             self.constrained_angle_table.removeRow(row)
@@ -1543,6 +1626,7 @@ class JobTypeOption(QWidget):
             self.jobTypeChanged.emit()
 
     def clicked_torsion_table(self, row, column):
+        """remove torsion from constraints if 'X' is clicked"""
         if column == 4:
             self.constrained_torsions.pop(row)
             self.constrained_torsion_table.removeRow(row)
@@ -1550,6 +1634,12 @@ class JobTypeOption(QWidget):
             self.jobTypeChanged.emit()
 
     def getConstraints(self):
+        """returns dictionary with contraints
+        keys are:
+            atoms
+            bonds
+            angles
+            torsions"""
         if self.do_geom_opt.checkState() != Qt.Checked:
             return None
             
@@ -1563,6 +1653,7 @@ class JobTypeOption(QWidget):
                     'torsions':self.constrained_torsions}
 
     def getNProc(self, update_settings=True):
+        """returns number of processors"""
         if update_settings:
             self.settings.last_nproc = self.nprocs.value()
         
@@ -1572,6 +1663,7 @@ class JobTypeOption(QWidget):
             return None
     
     def getMem(self, update_settings=True):
+        """returns memory"""
         if update_settings:
             self.settings.last_mem = self.mem.value()
         
@@ -1581,6 +1673,7 @@ class JobTypeOption(QWidget):
             return None
     
     def getKWDict(self, update_settings=True):
+        """returns dictiory specifying misc options for writing an input file"""
         if self.form == "Gaussian":
             route = {}
             if self.do_geom_opt.checkState() == Qt.Checked:
@@ -1831,6 +1924,7 @@ class FunctionalOption(QWidget):
         self.functional_kw.textChanged.connect(self.apply_filter)
 
     def something_changed(self, *args, **kw):
+        """called whenever something changes - emits functionalChanged"""
         self.functionalChanged.emit()
 
     def add_previously_used(self, row, name, basis_required):
@@ -1887,12 +1981,14 @@ class FunctionalOption(QWidget):
         self.previously_used_table.removeRow(row)
 
     def functional_changed(self, text):
+        """called whenever the functional kw changes - emits functionalChanged"""
         for option in self.other_options:
             option.setVisible(text == "other")
         
         self.functionalChanged.emit()
 
     def apply_filter(self, text):
+        """filter previous functional table when the user types in the custom kw box"""
         #text = self.functional_kw.text()
         if text:
             #the user doesn't need capturing groups
@@ -1914,6 +2010,7 @@ class FunctionalOption(QWidget):
             self.previously_used_table.setRowHidden(i, not filter(i))        
 
     def setOptions(self, program):
+        """change options to what's available in the specified program"""
         current_func = self.functional_option.currentText()
         self.functional_option.clear()
         self.dispersion.clear()
@@ -1957,6 +2054,8 @@ class FunctionalOption(QWidget):
         self.functionalChanged.emit()
 
     def setPreviousStuff(self):
+        """grabs the functional options from the last time this tool was used and set
+        the current options ot that"""
         func = self.settings.previous_functional
         disp = self.settings.previous_dispersion
         grid = self.settings.previous_grid
@@ -2009,6 +2108,7 @@ class FunctionalOption(QWidget):
         self.functionalChanged.emit()
 
     def getFunctional(self, update_settings=True):
+        """returns Functional corresponding to current settings"""
         if self.form == "Gaussian":
             if self.functional_option.currentText() == "B3LYP":
                 if update_settings:
@@ -2058,6 +2158,7 @@ class FunctionalOption(QWidget):
             return Functional(functional, is_semiempirical)
 
     def getDispersion(self, update_settings=True):
+        """returns EmpiricalDispersion corresponding to current settings"""
         disp = self.dispersion.currentText()
         if update_settings:
             self.settings.previous_dispersion = disp
@@ -2070,6 +2171,7 @@ class FunctionalOption(QWidget):
         return dispersion   
 
     def getGrid(self, update_settings=True):
+        """returns IntegrationGrid corresponding to current settings"""
         grid = self.grid.currentText()
         if update_settings:
             self.settings.previous_grid = grid
@@ -2080,6 +2182,7 @@ class FunctionalOption(QWidget):
             return IntegrationGrid(grid)
 
     def setGrid(self, grid):
+        """sets grid option to the specified grid"""
         if grid is None:
             ndx = self.grid.findText("Default")
         else:
@@ -2088,6 +2191,7 @@ class FunctionalOption(QWidget):
         self.grid.setCurrentIndex(ndx)
         
     def setDispersion(self, dispersion):
+        """sets dispersion to what's specified"""
         if dispersion is None:
             ndx = self.dispersion.findText("None")
         else:
@@ -2096,6 +2200,7 @@ class FunctionalOption(QWidget):
         self.dispersion.setCurrentIndex(ndx)
         
     def setFunctional(self, func):
+        """sets functional option to match the given Functional"""
         test_value = func.name
         if test_value in ["wB97X-D", "wB97X-D3"]:
             test_value = value.replace('w', 'ω')
@@ -2262,6 +2367,7 @@ class BasisOption(QWidget):
         self.aux_type.currentIndexChanged.connect(self.basis_changed)
 
     def setOptions(self, program):
+        """display options that are available in the specified program"""
         self.blockSignals(True)
         
         basis = self.basis_option.currentText()
@@ -2335,6 +2441,7 @@ class BasisOption(QWidget):
             self.path_to_basis_file.setText(filename)
 
     def apply_filter(self, text):
+        """filter list of previously used basis sets when the user types in the custom kw box"""
         #text = self.custom_basis_kw.text()
         if text:
             #the user doesn't need capturing groups
@@ -2358,6 +2465,7 @@ class BasisOption(QWidget):
         self.previously_used_table.resizeColumnToContents(0)
 
     def show_gen_path(self, state):
+        """show/hide the path to external basis file when the 'builtin' checkbox is toggled"""
         for option in self.gen_options:
             option.setVisible(state == Qt.Unchecked)
     
@@ -2391,16 +2499,21 @@ class BasisOption(QWidget):
         self.basisChanged.emit()
     
     def setToolBox(self, toolbox):
+        """toolbox should be either the container that holds basis options or ecp options"""
         self.parent_toolbox = toolbox
     
     def update_tooltab(self):
+        """sets the name of self's tab"""
         basis_name = self.currentBasis().name
         ndx = self.parent_toolbox.indexOf(self)
         if len(self.parent.basis_options) != 1 or len(self.parent.ecp_options) != 0:
             elements = "(%s)" % ", ".join(self.currentElements())
         else:
             elements = ""
-                
+        
+        if self.aux_available and self.getAuxType() != "no":
+            basis_name += "/%s" % self.getAuxType()
+
         self.parent_toolbox.setTabText(ndx, "%s %s" % (basis_name, elements))
 
     def show_elements(self, value):
@@ -2642,6 +2755,7 @@ class BasisOption(QWidget):
                 self.path_to_basis_file.setText(path)
 
     def setBasis(self, name=None, custom_kw=None, basis_path=False):
+        """set options to match these options"""
         if name is not None:
             ndx = self.basis_option.findData(name, Qt.MatchExactly)
             if ndx < 0:
@@ -2663,6 +2777,7 @@ class BasisOption(QWidget):
             self.path_to_basis_file.setText(self.settings.__getattr__(self.last_custom_path))
 
     def setAux(self, name):
+        """set auxiliary type to 'name'"""
         if name is None:
             name = "no"
 
@@ -2671,6 +2786,7 @@ class BasisOption(QWidget):
             self.aux_type.setCurrentIndex(ndx)
 
     def getAuxType(self):
+        """returns aux type"""
         return self.aux_type.currentText()
 
 
@@ -2691,6 +2807,7 @@ class ECPOption(BasisOption):
     basis_class = ECP
 
     def update_tooltab(self):
+        """renames the tab for this ecp"""
         basis_name = self.currentBasis().name
         elements = "(%s)" % ", ".join(self.currentElements())
         ndx = self.parent_toolbox.indexOf(self)
@@ -2773,14 +2890,17 @@ class BasisWidget(QWidget):
         self.setOptions(self.form)
 
     def something_changed(self, *args, **kw):
+        """called whenever something changes - emits basisChanged"""
         self.basisChanged.emit()
 
     def close_ecp_tab(self, index):
+        """the 'x' was clicked on an ecp tab - delete that ecp"""
         self.remove_basis(self.ecp_options[index])
         
         self.basisChanged.emit()
     
     def close_basis_tab(self, index):
+        """the 'x' was clicked on one of the basis tabs - delete that basis"""
         self.remove_basis(self.basis_options[index])
 
         self.basisChanged.emit()
@@ -2979,6 +3099,7 @@ class BasisWidget(QWidget):
         return BasisSet(basis, ecp)
 
     def setBasis(self, basis_set):
+        """sets basis to match input BasisSet"""
         for i in range(len(self.basis_options)-1, -1, -1):
             self.close_basis_tab(i)        
         
@@ -3043,6 +3164,7 @@ class BasisWidget(QWidget):
                             option.elements.item(i).setSelected(False)
 
     def setOptions(self, program):
+        """changes the basis set options to display what's available for the specified program"""
         self.form = program
         #reverse basis options because some might delete themselves
         #like if auxiliary basis sets aren't available in the program
@@ -4457,6 +4579,7 @@ class SavePreset(ChildToolWindow):
             preset["other"] = self.tool_instance.other_keywords_widget.getKWDict(update_settings=False)
         
         self.tool_instance.presets[program][name] = preset
+
         self.tool_instance.refresh_presets()
         
         self.status.showMessage("saved \"%s\"" % name)
