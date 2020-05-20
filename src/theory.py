@@ -366,10 +366,11 @@ class Method:
         
         if self.ORCA_BLOCKS in combined_dict:
             for kw in combined_dict[self.ORCA_BLOCKS]:
-                s += "%%%s\n" % kw
-                for opt in combined_dict[self.ORCA_BLOCKS][kw]:
-                    s += "    %s\n" % opt
-                s += "end\n"
+                if any(len(x) > 0 for x in combined_dict[self.ORCA_BLOCKS][kw]):
+                    s += "%%%s\n" % kw
+                    for opt in combined_dict[self.ORCA_BLOCKS][kw]:
+                        s += "    %s\n" % opt
+                    s += "end\n"
                 
             s += "\n"
             
@@ -625,9 +626,25 @@ class BasisSet:
                                 with open(basis.user_defined, "r") as f:
                                     lines = f.readlines()
                                 
-                                for line in lines:
-                                    if not line.startswith('!') and not len(line.strip()) == 0:
-                                        s += line
+                                i = 0
+                                while i < len(lines):
+                                    test = lines[i].strip()
+                                    if len(test) == 0 or test.startswith('!'):
+                                        i += 1
+                                        continue
+                                    
+                                    ele = test.split()[0]
+                                    while i < len(lines):
+                                        if ele in basis.elements:
+                                            s += lines[i]
+                                        
+                                        if lines[i].startswith('****'):
+                                            break
+
+                                        i += 1
+                                    
+                                    i += 1
+
                             else:
                                 s += "@%s\n" % basis.user_defined
                         
@@ -649,9 +666,25 @@ class BasisSet:
                             with open(basis.user_defined, "r") as f:
                                 lines = f.readlines()
                             
-                            for line in lines:
-                                if not line.startswith('!') and not len(line.strip()) == 0:
-                                    s += line
+                                i = 0
+                                while i < len(lines):
+                                    test = lines[i].strip()
+                                    if len(test) == 0 or test.startswith('!'):
+                                        i += 1
+                                        continue
+                                    
+                                    ele = test.split()[0]
+                                    while i < len(lines):
+                                        if ele in basis.elements:
+                                            s += lines[i]
+                                        
+                                        if lines[i].startswith('****'):
+                                            break
+
+                                        i += 1
+                                    
+                                    i += 1
+
                         else:
                             s += "@%s\n" % basis.user_defined
                             
@@ -1206,7 +1239,7 @@ class ImplicitSolvent:
                                "CycloPentanol", 
                                "CycloPentanone", 
                                "Decalin-mixture", 
-                               "DiBromomEthane", 
+                               "DiBromoMethane", 
                                "DiButylEther", 
                                "DiEthylAmine", 
                                "DiEthylSulfide", 

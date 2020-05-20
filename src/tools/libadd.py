@@ -258,7 +258,11 @@ class LibAdd(ToolInstance):
         angle = self.sub_angle.value()
         
         comment = "CF:%i,%i" % (confs, angle)
-        sub = Substituent(substituent_atoms, name=sub_name, conf_num=confs, conf_angle=angle)
+        if len(sub_name) == 0:
+            sub = Substituent(substituent_atoms, name="test", conf_num=confs, conf_angle=angle)
+        else:
+            sub = Substituent(substituent_atoms, name=sub_name, conf_num=confs, conf_angle=angle)
+        
         sub.comment = comment
         
         #align substituent bond to x axis

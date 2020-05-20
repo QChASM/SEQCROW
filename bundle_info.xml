@@ -28,7 +28,7 @@ tools:
 
     SEQCROW
         Managed Models           - restore models opened through SEQCROW to their original state
-        Build QM Input           - build Gaussian input file
+        Build QM Input           - build Gaussian, ORCA, or Psi4 input file
 
 selectors:
     tm  - select all transition metals
@@ -118,7 +118,7 @@ presets:
                 including my own Bundle line will prevent anything after it from being loaded
                 ChimeraX's devel build
                 ChimeraXClassifier>ChimeraX :: Bundle :: General,Input/Output,Structure Editing,External Program :: 1,1 :: SEQCROW :: ChimAARON,SEQCRO,SEQCROW :: true</ChimeraXClassifier-->
-                <ChimeraXClassifier>ChimeraX :: Tool :: Build QM Input :: SEQCROW :: Create Gaussian input file</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Build QM Input :: SEQCROW :: Create Gaussian, ORCA, or Psi4 input file</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Structure Modification :: AaronTools :: Modify substituents, swap ligands, and close rings</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Browse AaronTools Libraries :: AaronTools :: Browse the AaronTools ligand, substituent, and ring libraries"</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Process QM Thermochemistry :: AaronTools :: Compute the free energy of a molecule with frequency data</ChimeraXClassifier>
