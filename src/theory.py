@@ -626,9 +626,25 @@ class BasisSet:
                                 with open(basis.user_defined, "r") as f:
                                     lines = f.readlines()
                                 
-                                for line in lines:
-                                    if not line.startswith('!') and not len(line.strip()) == 0:
-                                        s += line
+                                i = 0
+                                while i < len(lines):
+                                    test = lines[i].strip()
+                                    if len(test) == 0 or test.startswith('!'):
+                                        i += 1
+                                        continue
+                                    
+                                    ele = test.split()[0]
+                                    while i < len(lines):
+                                        if ele in basis.elements:
+                                            s += lines[i]
+                                        
+                                        if lines[i].startswith('****'):
+                                            break
+
+                                        i += 1
+                                    
+                                    i += 1
+
                             else:
                                 s += "@%s\n" % basis.user_defined
                         
@@ -650,9 +666,25 @@ class BasisSet:
                             with open(basis.user_defined, "r") as f:
                                 lines = f.readlines()
                             
-                            for line in lines:
-                                if not line.startswith('!') and not len(line.strip()) == 0:
-                                    s += line
+                                i = 0
+                                while i < len(lines):
+                                    test = lines[i].strip()
+                                    if len(test) == 0 or test.startswith('!'):
+                                        i += 1
+                                        continue
+                                    
+                                    ele = test.split()[0]
+                                    while i < len(lines):
+                                        if ele in basis.elements:
+                                            s += lines[i]
+                                        
+                                        if lines[i].startswith('****'):
+                                            break
+
+                                        i += 1
+                                    
+                                    i += 1
+
                         else:
                             s += "@%s\n" % basis.user_defined
                             

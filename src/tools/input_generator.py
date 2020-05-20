@@ -632,16 +632,16 @@ class BuildQM(ToolInstance):
                 
             print("saved to %s" % filename)
     
-    def cleanup(self):
+    def delete(self):
         """deregister trigger handlers"""
-        #overload cleanup to de-register handler
+        #overload delete to de-register handler
         self.session.triggers.remove_handler(self._add_handler)
         self.session.triggers.remove_handler(self._remove_handler)
         
         global_triggers = get_triggers()
         global_triggers.remove_handler(self._changes)
         
-        super().cleanup()  
+        super().delete()  
 
     def display_help(self):
         """Show the help for this tool in the help viewer."""
@@ -2077,7 +2077,7 @@ class FunctionalOption(QWidget):
             
             #omegas don't get decoded right
             elif func.startswith("wB97"):
-                func = func.replace("ω", "w", 1)
+                func = func.replace("w", "ω", 1)
                 ndx = self.functional_option.findText(func, Qt.MatchExactly)
                 self.functional_option.setCurrentIndex(ndx)
     
