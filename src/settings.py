@@ -62,7 +62,7 @@ def register_settings_options(session):
             FileOption, 
             "Path to Gaussian executable"),
         "PSI4_EXE" : (
-            "ORCA executable", 
+            "Psi4 executable", 
             FileOption, 
             "Path to Psi4 executable"), 
         "SCRATCH_DIR" : (

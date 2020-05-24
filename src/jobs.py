@@ -94,7 +94,7 @@ class GaussianJob(LocalJob):
             os.makedirs(scratch_dir)
 
         infile = self.name + '.gjf'
-        self.theory.write_orca_input(self.kw_dict, os.path.join(scratch_dir, infile))
+        self.theory.write_gaussian_input(self.kw_dict, os.path.join(scratch_dir, infile))
 
         executable = os.path.abspath(self.session.seqcrow_settings.settings.GAUSSIAN_EXE)
         self.output_name = os.path.join(scratch_dir, self.name + '.log')
@@ -135,7 +135,7 @@ class Psi4Job(LocalJob):
             os.makedirs(scratch_dir)
 
         infile = self.name + '.in4'
-        self.theory.write_orca_input(self.kw_dict, os.path.join(scratch_dir, infile))
+        self.theory.write_psi4_input(self.kw_dict, os.path.join(scratch_dir, infile))
 
         executable = os.path.abspath(self.session.seqcrow_settings.settings.PSI4_EXE)
         self.output_name = os.path.join(scratch_dir, self.name + '.dat')
