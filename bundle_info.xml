@@ -53,6 +53,7 @@ presets:
             <Managers>
                 <Manager name="filereader_manager" uiOnly="true"/>
                 <Manager name="seqcrow_ordered_selection_manager" uiOnly="true"/>
+                <Manager name="seqcrow_job_manager" uiOnly="false"/>
             </Managers>
             
             <Providers manager="data formats">

@@ -75,6 +75,7 @@ class EnergyPlot(ToolInstance):
             if len(info) < 1:
                 #we will be unable to load an enegy plot because some structure does not have an associated energy
                 self.opened = False
+                self.session.logger.error("not enough iterations to plot - %i found" % len(info))
                 return
             else:
                 info = info[0]

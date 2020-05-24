@@ -20,6 +20,7 @@ from PyQt5.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.theory import *
 from SEQCROW.utils import iter2str, combine_dicts
+from SEQCROW.jobs import ORCAJob, GaussianJob, Psi4Job
 
 from AaronTools.const import TMETAL
 
@@ -293,10 +294,11 @@ class BuildQM(ToolInstance):
         #           list of places?
         #               look at how AARON does jobs
         
-        #run = menu.addMenu("&Run")
-        #locally = QAction("&Locally - coming soon", self.tool_window.ui_area)
+        run = menu.addMenu("&Run")
+        locally = QAction("&Locally", self.tool_window.ui_area)
         #remotely = QAction("R&emotely - coming eventually", self.tool_window.ui_area)
-        #run.addAction(locally)
+        locally.triggered.connect(self.run_local_job)
+        run.addAction(locally)
         #run.addAction(remotely)
         #
         #batch = menu.addMenu("&Batch")
@@ -565,6 +567,31 @@ class BuildQM(ToolInstance):
         
         return BasisSet(basis, ecp)
 
+    def run_local_job(self, *args, name="local_job"):
+        self.update_theory()
+        
+        kw_dict = self.job_widget.getKWDict()
+        other_kw_dict = self.other_keywords_widget.getKWDict()
+        self.settings.save()
+        
+        combined_dict = combine_dicts(kw_dict, other_kw_dict)
+        
+        self.settings.last_program = self.file_type.currentText()
+        
+        program = self.file_type.currentText()
+        if program == "Gaussian":
+            job = GaussianJob(name, self.session, self.theory, combined_dict)
+        elif program == "ORCA":
+            job = ORCAJob(name, self.session, self.theory, combined_dict)
+        elif program == "Psi4":
+            job = Psi4Job(name, self.session, self.theory, combined_dict)
+        
+        print("adding %s to queue" % name)   
+
+        self.session.seqcrow_job_manager.add_job(job)
+
+        self.update_preview()
+        
     def copy_input(self):
         """copies input file to the clipboard"""
         self.update_theory()
@@ -609,9 +636,11 @@ class BuildQM(ToolInstance):
         
         self.settings.last_program = self.file_type.currentText()
 
+        warnings = []
+
         program = self.file_type.currentText()
         if program == "Gaussian":
-            filename, _ = QFileDialog.getSaveFileName(filter="Gaussian input files (*.com)")
+            filename, _ = QFileDialog.getSaveFileName(filter="Gaussian input files (*.com *.gjf)")
             if filename:
                 output, warnings = self.theory.write_gaussian_input(combined_dict, fname=filename)
         
@@ -665,6 +694,7 @@ class JobTypeOption(QWidget):
     
     #TODO:
     #make selecting a row in one of the contraints tables select the atoms
+    #add option for numerical frequencies (ORCA requires numfreq for several popular dft functionals)
     
     def __init__(self, settings, session, init_form, parent=None):
         """layout has charge, multiplicity, and job type options up top
@@ -1265,16 +1295,17 @@ class JobTypeOption(QWidget):
             self.constrained_atom_table.insertRow(row)
             item = QTableWidgetItem()
             item.setData(Qt.DisplayRole, atom.atomspec)
+            item.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
             self.constrained_atom_table.setItem(row, 0, item)
         
             widget_that_lets_me_horizontally_align_an_icon = QWidget()
             widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
             trash_button = QLabel()
-            trash_button.setMaximumSize(16, 16)
-            trash_button.setScaledContents(False)
-            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
+            dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
             trash_button.setToolTip("double click to unfreeze")
-            widget_layout.addWidget(trash_button)
+            widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+            widget_layout.setContentsMargins(2, 2, 2, 2)
             self.constrained_atom_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
 
             self.constrained_atom_table.resizeRowToContents(row)
@@ -1300,20 +1331,22 @@ class JobTypeOption(QWidget):
         
         item1 = QTableWidgetItem()
         item1.setData(Qt.DisplayRole, atom1.atomspec)
+        item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_bond_table.setItem(row, 0, item1)
                 
         item2 = QTableWidgetItem()
         item2.setData(Qt.DisplayRole, atom2.atomspec)
+        item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_bond_table.setItem(row, 1, item2)
         
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to unfreeze")
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.constrained_bond_table.setCellWidget(row, 2, widget_that_lets_me_horizontally_align_an_icon)
 
         self.constrained_bond_table.resizeRowToContents(row)
@@ -1337,20 +1370,22 @@ class JobTypeOption(QWidget):
 
             item1 = QTableWidgetItem()
             item1.setData(Qt.DisplayRole, atom1.atomspec)
+            item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
             self.constrained_bond_table.setItem(row, 0, item1)
             
             item2 = QTableWidgetItem()
             item2.setData(Qt.DisplayRole, atom2.atomspec)
+            item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
             self.constrained_bond_table.setItem(row, 1, item2)
         
             widget_that_lets_me_horizontally_align_an_icon = QWidget()
             widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
             trash_button = QLabel()
-            trash_button.setMaximumSize(16, 16)
-            trash_button.setScaledContents(False)
-            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
+            dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
             trash_button.setToolTip("double click to unfreeze")
-            widget_layout.addWidget(trash_button)
+            widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+            widget_layout.setContentsMargins(2, 2, 2, 2)
             self.constrained_bond_table.setCellWidget(row, 2, widget_that_lets_me_horizontally_align_an_icon)
 
             self.constrained_bond_table.resizeRowToContents(row)
@@ -1384,24 +1419,27 @@ class JobTypeOption(QWidget):
         
         item1 = QTableWidgetItem()
         item1.setData(Qt.DisplayRole, atom1.atomspec)
+        item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_angle_table.setItem(row, 0, item1)
 
         item2 = QTableWidgetItem()
         item2.setData(Qt.DisplayRole, atom2.atomspec)
+        item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_angle_table.setItem(row, 1, item2)
 
         item3 = QTableWidgetItem()
         item3.setData(Qt.DisplayRole, atom3.atomspec)
+        item3.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_angle_table.setItem(row, 2, item3)
         
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to unfreeze")
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.constrained_angle_table.setCellWidget(row, 3, widget_that_lets_me_horizontally_align_an_icon)
 
         self.constrained_angle_table.resizeRowToContents(row)
@@ -1448,24 +1486,27 @@ class JobTypeOption(QWidget):
         
         item1 = QTableWidgetItem()
         item1.setData(Qt.DisplayRole, atom1.atomspec)
+        item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_angle_table.setItem(row, 0, item1)
 
         item2 = QTableWidgetItem()
         item2.setData(Qt.DisplayRole, atom2.atomspec)
+        item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_angle_table.setItem(row, 1, item2)
 
         item3 = QTableWidgetItem()
         item3.setData(Qt.DisplayRole, atom3.atomspec)
+        item3.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_angle_table.setItem(row, 2, item3)
         
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to unfreeze")
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.constrained_angle_table.setCellWidget(row, 3, widget_that_lets_me_horizontally_align_an_icon)
 
         self.constrained_angle_table.resizeRowToContents(row)
@@ -1499,28 +1540,32 @@ class JobTypeOption(QWidget):
         
         item1 = QTableWidgetItem()
         item1.setData(Qt.DisplayRole, atom1.atomspec)
+        item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_torsion_table.setItem(row, 0, item1)
 
         item2 = QTableWidgetItem()
         item2.setData(Qt.DisplayRole, atom2.atomspec)
+        item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_torsion_table.setItem(row, 1, item2)
 
         item3 = QTableWidgetItem()
         item3.setData(Qt.DisplayRole, atom3.atomspec)
+        item3.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_torsion_table.setItem(row, 2, item3)
         
         item4 = QTableWidgetItem()
         item4.setData(Qt.DisplayRole, atom4.atomspec)
+        item4.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_torsion_table.setItem(row, 3, item4)
         
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to unfreeze")
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.constrained_torsion_table.setCellWidget(row, 4, widget_that_lets_me_horizontally_align_an_icon)
 
         self.constrained_torsion_table.resizeRowToContents(row)
@@ -1573,28 +1618,32 @@ class JobTypeOption(QWidget):
         
         item1 = QTableWidgetItem()
         item1.setData(Qt.DisplayRole, atom1.atomspec)
+        item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_torsion_table.setItem(row, 0, item1)
 
         item2 = QTableWidgetItem()
         item2.setData(Qt.DisplayRole, atom2.atomspec)
+        item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_torsion_table.setItem(row, 1, item2)
 
         item3 = QTableWidgetItem()
         item3.setData(Qt.DisplayRole, atom3.atomspec)
+        item3.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_torsion_table.setItem(row, 2, item3)
         
         item4 = QTableWidgetItem()
         item4.setData(Qt.DisplayRole, atom4.atomspec)
+        item4.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_torsion_table.setItem(row, 3, item4)
         
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to unfreeze")
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.constrained_torsion_table.setCellWidget(row, 4, widget_that_lets_me_horizontally_align_an_icon)
         
         self.constrained_torsion_table.resizeRowToContents(row)
@@ -1875,6 +1924,7 @@ class FunctionalOption(QWidget):
         self.previously_used_table.setSelectionBehavior(self.previously_used_table.SelectRows)
         self.previously_used_table.setEditTriggers(self.previously_used_table.NoEditTriggers)
         self.previously_used_table.setSelectionMode(self.previously_used_table.SingleSelection)
+        self.previously_used_table.setSortingEnabled(True)
         for i, (name, basis_required) in enumerate(zip(self.settings.previous_functional_names, self.settings.previous_functional_needs_basis)):
             row = self.previously_used_table.rowCount()
             self.add_previously_used(row, name, basis_required)
@@ -1945,16 +1995,17 @@ class FunctionalOption(QWidget):
             needs_basis.setData(Qt.DisplayRole, "no")
         else:
             needs_basis.setData(Qt.DisplayRole, "yes")
+        needs_basis.setTextAlignment(Qt.AlignHCenter)
         self.previously_used_table.setItem(row, 1, needs_basis)
         
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to remove from stored functionals")
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.previously_used_table.setCellWidget(row, 2, widget_that_lets_me_horizontally_align_an_icon)
         
         self.previously_used_table.resizeRowToContents(row)
@@ -2330,8 +2381,10 @@ class BasisOption(QWidget):
         self.previously_used_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.previously_used_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.previously_used_table.setSelectionMode(QTableWidget.SingleSelection)
+        #this sometimes causes an empty row to be added to the 'previous' table when the file is exported
+        #don't know why
+        #self.previously_used_table.setSortingEnabled(True)
         self.previously_used_table.verticalHeader().setVisible(False)
-        self.custom_basis_rows = []
         for i, (name, path) in enumerate(zip(self.settings.__getattr__(self.name_setting), self.settings.__getattr__(self.path_setting))):
             row = self.previously_used_table.rowCount()
             self.add_previously_used(row, name, path, False)
@@ -2649,7 +2702,6 @@ class BasisOption(QWidget):
         if add_to_others:
             self.parent.add_to_all_but(self, row, name, path)
         
-        self.custom_basis_rows.append((name, path))
         self.previously_used_table.insertRow(row)
         
         basis = QTableWidgetItem()
@@ -2660,11 +2712,11 @@ class BasisOption(QWidget):
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to remove from stored basis sets")
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.previously_used_table.setCellWidget(row, 2, widget_that_lets_me_horizontally_align_an_icon)
         
         self.previously_used_table.resizeRowToContents(row)
@@ -3332,11 +3384,11 @@ class OneLayerKeyWordOption(QWidget):
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to remove from stored keywords")
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.previous_kw_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
     
         item = QTableWidgetItem(kw)
@@ -3367,11 +3419,11 @@ class OneLayerKeyWordOption(QWidget):
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to not use this %s" % self.name)
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.current_kw_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
 
         item = QTableWidgetItem(kw)
@@ -3603,11 +3655,11 @@ class TwoLayerKeyWordOption(QWidget):
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to remove from stored keywords")
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.previous_kw_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
     
         self.previous_kw_table.resizeRowToContents(row)
@@ -3636,11 +3688,11 @@ class TwoLayerKeyWordOption(QWidget):
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to not use this %s" % self.name[:-1])
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.current_kw_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
     
         self.current_kw_table.resizeRowToContents(row)
@@ -3661,11 +3713,11 @@ class TwoLayerKeyWordOption(QWidget):
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to remove from stored options")
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.previous_opt_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
     
         self.previous_opt_table.resizeRowToContents(row)
@@ -3705,11 +3757,11 @@ class TwoLayerKeyWordOption(QWidget):
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to not use this option")
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.current_opt_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
     
         self.current_opt_table.resizeRowToContents(row)
