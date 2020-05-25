@@ -12,6 +12,8 @@ class _SEQCROWSettings(Settings):
     EXPLICIT_SAVE = {
         'AARONLIB': Value(getenv('AARONLIB', path.join(path.expanduser('~'), "AARON_libs")), StringArg),
         'ORCA_EXE': Value("orca.exe" if platform == "win32" else "orca", StringArg),
+        'GAUSSIAN_EXE': Value("g09.exe" if platform == "win32" else "g09", StringArg),
+        'PSI4_EXE': Value("psi4", StringArg),
         'SCRATCH_DIR': Value(path.join(path.expanduser('~'), "SEQCROW_SCRATCH"), StringArg), 
     }
 
@@ -54,7 +56,15 @@ def register_settings_options(session):
         "ORCA_EXE" : (
             "ORCA executable", 
             FileOption, 
-            "Path to ORCA executable\nFull path is required for parallel/multithreaded execution"), 
+            "Path to ORCA executable\nFull path is required for parallel/multithreaded execution"),
+        "GAUSSIAN_EXE" : (
+            "Gaussian executable", 
+            FileOption, 
+            "Path to Gaussian executable"),
+        "PSI4_EXE" : (
+            "ORCA executable", 
+            FileOption, 
+            "Path to Psi4 executable"), 
         "SCRATCH_DIR" : (
             "Scratch directory",
             InputFolderOption,
@@ -76,12 +86,6 @@ def register_settings_options(session):
             
             if setting == "Personal AaronTools library folder":
                 warn("Environment variable has been set for ChimeraX. Please restart ChimeraX for changes to take effect.")
-            
-            if setting == "Scratch directory":
-                if " " in val:
-                    session.logger.error("ORCA input files cannot contain spaces")
-                else:
-                    opt.settings.ORCA_EXE = val
             
         opt = opt_class(opt_name, getattr(settings, setting), _opt_cb,
             attr_name=setting, settings=settings, balloon=balloon, auto_set_attr=False)

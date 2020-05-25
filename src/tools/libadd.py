@@ -22,7 +22,7 @@ from warnings import warn
 class LibAdd(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False         
-    help = "https://github.com/QChASM/ChimAARON/wiki/Add-to-Personal-Library-Tool"
+    help = "https://github.com/QChASM/SEQCROW/wiki/Add-to-Personal-Library-Tool"
     
     def __init__(self, session, name):       
         super().__init__(session, name)

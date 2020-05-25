@@ -38,7 +38,7 @@ class _BrowseLibSettings(Settings):
 class AaronTools_Library(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False         
-    help = "https://github.com/QChASM/ChimAARON/wiki/Browse-AaronTools-Libraries-Tool"
+    help = "https://github.com/QChASM/SEQCROW/wiki/Browse-AaronTools-Libraries-Tool"
     
     def __init__(self, session, name):       
         super().__init__(session, name)

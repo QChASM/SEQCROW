@@ -1,5 +1,6 @@
 from chimerax.core.toolshed import ProviderManager
 from chimerax.core.triggerset import TriggerSet
+from chimerax.core.commands import run
 
 from SEQCROW.jobs import LocalJob
 
@@ -41,15 +42,21 @@ class JobManager(ProviderManager):
         self._thread = None
 
     def job_finished(self, trigger_name, job):
-        print(trigger_name, job)
+        print("%s: %s" % (trigger_name, job))
         if isinstance(job, LocalJob):
             self._thread = None
+
+        if job.auto_open:
+            run(job.session, "open \"%s\"" % job.output_name, log=False)
+        elif job.auto_update:
+            print("auto update isn't done")
+            pass
             
         self.check_queue()
         pass
     
     def job_started(self, trigger_name, job):
-        print(trigger_name, job)
+        print("%s: %s" % (trigger_name, job))
         pass
     
     def add_job(self, job):

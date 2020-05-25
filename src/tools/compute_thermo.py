@@ -26,7 +26,7 @@ class _ComputeThermoSettings(Settings):
 class Thermochem(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False         
-    help = "https://github.com/QChASM/ChimAARON/wiki/Process-Thermochemistry-Tool"
+    help = "https://github.com/QChASM/SEQCROW/wiki/Process-Thermochemistry-Tool"
 
     theory_helper = {"Grimme's Quasi-RRHO":"https://doi.org/10.1002/chem.201200497",
                      "Truhlar's Quasi-Harmonic":"https://doi.org/10.1021/jp205508z"}

@@ -21,7 +21,7 @@ from AaronTools.catalyst import Catalyst
 class FileReaderPanel(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False         
-    help = "https://github.com/QChASM/ChimAARON/wiki/Model-Manager-Tool"
+    help = "https://github.com/QChASM/SEQCROW/wiki/Model-Manager-Tool"
     
     NAME_COL = 0
     ID_COL = 1

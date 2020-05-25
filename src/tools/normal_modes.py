@@ -37,7 +37,7 @@ class _NormalModeSettings(Settings):
 class NormalModes(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False         
-    help = "https://github.com/QChASM/ChimAARON/wiki/Visualize-Normal-Modes-Tool"
+    help = "https://github.com/QChASM/SEQCROW/wiki/Visualize-Normal-Modes-Tool"
     
     def __init__(self, session, name):       
         super().__init__(session, name)

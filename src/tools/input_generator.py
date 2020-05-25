@@ -177,7 +177,7 @@ class BuildQM(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False         
 
-    help = "https://github.com/QChASM/ChimAARON/wiki/Build-QM-Input-Tool"
+    help = "https://github.com/QChASM/SEQCROW/wiki/Build-QM-Input-Tool"
 
     def __init__(self, session, name):       
         super().__init__(session, name)
@@ -189,6 +189,7 @@ class BuildQM(ToolInstance):
         self.tool_window = MainToolWindow(self)        
         self.preview_window = None
         self.preset_window = None
+        self.job_local_prep = None
 
         self._build_ui()
 
@@ -293,14 +294,7 @@ class BuildQM(ToolInstance):
         #       Remotely ->
         #           list of places?
         #               look at how AARON does jobs
-        
-        run = menu.addMenu("&Run")
-        locally = QAction("&Locally", self.tool_window.ui_area)
-        #remotely = QAction("R&emotely - coming eventually", self.tool_window.ui_area)
-        locally.triggered.connect(self.run_local_job)
-        run.addAction(locally)
-        #run.addAction(remotely)
-        #
+
         #batch = menu.addMenu("&Batch")
         #multistructure = QAction("&Multiple structures - coming eventually", self.tool_window.ui_area)
         #focal_point = QAction("&Focal point table - coming eventually", self.tool_window.ui_area)
@@ -311,7 +305,14 @@ class BuildQM(ToolInstance):
         self.new_preset = QAction("Save Preset...", self.tool_window.ui_area)
         self.new_preset.triggered.connect(self.show_new_preset)
         self.presets_menu.addAction(self.new_preset)
-
+        
+        run = menu.addMenu("&Run")
+        locally = QAction("&Locally", self.tool_window.ui_area)
+        #remotely = QAction("R&emotely - coming eventually", self.tool_window.ui_area)
+        locally.triggered.connect(self.show_local_job_prep)
+        run.addAction(locally)
+        #run.addAction(remotely)
+        
         menu.setNativeMenuBar(False)
         layout.setMenuBar(menu)
 
@@ -567,7 +568,11 @@ class BuildQM(ToolInstance):
         
         return BasisSet(basis, ecp)
 
-    def run_local_job(self, *args, name="local_job"):
+    def show_local_job_prep(self):
+        if self.job_local_prep is None:
+            self.job_local_prep = self.tool_window.create_child_window("Launch Job", window_class=PrepLocalJob)
+
+    def run_local_job(self, *args, name="local_job", auto_update=False, auto_open=False):
         self.update_theory()
         
         kw_dict = self.job_widget.getKWDict()
@@ -580,11 +585,11 @@ class BuildQM(ToolInstance):
         
         program = self.file_type.currentText()
         if program == "Gaussian":
-            job = GaussianJob(name, self.session, self.theory, combined_dict)
+            job = GaussianJob(name, self.session, self.theory, combined_dict, auto_update=auto_update, auto_open=auto_open)
         elif program == "ORCA":
-            job = ORCAJob(name, self.session, self.theory, combined_dict)
+            job = ORCAJob(name, self.session, self.theory, combined_dict, auto_update=auto_update, auto_open=auto_open)
         elif program == "Psi4":
-            job = Psi4Job(name, self.session, self.theory, combined_dict)
+            job = Psi4Job(name, self.session, self.theory, combined_dict, auto_update=auto_update, auto_open=auto_open)
         
         print("adding %s to queue" % name)   
 
@@ -763,7 +768,7 @@ class JobTypeOption(QWidget):
         
         self.nprocs = QSpinBox()
         self.nprocs.setRange(0, 128)
-        self.nprocs.setSingleStep(2)
+        self.nprocs.setSingleStep(1)
         self.nprocs.setToolTip("set to 0 to not specify")
         self.nprocs.setValue(self.settings.last_nproc)
         self.nprocs.valueChanged.connect(self.something_changed)
@@ -771,7 +776,7 @@ class JobTypeOption(QWidget):
         
         self.mem = QSpinBox()
         self.mem.setRange(0, 512)
-        self.mem.setSingleStep(4)
+        self.mem.setSingleStep(2)
         self.mem.setSuffix(' GB')
         self.mem.setToolTip("set to 0 to not specify")
         self.mem.setValue(self.settings.last_mem)
@@ -953,6 +958,12 @@ class JobTypeOption(QWidget):
         self.raman.setCheckState(Qt.Unchecked)
         self.raman.stateChanged.connect(self.something_changed)
         freq_opt_form.addRow("Raman intensities:", self.raman)
+
+        self.num_freq = QCheckBox()
+        self.num_freq.setCheckState(Qt.Unchecked)
+        self.num_freq.stateChanged.connect(self.something_changed)
+        self.num_freq.setToolTip("numerical vibrational frequency algorithms are often slower than analytical algorithms,\nusually require less memory and available for functionals where analytical methods are not")
+        freq_opt_form.addRow("Numerical frequencies:", self.num_freq)
 
         self.job_type_opts.addTab(self.freq_opt, "frequency settings")
         
@@ -1740,6 +1751,9 @@ class JobTypeOption(QWidget):
                 temp = self.temp.value()
                 route['freq'].append("temperature=%.2f" % temp)
                 
+                if self.num_freq.checkState == Qt.Checked:
+                    route['freq'].append('Numerical')
+                
                 if self.raman.checkState() == Qt.Unchecked:
                     route['freq'].append("NoRaman")
                 else:
@@ -1799,11 +1813,13 @@ class JobTypeOption(QWidget):
                     route.append("Opt")
 
             if self.do_freq.checkState() == Qt.Checked:
-                if self.raman.checkState() != Qt.Checked:
+                if self.raman.checkState() == Qt.Unchecked and self.num_freq.checkState() == Qt.Unchecked:
                     route.append("Freq")
-                else:
+                elif self.raman.checkState() == Qt.Checked:
                     route.append("NumFreq")
                     blocks['elprop'] = ['Polar 1']
+                else:
+                    route.append("NumFreq")
                     
                 temp = self.temp.value()
                 blocks['freq'] = ["Temp    %.2f" % temp]
@@ -1847,7 +1863,10 @@ class JobTypeOption(QWidget):
                     
             
             if self.do_freq.checkState() == Qt.Checked:
-                after_geom.append("nrg, wfn = frequencies('$FUNCTIONAL', return_wfn=True)")
+                if self.num_freq.checkState() == Qt.Checked:
+                    after_geom.append("nrg, wfn = frequencies('$FUNCTIONAL', return_wfn=True, dertype='gradient')")
+                else:
+                    after_geom.append("nrg, wfn = frequencies('$FUNCTIONAL', return_wfn=True)")
 
             if update_settings:
                 self.settings.last_nproc = self.nprocs.value()
@@ -4642,5 +4661,60 @@ class SavePreset(ChildToolWindow):
         
     def cleanup(self):
         self.tool_instance.preset_window = None
+        
+        super().cleanup()
+
+
+class PrepLocalJob(ChildToolWindow):
+    def __init__(self, tool_instance, title, **kwargs):
+        super().__init__(tool_instance, title, statusbar=False, **kwargs)
+        
+        self._build_ui()
+    
+        self.form = self.tool_instance.file_type.currentText()
+        self.tool_instance.file_type.currentTextChanged.connect(lambda program, widget=self: widget.__setattr__("form", program))
+    
+    def _build_ui(self):
+        layout = QFormLayout()
+        
+        
+        self.auto_update = QCheckBox()
+        layout.addRow("update structure upon finish:", self.auto_update)
+        
+        self.auto_open = QCheckBox()
+        self.auto_open.setCheckState(Qt.Checked)
+        layout.addRow("open structure upon finish:", self.auto_open)
+        
+        self.job_name = QLineEdit()
+        self.job_name.returnPressed.connect(self.run_job)
+        layout.addRow("job name:", self.job_name)
+
+        run = QPushButton("run")
+        run.clicked.connect(self.run_job)
+        layout.addRow(run)
+        
+        self.status = QStatusBar()
+        self.status.setSizeGripEnabled(False)
+        layout.addRow(self.status)
+        
+        self.ui_area.setLayout(layout)
+        self.manage(None)
+        
+    def run_job(self):
+        job_name = self.job_name.text().strip()
+        
+        if len(job_name.strip()) == 0 or any(x in job_name for x in "\\/;'\"?<>,`~!@#$%^&*"):
+            self.session.logger.error("invalid job name: '%s'" % job_name)
+            return
+
+        auto_update = self.auto_update.checkState() == Qt.Checked
+        auto_open = self.auto_open.checkState() == Qt.Checked
+        
+        self.tool_instance.run_local_job(name=job_name, auto_update=auto_update, auto_open=auto_open)
+        
+        self.status.showMessage("queued \"%s\"; see the log for any details" % job_name)
+        
+    def cleanup(self):
+        self.tool_instance.job_local_prep = None
         
         super().cleanup()

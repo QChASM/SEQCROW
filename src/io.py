@@ -44,7 +44,7 @@ def open_aarontools(session, path, format_name=None, coordsets=False):
         if coordsets:
             slider.set_slider(len(f.all_geom))
 
-    status = "Opened %s as a %s %s" % (path, fmt, "movie" if coordsets else "file")
+    status = "Opened %s as a %s %s" % (path, format_name, "movie" if coordsets else "")
 
     return [structure], status
 
