@@ -13,9 +13,9 @@ class LocalJob(QThread):
         self.kw_dict = kw_dict
         self.auto_update = auto_update
         self.auto_open = auto_open
+        self.killed = False
         
         self.process = None
-        self.started = False
         self.start_time = None
         
         super().__init__()
@@ -28,44 +28,54 @@ class LocalJob(QThread):
         """overwrite to execute job"""
         pass
 
+    def terminate(self):
+        self.session.logger.warning("terminating %s" % self)
+        self.killed = True
+
+        if self.process is not None:
+            self.process.kill()
+        
+        #use exit b/c terminate can cause chimera to freeze
+        super().exit(1)
+
 
 class ORCAJob(LocalJob):
     def __repr__(self):
         return "local ORCA job \"%s\"" % self.name
 
     def run(self):
-        self.started = True
         self.start_time = asctime(localtime())
         
-        scratch_dir = os.path.join(
+        self.scratch_dir = os.path.join(
                         os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
                         "%s %s" % (self.name, self.start_time.replace(':', '.')), \
                     )
 
         cwd = os.getcwd()
         
-        if not os.path.exists(scratch_dir):
-            os.makedirs(scratch_dir)
+        if not os.path.exists(self.scratch_dir):
+            os.makedirs(self.scratch_dir)
 
         infile = self.name + '.inp'
         infile = infile.replace(' ', '_')
-        self.theory.write_orca_input(self.kw_dict, os.path.join(scratch_dir, infile))
+        self.theory.write_orca_input(self.kw_dict, os.path.join(self.scratch_dir, infile))
 
         executable = os.path.abspath(self.session.seqcrow_settings.settings.ORCA_EXE)
-        self.output_name = os.path.join(scratch_dir, self.name.replace(' ', '_') + '.out')
+        self.output_name = os.path.join(self.scratch_dir, self.name.replace(' ', '_') + '.out')
         outfile = open(self.output_name, 'w')
         
         args = [executable, infile]
         
-        log = open(os.path.join(scratch_dir, "seqcrow_log.txt"), 'w')
+        log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
         log.write("executing:\n%s\n\n" % " ".join(args))
 
         if " " in infile:
             raise RuntimeError("ORCA input files cannot contain spaces")
 
         try:
-            self.process = subprocess.Popen(args, cwd=scratch_dir, stdout=outfile, stderr=log)
+            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log)
             self.process.communicate()
+            self.process = None
 
         except:
             self.process = None
@@ -80,32 +90,31 @@ class GaussianJob(LocalJob):
         return "local Gaussian job \"%s\"" % self.name
 
     def run(self):
-        self.started = True
         self.start_time = asctime(localtime())
         
-        scratch_dir = os.path.join(
+        self.scratch_dir = os.path.join(
                         os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
                         "%s %s" % (self.name, self.start_time.replace(':', '.')), \
                     )
 
         cwd = os.getcwd()
         
-        if not os.path.exists(scratch_dir):
-            os.makedirs(scratch_dir)
+        if not os.path.exists(self.scratch_dir):
+            os.makedirs(self.scratch_dir)
 
         infile = self.name + '.gjf'
-        self.theory.write_gaussian_input(self.kw_dict, os.path.join(scratch_dir, infile))
+        self.theory.write_gaussian_input(self.kw_dict, os.path.join(self.scratch_dir, infile))
 
         executable = os.path.abspath(self.session.seqcrow_settings.settings.GAUSSIAN_EXE)
-        self.output_name = os.path.join(scratch_dir, self.name + '.log')
+        self.output_name = os.path.join(self.scratch_dir, self.name + '.log')
         
         args = [executable, infile, self.output_name]
         
-        log = open(os.path.join(scratch_dir, "seqcrow_log.txt"), 'w')
+        log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
         log.write("executing:\n%s\n\n" % " ".join(args))
 
         try:
-            self.process = subprocess.Popen(args, cwd=scratch_dir, stdout=log, stderr=log)
+            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log)
             self.process.communicate()
 
         except:
@@ -121,32 +130,31 @@ class Psi4Job(LocalJob):
         return "local Psi4 job \"%s\"" % self.name
 
     def run(self):
-        self.started = True
         self.start_time = asctime(localtime())
         
-        scratch_dir = os.path.join(
+        self.scratch_dir = os.path.join(
                         os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
                         "%s %s" % (self.name, self.start_time.replace(':', '.')), \
                     )
 
         cwd = os.getcwd()
         
-        if not os.path.exists(scratch_dir):
-            os.makedirs(scratch_dir)
+        if not os.path.exists(self.scratch_dir):
+            os.makedirs(self.scratch_dir)
 
         infile = self.name + '.in4'
-        self.theory.write_psi4_input(self.kw_dict, os.path.join(scratch_dir, infile))
+        self.theory.write_psi4_input(self.kw_dict, os.path.join(self.scratch_dir, infile))
 
         executable = os.path.abspath(self.session.seqcrow_settings.settings.PSI4_EXE)
-        self.output_name = os.path.join(scratch_dir, self.name + '.dat')
+        self.output_name = os.path.join(self.scratch_dir, self.name + '.dat')
         
         args = [executable, infile, self.output_name]
         
-        log = open(os.path.join(scratch_dir, "seqcrow_log.txt"), 'w')
+        log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
         log.write("executing:\n%s\n\n" % " ".join(args))
 
         try:
-            self.process = subprocess.Popen(args, cwd=scratch_dir, stdout=log, stderr=log)
+            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log)
             self.process.communicate()
 
         except:

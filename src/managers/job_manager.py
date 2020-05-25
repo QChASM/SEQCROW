@@ -26,7 +26,16 @@ class JobManager(ProviderManager):
         self.triggers.add_handler(JOB_STARTED, self.job_started)
         self.triggers.add_trigger(JOB_QUEUED)
         self.triggers.add_handler(JOB_QUEUED, self.check_queue)
+    
+    def __setattr__(self, attr, val):
+        if attr == "paused":
+            if val:
+                print("paused SEQCROW queue")
+            else:
+                print("unpaused SEQCROW queue")
         
+        super().__setattr__(attr, val)
+    
     @property
     def jobs(self):
         return self.local_jobs + self.remote_jobs
@@ -68,7 +77,7 @@ class JobManager(ProviderManager):
         if not self.has_job_running:
             unstarted_local_jobs = []
             for job in self.local_jobs:
-                if not job.started:
+                if job.start_time is None and not job.killed:
                     unstarted_local_jobs.append(job)
                     
             if len(unstarted_local_jobs) > 0 and not self.paused:
@@ -76,8 +85,8 @@ class JobManager(ProviderManager):
 
                 self._thread = start_job
                 start_job.finished.connect(lambda data=start_job: self.triggers.activate_trigger(JOB_FINISHED, data))
+                start_job.started.connect(lambda data=start_job: self.triggers.activate_trigger(JOB_STARTED, data))
                 start_job.start()
-                self.triggers.activate_trigger(JOB_STARTED, start_job)
 
             else:
                 self._thread = None

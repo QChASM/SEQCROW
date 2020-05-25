@@ -115,6 +115,9 @@ class _SEQCROW_API(BundleAPI):
             from .tools import BuildQM
             tool = BuildQM(session, ti.name)
             return tool
+        elif ti.name == "Job Queue":
+            from .tools import JobQueue
+            return JobQueue(session, ti.name)
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)
 

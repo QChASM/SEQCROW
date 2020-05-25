@@ -126,6 +126,7 @@ presets:
                 <ChimeraXClassifier>ChimeraX :: Tool :: Managed Models :: SEQCROW :: see models managed by SEQCROW</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Add to Personal Library :: AaronTools :: Add to your personal ligand, substituent, and ring libraries</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Visualize Normal Modes :: AaronTools :: Visualize normal modes from a Gaussian output file as displacement vectors or as an animation</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Job Queue :: SEQCROW :: View status of jobs</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: tm :: Transition metals</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: DataFormat :: XYZ :: XYZ :: Molecular structure :: .xyz :: :: :: :: :: XYZ Format :: utf-8</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Open :: XYZ :: AaronTools :: false :: coordsets:Bool</ChimeraXClassifier>
