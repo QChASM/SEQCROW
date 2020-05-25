@@ -17,6 +17,35 @@ from PyQt5.QtWidgets import QLabel, QLineEdit, QGridLayout, QPushButton, QTabWid
 from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.libraries import SubstituentTable, LigandTable, RingTable
 
+def minimal_ring_convert(atomic_structure, atom1, atom2):
+    residues = [atom1.residue]
+    if atom2.residue not in residues:
+        residues.append(atom2.residue)
+        
+    max_iter = len(atomic_structure.atoms)
+    start = atom1
+    i = 0
+    while start != atom2:
+        if start.residue not in residues:
+            residues.append(residue)
+            
+        i += 1
+        if i > max_iter:
+            return atomic_structure.residues
+            
+        v1 = atom2.coord - start.coord
+        max_overlap = None
+        for atom in start.neighbors:
+            v2 = atom.coord - start.coord
+            overlap = np.dot(v1, v2)
+            if max_overlap is None or overlap > max_overlap:
+                new_start = atom
+                max_overlap = overlap
+                
+        start = new_start
+        
+    return residues
+
 class EditStructure(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False         
@@ -202,7 +231,7 @@ class EditStructure(ToolInstance):
                     
                     residues = [model_copy.residues[i] for i in [model.residues.index(res) for res in models[model]]]
                     
-                    rescol = ResidueCollection(model_copy)
+                    rescol = ResidueCollection(model_copy, convert_residues=residues)
                     for res_copy, res in zip(residues, models[model]):                        
                         residue = Residue(res_copy)
                         for target in models[model][res]:
@@ -211,6 +240,9 @@ class EditStructure(ToolInstance):
                             else:
                                 end = None
                                 
+                            for atom in rescol.atoms:
+                                atom.atomspec = model.atoms[model_copy.atoms.index(atom.chix_atom)].atomspec
+
                             residue.substitute(sub.copy(), target.atomspec, attached_to=end)  
                             
                         residue.update_chix(res_copy)
@@ -306,9 +338,9 @@ class EditStructure(ToolInstance):
         models = {}
         for atom in selection:
             if atom.structure not in models:
-                models[atom.structure] = [atom.atomspec]
+                models[atom.structure] = [atom]
             else:
-                models[atom.structure].append(atom.atomspec)
+                models[atom.structure].append(atom)
         
             if len(models[atom.structure]) > 2:
                 raise RuntimeError("only two atoms can be selected on any model")
@@ -319,26 +351,34 @@ class EditStructure(ToolInstance):
             ringname = ringname.strip()
             
             for model in models:
+                atom1 = models[model][0]
+                atom2 = models[model][1]
                 if self.close_previous_bool and first_pass:
-                    rescol = ResidueCollection(model)
+                    convert = minimal_ring_convert(model, *models[model])
+                    rescol = ResidueCollection(model, convert_residues=convert)
+
                 elif self.close_previous_bool and not first_pass:
                     raise RuntimeError("only the first model can be replaced")
                 else:
                     model_copy = model.copy()
-                    rescol = ResidueCollection(model_copy)
-                    for i, atom in enumerate(model.atoms):
-                        rescol.atoms[i].atomspec = atom.atomspec
-                        rescol.atoms[i].add_tag(atom.atomspec)
-                
-                target = rescol.find(models[model])
+                    a1 = model_copy.atoms[model.atoms.index(models[model][0])]
+                    a2 = model_copy.atoms[model.atoms.index(models[model][1])]
+                    convert = minimal_ring_convert(model_copy, a1, a2)
+                    
+                    rescol = ResidueCollection(model_copy, convert_residues=convert)
+                                
+                    for atom in rescol.atoms:
+                        atom.atomspec = model.atoms[model_copy.atoms.index(atom.chix_atom)].atomspec
+
+                target = rescol.find([atom1.atomspec, atom2.atomspec])
                                 
                 rescol.ring_substitute(target, ringname)
                 
                 if self.close_previous_bool:                    
                     rescol.update_chix(model)
                 else:
-                    struc = rescol.get_chimera(self.session)
-                    new_structures.append(struc)
+                    rescol.update_chix(model_copy)
+                    new_structures.append(model_copy)
             
             first_pass = False
         
@@ -384,7 +424,7 @@ class SubstituentSelection(ChildToolWindow):
             
         self.textBox.setText(",".join(sub_names))  
 
-        
+
 class LigandSelection(ChildToolWindow):
     def __init__(self, tool_instance, title, textBox=None, **kwargs):
         super().__init__(tool_instance, title, **kwargs)
@@ -414,7 +454,7 @@ class LigandSelection(ChildToolWindow):
             
         self.textBox.setText(",".join(lig_names))   
 
-        
+
 class RingSelection(ChildToolWindow):
     def __init__(self, tool_instance, title, textBox=None, **kwargs):
         super().__init__(tool_instance, title, **kwargs)

@@ -41,6 +41,8 @@ class Residue(Geometry):
                     aaron_atom = fromChimAtom(atom=atom)
                     aaron_atoms.append(aaron_atom)
             
+            self.chix_residue = geom
+            
             super().__init__(aaron_atoms, name=geom.name, **kwargs)
             if resnum is None:
                 self.resnum = geom.number
@@ -64,6 +66,7 @@ class Residue(Geometry):
             self.name = name
             self.resnum = resnum
             self.atomspec = atomspec
+            self.chix_residue = None
             if chain_id is None:
                 self.chain_id = "a"
             else:
@@ -88,11 +91,10 @@ class Residue(Geometry):
                 
         chix_residue.name = self.name
         
-        for i, atom in enumerate(self.atoms):
-            if i >= len(chix_residue.atoms) or \
-                    not hasattr(atom, "chix_atom") or \
-                    atom.chix_atom is None or \
-                    atom.chix_atom.deleted or atom.chix_atom != chix_residue.atoms[i]:
+        for atom in self.atoms:
+            if not hasattr(atom, "chix_atom") or \
+               atom.chix_atom is None or \
+               atom.chix_atom.deleted or atom.chix_atom not in chix_residue.atoms:
                 #if not hasattr(atom, "chix_atom"):
                 #    print("no chix atom", atom)
                 #elif atom.chix_atom is None:
@@ -123,7 +125,6 @@ class Residue(Geometry):
                 
         for atom in chix_residue.atoms:
             if atom not in known_atoms:
-                #chix_residue.remove_atom(atom)
                 atom.delete()
 
         if refresh_connected:
@@ -136,7 +137,10 @@ class Residue(Geometry):
         
         for i, aaron_atom1 in enumerate(self.atoms):
             atom1 = [atom for atom in chix_residue.atoms if aaron_atom1.chix_atom == atom][0]
-            for aaron_atom2 in aaron_atom1.connected:
+            for aaron_atom2 in self.atoms[:i]:
+                if aaron_atom2 not in aaron_atom1.connected:
+                    continue
+
                 if sorted((aaron_atom1, aaron_atom2,)) in known_bonds:
                     continue
                 
@@ -152,7 +156,7 @@ class Residue(Geometry):
                 
                 try:
                     new_bond = chix_residue.structure.new_bond(atom1, atom2)
-                                        
+
                     if any([aaron_atom.element in TMETAL for aaron_atom in [aaron_atom1, aaron_atom2]]):
                         pbg = chix_residue.structure.pseudobond_group(chix_residue.structure.PBG_METAL_COORDINATION, create_type='normal') 
                         pbg.new_pseudobond(atom1, atom2)
@@ -176,8 +180,13 @@ class Residue(Geometry):
         
 class ResidueCollection(Geometry):
     """geometry object used for SEQCROW to easily convert to AaronTools but keep residue info"""
-    def __init__(self, molecule, refresh_connected=False, **kwargs):
-        """molecule     - chimerax AtomicStructure or [AtomicStructure] or AaronTools Geometry (for easy compatibility stuff)"""
+    def __init__(self, molecule, refresh_connected=False, convert_residues=None, **kwargs):
+        """molecule       - chimerax AtomicStructure or [AtomicStructure] or AaronTools Geometry (for easy compatibility stuff)
+        refresh_connected - let AaronTools determine bonding
+        convert_residues  - None to convert everything or [chimerax.atomic.Residue] to convert only specific residues
+                            this only applies to chimerax AtomicStructures"""
+        self.convert_residues = convert_residues
+        
         if isinstance(molecule, Catalyst):
             super().__init__(molecule, refresh_connected=refresh_connected, comment=molecule.comment, **kwargs)
                 
@@ -202,7 +211,9 @@ class ResidueCollection(Geometry):
             
             #convert chimerax stuff to AaronTools
             all_atoms = []
-            for i, residue in enumerate(molecule.residues):
+            if convert_residues is None:
+                convert_residues = molecule.residues
+            for i, residue in enumerate(convert_residues):
                 aaron_atoms = []
     
                 new_res = Residue(residue, \
@@ -219,21 +230,12 @@ class ResidueCollection(Geometry):
             for bond in molecule.bonds:
                 atom1 = bond.atoms[0]
                 atom2 = bond.atoms[1]
+                if self.convert_residues is not None and (atom1.residue not in self.convert_residues or atom2.residue not in self.convert_residues):
+                    continue
                 
-                aaron_atom1 = self.find(atom1.atomspec)
-                if len(aaron_atom1) > 1:
-                    raise RuntimeError("multiple atoms might have the same atomspec: %s" % \
-                        " ".join([str(atom) for atom in aaron_atom1]))
-                else:
-                    aaron_atom1 = aaron_atom1[0]
-                    
-                aaron_atom2 = self.find(atom2.atomspec)
-                if len(aaron_atom2) != 1:
-                    raise RuntimeError("multiple atoms might have the same atomspec: %s" % \
-                        " ".join([str(atom) for atom in aaron_atom2]))
-                else:
-                    aaron_atom2 = aaron_atom2[0]
-                    
+                aaron_atom1 = [atom for atom in all_atoms if atom.chix_atom is atom1][0]
+                aaron_atom2 = [atom for atom in all_atoms if atom.chix_atom is atom2][0]
+
                 aaron_atom1.connected.add(aaron_atom2)
                 aaron_atom2.connected.add(aaron_atom1)
             
@@ -242,6 +244,9 @@ class ResidueCollection(Geometry):
             if tm_bonds is not None:
                 for pseudobond in tm_bonds.pseudobonds:
                     atom1, atom2 = pseudobond.atoms
+                    if self.convert_residues is not None and (atom1.residue not in self.convert_residues or atom2.residue not in self.convert_residues):
+                        continue
+                    
                     aaron_atom1 = self.find(atom1.atomspec)[0]
                     aaron_atom2 = self.find(atom2.atomspec)[0]
                     aaron_atom1.connected.add(aaron_atom2)
@@ -256,6 +261,7 @@ class ResidueCollection(Geometry):
                 self.residues = [Residue(molecule, resnum=1, name="UNK", refresh_connected=refresh_connected, comment=molecule.comment)]
             else:
                 self.residues = [Residue(molecule, resnum=1, name="UNK", refresh_connected=refresh_connected)]
+            
             return
   
     def _atom_update(self):
@@ -344,7 +350,8 @@ class ResidueCollection(Geometry):
                 chix_missing.append(atom)
                
         for atom in atomic_structure.atoms:
-            if not any([atom == aaron_atom.chix_atom for aaron_atom in self.atoms if hasattr(aaron_atom, "chix_atom")]):
+            if not any([atom == aaron_atom.chix_atom for aaron_atom in self.atoms if hasattr(aaron_atom, "chix_atom")]) \
+                    and (atom.residue in self.convert_residues or self.convert_residues is None):
                 geom_missing.append(atom)
                 
         out = {'geom missing': geom_missing, 'chix missing': chix_missing}
@@ -354,16 +361,27 @@ class ResidueCollection(Geometry):
         """update chimerax atomic structure to match self
         may also change residue numbers for self"""
 
-        for i, residue in enumerate(self.residues):
-            if i >= len(atomic_structure.residues):
+        for residue in self.residues:
+            if residue.chix_residue is None or residue.chix_residue not in atomic_structure.residues:
                 res = atomic_structure.new_residue(residue.name, residue.chain_id, residue.resnum)
+                residue.chix_residue = res
             else:
-                res = atomic_structure.residues[i]
+                res = residue.chix_residue
 
             residue.update_chix(res, refresh_connected=False)
+        
+        if self.convert_residues is None:
+            for residue in atomic_structure.residues:
+                if not any(residue is res.chix_residue for res in self.residues):
+                    residue.delete()            
             
-        for residue in atomic_structure.residues[len(self.residues):]:
-            residue.delete()
+            for residue in atomic_structure.residues[len(self.residues):]:
+                residue.delete()
+        
+        else:
+            for residue in atomic_structure.residues:
+                if residue in self.convert_residues and not any(residue is res.chix_residue for res in self.residues):
+                    residue.delete()
         
         self.refresh_chix_connected(atomic_structure, sanity_check=False)
     
@@ -378,11 +396,13 @@ class ResidueCollection(Geometry):
                         (repr(self), repr(ResidueCollection(atomic_structure))))
                     
         for bond in atomic_structure.bonds:
-            bond.delete()
+            if self.convert_residues is None or all(atom.residue in self.convert_residues for atom in bond.atoms):
+                bond.delete()
             
         known_bonds = []
         for i, aaron_atom1 in enumerate(self.atoms):
-            atom1 = [atom for atom in atomic_structure.atoms if aaron_atom1.chix_atom == atom][0]
+            atom1 = [atom for atom in atomic_structure.atoms if aaron_atom1.chix_atom is atom][0]
+
             for aaron_atom2 in aaron_atom1.connected:
                 if sorted((aaron_atom1, aaron_atom2,)) in known_bonds:
                     continue
@@ -431,7 +451,7 @@ class ResidueCollection(Geometry):
         """returns a chimerax equivalent of self"""
         struc = AtomicStructure(session, name=self.name)
         struc.comment = self.comment
-        
+
         self.update_chix(struc)
 
         if coordsets and filereader is not None and filereader.all_geom is not None:
