@@ -170,8 +170,9 @@ class JobQueue(ToolInstance):
         ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
         for ndx in ndxs:
             job = jobs[ndx]
-            job.terminate()
-            job.wait()
+            if not job.isFinished():
+                job.terminate()
+                job.wait()
             
         self.session.seqcrow_job_manager.triggers.activate_trigger(JOB_QUEUED, "kill")
             

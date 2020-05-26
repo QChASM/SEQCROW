@@ -4,6 +4,7 @@ from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
 from chimerax.core.commands.cli import StringArg, BoolArg, ListOf, IntArg
+from chimerax.core.commands import run
 from chimerax.core.models import ADD_MODELS, REMOVE_MODELS
 
 from json import dumps, loads
@@ -31,6 +32,8 @@ class _InputGeneratorSettings(Settings):
         'last_opt': Value(False, BoolArg), 
         'last_ts': Value(False, BoolArg), 
         'last_freq': Value(False, BoolArg), 
+        'last_raman': Value(False, BoolArg), 
+        'last_num_freq': Value(False, BoolArg), 
         'previous_basis_names': Value([], ListOf(StringArg), iter2str),
         'previous_basis_paths': Value([], ListOf(StringArg), iter2str),
         'previous_ecp_names': Value([], ListOf(StringArg), iter2str),
@@ -287,6 +290,9 @@ class BuildQM(ToolInstance):
         preview = QAction("&Preview", self.tool_window.ui_area)
         preview.triggered.connect(self.show_preview)
         view.addAction(preview)
+        queue = QAction("&Queue", self.tool_window.ui_area)
+        queue.triggered.connect(self.show_queue)
+        view.addAction(queue)
         
         #TODO:
         #add Run ->
@@ -368,6 +374,9 @@ class BuildQM(ToolInstance):
         if 'raman' in preset:
             self.job_widget.raman.setChecked(preset['raman'])
         
+        if 'num_freq' in preset:
+            self.job_widget.num_freq.setChecked(preset['num_freq'])
+        
         if 'nproc' in preset:
             self.job_widget.setProcessors(preset['nproc'])
             self.job_widget.setMemory(preset['mem'])
@@ -423,6 +432,9 @@ class BuildQM(ToolInstance):
         
         if self.preset_window is not None:
             self.preset_window.basis_elements.refresh_basis()
+
+    def show_queue(self):
+        run(self.session, "ui tool show \"Job Queue\"")
 
     def show_preview(self):
         """open child tool that showns contents of input file"""
@@ -955,12 +967,12 @@ class JobTypeOption(QWidget):
         freq_opt_form.addRow("high-precision modes:", self.hpmodes)
 
         self.raman = QCheckBox()
-        self.raman.setCheckState(Qt.Unchecked)
+        self.raman.setCheckState(self.settings.last_raman)
         self.raman.stateChanged.connect(self.something_changed)
         freq_opt_form.addRow("Raman intensities:", self.raman)
 
         self.num_freq = QCheckBox()
-        self.num_freq.setCheckState(Qt.Unchecked)
+        self.num_freq.setChecked(self.settings.last_num_freq)
         self.num_freq.stateChanged.connect(self.something_changed)
         self.num_freq.setToolTip("numerical vibrational frequency algorithms are often slower than analytical algorithms,\nusually require less memory and available for functionals where analytical methods are not")
         freq_opt_form.addRow("Numerical frequencies:", self.num_freq)
@@ -1751,7 +1763,7 @@ class JobTypeOption(QWidget):
                 temp = self.temp.value()
                 route['freq'].append("temperature=%.2f" % temp)
                 
-                if self.num_freq.checkState == Qt.Checked:
+                if self.num_freq.checkState() == Qt.Checked:
                     route['freq'].append('Numerical')
                 
                 if self.raman.checkState() == Qt.Unchecked:
@@ -1800,6 +1812,8 @@ class JobTypeOption(QWidget):
                 self.settings.last_opt = self.do_geom_opt.checkState() == Qt.Checked
                 self.settings.last_ts = self.ts_opt.checkState() == Qt.Checked
                 self.settings.last_freq = self.do_freq.checkState() == Qt.Checked
+                self.settings.last_num_freq = self.num_freq.checkState() == Qt.Checked
+                self.settings.last_raman = self.raman.checkState() == Qt.Checked
 
             return {Method.GAUSSIAN_PRE_ROUTE:link0, Method.GAUSSIAN_ROUTE:route}
 
@@ -1848,6 +1862,8 @@ class JobTypeOption(QWidget):
                 self.settings.last_opt = self.do_geom_opt.checkState() == Qt.Checked
                 self.settings.last_ts = self.ts_opt.checkState() == Qt.Checked
                 self.settings.last_freq = self.do_freq.checkState() == Qt.Checked
+                self.settings.last_num_freq = self.num_freq.checkState() == Qt.Checked
+                self.settings.last_raman = self.raman.checkState() == Qt.Checked
 
             return {Method.ORCA_ROUTE:route, Method.ORCA_BLOCKS:blocks}
             
@@ -1874,7 +1890,9 @@ class JobTypeOption(QWidget):
                 self.settings.last_opt = self.do_geom_opt.checkState() == Qt.Checked
                 self.settings.last_ts = self.ts_opt.checkState() == Qt.Checked
                 self.settings.last_freq = self.do_freq.checkState() == Qt.Checked
-            
+                self.settings.last_num_freq = self.num_freq.checkState() == Qt.Checked
+                self.settings.last_raman = self.raman.checkState() == Qt.Checked
+                
             info = {Method.PSI4_AFTER_GEOM:after_geom}
             if len(settings.keys()) > 0:
                 info[Method.PSI4_SETTINGS] = settings
@@ -1920,7 +1938,7 @@ class FunctionalOption(QWidget):
         keyword_label = QLabel("keyword:")
         
         self.functional_kw = QLineEdit()
-        self.functional_kw.setPlaceholderText("functional name")
+        self.functional_kw.setPlaceholderText("filter functionals")
         self.functional_kw.setText(self.settings.previous_custom_func)
         self.functional_kw.setClearButtonEnabled(True)
         
@@ -2369,7 +2387,7 @@ class BasisOption(QWidget):
         self.custom_basis_kw = QLineEdit()
         self.custom_basis_kw.textChanged.connect(self.apply_filter)
         self.custom_basis_kw.textChanged.connect(self.update_tooltab)
-        self.custom_basis_kw.setPlaceholderText("basis name")
+        self.custom_basis_kw.setPlaceholderText("filter basis sets")
         self.custom_basis_kw.setClearButtonEnabled(True)
         
         keyword_label = QLabel("keyword:")
@@ -3361,7 +3379,7 @@ class OneLayerKeyWordOption(QWidget):
             self.new_kw.setClearButtonEnabled(True)
             self.new_kw.returnPressed.connect(self.add_kw)
           
-        self.new_kw.setPlaceholderText("new %s" % self.name)
+        self.new_kw.setPlaceholderText("filter %s%s" % (self.name[:-1], self.name[-1] + "s" if self.name[-1] != 'y' else "ies"))
         self.new_kw.textChanged.connect(self.apply_kw_filter)
         add_kw_button = QPushButton("add")
         add_kw_button.clicked.connect(self.add_kw)
@@ -3524,11 +3542,14 @@ class OneLayerKeyWordOption(QWidget):
     def setCurrentSettings(self, kw_list):
         self.last_list = kw_list
         
-        for i in range(self.current_kw_table.rowCount(), -1, -1):
-            self.current_kw_table.removeRow(i)
-            
+        self.clearCurrentSettings()
+        
         for kw in self.last_list:
             self.add_item_to_current_kw_table(kw)
+
+    def clearCurrentSettings(self):
+        for i in range(self.current_kw_table.rowCount(), -1, -1):
+            self.current_kw_table.removeRow(i)
 
 
 class TwoLayerKeyWordOption(QWidget):
@@ -3581,7 +3602,7 @@ class TwoLayerKeyWordOption(QWidget):
         new_kw_widget = QWidget()
         new_kw_widgets_layout = QGridLayout(new_kw_widget)
         self.new_kw = QLineEdit()
-        self.new_kw.setPlaceholderText("new %s" % self.name[:-1])
+        self.new_kw.setPlaceholderText("filter %s" % self.name)
         self.new_kw.textChanged.connect(self.apply_kw_filter)
         self.new_kw.returnPressed.connect(self.add_kw)
         self.new_kw.setClearButtonEnabled(True)
@@ -3617,7 +3638,7 @@ class TwoLayerKeyWordOption(QWidget):
         new_opt_widget = QWidget()
         new_opt_widgets_layout = QGridLayout(new_opt_widget)
         self.new_opt = QLineEdit()
-        self.new_opt.setPlaceholderText("new option")
+        self.new_opt.setPlaceholderText("filter options")
         self.new_opt.textChanged.connect(self.apply_opt_filter)
         self.new_opt.returnPressed.connect(self.add_opt)
         self.new_opt.setClearButtonEnabled(True)
@@ -3630,8 +3651,10 @@ class TwoLayerKeyWordOption(QWidget):
 
         self.current_kw_table.itemSelectionChanged.connect(self.update_route_opts)
 
+        self.selected_kw = None
         for kw in self.previous_dict:
             self.add_item_to_previous_kw_table(kw)
+            self.selected_kw = kw
                 
         for kw in self.last_dict:
             self.add_item_to_current_kw_table(kw)
@@ -3661,8 +3684,6 @@ class TwoLayerKeyWordOption(QWidget):
         splitter.addWidget(self.option_groupbox)
         layout.addWidget(splitter, 0, 0, 1, 1, Qt.AlignTop)
         layout.setContentsMargins(0, 0, 0, 0)
-        
-        self.selected_kw = None
 
     def add_item_to_previous_kw_table(self, kw):
         row = self.previous_kw_table.rowCount()
@@ -3953,15 +3974,19 @@ class TwoLayerKeyWordOption(QWidget):
     
     def setCurrentSettings(self, kw_dict):
         self.last_dict = kw_dict
+
+        self.clearCurrentSettings()
+            
+        for kw in self.last_dict:
+            self.add_item_to_current_kw_table(kw)
+
+    def clearCurrentSettings(self):
         for i in range(self.current_opt_table.rowCount(), -1, -1):
             self.current_opt_table.removeRow(i)
             
         for i in range(self.current_kw_table.rowCount(), -1, -1):
             self.current_kw_table.removeRow(i)
             
-        for kw in self.last_dict:
-            self.add_item_to_current_kw_table(kw)
-
 
 class KeywordOptions(QWidget):
     """
@@ -4044,6 +4069,9 @@ class KeywordOptions(QWidget):
         for item in self.widgets.keys():
             if self.items[item] in current_dict:
                 self.widgets[item].setCurrentSettings(current_dict[self.items[item]])
+                
+            else:
+                self.widgets[item].clearCurrentSettings()
     
     def something_changed(self, *args, **kw):
         """just for updating the preview"""
@@ -4080,10 +4108,32 @@ class KeywordOptions(QWidget):
         for item in self.widgets.keys():
             if isinstance(self.widgets[item], TwoLayerKeyWordOption):
                 last_dict[self.items[item]] = self.widgets[item].last_dict
+                if update_settings:
+                    for kw in self.widgets[item].last_dict:
+                        if kw not in self.widgets[item].previous_dict:
+                            self.widgets[item].previous_dict[kw] = [x for x in self.widgets[item].last_dict[kw]]
+                            self.widgets[item].add_item_to_previous_kw_table(kw)
+                            
+                            if self.widgets[item].selected_kw == kw:
+                                for opt in self.widgets[item].previous_dict[kw]:
+                                    self.widgets[item].add_item_to_previous_opt_table(opt)
+
+                        else:
+                            for opt in self.widgets[item].last_dict[kw]:
+                                if opt not in self.widgets[item].previous_dict[kw]:
+                                    self.widgets[item].previous_dict[kw].append(opt)
+                                    
+                                    if self.widgets[item].selected_kw == kw:
+                                        self.widgets[item].add_item_to_previous_opt_table(opt)
             
             elif isinstance(self.widgets[item], OneLayerKeyWordOption):
                 last_dict[self.items[item]] = self.widgets[item].last_list
-        
+                if update_settings:
+                    for kw in self.widgets[item].last_list:
+                        if kw not in self.widgets[item].previous_list:
+                            self.widgets[item].previous_list.append(kw)
+                            self.widgets[item].add_item_to_previous_kw_table(kw)
+
         if update_settings:
             self.settings_changed()
         
@@ -4581,7 +4631,10 @@ class SavePreset(ChildToolWindow):
             preset['ts'] = ts_opt
             
             freq = self.tool_instance.job_widget.getFrequencyCalculation()
-            preset['freq'] = freq
+            preset['freq'] = freq            
+            
+            num_freq = self.tool_instance.job_widget.num_freq.checkState() == Qt.Checked
+            preset['num_freq'] = num_freq
             
             raman = self.tool_instance.job_widget.raman.checkState() == Qt.Checked
             preset['raman'] = raman
