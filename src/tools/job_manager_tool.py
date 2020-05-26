@@ -131,7 +131,7 @@ class JobQueue(ToolInstance):
     
             self.tree.expandItem(item)
     
-        self.tree.resizeColumnToContents(self.NAME_COL)
+        #self.tree.resizeColumnToContents(self.NAME_COL)
         self.tree.resizeColumnToContents(self.SERVER_COL)
 
     def pause_queue(self):

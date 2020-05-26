@@ -428,7 +428,7 @@ class BuildQM(ToolInstance):
     
         self.update_preview()
         
-        self.session.logger.info("applied \"%s\" (%s)"% (preset_name, program))
+        self.session.logger.info("applied \"%s\" (%s)" % (preset_name, program))
         
         if self.preset_window is not None:
             self.preset_window.basis_elements.refresh_basis()
@@ -603,7 +603,7 @@ class BuildQM(ToolInstance):
         elif program == "Psi4":
             job = Psi4Job(name, self.session, self.theory, combined_dict, auto_update=auto_update, auto_open=auto_open)
         
-        print("adding %s to queue" % name)   
+        self.session.logger.info("adding %s to queue" % name)   
 
         self.session.seqcrow_job_manager.add_job(job)
 
@@ -638,7 +638,7 @@ class BuildQM(ToolInstance):
     
         self.update_preview()
     
-        print("copied to clipboard")
+        self.session.logger.info("copied to clipboard")
     
     def save_input(self):
         """save input to a file
@@ -674,9 +674,9 @@ class BuildQM(ToolInstance):
         for warning in warnings:
             self.session.logger.warning(warning)
             
-            self.update_preview()
-                
-            print("saved to %s" % filename)
+        self.update_preview()
+            
+        self.session.logger.info("saved to %s" % filename)
     
     def delete(self):
         """deregister trigger handlers"""
@@ -3540,7 +3540,7 @@ class OneLayerKeyWordOption(QWidget):
         self.previous_kw_table.resizeColumnToContents(0)    
     
     def setCurrentSettings(self, kw_list):
-        self.last_list = kw_list
+        self.last_list = kw_list.copy()
         
         self.clearCurrentSettings()
         
@@ -3973,7 +3973,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.previous_opt_table.resizeColumnToContents(0)
     
     def setCurrentSettings(self, kw_dict):
-        self.last_dict = kw_dict
+        self.last_dict = kw_dict.copy()
 
         self.clearCurrentSettings()
             
