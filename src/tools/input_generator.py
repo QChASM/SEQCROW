@@ -1097,7 +1097,6 @@ class JobTypeOption(QWidget):
         if program == "Gaussian":
             self.solvent_option.addItems(["None"])
             self.solvent_option.addItems(self.GAUSSIAN_SOLVENT_MODELS)
-            self.solvent_option.setEnabled(True)
             self.hpmodes.setEnabled(True)
             self.raman.setToolTip("ask Gaussian to compute Raman intensities")
             self.raman.setEnabled(True)
@@ -1105,8 +1104,7 @@ class JobTypeOption(QWidget):
             ndx = self.solvent_option.findText(self.settings.previous_gaussian_solvent_model)
             if ndx >= 0:
                 self.solvent_option.setCurrentIndex(ndx)
-            self.solvent_name.setEnabled(True)
-            self.solvent_name.setText(self.settings.previous_gaussian_solvent_name)
+            self.job_type_opts.setTabEnabled(3, True)
             self.use_checkpoint.setEnabled(True)
             self.chk_file_path.setEnabled(True)
             self.chk_browse_button.setEnabled(True)
@@ -1114,7 +1112,6 @@ class JobTypeOption(QWidget):
         elif program == "ORCA":
             self.solvent_option.addItems(["None"])
             self.solvent_option.addItems(self.ORCA_SOLVENT_MODELS)
-            self.solvent_option.setEnabled(True)
             self.hpmodes.setEnabled(False)
             self.raman.setToolTip("ask ORCA to compute Raman intensities")
             self.raman.setEnabled(True)
@@ -1123,13 +1120,14 @@ class JobTypeOption(QWidget):
             if ndx >= 0:
                 self.solvent_option.setCurrentIndex(ndx)
             self.solvent_name.setText(self.settings.previous_orca_solvent_name)
+            self.job_type_opts.setTabEnabled(3, True)
             self.use_checkpoint.setEnabled(False)
             self.chk_file_path.setEnabled(False)
             self.chk_browse_button.setEnabled(False)
             
         elif program == "Psi4":
             self.solvent_option.addItems(["None"])
-            self.solvent_option.setEnabled(False)
+            self.job_type_opts.setTabEnabled(3, False)
             self.hpmodes.setEnabled(False)
             self.raman.setEnabled(False)
             self.use_checkpoint.setEnabled(False)
@@ -2034,7 +2032,7 @@ class FunctionalOption(QWidget):
             needs_basis.setData(Qt.DisplayRole, "no")
         else:
             needs_basis.setData(Qt.DisplayRole, "yes")
-        needs_basis.setTextAlignment(Qt.AlignHCenter)
+        needs_basis.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.previously_used_table.setItem(row, 1, needs_basis)
         
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
@@ -3345,10 +3343,11 @@ class OneLayerKeyWordOption(QWidget):
         self.current_kw_table.setColumnCount(2)
         self.current_kw_table.setHorizontalHeaderLabels(['current', 'remove'])
         self.current_kw_table.setSelectionMode(QTableWidget.SingleSelection)
-        self.current_kw_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.current_kw_table.setEditTriggers(QTableWidget.DoubleClicked)
         self.current_kw_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.current_kw_table.verticalHeader().setVisible(False)
         self.current_kw_table.cellActivated.connect(self.clicked_current_route_keyword)
+        self.current_kw_table.cellChanged.connect(self.edit_current_kw)
 
         new_kw_widget = QWidget()
         new_kw_widgets_layout = QGridLayout(new_kw_widget)
@@ -3432,6 +3431,8 @@ class OneLayerKeyWordOption(QWidget):
         self.previous_kw_table.removeRow(row)
     
     def add_item_to_current_kw_table(self, kw):
+        self.current_kw_table.blockSignals(True)
+        
         row = self.current_kw_table.rowCount()
         self.current_kw_table.insertRow(row)
 
@@ -3446,11 +3447,18 @@ class OneLayerKeyWordOption(QWidget):
         self.current_kw_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
 
         item = QTableWidgetItem(kw)
+        if self.multiline:
+            item.setToolTip("double click to edit\n'\\n' will be replaced with newline")
+        else:
+            item.setToolTip("double click to edit")
+        
         self.current_kw_table.setItem(row, 0, item)
         
         self.current_kw_table.resizeRowToContents(row)
 
         self.optionChanged.emit()
+        
+        self.current_kw_table.blockSignals(False)
 
     def add_kw(self):
         if self.multiline:
@@ -3490,6 +3498,19 @@ class OneLayerKeyWordOption(QWidget):
 
             self.optionChanged.emit()
  
+    def edit_current_kw(self, row, column):
+        if column == 0:
+            if self.multiline:
+                self.last_list[row] = self.current_kw_table.item(row, column).text().replace('\\n', '\n')
+                self.current_kw_table.blockSignals(True)
+                self.current_kw_table.item(row, column).setText(self.last_list[row])
+                self.current_kw_table.resizeRowToContents(row)
+                self.current_kw_table.blockSignals(False)
+            else:
+                self.last_list[row] = self.current_kw_table.item(row, column).text()
+            
+            self.optionChanged.emit()
+
     def refresh_previous(self):
         for item in self.last_list:
             if item not in self.previous_list:
@@ -3611,9 +3632,10 @@ class TwoLayerKeyWordOption(QWidget):
         self.current_opt_table = QTableWidget()
         self.current_opt_table.setColumnCount(2)
         self.current_opt_table.setHorizontalHeaderLabels(['current', 'remove'])
-        self.current_opt_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.current_opt_table.setEditTriggers(QTableWidget.DoubleClicked)
         self.current_opt_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.current_opt_table.cellActivated.connect(self.clicked_current_keyword_option)
+        self.current_opt_table.cellChanged.connect(self.edit_current_opt)
         self.current_opt_table.verticalHeader().setVisible(False)
         option_layout.addWidget(self.current_opt_table, 0, 1)
 
@@ -3760,6 +3782,9 @@ class TwoLayerKeyWordOption(QWidget):
         self.previous_opt_table.removeRow(row)
 
     def add_item_to_current_opt_table(self, opt):
+        #prevent edit signal from triggering
+        #it should break anything, but we don't need it
+        self.current_opt_table.blockSignals(True)
         if opt not in self.last_dict[self.selected_kw]:
             if self.one_opt_per_kw:
                 self.last_dict[self.selected_kw] = [opt]
@@ -3774,6 +3799,7 @@ class TwoLayerKeyWordOption(QWidget):
         row = self.current_opt_table.rowCount()
         self.current_opt_table.insertRow(row)
         item = QTableWidgetItem(opt)
+        item.setToolTip("double click to edit")
         self.current_opt_table.setItem(row, 0, item)
         
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
@@ -3789,6 +3815,8 @@ class TwoLayerKeyWordOption(QWidget):
         self.current_opt_table.resizeRowToContents(row)
         self.current_opt_table.resizeColumnToContents(0)
         self.current_opt_table.resizeColumnToContents(1)
+        
+        self.current_opt_table.blockSignals(False)
 
     def add_kw(self):
         #TODO:
@@ -3899,6 +3927,11 @@ class TwoLayerKeyWordOption(QWidget):
             
             self.optionChanged.emit()
     
+    def edit_current_opt(self, row, column):
+        if column == 0:
+            self.last_dict[self.selected_kw][row] = self.current_opt_table.item(row, column).text()
+            self.optionChanged.emit()
+
     def refresh_previous(self):
         for item in self.last_dict.keys():
             if item not in self.previous_dict:
@@ -3968,7 +4001,7 @@ class TwoLayerKeyWordOption(QWidget):
             
         for i in range(self.current_kw_table.rowCount(), -1, -1):
             self.current_kw_table.removeRow(i)
-            
+
 
 class KeywordOptions(QWidget):
     """
