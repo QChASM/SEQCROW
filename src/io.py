@@ -33,7 +33,7 @@ def open_aarontools(session, path, format_name=None, coordsets=False):
         
         slider = CoordinateSetSlider(session, structure)
         if "energy" in f.other:
-            nrg_plot = EnergyPlot(session, structure)
+            nrg_plot = EnergyPlot(session, structure, f)
             if not nrg_plot.opened:
                 warn("energy plot could not be opened\n" + \
                      "there might be a mismatch between energy entries and structure entries in %s" % path)

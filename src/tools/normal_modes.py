@@ -172,7 +172,7 @@ class NormalModes(ToolInstance):
             return
             
         model = self.models_with_freq[state]
-        fr = self.session.filereader_manager.filereader_dict[model]
+        fr = self.session.filereader_manager.filereader_dict[model][-1]
         
         freq_data = fr.other['frequency'].data
         self.rows = []
@@ -201,8 +201,12 @@ class NormalModes(ToolInstance):
                 self.model_selector.removeItem(i)
                 
         for model in self.models_with_freq:
-            if self.model_selector.findData(model) == -1:
-                self.model_selector.addItem("%s (%s)" % (model.name, model.atomspec), model)
+            for fr in self.session.filereader_manager.filereader_dict[model]:
+                if 'frequency' not in fr.other:
+                    continue
+                    
+                if self.model_selector.findData(fr) == -1:
+                    self.model_selector.addItem("%s (%s)" % (model.name, model.atomspec), fr)
 
     def change_mw_option(self, state):
         """toggle bool associated with mass-weighting option"""
@@ -232,8 +236,8 @@ class NormalModes(ToolInstance):
 
     def show_vec(self):
         """display normal mode displacement vector"""
-        model = self.models_with_freq[self.model_selector.currentIndex()]
-        fr = self.session.filereader_manager.filereader_dict[model]
+        fr = self.model_selector.currentData()
+        model = self.session.filereader_manager.get_model(fr)
         modes = self.table.selectedItems()
         if len([mode for mode in modes if mode.column() == 0]) != 1:
             raise RuntimeError("one mode must be selected")
@@ -286,8 +290,8 @@ class NormalModes(ToolInstance):
     
     def show_anim(self):
         """play selected modes as an animation"""
-        model = self.models_with_freq[self.model_selector.currentIndex()]
-        fr = self.session.filereader_manager.filereader_dict[model]
+        fr = self.model_selector.currentData()
+        model = self.session.filereader_manager.get_model(fr)
         modes = self.table.selectedItems()
         if len([mode for mode in modes if mode.column() == 0]) != 1:
             raise RuntimeError("one mode must be selected")

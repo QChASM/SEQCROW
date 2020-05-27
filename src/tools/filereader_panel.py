@@ -107,44 +107,69 @@ class FileReaderPanel(ToolInstance):
             item.setText(self.NAME_COL, name)
             item.setText(self.ID_COL, ".".join([str(x) for x in id]))
             
-            if fr_dict[model].all_geom is not None and len(fr_dict[model].all_geom) > 1:
+            if any(x.all_geom is not None and len(x.all_geom) > 1 for x in fr_dict[model]):
                 item.setText(self.COORDSETS_COL, "yes")
             else:
                 item.setText(self.COORDSETS_COL, "no")
                 
-            if "energy" in fr_dict[model].other:
-                item.setText(self.NRG_COL, "%.6f" % fr_dict[model].other["energy"])
+            if any("energy" in x.other for x in fr_dict[model]):
+                item.setText(self.NRG_COL, "yes")
             else:
-                item.setText(self.NRG_COL, "")
+                item.setText(self.NRG_COL, "no")
                 
-            if "frequency" in fr_dict[model].other:
+            if any("frequency" in x.other for x in fr_dict[model]):
                 item.setText(self.FREQ_COL, "yes")
             else:
                 item.setText(self.FREQ_COL, "no")
-    
-            self.tree.expandItem(item)
+        
+            for fr in fr_dict[model]:
+                child = QTreeWidgetItem(item)
+                child.setData(self.NAME_COL, Qt.DisplayRole, fr)
+                child.setText(self.NAME_COL, fr.name)
+                if fr.all_geom is not None and len(fr.all_geom) > 1:
+                    child.setText(self.COORDSETS_COL, "yes")
+                else:
+                    child.setText(self.COORDSETS_COL, "no")
+                    
+                if "energy" in fr.other:
+                    child.setText(self.NRG_COL, "%.6f" % fr.other["energy"])
+                else:
+                    child.setText(self.NRG_COL, "")
+                    
+                if "frequency" in fr.other:
+                    child.setText(self.FREQ_COL, "yes")
+                else:
+                    child.setText(self.FREQ_COL, "no")    
+            
+            #self.tree.expandItem(item)
     
         for i in [self.ID_COL, self.COORDSETS_COL, self.NRG_COL, self.FREQ_COL]:
             self.tree.resizeColumnToContents(i)
    
     def use_cat_residues(self):
-        ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
+        items = [item for item in self.tree.selectedItems()]
         model_dict = self.session.filereader_manager.filereader_dict
         models = list(model_dict.keys())
-        for ndx in ndxs:
-            mdl = models[ndx]
+        for item in items:
+            parent = item.parent()
+            mdl = models[self.tree.indexOfTopLevelItem(parent)]
             rescol = ResidueCollection(mdl)
             cat = Catalyst(rescol)
             rescat = ResidueCollection(cat)
             rescat.update_chix(mdl)
    
     def restore_selected(self):
-        ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
+        items = [item for item in self.tree.selectedItems()]
         model_dict = self.session.filereader_manager.filereader_dict
         models = list(model_dict.keys())
-        for ndx in ndxs:
-            mdl = models[ndx]
-            fr = model_dict[mdl]
+        for item in items:
+            parent = item.parent()
+            mdl = models[self.tree.indexOfTopLevelItem(parent)]
+            if parent is None:
+                fr = model_dict[mdl][-1]
+            else:
+                fr = model_dict[mdl][parent.indexOfChild(item)]
+
             fr_rescol = ResidueCollection(fr)
             fr_rescol.update_chix(mdl)
             if fr.all_geom is not None and len(fr.all_geom) > 1:
@@ -162,19 +187,26 @@ class FileReaderPanel(ToolInstance):
                 mdl.active_coordset_id = 1
                     
     def open_nrg_plot(self):
-        ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
+        items = [item for item in self.tree.selectedItems()]
         model_dict = self.session.filereader_manager.filereader_dict
         models = list(model_dict.keys())
-        for ndx in ndxs:
-            mdl = models[ndx]
-            EnergyPlot(self.session, mdl)
+        for item in items:
+            parent = item.parent()
+            mdl = models[self.tree.indexOfTopLevelItem(parent)]
+            if parent is None:
+                fr = model_dict[mdl][-1]
+            else:
+                fr = model_dict[mdl][parent.indexOfChild(item)]
+
+            EnergyPlot(self.session, mdl, fr)
     
     def open_movie_slider(self):
-        ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
+        items = [item for item in self.tree.selectedItems()]
         model_dict = self.session.filereader_manager.filereader_dict
         models = list(model_dict.keys())
-        for ndx in ndxs:
-            mdl = models[ndx]
+        for item in items:
+            parent = item.parent()
+            mdl = models[self.tree.indexOfTopLevelItem(parent)]
             #coordset doesn't start out with the current coordset id
             #it looks like it should, but it doesn't
             #it starts at 1 instead

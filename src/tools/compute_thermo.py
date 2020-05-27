@@ -60,7 +60,7 @@ class Thermochem(ToolInstance):
         self.sp_layout = QGridLayout(sp_area_widget)
 
         sp_label = QLabel("Single-point energy:")
-        self.sp_layout.addWidget(sp_label, 0, 0, 1, 1, Qt.AlignTop)
+        self.sp_layout.addWidget(sp_label, 0, 0, 1, 1, Qt.AlignVCenter)
 
         self.sp_selector = QComboBox()
         self.sp_selector.currentIndexChanged.connect(self.set_sp)
@@ -92,7 +92,7 @@ class Thermochem(ToolInstance):
         self.thermo_layout = QGridLayout(therm_area_widget)
         
         therm_label = QLabel("Thermal corrections:")
-        self.thermo_layout.addWidget(therm_label, row, 0, 1, 1, Qt.AlignTop)
+        self.thermo_layout.addWidget(therm_label, row, 0, 1, 1, Qt.AlignVCenter)
         
         self.thermo_selector = QComboBox()
         self.thermo_selector.currentIndexChanged.connect(self.set_thermo_mdl)
@@ -409,41 +409,41 @@ class Thermochem(ToolInstance):
         #figure out new models
         new_models = [model for model in models if model not in self.nrg_cos.keys()]
         new_models.extend([model for model in models if model not in self.nrg_cos.keys() and model not in new_models])
-        
-        comp_outs = [CompOutput(self.session.filereader_manager.filereader_dict[mdl]) for mdl in models]
-        for mdl, co in zip(new_models, comp_outs):
-            if co.energy is not None:
-                self.nrg_cos[mdl] = co
-            
-            if co.grimme_g is not None:    
-                self.thermo_cos[mdl] = co
+
+        for mdl in models:
+            self.nrg_cos[mdl] = []
+            self.thermo_cos[mdl] = []
+            for fr in self.session.filereader_manager.filereader_dict[mdl]:
+                co = CompOutput(fr)
+                if co.energy is not None:
+                    self.nrg_cos[mdl].append(co)
+                
+                if co.grimme_g is not None:    
+                    self.thermo_cos[mdl].append(co)
         
         self.nrg_models = list(self.nrg_cos.keys())
         self.thermo_models = list(self.thermo_cos.keys())
-        
-        #remove models in reverse order b/c some don't get removed if multiple are
-        #closed at once
-        for i in range(self.sp_selector.count(), -1, -1):
-            if self.sp_selector.itemData(i) not in self.nrg_models:
-                self.sp_selector.removeItem(i)
-                
+
+        self.sp_selector.clear()
+
+        #TODO:
+        #add something to distinguish between different filereaders
         for model in self.nrg_models:
-            if self.sp_selector.findData(model) == -1:
-                self.sp_selector.addItem("%s (%s)" % (model.name, model.atomspec), model)
+            for co in self.nrg_cos[model]:
+                if self.sp_selector.findData(co) == -1:
+                    self.sp_selector.addItem("%s (%s)" % (model.name, model.atomspec), co)
         
-        for i in range(self.thermo_selector.count(), -1, -1):
-            if self.thermo_selector.itemData(i) not in self.thermo_models:
-                self.thermo_selector.removeItem(i)
+        self.thermo_selector.clear()
                 
         for model in self.thermo_models:
-            if self.thermo_selector.findData(model) == -1:
-                self.thermo_selector.addItem("%s (%s)" % (model.name, model.atomspec), model)
+            for co in self.thermo_cos[model]:
+                if self.thermo_selector.findData(co) == -1:
+                    self.thermo_selector.addItem("%s (%s)" % (model.name, model.atomspec), co)
 
     def set_sp(self):
         """set energy entry for when sp model changes"""
         if self.sp_selector.currentIndex() >= 0:
-            mdl = self.nrg_models[self.sp_selector.currentIndex()]
-            co = self.nrg_cos[mdl]
+            co = self.sp_selector.currentData()
                 
             self.sp_nrg_line.setText("%.6f" % co.energy)
         else:
@@ -453,9 +453,8 @@ class Thermochem(ToolInstance):
         
     def set_thermo_mdl(self):
         if self.thermo_selector.currentIndex() >= 0:
-            mdl = self.thermo_models[self.thermo_selector.currentIndex()]
-            co = self.thermo_cos[mdl]
-            
+            co = self.thermo_selector.currentData()
+
             if co.temperature is not None:
                 self.temperature_line.setValue(co.temperature)
 
@@ -465,8 +464,7 @@ class Thermochem(ToolInstance):
         """sets thermo entries for when thermo model changes"""
         #index of combobox is -1 when combobox has no entries
         if self.thermo_selector.currentIndex() >= 0:
-            mdl = self.thermo_models[self.thermo_selector.currentIndex()]
-            co = self.thermo_cos[mdl]
+            co = self.thermo_selector.currentData()
             
             v0 = self.v0_edit.value()
 

@@ -1,8 +1,14 @@
+import os
+
+from AaronTools.fileIO import FileReader
+
 from chimerax.core.toolshed import ProviderManager
 from chimerax.core.triggerset import TriggerSet
 from chimerax.core.commands import run
 
-from SEQCROW.jobs import LocalJob
+from SEQCROW.jobs import LocalJob, GaussianJob, ORCAJob, Psi4Job
+from SEQCROW.managers import FILEREADER_ADDED
+from SEQCROW.residue_collection import ResidueCollection
 
 from PyQt5.QtCore import QThread
 
@@ -55,11 +61,40 @@ class JobManager(ProviderManager):
         if isinstance(job, LocalJob):
             self._thread = None
 
-        if job.auto_open:
+        if job.auto_update and not job.theory.structure.deleted:
+            if os.path.exists(job.output_name):
+                finfo = job.output_name
+                if isinstance(job, GaussianJob):
+                    finfo = (job.output_name, "com", None)                
+                elif isinstance(job, ORCAJob):
+                    finfo = (job.output_name, "out", None)                
+                elif isinstance(job, Psi4Job):
+                    #coming eventually...
+                    finfo = (job.output_name, "dat", None)
+                    
+                fr = FileReader(finfo, get_all=True, just_geom=False)
+                
+                job.session.filereader_manager.triggers.activate_trigger(FILEREADER_ADDED, ([job.theory.structure], [fr]))
+
+                rescol = ResidueCollection(fr, refresh_connected=True)
+                rescol.update_chix(job.theory.structure)
+            
+            if fr.all_geom is not None and len(fr.all_geom) > 1:
+                coordsets = rescol.all_geom_coordsets(fr)
+
+                job.theory.structure.remove_coordsets()
+                job.theory.structure.add_coordsets(coordsets)
+
+                for i, coordset in enumerate(coordsets):
+                    job.theory.structure.active_coordset_id = i + 1
+                    
+                    for atom, coord in zip(job.theory.structure.atoms, coordset):
+                        atom.coord = coord
+                
+                job.theory.structure.active_coordset_id = job.theory.structure.num_coordsets
+
+        elif job.auto_open:
             run(job.session, "open \"%s\"" % job.output_name, log=False)
-        elif job.auto_update:
-            print("auto update isn't done")
-            pass
             
         self.check_queue()
         pass

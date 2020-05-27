@@ -121,7 +121,7 @@ class _InputGeneratorSettings(Settings):
                                                            "other": {}, \
                                                          }, \
                                         }), StringArg), \
-        'orca_presets':Value(dumps({"quick optimize":{"nproc":1, \
+        'orca_presets': Value(dumps({"quick optimize":{"nproc":1, \
                                                        "mem":0, \
                                                        "opt":True, \
                                                        "ts":False, \
@@ -152,7 +152,7 @@ class _InputGeneratorSettings(Settings):
                                                    "other": {Method.ORCA_ROUTE:['TightSCF']}, \
                                                   }, \
                                        }), StringArg), \
-         'psi4_presets':Value(dumps({"quick optimize":{"nproc":1, \
+         'psi4_presets': Value(dumps({"quick optimize":{"nproc":1, \
                                                        "mem":0, \
                                                        "opt":True, \
                                                        "ts":False, \
@@ -169,6 +169,8 @@ class _InputGeneratorSettings(Settings):
                                                       }, \
                                         },\
                                 ), StringArg),
+        'refresh_finished': Value(False, BoolArg), 
+        'open_finished': Value(False, BoolArg), 
     }
     
     #def save(self, *args, **kwargs):
@@ -557,15 +559,15 @@ class BuildQM(ToolInstance):
         self.job_widget.setStructure(mdl)
 
         if mdl in self.session.filereader_manager.filereader_dict:
-            fr = self.session.filereader_manager.filereader_dict[mdl]
-            if 'charge' in fr.other:
-                self.job_widget.setCharge(fr.other['charge'])
-           
-            if 'multiplicity' in fr.other:
-                self.job_widget.setMultiplicity(fr.other['multiplicity'])
-                
-            if 'temperature' in fr.other:
-                self.job_widget.setTemperature(fr.other['temperature'])
+            for fr in self.session.filereader_manager.filereader_dict[mdl]:
+                if 'charge' in fr.other:
+                    self.job_widget.setCharge(fr.other['charge'])
+            
+                if 'multiplicity' in fr.other:
+                    self.job_widget.setMultiplicity(fr.other['multiplicity'])
+                    
+                if 'temperature' in fr.other:
+                    self.job_widget.setTemperature(fr.other['temperature'])
 
     def check_elements(self, *args, **kw):
         """ask self.basis_widget to check the elements"""
@@ -4732,10 +4734,11 @@ class PrepLocalJob(ChildToolWindow):
         
         
         self.auto_update = QCheckBox()
+        self.auto_update.setChecked(self.tool_instance.settings.refresh_finished)
         layout.addRow("update structure upon finish:", self.auto_update)
         
         self.auto_open = QCheckBox()
-        self.auto_open.setCheckState(Qt.Checked)
+        self.auto_open.setChecked(self.tool_instance.settings.open_finished)
         layout.addRow("open structure upon finish:", self.auto_open)
         
         self.job_name = QLineEdit()
@@ -4761,8 +4764,10 @@ class PrepLocalJob(ChildToolWindow):
             return
 
         auto_update = self.auto_update.checkState() == Qt.Checked
+        self.tool_instance.settings.refresh_finished = auto_update
         auto_open = self.auto_open.checkState() == Qt.Checked
-        
+        self.tool_instance.settings.open_finished = auto_open
+
         self.tool_instance.run_local_job(name=job_name, auto_update=auto_update, auto_open=auto_open)
         
         self.status.showMessage("queued \"%s\"; see the log for any details" % job_name)
