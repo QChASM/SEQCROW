@@ -15,6 +15,8 @@ from AaronTools.trajectory import Pathway
 
 from io import BytesIO
 
+from os.path import basename
+
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, QTabWidget, QComboBox, \
                             QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, \
@@ -171,8 +173,11 @@ class NormalModes(ToolInstance):
             # early return if no frequency models
             return
             
-        model = self.models_with_freq[state]
-        fr = self.session.filereader_manager.filereader_dict[model][-1]
+        fr = self.model_selector.currentData()
+        if fr is None:
+            return 
+            
+        model = self.session.filereader_manager.get_model(fr)
         
         freq_data = fr.other['frequency'].data
         self.rows = []
@@ -196,6 +201,7 @@ class NormalModes(ToolInstance):
         self.models_with_freq = self.session.filereader_manager.frequency_models
         
         #remove in reverse order b/c sometimes they don't get removed in forwards order
+        #TODO: we use FileReaders now, not models - look for those
         for i in range(self.model_selector.count(), -1, -1):
             if self.model_selector.itemData(i) not in self.models_with_freq:
                 self.model_selector.removeItem(i)
@@ -206,7 +212,7 @@ class NormalModes(ToolInstance):
                     continue
                     
                 if self.model_selector.findData(fr) == -1:
-                    self.model_selector.addItem("%s (%s)" % (model.name, model.atomspec), fr)
+                    self.model_selector.addItem("%s (%s)" % (basename(fr.name), model.atomspec), fr)
 
     def change_mw_option(self, state):
         """toggle bool associated with mass-weighting option"""

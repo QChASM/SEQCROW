@@ -2149,36 +2149,9 @@ class FunctionalOption(QWidget):
         func = self.settings.previous_functional
         disp = self.settings.previous_dispersion
         grid = self.settings.previous_grid
-        if self.form == "Gaussian":
-            #update functional
-            if func == "Gaussian's B3LYP":
-                ndx = self.functional_option.findText("B3LYP", Qt.MatchExactly)
-                self.functional_option.setCurrentIndex(ndx)
-                
-            elif func == "other":
-                ndx = self.functional_option.findText("other", Qt.MatchExactly)
-                self.functional_option.setCurrentIndex(ndx)
-                self.functional_kw.setText(self.settings.previous_custom_func)
-                
-            elif func in self.GAUSSIAN_FUNCTIONALS:
-                    ndx = self.functional_option.findText(func, Qt.MatchExactly)
-                    self.functional_option.setCurrentIndex(ndx)
-                    self.is_semiempirical.setCheckState(func in KNOWN_SEMI_EMPIRICAL)
-            
-            #omegas don't get decoded right
-            elif func.startswith("wB97"):
-                func = func.replace("w", "ω", 1)
-                ndx = self.functional_option.findText(func, Qt.MatchExactly)
-                self.functional_option.setCurrentIndex(ndx)
-    
-            #update_dispersion
-            if disp in self.GAUSSIAN_DISPERSION:
-                ndx = self.dispersion.findText(disp, Qt.MatchExactly)
-                self.dispersion.setCurrentIndex(ndx)
-                
-            if grid in self.GAUSSIAN_GRIDS:
-                ndx = self.grid.findText(grid, Qt.MatchExactly)
-                self.grid.setCurrentIndex(ndx)
+        self.setFunctional(func)
+        self.setGrid(grid)
+        self.setDispersion(disp)
         
         self.functionalChanged.emit()
 
@@ -2291,9 +2264,13 @@ class FunctionalOption(QWidget):
         
     def setFunctional(self, func):
         """sets functional option to match the given Functional"""
-        test_value = func.name
+        if isinstance(func, Functional):
+            test_value = func.name
+        else:
+            test_value = func
+
         if test_value in ["wB97X-D", "wB97X-D3"]:
-            test_value = value.replace('w', 'ω')
+            test_value = test_value.replace('w', 'ω')
         
         if self.form == "Gaussian" and test_value == "Gaussian's B3LYP":
             test_value = "B3LYP"
@@ -2301,11 +2278,14 @@ class FunctionalOption(QWidget):
         ndx = self.functional_option.findText(test_value, Qt.MatchExactly)
         if ndx < 0:
             ndx = self.functional_option.findText("other", Qt.MatchExactly)
-            self.functional_kw.setText(func.name)
+            if isinstance(func, Functional):
+                self.functional_kw.setText(func.name)
+                self.is_semiempirical.setChecked(func.is_semiempirical)
+            else:
+                self.functional_kw.setText(func)
+                self.is_semiempirical.setChecked(func in KNOWN_SEMI_EMPIRICAL)
 
         self.functional_option.setCurrentIndex(ndx)
-            
-        self.is_semiempirical.setChecked(func.is_semiempirical)
 
 
 class BasisOption(QWidget):

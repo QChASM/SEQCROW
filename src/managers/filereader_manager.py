@@ -44,7 +44,7 @@ class FileReaderManager(ProviderManager):
         """remove models with filereader data from our list when they are closed"""
         models_changed = False
         for model in models:
-            if model in self.models:
+            while model in self.models:
                 models_changed = True
                 ndx = self.models.index(model)
                 self.filereaders.pop(ndx)

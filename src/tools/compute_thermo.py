@@ -450,6 +450,8 @@ class Thermochem(ToolInstance):
             if mdl in self.thermo_cos:
                 del self.thermo_cos[mdl]
         
+        #TODO:
+        #figure out new CompOutputs instead of models
         #figure out new models
         new_models = [model for model in models if model not in self.nrg_cos.keys()]
         new_models.extend([model for model in models if model not in self.nrg_cos.keys() and model not in new_models])
