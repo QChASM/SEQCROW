@@ -21,22 +21,27 @@ class LocalJob(QThread):
         super().__init__()
         
     def kill(self):
+        self.session.logger.warning("killing %s..." % self)
+
         if self.process is not None:
-            self.process.terminate()
-    
+            self.process.kill()
+            self.process.wait()
+            self.session.logger.warning("%s might finish an in-progess calculation step before exiting" % self)
+        
+        self.killed = True
+
+        #use exit b/c terminate can cause chimera to freeze
+        super().exit(1)
+
     def run(self):
         """overwrite to execute job"""
         pass
 
     def terminate(self):
-        self.session.logger.warning("terminating %s" % self)
-        self.killed = True
-
         if self.process is not None:
             self.process.kill()
-        
-        #use exit b/c terminate can cause chimera to freeze
-        super().exit(1)
+            
+        super().terminate()
 
 
 class ORCAJob(LocalJob):
@@ -61,6 +66,9 @@ class ORCAJob(LocalJob):
         self.theory.write_orca_input(self.kw_dict, os.path.join(self.scratch_dir, infile))
 
         executable = os.path.abspath(self.session.seqcrow_settings.settings.ORCA_EXE)
+        if not os.path.exists(executable):
+            executable = self.session.seqcrow_settings.settings.ORCA_EXE
+            
         self.output_name = os.path.join(self.scratch_dir, self.name.replace(' ', '_') + '.out')
         outfile = open(self.output_name, 'w')
         
@@ -72,15 +80,9 @@ class ORCAJob(LocalJob):
         if " " in infile:
             raise RuntimeError("ORCA input files cannot contain spaces")
 
-        try:
-            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log)
-            self.process.communicate()
-            self.process = None
-
-        except:
-            self.process = None
-
-        print("finished")
+        self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+        self.process.communicate()
+        self.process = None
 
         return 
 
@@ -106,6 +108,9 @@ class GaussianJob(LocalJob):
         self.theory.write_gaussian_input(self.kw_dict, os.path.join(self.scratch_dir, infile))
 
         executable = os.path.abspath(self.session.seqcrow_settings.settings.GAUSSIAN_EXE)
+        if not os.path.exists(executable):
+            executable = self.session.seqcrow_settings.settings.GAUSSIAN_EXE
+            
         self.output_name = os.path.join(self.scratch_dir, self.name + '.log')
         
         args = [executable, infile, self.output_name]
@@ -113,14 +118,9 @@ class GaussianJob(LocalJob):
         log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
         log.write("executing:\n%s\n\n" % " ".join(args))
 
-        try:
-            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log)
-            self.process.communicate()
-
-        except:
-            self.process = None
-
-        print("finished")
+        self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+        self.process.communicate()
+        self.process = None
 
         return 
 
@@ -146,6 +146,9 @@ class Psi4Job(LocalJob):
         self.theory.write_psi4_input(self.kw_dict, os.path.join(self.scratch_dir, infile))
 
         executable = os.path.abspath(self.session.seqcrow_settings.settings.PSI4_EXE)
+        if not os.path.exists(executable):
+            executable = self.session.seqcrow_settings.settings.PSI4_EXE
+
         self.output_name = os.path.join(self.scratch_dir, self.name + '.dat')
         
         args = [executable, infile, self.output_name]
@@ -153,13 +156,8 @@ class Psi4Job(LocalJob):
         log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
         log.write("executing:\n%s\n\n" % " ".join(args))
 
-        try:
-            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log)
-            self.process.communicate()
-
-        except:
-            self.process = None
-
-        print("finished")
+        self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+        self.process.communicate()
+        self.process = None
 
         return 

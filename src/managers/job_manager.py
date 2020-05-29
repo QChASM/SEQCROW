@@ -57,7 +57,7 @@ class JobManager(ProviderManager):
         self._thread = None
 
     def job_finished(self, trigger_name, job):
-        print("%s: %s" % (trigger_name, job))
+        job.session.logger.info("%s: %s" % (trigger_name, job))
         if isinstance(job, LocalJob):
             self._thread = None
 
@@ -100,7 +100,7 @@ class JobManager(ProviderManager):
         pass
     
     def job_started(self, trigger_name, job):
-        print("%s: %s" % (trigger_name, job))
+        job.session.logger.info("%s: %s" % (trigger_name, job))
         pass
     
     def add_job(self, job):
