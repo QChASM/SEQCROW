@@ -5,6 +5,8 @@ from PyQt5.QtCore import QThread, pyqtSignal
 
 from time import asctime, localtime
 
+from sys import platform
+
 class LocalJob(QThread):
     def __init__(self, name, session, theory, kw_dict, auto_update=False, auto_open=False):
         self.name = name
@@ -80,7 +82,11 @@ class ORCAJob(LocalJob):
         if " " in infile:
             raise RuntimeError("ORCA input files cannot contain spaces")
 
-        self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+        if platform == "win32":
+            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+        else:        
+            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log)
+        
         self.process.communicate()
         self.process = None
 
@@ -118,7 +124,11 @@ class GaussianJob(LocalJob):
         log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
         log.write("executing:\n%s\n\n" % " ".join(args))
 
-        self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+        if platform == "win32":
+            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+        else:
+            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log)
+
         self.process.communicate()
         self.process = None
 
@@ -156,7 +166,12 @@ class Psi4Job(LocalJob):
         log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
         log.write("executing:\n%s\n\n" % " ".join(args))
 
-        self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+        
+        if platform == "win32":
+            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+        else:
+            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log)
+
         self.process.communicate()
         self.process = None
 
