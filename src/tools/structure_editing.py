@@ -321,10 +321,6 @@ class EditStructure(ToolInstance):
                                 end = attached[target].atomspec
                             else:
                                 end = None
-                                
-                            for atom, chix_atom in zip(rescol.atoms, model.atoms):
-                                atom.atomspec = chix_atom.atomspec
-                                atom.add_tag(chix_atom.atomspec)
 
                             residue.substitute(sub.copy(), model_copy.atoms[model.atoms.index(target)].atomspec, attached_to=end)
                             
@@ -464,6 +460,8 @@ class EditStructure(ToolInstance):
                             res.name = new_name[i]
                     rescol = ResidueCollection(model, convert_residues=convert)
 
+                    target = rescol.find([atom1.atomspec, atom2.atomspec])
+
                 elif self.close_previous_bool and not first_pass:
                     raise RuntimeError("only the first model can be replaced")
                 else:
@@ -476,12 +474,10 @@ class EditStructure(ToolInstance):
                             res.name = new_name[i]
 
                     rescol = ResidueCollection(model_copy, convert_residues=convert)
-                                
-                    for atom in rescol.atoms:
-                        atom.atomspec = model.atoms[model_copy.atoms.index(atom.chix_atom)].atomspec
 
-                target = rescol.find([atom1.atomspec, atom2.atomspec])
-                                
+                    target = rescol.find([model_copy.atoms[model.atoms.index(atom1)].atomspec, \
+                                          model_copy.atoms[model.atoms.index(atom2)].atomspec])
+
                 rescol.ring_substitute(target, ringname)
                 
                 if self.close_previous_bool:                    
