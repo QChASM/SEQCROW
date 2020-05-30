@@ -177,7 +177,8 @@ class Residue(Geometry):
         for bond in residue_bonds:
             if bond not in known_chix_bonds:
                 bond.delete()
-        
+
+
 class ResidueCollection(Geometry):
     """geometry object used for SEQCROW to easily convert to AaronTools but keep residue info"""
     def __init__(self, molecule, refresh_connected=False, convert_residues=None, **kwargs):

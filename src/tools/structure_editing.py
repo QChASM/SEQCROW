@@ -8,11 +8,16 @@ from AaronTools.ring import Ring
 from chimerax.atomic import selected_atoms, selected_residues
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
+from chimerax.core.settings import Settings
+from chimerax.core.configfile import Value
+from chimerax.core.commands.cli import BoolArg
 
 from io import BytesIO
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QLabel, QLineEdit, QGridLayout, QPushButton, QTabWidget, QComboBox, QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, QFormLayout, QCheckBox
+from PyQt5.QtWidgets import QLabel, QLineEdit, QGridLayout, QPushButton, QTabWidget, QComboBox, \
+                            QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, \
+                            QFormLayout, QCheckBox, QCompleter
 
 from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.libraries import SubstituentTable, LigandTable, RingTable
@@ -46,6 +51,13 @@ def minimal_ring_convert(atomic_structure, atom1, atom2):
         
     return residues
 
+
+class _EditStructureSettings(Settings):
+    AUTO_SAVE = {'modify': Value(True, BoolArg), 
+                 'guess': Value(True, BoolArg),
+                }
+
+
 class EditStructure(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False         
@@ -54,9 +66,11 @@ class EditStructure(ToolInstance):
     def __init__(self, session, name):       
         super().__init__(session, name)
         
+        self.settings = _EditStructureSettings(session, name)
+        
         self.tool_window = MainToolWindow(self)        
 
-        self.close_previous_bool = True
+        self.close_previous_bool = self.settings.modify
 
         self._build_ui()
 
@@ -64,7 +78,6 @@ class EditStructure(ToolInstance):
         layout = QGridLayout()
         
         self.alchemy_tabs = QTabWidget()
-        
         
         #substitute
         self.substitute_tab = QWidget()
@@ -74,7 +87,9 @@ class EditStructure(ToolInstance):
         self.substitute_layout.addWidget(sublabel, 0, 0, Qt.AlignVCenter)
         
         self.subname = QLineEdit()
-        self.subname.setToolTip("name of substituent in AaronTools library")
+        sub_completer = NameCompleter(Substituent.list(), self.subname)
+        self.subname.setCompleter(sub_completer)
+        self.subname.setToolTip("name of substituent in the AaronTools library or your personal library\nseparate names with commas and uncheck 'modify selected structure' to create several structures")
         self.substitute_layout.addWidget(self.subname, 0, 1, Qt.AlignVCenter)
         
         open_sub_lib = QPushButton("from library...")
@@ -85,7 +100,7 @@ class EditStructure(ToolInstance):
         
         self.close_previous_sub = QCheckBox()
         self.close_previous_sub.setToolTip("checked: selected structure will be modified\nunchecked: new model will be created for the modified structure")
-        self.close_previous_sub.toggle()
+        self.close_previous_sub.setChecked(self.settings.modify)
         self.close_previous_sub.stateChanged.connect(self.close_previous_change)
         self.substitute_layout.addWidget(self.close_previous_sub, 1, 1, 1, 2, Qt.AlignTop)    
         
@@ -93,7 +108,8 @@ class EditStructure(ToolInstance):
         
         self.guess_old = QCheckBox()
         self.guess_old.setToolTip("checked: AaronTools will use the shortest connected fragment in the residue\nunchecked: previous substituent must be selected")
-        self.guess_old.toggle()
+        self.guess_old.setChecked(self.settings.guess)
+        self.guess_old.stateChanged.connect(lambda state, settings=self.settings: settings.__setattr__("guess", True if state == Qt.Checked else False))
         self.substitute_layout.addWidget(self.guess_old, 2, 1, 1, 2, Qt.AlignTop)
         
         self.substitute_layout.addWidget(QLabel("new residue name:"), 3, 0, 1, 1, Qt.AlignTop)
@@ -122,7 +138,9 @@ class EditStructure(ToolInstance):
         self.maplig_layout.addWidget(liglabel, 0, 0, Qt.AlignVCenter)
         
         self.ligname = QLineEdit()
-        self.ligname.setToolTip("name of ligand in AaronTools library")
+        lig_completer = NameCompleter(Component.list(), self.ligname)
+        self.ligname.setCompleter(lig_completer)
+        self.ligname.setToolTip("name of ligand in the AaronTools library or your personal library\nseparate names with commas and uncheck 'modify selected structure' to create several structures")
         self.maplig_layout.addWidget(self.ligname, 0, 1, Qt.AlignVCenter)
         
         open_lig_lib = QPushButton("from library...")
@@ -133,7 +151,7 @@ class EditStructure(ToolInstance):
         
         self.close_previous_lig = QCheckBox()
         self.close_previous_lig.setToolTip("checked: selected structure will be modified\nunchecked: new model will be created for the modified structure")
-        self.close_previous_lig.toggle()
+        self.close_previous_lig.setChecked(self.settings.modify)
         self.close_previous_lig.stateChanged.connect(self.close_previous_change)
         self.maplig_layout.addWidget(self.close_previous_lig, 1, 1, 1, 2, Qt.AlignTop)
 
@@ -154,7 +172,9 @@ class EditStructure(ToolInstance):
         self.closering_layout.addWidget(ringlabel, 0, 0, Qt.AlignVCenter)
         
         self.ringname = QLineEdit()
-        self.ringname.setToolTip("name of ring in AaronTools library")
+        ring_completer = NameCompleter(Ring.list(), self.ringname)
+        self.ringname.setCompleter(ring_completer)
+        self.ringname.setToolTip("name of ring in the AaronTools library or your personal library\nseparate names with commas and uncheck 'modify selected structure' to create several structures")
         self.closering_layout.addWidget(self.ringname, 0, 1, Qt.AlignVCenter)
         
         open_ring_lib = QPushButton("from library...")
@@ -165,7 +185,7 @@ class EditStructure(ToolInstance):
         
         self.close_previous_ring = QCheckBox()
         self.close_previous_ring.setToolTip("checked: selected structure will be modified\nunchecked: new model will be created for the modified structure")
-        self.close_previous_ring.toggle()
+        self.close_previous_ring.setChecked(self.settings.modify)
         self.close_previous_ring.stateChanged.connect(self.close_previous_change)
         self.closering_layout.addWidget(self.close_previous_ring, 1, 1, 1, 2, Qt.AlignTop)
 
@@ -198,10 +218,12 @@ class EditStructure(ToolInstance):
     
     def close_previous_change(self, state):
         if state == Qt.Checked:
+            self.settings.modify = True
             for checkbox in [self.close_previous_lig, self.close_previous_sub, self.close_previous_ring]:
                 checkbox.setChecked(True)
             self.close_previous_bool = True
         else:
+            self.settings.modify = False
             for checkbox in [self.close_previous_lig, self.close_previous_sub, self.close_previous_ring]:
                 checkbox.setChecked(False)
             self.close_previous_bool = False
@@ -300,10 +322,11 @@ class EditStructure(ToolInstance):
                             else:
                                 end = None
                                 
-                            for atom in rescol.atoms:
-                                atom.atomspec = model.atoms[model_copy.atoms.index(atom.chix_atom)].atomspec
+                            for atom, chix_atom in zip(rescol.atoms, model.atoms):
+                                atom.atomspec = chix_atom.atomspec
+                                atom.add_tag(chix_atom.atomspec)
 
-                            residue.substitute(sub.copy(), target.atomspec, attached_to=end)  
+                            residue.substitute(sub.copy(), model_copy.atoms[model.atoms.index(target)].atomspec, attached_to=end)
                             
                         residue.update_chix(res_copy)
 
@@ -313,7 +336,7 @@ class EditStructure(ToolInstance):
         
         if not self.close_previous_bool:
             self.session.models.add(new_structures)
-        
+
     def open_sub_selector(self):
         self.tool_window.create_child_window("select substituents", window_class=SubstituentSelection, textBox=self.subname)
 
@@ -393,7 +416,7 @@ class EditStructure(ToolInstance):
         
         if not self.close_previous_bool:
             self.session.models.add(new_structures)
-                    
+
     def open_lig_selector(self):
         self.tool_window.create_child_window("select ligands", window_class=LigandSelection, textBox=self.ligname)
     
@@ -471,7 +494,7 @@ class EditStructure(ToolInstance):
         
         if not self.close_previous_bool:
             self.session.models.add(new_structures)
-                    
+
     def open_ring_selector(self):
         self.tool_window.create_child_window("select rings", window_class=RingSelection, textBox=self.ringname)
     
@@ -571,3 +594,27 @@ class RingSelection(ChildToolWindow):
             
         self.textBox.setText(",".join(ring_names))
         
+
+
+class NameCompleter(QCompleter):
+    def __init__(self, name_list, parent=None):
+        super().__init__(name_list, parent=parent)
+        
+        self.setCaseSensitivity(Qt.CaseInsensitive)
+        self.setCompletionMode(self.PopupCompletion)
+        self.setFilterMode(Qt.MatchContains)
+        self.setWrapAround(False)
+        
+    def pathFromIndex(self, ndx):
+        name = super().pathFromIndex(ndx)
+        
+        names = self.widget().text().split(',')
+        
+        if len(names) > 1:
+            name = "%s, %s" % (", ".join(names[:-1]), name)
+            
+        return name
+        
+    def splitPath(self, path):
+        path = path.split(',')[-1].strip()
+        return [path]
