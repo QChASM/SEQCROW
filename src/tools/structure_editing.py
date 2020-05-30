@@ -65,86 +65,127 @@ class EditStructure(ToolInstance):
         
         self.alchemy_tabs = QTabWidget()
         
+        
         #substitute
         self.substitute_tab = QWidget()
         self.substitute_layout = QGridLayout(self.substitute_tab) 
-                
+
         sublabel = QLabel("substituent name:")
-        self.substitute_layout.addWidget(sublabel, 0, 0)
+        self.substitute_layout.addWidget(sublabel, 0, 0, Qt.AlignVCenter)
         
         self.subname = QLineEdit()
         self.subname.setToolTip("name of substituent in AaronTools library")
-        self.substitute_layout.addWidget(self.subname, 0, 1)
+        self.substitute_layout.addWidget(self.subname, 0, 1, Qt.AlignVCenter)
         
         open_sub_lib = QPushButton("from library...")
         open_sub_lib.clicked.connect(self.open_sub_selector)
-        self.substitute_layout.addWidget(open_sub_lib, 0, 2)        
+        self.substitute_layout.addWidget(open_sub_lib, 0, 2, Qt.AlignTop)        
         
-        self.close_previous_sub = QCheckBox("modify selected structure")
+        self.substitute_layout.addWidget(QLabel("modify selected structure:"), 1, 0, 1, 1, Qt.AlignTop)
+        
+        self.close_previous_sub = QCheckBox()
         self.close_previous_sub.setToolTip("checked: selected structure will be modified\nunchecked: new model will be created for the modified structure")
         self.close_previous_sub.toggle()
         self.close_previous_sub.stateChanged.connect(self.close_previous_change)
-        self.substitute_layout.addWidget(self.close_previous_sub, 1, 0, 1, 3)    
+        self.substitute_layout.addWidget(self.close_previous_sub, 1, 1, 1, 2, Qt.AlignTop)    
         
-        self.guess_old = QCheckBox("guess old substituent")
+        self.substitute_layout.addWidget(QLabel("guess previous substituent:"), 2, 0, 1, 1, Qt.AlignTop)
+        
+        self.guess_old = QCheckBox()
         self.guess_old.setToolTip("checked: AaronTools will use the shortest connected fragment in the residue\nunchecked: previous substituent must be selected")
         self.guess_old.toggle()
-        self.substitute_layout.addWidget(self.guess_old, 2, 0, 1, 3)
+        self.substitute_layout.addWidget(self.guess_old, 2, 1, 1, 2, Qt.AlignTop)
+        
+        self.substitute_layout.addWidget(QLabel("new residue name:"), 3, 0, 1, 1, Qt.AlignTop)
+        
+        self.new_sub_name = QLineEdit()
+        self.new_sub_name.setToolTip("change name of modified residues")
+        self.new_sub_name.setPlaceholderText("leave blank to keep current")
+        self.substitute_layout.addWidget(self.new_sub_name, 3, 1, 1, 2, Qt.AlignTop)
         
         substitute_button = QPushButton("substitute current selection")
         substitute_button.clicked.connect(self.do_substitute)
-        self.substitute_layout.addWidget(substitute_button, 3, 0, 1, 3)
+        self.substitute_layout.addWidget(substitute_button, 4, 0, 1, 3, Qt.AlignTop)
+        
+        self.substitute_layout.setRowStretch(0, 0)
+        self.substitute_layout.setRowStretch(1, 0)
+        self.substitute_layout.setRowStretch(2, 0)
+        self.substitute_layout.setRowStretch(3, 0)
+        self.substitute_layout.setRowStretch(4, 1)
+        
         
         #map ligand
         self.maplig_tab = QWidget()
         self.maplig_layout = QGridLayout(self.maplig_tab)
         
         liglabel = QLabel("ligand name:")
-        self.maplig_layout.addWidget(liglabel, 0, 0)
+        self.maplig_layout.addWidget(liglabel, 0, 0, Qt.AlignVCenter)
         
         self.ligname = QLineEdit()
         self.ligname.setToolTip("name of ligand in AaronTools library")
-        self.maplig_layout.addWidget(self.ligname, 0, 1)
+        self.maplig_layout.addWidget(self.ligname, 0, 1, Qt.AlignVCenter)
         
         open_lig_lib = QPushButton("from library...")
         open_lig_lib.clicked.connect(self.open_lig_selector)
-        self.maplig_layout.addWidget(open_lig_lib, 0, 2)        
+        self.maplig_layout.addWidget(open_lig_lib, 0, 2, Qt.AlignTop)        
         
-        self.close_previous_lig = QCheckBox("modify selected structure")
+        self.maplig_layout.addWidget(QLabel("modify selected structure:"), 1, 0, 1, 1, Qt.AlignTop)
+        
+        self.close_previous_lig = QCheckBox()
         self.close_previous_lig.setToolTip("checked: selected structure will be modified\nunchecked: new model will be created for the modified structure")
         self.close_previous_lig.toggle()
         self.close_previous_lig.stateChanged.connect(self.close_previous_change)
-        self.maplig_layout.addWidget(self.close_previous_lig, 1, 0, 1, 3)
-        
+        self.maplig_layout.addWidget(self.close_previous_lig, 1, 1, 1, 2, Qt.AlignTop)
+
         maplig_button = QPushButton("swap ligand of current selection")
         maplig_button.clicked.connect(self.do_maplig)
-        self.maplig_layout.addWidget(maplig_button, 2, 0, 1, 3)
+        self.maplig_layout.addWidget(maplig_button, 2, 0, 1, 3, Qt.AlignTop)
+        
+        self.maplig_layout.setRowStretch(0, 0)
+        self.maplig_layout.setRowStretch(1, 0)
+        self.maplig_layout.setRowStretch(2, 1)
+        
         
         #close ring
         self.closering_tab = QWidget()
         self.closering_layout = QGridLayout(self.closering_tab)
         
         ringlabel = QLabel("ring name:")
-        self.closering_layout.addWidget(ringlabel, 0, 0)
+        self.closering_layout.addWidget(ringlabel, 0, 0, Qt.AlignVCenter)
         
         self.ringname = QLineEdit()
         self.ringname.setToolTip("name of ring in AaronTools library")
-        self.closering_layout.addWidget(self.ringname, 0, 1)
+        self.closering_layout.addWidget(self.ringname, 0, 1, Qt.AlignVCenter)
         
         open_ring_lib = QPushButton("from library...")
         open_ring_lib.clicked.connect(self.open_ring_selector)
-        self.closering_layout.addWidget(open_ring_lib, 0, 2)        
+        self.closering_layout.addWidget(open_ring_lib, 0, 2, Qt.AlignTop)        
         
-        self.close_previous_ring = QCheckBox("modify selected structure")
+        self.closering_layout.addWidget(QLabel("modify selected structure:"), 1, 0, 1, 1, Qt.AlignTop) 
+        
+        self.close_previous_ring = QCheckBox()
         self.close_previous_ring.setToolTip("checked: selected structure will be modified\nunchecked: new model will be created for the modified structure")
         self.close_previous_ring.toggle()
         self.close_previous_ring.stateChanged.connect(self.close_previous_change)
-        self.closering_layout.addWidget(self.close_previous_ring, 1, 0, 1, 3)
+        self.closering_layout.addWidget(self.close_previous_ring, 1, 1, 1, 2, Qt.AlignTop)
+
+        self.closering_layout.addWidget(QLabel("new residue name:"), 2, 0, 1, 1, Qt.AlignTop)
         
+        self.new_ring_name = QLineEdit()
+        self.new_ring_name.setToolTip("change name of modified residues")
+        self.new_ring_name.setPlaceholderText("leave blank to keep current")
+        self.closering_layout.addWidget(self.new_ring_name, 2, 1, 1, 2, Qt.AlignTop)
+
         closering_button = QPushButton("put a ring on current selection")
         closering_button.clicked.connect(self.do_closering)
-        self.closering_layout.addWidget(closering_button, 2, 0, 1, 3)
-        
+        self.closering_layout.addWidget(closering_button, 3, 0, 1, 3, Qt.AlignTop)
+
+        self.closering_layout.setRowStretch(0, 0)
+        self.closering_layout.setRowStretch(1, 0)
+        self.closering_layout.setRowStretch(2, 0)
+        self.closering_layout.setRowStretch(3, 1)
+
+
         self.alchemy_tabs.addTab(self.substitute_tab, "substitute")
         self.alchemy_tabs.addTab(self.maplig_tab, "swap ligand")
         self.alchemy_tabs.addTab(self.closering_tab, "close ring")
@@ -168,6 +209,18 @@ class EditStructure(ToolInstance):
     def do_substitute(self):
         subnames = self.subname.text()
         selection = selected_atoms(self.session)
+        
+        new_name = self.new_sub_name.text()
+        if len(new_name.strip()) == 0:
+            new_name = None
+        elif any(len(name.strip()) > 4 for name in new_name.split(',')):
+            raise RuntimeError("residue names must be 4 characters or less")
+        elif any(x in new_name for x in "!@#$%^&*()\\/.<><;':\"[]{}|-=_+"):
+            raise RuntimeError("invalid residue name: %s" % new_name)
+        elif len(subnames.split(',')) != len(new_name.split(',')):
+            raise RuntimeError("number of substituents is not the same as the number of new names")
+        else:
+            new_name = [x.strip() for x in new_name.split(',')]
         
         if len(selection) < 1:
             raise RuntimeWarning("nothing selected")
@@ -207,13 +260,16 @@ class EditStructure(ToolInstance):
 
         first_pass = True
         new_structures = []
-        for subname in subnames.split(','):
+        for ndx, subname in enumerate(subnames.split(',')):
             subname = subname.strip()
             sub = Substituent(subname)
             for model in models:
                 if self.close_previous_bool and first_pass:
                     for res in models[model]:
                         residue = Residue(res)
+                        if new_name is not None:
+                            residue.name = new_name[ndx]
+                            
                         for target in models[model][res]:
                             if use_attached:
                                 end = attached[target].atomspec
@@ -223,6 +279,7 @@ class EditStructure(ToolInstance):
                             residue.substitute(sub.copy(), target.atomspec, attached_to=end)
                     
                         residue.update_chix(res)
+
                     
                 elif self.close_previous_bool and not first_pass:
                     raise RuntimeError("only the first model can be replaced")
@@ -234,6 +291,9 @@ class EditStructure(ToolInstance):
                     rescol = ResidueCollection(model_copy, convert_residues=residues)
                     for res_copy, res in zip(residues, models[model]):                        
                         residue = Residue(res_copy)
+                        if new_name is not None:
+                            residue.name = new_name[ndx]
+                        
                         for target in models[model][res]:
                             if use_attached:
                                 end = attached[target].atomspec
@@ -246,7 +306,7 @@ class EditStructure(ToolInstance):
                             residue.substitute(sub.copy(), target.atomspec, attached_to=end)  
                             
                         residue.update_chix(res_copy)
-                        
+
                     new_structures.append(model_copy)
             
             first_pass = False
@@ -290,12 +350,12 @@ class EditStructure(ToolInstance):
                         rescol.atoms[i].chix_atom = atom
                         
                 try:
-                    cat = Catalyst(structure=rescol)                   
+                    cat = Catalyst(structure=rescol)
                 except IOError:
-                    cat = Catalyst(structure=rescol, comment=model.comment)                     
+                    cat = Catalyst(structure=rescol, comment=model.comment)
                 except KeyError:
-                    cat = Catalyst(structure=rescol, comment=model.comment) 
-                
+                    cat = Catalyst(structure=rescol, comment=model.comment)
+
                 target = cat.find(models[model])
                 if len(target) % len(lig.key_atoms) == 0:
                     k = 0
@@ -310,6 +370,15 @@ class EditStructure(ToolInstance):
                     raise RuntimeError("number of key atoms no not match: %i now, new ligand has %i" % (len(target), len(lig.key_atoms)))
                 
                 cat.map_ligand(ligands, target)
+                cat.fix_comment()
+
+                for center_atom in cat.center:
+                    center_atom.connected = set([])
+                    for atom in cat.atoms:
+                        if atom not in cat.center:
+                            if center_atom.is_connected(atom):
+                                atom.connected.add(center_atom)
+                                center_atom.connected.add(atom)
                 
                 if self.close_previous_bool:    
                     new_rescol = ResidueCollection(cat)
@@ -331,6 +400,18 @@ class EditStructure(ToolInstance):
     def do_closering(self):
         ringnames = self.ringname.text()
         selection = self.session.seqcrow_ordered_selection_manager.selection
+        new_name = self.new_ring_name.text()
+        
+        if len(new_name.strip()) == 0:
+            new_name = None
+        elif any(len(name.strip()) > 4 for name in new_name.split(',')):
+            raise RuntimeError("residue names must be 4 characters or less")
+        elif any(x in new_name for x in "!@#$%^&*()\\/.<><;':\"[]{}|-=_+"):
+            raise RuntimeError("invalid residue name: %s" % new_name)
+        elif len(ringnames.split(',')) != len(new_name.split(',')):
+            raise RuntimeError("number of substituents is not the same as the number of new names")
+        else:
+            new_name = [x.strip() for x in new_name.split(',')]
         
         if len(selection) < 2:
             raise RuntimeWarning("two atoms must be selected per molecule")
@@ -347,7 +428,7 @@ class EditStructure(ToolInstance):
         
         first_pass = True
         new_structures = []
-        for ringname in ringnames.split(','):
+        for i, ringname in enumerate(ringnames.split(',')):
             ringname = ringname.strip()
             
             for model in models:
@@ -355,6 +436,9 @@ class EditStructure(ToolInstance):
                 atom2 = models[model][1]
                 if self.close_previous_bool and first_pass:
                     convert = minimal_ring_convert(model, *models[model])
+                    if new_name is not None:
+                        for res in convert:
+                            res.name = new_name[i]
                     rescol = ResidueCollection(model, convert_residues=convert)
 
                 elif self.close_previous_bool and not first_pass:
@@ -364,7 +448,10 @@ class EditStructure(ToolInstance):
                     a1 = model_copy.atoms[model.atoms.index(models[model][0])]
                     a2 = model_copy.atoms[model.atoms.index(models[model][1])]
                     convert = minimal_ring_convert(model_copy, a1, a2)
-                    
+                    if new_name is not None:
+                        for res in convert:
+                            res.name = new_name[i]
+
                     rescol = ResidueCollection(model_copy, convert_residues=convert)
                                 
                     for atom in rescol.atoms:

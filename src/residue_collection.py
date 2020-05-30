@@ -111,7 +111,7 @@ class Residue(Geometry):
                     atom_name = "%s%i" % (atom.element, k)
                 
                 new_atom = chix_residue.structure.new_atom(atom_name, atom.element)
-                new_atom.draw_mode = ChixAtom.STICK_STYLE
+                new_atom.draw_mode = ChixAtom.BALL_STYLE
                 new_atom.color = element_color(new_atom.element.number)
                 new_atom.coord = atom.coords
                 
@@ -192,17 +192,17 @@ class ResidueCollection(Geometry):
                 
             self.residues = []
             i = 1
-            for key in molecule.components:
-                for comp in molecule.components[key]:
-                    if key == 'ligand':
-                        resname = "LIG"
-                    else:
-                        resname = "SUB"
-                    
-                    self.residues.append(Residue(comp, refresh_connected=refresh_connected, resnum=i, name=resname))
-                    i += 1
-                    
+            for comp in molecule.components['substrate']:                    
+                self.residues.append(Residue(comp, refresh_connected=refresh_connected, resnum=i, name="SUB"))
+                i += 1
+
             self.residues.append(Residue(molecule.center, refresh_connected=refresh_connected, resnum=i, name="CENT"))
+            i += 1
+            
+            for comp in molecule.components['ligand']:                    
+                self.residues.append(Residue(comp, refresh_connected=refresh_connected, resnum=i, name="LIG"))
+                i += 1
+                
             self.session = None
             return
         
@@ -360,6 +360,8 @@ class ResidueCollection(Geometry):
     def update_chix(self, atomic_structure):
         """update chimerax atomic structure to match self
         may also change residue numbers for self"""
+
+        atomic_structure.comment = self.comment
 
         for residue in self.residues:
             if residue.chix_residue is None or residue.chix_residue not in atomic_structure.residues:
