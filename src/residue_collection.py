@@ -15,6 +15,7 @@ from chimerax.atomic.colors import element_color
 
 from warnings import warn
 
+
 def fromChimAtom(atom=None, *args, serial_number=None, atomspec=None, **kwargs):
     """get AaronTools Atom object from ChimeraX Atom"""
     aarontools_atom = Atom(*args, name=str(atom.serial_number), element=str(atom.element), coords=atom.coord, **kwargs)
@@ -101,8 +102,8 @@ class Residue(Geometry):
                 #    print("no chix atom yet", atom)
                 #elif atom.chix_atom.deleted:
                 #    print("chix_atom deleted", atom)
-                #elif atom.chix_atom != chix_residue.atoms[i]:
-                #    print("atoms do not match", atom.chix_atom, chix_residue.atoms[i])
+                #else:
+                #    print("atoms do not match", atom.chix_atom)
                     
                 atom_name = "%s1" % atom.element
                 k = 1
@@ -125,6 +126,7 @@ class Residue(Geometry):
                 
         for atom in chix_residue.atoms:
             if atom not in known_atoms:
+                #print("deleting %s" % atom.atomspec)
                 atom.delete()
 
         if refresh_connected:
@@ -266,9 +268,10 @@ class ResidueCollection(Geometry):
             return
   
     def _atom_update(self):
+        old_atoms = [a for a in self.atoms]
         self.atoms = []
         for res in self.residues:
-            self.atoms.extend(res.atoms)
+            self.atoms.extend([a for a in res.atoms if a in old_atoms])
   
     def substitute(self, sub, target, *args, **kwargs):
         """find the residue that target is on and substitute it for sub"""
@@ -290,39 +293,30 @@ class ResidueCollection(Geometry):
 
     def ring_substitute(self, target, ring, *args, **kwargs):
         """put a ring on the given targets"""
-        target = self.find(target)
         if not isinstance(ring, Ring):
             ring = Ring(ring)
-            
-        if len(target) != 2:
-            raise RuntimeError("can only specify two targets")
-            
-        residue_1 = self.find_residue(target[0])[0]
-        residue_2 = self.find_residue(target[1])[0]
-        
-        #turn atoms into ChixAtoms
-        
-        #update ring end
-        ring.end = ring.find(",".join(atom.name for atom in ring.end)) 
-        
-        if residue_1 is not residue_2:
-            temp_res = Residue(residue_1.atoms + residue_2.atoms)
-            temp_res.ring_substitute(target, ring, *args, **kwargs)
-            
-            for atom in temp_res.atoms:
-                if atom not in residue_1.atoms and atom not in residue_2.atoms:
-                    residue_1.atoms.append(atom)
-                    
-            for atom in residue_1.atoms + residue_2.atoms:
-                if atom not in temp_res.atoms:
-                    res = self.find_residue(atom)[0]
-                    res -= atom
-        
-        else:
-            residue_1.ring_substitute(target, ring, *args, **kwargs)   
-                    
-        self._atom_update()
 
+        residue = self.find_residue(target[0])[0]
+        
+        super().ring_substitute(target, ring)
+
+        new_atoms = [atom for atom in self.atoms if not hasattr(atom, "chix_atom")]
+        residue.atoms.extend(new_atoms)
+
+        for res in self.residues:
+            deleted_atoms = []
+            for atom in res.atoms:
+                if not hasattr(atom, "chix_atom"):
+                    continue
+
+                if atom.chix_atom.residue is not res.chix_residue and atom in self.atoms:
+                    deleted_atoms.append(atom)
+                elif atom not in self.atoms:
+                    deleted_atoms.append(atom)
+                
+            for atom in deleted_atoms:
+                res.atoms.remove(atom)
+        
     def find_residue(self, target):
         """returns a list of residues containing the specified target"""
         atom = self.find(target)
@@ -426,12 +420,14 @@ class ResidueCollection(Geometry):
                 
                 try:
                     new_bond = atomic_structure.new_bond(atom1, atom2)
-                                        
+
                     if any([aaron_atom.element in TMETAL for aaron_atom in [aaron_atom1, aaron_atom2]]):
                         pbg = atomic_structure.pseudobond_group(atomic_structure.PBG_METAL_COORDINATION, create_type='normal') 
                         pbg.new_pseudobond(atom1, atom2)
                         new_bond.delete()
-                except:
+                
+                except Exception as e:
+                    print("failed to create bond", e)
                     pass
 
     def all_geom_coordsets(self, filereader):

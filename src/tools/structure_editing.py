@@ -23,6 +23,7 @@ from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.libraries import SubstituentTable, LigandTable, RingTable
 
 def minimal_ring_convert(atomic_structure, atom1, atom2):
+    tm_bonds = atomic_structure.pseudobond_group(atomic_structure.PBG_METAL_COORDINATION, create_type=None)
     residues = [atom1.residue]
     if atom2.residue not in residues:
         residues.append(atom2.residue)
@@ -32,7 +33,7 @@ def minimal_ring_convert(atomic_structure, atom1, atom2):
     i = 0
     while start != atom2:
         if start.residue not in residues:
-            residues.append(residue)
+            residues.append(start.residue)
             
         i += 1
         if i > max_iter:
@@ -40,7 +41,17 @@ def minimal_ring_convert(atomic_structure, atom1, atom2):
             
         v1 = atom2.coord - start.coord
         max_overlap = None
-        for atom in start.neighbors:
+        pseudobonds = []
+        if tm_bonds is not None:
+            for bond in tm_bonds.pseudobonds:
+                atom1, atom2 = bond.atoms
+                if start is atom1:
+                    pseudobonds.append(atom2)
+                    
+                if start is atom2:
+                    pseudobonds.append(atom1)
+
+        for atom in start.neighbors + pseudobonds:
             v2 = atom.coord - start.coord
             overlap = np.dot(v1, v2)
             if max_overlap is None or overlap > max_overlap:
@@ -48,7 +59,10 @@ def minimal_ring_convert(atomic_structure, atom1, atom2):
                 max_overlap = overlap
                 
         start = new_start
-        
+
+    for residue in residues:
+        atomic_structure.session.logger.info(residue.atomspec)
+
     return residues
 
 
@@ -96,7 +110,7 @@ class EditStructure(ToolInstance):
         open_sub_lib.clicked.connect(self.open_sub_selector)
         self.substitute_layout.addWidget(open_sub_lib, 0, 2, Qt.AlignTop)        
         
-        self.substitute_layout.addWidget(QLabel("modify selected structure:"), 1, 0, 1, 1, Qt.AlignTop)
+        self.substitute_layout.addWidget(QLabel("modify selected structure:"), 1, 0, 1, 1, Qt.AlignVCenter)
         
         self.close_previous_sub = QCheckBox()
         self.close_previous_sub.setToolTip("checked: selected structure will be modified\nunchecked: new model will be created for the modified structure")
@@ -104,7 +118,7 @@ class EditStructure(ToolInstance):
         self.close_previous_sub.stateChanged.connect(self.close_previous_change)
         self.substitute_layout.addWidget(self.close_previous_sub, 1, 1, 1, 2, Qt.AlignTop)    
         
-        self.substitute_layout.addWidget(QLabel("guess previous substituent:"), 2, 0, 1, 1, Qt.AlignTop)
+        self.substitute_layout.addWidget(QLabel("guess previous substituent:"), 2, 0, 1, 1, Qt.AlignVCenter)
         
         self.guess_old = QCheckBox()
         self.guess_old.setToolTip("checked: AaronTools will use the shortest connected fragment in the residue\nunchecked: previous substituent must be selected")
@@ -112,7 +126,7 @@ class EditStructure(ToolInstance):
         self.guess_old.stateChanged.connect(lambda state, settings=self.settings: settings.__setattr__("guess", True if state == Qt.Checked else False))
         self.substitute_layout.addWidget(self.guess_old, 2, 1, 1, 2, Qt.AlignTop)
         
-        self.substitute_layout.addWidget(QLabel("new residue name:"), 3, 0, 1, 1, Qt.AlignTop)
+        self.substitute_layout.addWidget(QLabel("new residue name:"), 3, 0, 1, 1, Qt.AlignVCenter)
         
         self.new_sub_name = QLineEdit()
         self.new_sub_name.setToolTip("change name of modified residues")
@@ -147,7 +161,7 @@ class EditStructure(ToolInstance):
         open_lig_lib.clicked.connect(self.open_lig_selector)
         self.maplig_layout.addWidget(open_lig_lib, 0, 2, Qt.AlignTop)        
         
-        self.maplig_layout.addWidget(QLabel("modify selected structure:"), 1, 0, 1, 1, Qt.AlignTop)
+        self.maplig_layout.addWidget(QLabel("modify selected structure:"), 1, 0, 1, 1, Qt.AlignVCenter)
         
         self.close_previous_lig = QCheckBox()
         self.close_previous_lig.setToolTip("checked: selected structure will be modified\nunchecked: new model will be created for the modified structure")
@@ -181,7 +195,7 @@ class EditStructure(ToolInstance):
         open_ring_lib.clicked.connect(self.open_ring_selector)
         self.closering_layout.addWidget(open_ring_lib, 0, 2, Qt.AlignTop)        
         
-        self.closering_layout.addWidget(QLabel("modify selected structure:"), 1, 0, 1, 1, Qt.AlignTop) 
+        self.closering_layout.addWidget(QLabel("modify selected structure:"), 1, 0, 1, 1, Qt.AlignVCenter) 
         
         self.close_previous_ring = QCheckBox()
         self.close_previous_ring.setToolTip("checked: selected structure will be modified\nunchecked: new model will be created for the modified structure")
@@ -189,7 +203,7 @@ class EditStructure(ToolInstance):
         self.close_previous_ring.stateChanged.connect(self.close_previous_change)
         self.closering_layout.addWidget(self.close_previous_ring, 1, 1, 1, 2, Qt.AlignTop)
 
-        self.closering_layout.addWidget(QLabel("new residue name:"), 2, 0, 1, 1, Qt.AlignTop)
+        self.closering_layout.addWidget(QLabel("new residue name:"), 2, 0, 1, 1, Qt.AlignVCenter)
         
         self.new_ring_name = QLineEdit()
         self.new_ring_name.setToolTip("change name of modified residues")
@@ -458,6 +472,7 @@ class EditStructure(ToolInstance):
                     if new_name is not None:
                         for res in convert:
                             res.name = new_name[i]
+
                     rescol = ResidueCollection(model, convert_residues=convert)
 
                     target = rescol.find([atom1.atomspec, atom2.atomspec])

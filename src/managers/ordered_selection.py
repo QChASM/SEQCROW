@@ -13,7 +13,7 @@ class OrderedSelectionManager(ProviderManager):
     
     @property
     def selection(self):
-        return Atoms(self._selection)  
+        return Atoms([a for a in self._selection if not a.deleted])  
     
     def selection_changed(self, *args):
         selection = selected_atoms(self.session)
