@@ -30,6 +30,8 @@ class FileReaderManager(ProviderManager):
             self.models.append(model)
             self.filereaders.append(filereader)
     
+        self.triggers.activate_trigger(FILEREADER_CHANGE, self)
+
     def remove_filereader(self, trigger_name, models_and_filereaders):
         models, filereaders = models_and_filereaders
         for model, filereader in zip(models, filereaders):
@@ -42,7 +44,7 @@ class FileReaderManager(ProviderManager):
         """remove models with filereader data from our list when they are closed"""
         models_changed = False
         for model in models:
-            if model in self.models:
+            while model in self.models:
                 models_changed = True
                 ndx = self.models.index(model)
                 self.filereaders.pop(ndx)
@@ -55,12 +57,26 @@ class FileReaderManager(ProviderManager):
         #*buzz lightyear* ah yes, the models are models
         self.models = self.models
     
+    def get_model(self, fr):
+        dict = self.filereader_dict
+        for mdl in dict:
+            if fr in dict[mdl]:
+                return mdl
+    
     @property
     def frequency_models(self):
         """returns a list of models with frequency data"""
-        return [model for model in self.filereader_dict.keys() if 'frequency' in self.filereader_dict[model].other]
+        return [model for model in self.filereader_dict.keys() if any('frequency' in fr.other for fr in self.filereader_dict[model])]
         
     @property
     def filereader_dict(self):
         """returns a dictionary with atomic structures:FileReader pairs"""
-        return {mdl:fr for mdl, fr in zip(self.models, self.filereaders)}
+        out = {}
+        for mdl in self.models:
+            out[mdl] = []
+            for i, fr in enumerate(self.filereaders):
+                if self.models[i] is mdl:
+                    out[mdl].append(fr)
+                    
+        return out
+    
