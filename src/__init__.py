@@ -28,6 +28,8 @@ class _SEQCROW_API(BundleAPI):
         if seqcrow_settings.settings.AARONLIB is not None:
             os.environ['AARONLIB'] = seqcrow_settings.settings.AARONLIB
 
+        session.seqcrow_settings = seqcrow_settings
+
         ##register selectors from the user's personal library
         #from AaronTools.substituent import Substituent
         #for sub in Substituent.list():  
@@ -76,6 +78,10 @@ class _SEQCROW_API(BundleAPI):
             from SEQCROW.managers import OrderedSelectionManager
             session.seqcrow_ordered_selection_manager = OrderedSelectionManager(session)
             return session.seqcrow_ordered_selection_manager
+        elif name == "seqcrow_job_manager":
+            from SEQCROW.managers import JobManager
+            session.seqcrow_job_manager = JobManager()
+            return session.seqcrow_job_manager
         else:
             raise RuntimeError("manager named '%s' is unknown to SEQCROW" % name)
   
@@ -109,6 +115,9 @@ class _SEQCROW_API(BundleAPI):
             from .tools import BuildQM
             tool = BuildQM(session, ti.name)
             return tool
+        elif ti.name == "Job Queue":
+            from .tools import JobQueue
+            return JobQueue(session, ti.name)
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)
 

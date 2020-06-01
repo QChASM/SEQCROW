@@ -8,7 +8,7 @@
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
-            <URL>catalysttrends.org</URL>
+            <URL>http://catalysttrends.wheelergroupresearch.com/</URL>
             <License>license.txt</License>
             <Synopsis>Structure Editing and Quantum Chemical Representation and Organization for Workflows</Synopsis>
             <Description>An AaronTools-based plugin for ChimeraX. 
@@ -28,7 +28,8 @@ tools:
 
     SEQCROW
         Managed Models           - restore models opened through SEQCROW to their original state
-        Build QM Input           - build Gaussian, ORCA, or Psi4 input file
+        Build QM Input           - build Gaussian, ORCA, or Psi4 input files
+        Job Queue                - manage QM jobs that are run with SEQCROW
 
 selectors:
     tm  - select all transition metals
@@ -40,7 +41,7 @@ presets:
             </Description>
             
             <Dependencies>
-                <Dependency name="ChimeraX-Core" version=">=0.93"/>
+                <Dependency name="ChimeraX-Core" version=">=0.94"/>
                 <Dependency name="scipy"/>
                 <Dependency name="numpy"/>
             </Dependencies>
@@ -53,6 +54,7 @@ presets:
             <Managers>
                 <Manager name="filereader_manager" uiOnly="true"/>
                 <Manager name="seqcrow_ordered_selection_manager" uiOnly="true"/>
+                <Manager name="seqcrow_job_manager" uiOnly="false"/>
             </Managers>
             
             <Providers manager="data formats">
@@ -125,6 +127,7 @@ presets:
                 <ChimeraXClassifier>ChimeraX :: Tool :: Managed Models :: SEQCROW :: see models managed by SEQCROW</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Add to Personal Library :: AaronTools :: Add to your personal ligand, substituent, and ring libraries</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Visualize Normal Modes :: AaronTools :: Visualize normal modes from a Gaussian output file as displacement vectors or as an animation</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Job Queue :: SEQCROW :: View status of jobs</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: tm :: Transition metals</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: DataFormat :: XYZ :: XYZ :: Molecular structure :: .xyz :: :: :: :: :: XYZ Format :: utf-8</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Open :: XYZ :: AaronTools :: false :: coordsets:Bool</ChimeraXClassifier>

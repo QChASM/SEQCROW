@@ -482,13 +482,18 @@ class Method:
             s += "}\n\n"
 
         if self.constraints is not None:
-            s += "set optking {\n"
             if len(self.constraints['atoms']) > 0 and self.structure is not None:
-                s += "    frozen_cartesian = (\"\n"
+                s += "freeze_list = \"\"\"\n"
                 for atom in self.constraints['atoms']:
-                    s += "        %2i xyz\n" % (self.structure.atoms.index(atom) + 1)
+                    s += "    %2i xyz\n" % (self.structure.atoms.index(atom) + 1)
                 
-                s += "    \")\n"
+                s += "\"\"\"\n"
+                s += "    \n"
+
+            s += "set optking {\n"
+            
+            if len(self.constraints['atoms']) > 0 and self.structure is not None:
+                s += "    frozen_cartesian $freeze_list\n"
 
             if len(self.constraints['bonds']) > 0 and self.structure is not None:
                 s += "    frozen_distance = (\"\n"
@@ -509,7 +514,7 @@ class Method:
             if len(self.constraints['torsions']) > 0 and self.structure is not None:
                 s += "    frozen_dihedral = (\"\n"
                 for torsion in self.constraints['torsions']:
-                    atom1, atom2, atom3 = torsion
+                    atom1, atom2, atom3, atom4 = torsion
                     s += "        %2i %2i %2i %2i\n" % (self.structure.atoms.index(atom1) + 1, self.structure.atoms.index(atom2) + 1, self.structure.atoms.index(atom3) + 1, self.structure.atoms.index(atom4) + 1)
                     
                 s += "    \")\n"

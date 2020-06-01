@@ -33,7 +33,7 @@ def open_aarontools(session, path, format_name=None, coordsets=False):
         
         slider = CoordinateSetSlider(session, structure)
         if "energy" in f.other:
-            nrg_plot = EnergyPlot(session, structure)
+            nrg_plot = EnergyPlot(session, structure, f)
             if not nrg_plot.opened:
                 warn("energy plot could not be opened\n" + \
                      "there might be a mismatch between energy entries and structure entries in %s" % path)
@@ -44,7 +44,7 @@ def open_aarontools(session, path, format_name=None, coordsets=False):
         if coordsets:
             slider.set_slider(len(f.all_geom))
 
-    status = "Opened %s as a %s %s" % (path, fmt, "movie" if coordsets else "file")
+    status = "Opened %s as a %s %s" % (path, format_name, "movie" if coordsets else "")
 
     return [structure], status
 

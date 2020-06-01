@@ -36,13 +36,14 @@ class EnergyPlot(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False         
     
-    def __init__(self, session, model):
+    def __init__(self, session, model, filereader):
         super().__init__(session, model.name)
         
         from chimerax.ui import MainToolWindow
         self.tool_window = MainToolWindow(self)    
         
         self.structure = model
+        self.filereader = filereader
 
         self.display_name = "Thing per iteration for %s" % model.name     
 
@@ -67,7 +68,7 @@ class EnergyPlot(ToolInstance):
         
         ax = self.figure.add_axes((0.22, 0.22, 0.66, 0.66))
 
-        fr = self.session.filereader_manager.filereader_dict[self.structure]
+        fr = self.filereader
 
         data = []
         for step in fr.all_geom:
@@ -75,6 +76,7 @@ class EnergyPlot(ToolInstance):
             if len(info) < 1:
                 #we will be unable to load an enegy plot because some structure does not have an associated energy
                 self.opened = False
+                self.session.logger.error("not enough iterations to plot - %i found" % len(info))
                 return
             else:
                 info = info[0]

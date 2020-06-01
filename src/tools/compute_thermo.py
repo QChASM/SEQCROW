@@ -3,13 +3,15 @@ from chimerax.ui.gui import MainToolWindow
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
 from chimerax.core.commands import run
-from chimerax.core.commands.cli import FloatArg, BoolArg
+from chimerax.core.commands.cli import FloatArg, BoolArg, StringArg
 from chimerax.core.models import ADD_MODELS
 
 from PyQt5.Qt import QClipboard
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QKeySequence
-from PyQt5.QtWidgets import QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, QDoubleSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QWidget
+from PyQt5.QtWidgets import QLabel, QGridLayout, QComboBox, QSplitter, QLineEdit, QDoubleSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QWidget, QGroupBox
+
+from os.path import basename
 
 from SEQCROW.managers.filereader_manager import FILEREADER_CHANGE 
 
@@ -20,13 +22,14 @@ class _ComputeThermoSettings(Settings):
     AUTO_SAVE = {
         'w0': Value(100.0, FloatArg, str),
         'include_header': Value(True, BoolArg, str),
+        'delimiter': Value('comma', StringArg), 
     }
 
 
 class Thermochem(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False         
-    help = "https://github.com/QChASM/ChimAARON/wiki/Process-Thermochemistry-Tool"
+    help = "https://github.com/QChASM/SEQCROW/wiki/Process-Thermochemistry-Tool"
 
     theory_helper = {"Grimme's Quasi-RRHO":"https://doi.org/10.1002/chem.201200497",
                      "Truhlar's Quasi-Harmonic":"https://doi.org/10.1021/jp205508z"}
@@ -56,15 +59,12 @@ class Thermochem(ToolInstance):
         layout = QGridLayout()
 
         #box for sp
-        sp_area_widget = QFrame()
+        sp_area_widget = QGroupBox("Single-point")
         self.sp_layout = QGridLayout(sp_area_widget)
-
-        sp_label = QLabel("Single-point energy:")
-        self.sp_layout.addWidget(sp_label, 0, 0, 1, 1, Qt.AlignTop)
 
         self.sp_selector = QComboBox()
         self.sp_selector.currentIndexChanged.connect(self.set_sp)
-        self.sp_layout.addWidget(self.sp_selector, 0, 1, 1, 2, Qt.AlignTop)
+        self.sp_layout.addWidget(self.sp_selector, 0, 0, 1, 3, Qt.AlignTop)
         
         nrg_label = QLabel("E =")
         self.sp_layout.addWidget(nrg_label, 1, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
@@ -83,20 +83,16 @@ class Thermochem(ToolInstance):
         self.sp_layout.setRowStretch(0, 0)
         self.sp_layout.setRowStretch(1, 0)
         self.sp_layout.setRowStretch(2, 1)
-        sp_area_widget.setFrameStyle(QFrame.StyledPanel)
         
 
         row = 0
         #box for thermo
-        therm_area_widget = QFrame()
+        therm_area_widget = QGroupBox("Thermal corrections")
         self.thermo_layout = QGridLayout(therm_area_widget)
-        
-        therm_label = QLabel("Thermal corrections:")
-        self.thermo_layout.addWidget(therm_label, row, 0, 1, 1, Qt.AlignTop)
-        
+
         self.thermo_selector = QComboBox()
         self.thermo_selector.currentIndexChanged.connect(self.set_thermo_mdl)
-        self.thermo_layout.addWidget(self.thermo_selector, row, 1, 1, 2, Qt.AlignTop)
+        self.thermo_layout.addWidget(self.thermo_selector, row, 0, 1, 3, Qt.AlignTop)
 
         row += 1
 
@@ -206,21 +202,14 @@ class Thermochem(ToolInstance):
         for i in range(0, row):
             self.thermo_layout.setRowStretch(i, 0)
         
-        self.thermo_layout.setRowStretch(row + 1, 1)
-        therm_area_widget.setFrameStyle(QFrame.StyledPanel)
+        self.thermo_layout.setRowStretch(row + 1, 1)        
         
         
         row = 0
         # for for total
-        sum_area_widget = QFrame()
+        sum_area_widget = QGroupBox("Thermochemistry")
         self.sum_layout = QGridLayout(sum_area_widget)
-        sum_area_widget.setFrameStyle(QFrame.StyledPanel)
-        
-        total_label = QLabel("Thermochemistry")
-        self.sum_layout.addWidget(total_label, row, 0, 1, 3, Qt.AlignHCenter | Qt.AlignTop)
-        
-        row += 1
-        
+
         self.sum_layout.addWidget(QLabel("ZPE ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
         
         self.zpe_sum_line = QLineEdit()
@@ -305,10 +294,6 @@ class Thermochem(ToolInstance):
         copy.setShortcut(shortcut)
         export.addAction(copy)
         
-        add_header = QAction("&Include CSV header", self.tool_window.ui_area, checkable=True)
-        add_header.setChecked(self.settings.include_header)
-        add_header.triggered.connect(self.header_check)
-        export.addAction(add_header)
         
         save = QAction("&Save CSV...", self.tool_window.ui_area)
         save.triggered.connect(self.save_csv)
@@ -319,7 +304,50 @@ class Thermochem(ToolInstance):
         #save.setShortcut(shortcut)
         #save.setShortcutContext(Qt.WidgetShortcut)
         export.addAction(save)
+
+        delimiter = export.addMenu("Delimiter")
         
+        comma = QAction("comma", self.tool_window.ui_area, checkable=True)
+        comma.setChecked(self.settings.delimiter == "comma")
+        comma.triggered.connect(lambda *args, delim="comma": self.settings.__setattr__("delimiter", delim))
+        delimiter.addAction(comma)
+        
+        tab = QAction("tab", self.tool_window.ui_area, checkable=True)
+        tab.setChecked(self.settings.delimiter == "tab")
+        tab.triggered.connect(lambda *args, delim="tab": self.settings.__setattr__("delimiter", delim))
+        delimiter.addAction(tab)
+        
+        space = QAction("space", self.tool_window.ui_area, checkable=True)
+        space.setChecked(self.settings.delimiter == "space")
+        space.triggered.connect(lambda *args, delim="space": self.settings.__setattr__("delimiter", delim))
+        delimiter.addAction(space)
+        
+        semicolon = QAction("semicolon", self.tool_window.ui_area, checkable=True)
+        semicolon.setChecked(self.settings.delimiter == "semicolon")
+        semicolon.triggered.connect(lambda *args, delim="semicolon": self.settings.__setattr__("delimiter", delim))
+        delimiter.addAction(semicolon)
+        
+        add_header = QAction("&Include CSV header", self.tool_window.ui_area, checkable=True)
+        add_header.setChecked(self.settings.include_header)
+        add_header.triggered.connect(self.header_check)
+        export.addAction(add_header)
+        
+        comma.triggered.connect(lambda *args, action=tab: action.setChecked(False))
+        comma.triggered.connect(lambda *args, action=space: action.setChecked(False))
+        comma.triggered.connect(lambda *args, action=semicolon: action.setChecked(False))
+        
+        tab.triggered.connect(lambda *args, action=comma: action.setChecked(False))
+        tab.triggered.connect(lambda *args, action=space: action.setChecked(False))
+        tab.triggered.connect(lambda *args, action=semicolon: action.setChecked(False))
+        
+        space.triggered.connect(lambda *args, action=comma: action.setChecked(False))
+        space.triggered.connect(lambda *args, action=tab: action.setChecked(False))
+        space.triggered.connect(lambda *args, action=semicolon: action.setChecked(False))
+        
+        semicolon.triggered.connect(lambda *args, action=comma: action.setChecked(False))
+        semicolon.triggered.connect(lambda *args, action=tab: action.setChecked(False))
+        semicolon.triggered.connect(lambda *args, action=space: action.setChecked(False))
+
         menu.setNativeMenuBar(False)
         layout.setMenuBar(menu)
 
@@ -349,12 +377,28 @@ class Thermochem(ToolInstance):
         print("copied to clipboard")
 
     def get_csv(self):
+        if self.settings.delimiter == "comma":
+            delim = ","
+        elif self.settings.delimiter == "space":
+            delim = " "
+        elif self.settings.delimiter == "tab":
+            delim = "\t"
+        elif self.settings.delimiter == "semicolon":
+            delim = ";"
+
         if self.settings.include_header:
-            s = "E,ZPE,H(RRHO),G(RRHO),G(Quasi-RRHO),G(Quasi-harmonic),dZPE,dH(RRHO),dG(RRHO),dG(Quasi-RRHO),dG(Quasi-harmonic),SP File,Thermo File\n"
+            s = delim.join(["E" , "ZPE", "H(RRHO)", "G(RRHO)", "G(Quasi-RRHO)", "G(Quasi-harmonic)", \
+                            "dZPE", "dH(RRHO)", "dG(RRHO)", "dG(Quasi-RRHO)", "dG(Quasi-harmonic)", \
+                            "SP File", "Thermo File"])
+            
+            s += "\n"
         else:
             s = ""
         
-        fmt = 11*"%.12f," + "%s,%s" + "\n"
+        float_fmt = "%.12f" + delim
+        str_dmt = "%s" + delim + "%s"
+        
+        fmt = 11*float_fmt + str_dmt + "\n"
         
         E    = float(self.sp_nrg_line.text())
         
@@ -371,10 +415,10 @@ class Thermochem(ToolInstance):
         qharm_G = float(self.qharm_g_sum_line.text())
         
         sp_mdl = self.sp_selector.currentData()
-        sp_name = sp_mdl.name
+        sp_name = sp_mdl.geometry.name
                     
         therm_mdl = self.thermo_selector.currentData()
-        therm_name = therm_mdl.name
+        therm_name = therm_mdl.geometry.name
         
         s += fmt % (E, ZPE, H, rrho_G, qrrho_G, qharm_G, dZPE, dH, rrho_dG, qrrho_dG, qharm_dG, sp_name, therm_name)
         
@@ -406,44 +450,44 @@ class Thermochem(ToolInstance):
             if mdl in self.thermo_cos:
                 del self.thermo_cos[mdl]
         
+        #TODO:
+        #figure out new CompOutputs instead of models
         #figure out new models
         new_models = [model for model in models if model not in self.nrg_cos.keys()]
         new_models.extend([model for model in models if model not in self.nrg_cos.keys() and model not in new_models])
-        
-        comp_outs = [CompOutput(self.session.filereader_manager.filereader_dict[mdl]) for mdl in models]
-        for mdl, co in zip(new_models, comp_outs):
-            if co.energy is not None:
-                self.nrg_cos[mdl] = co
-            
-            if co.grimme_g is not None:    
-                self.thermo_cos[mdl] = co
+
+        for mdl in models:
+            self.nrg_cos[mdl] = []
+            self.thermo_cos[mdl] = []
+            for fr in self.session.filereader_manager.filereader_dict[mdl]:
+                co = CompOutput(fr)
+                if co.energy is not None:
+                    self.nrg_cos[mdl].append(co)
+                
+                if co.grimme_g is not None:    
+                    self.thermo_cos[mdl].append(co)
         
         self.nrg_models = list(self.nrg_cos.keys())
         self.thermo_models = list(self.thermo_cos.keys())
-        
-        #remove models in reverse order b/c some don't get removed if multiple are
-        #closed at once
-        for i in range(self.sp_selector.count(), -1, -1):
-            if self.sp_selector.itemData(i) not in self.nrg_models:
-                self.sp_selector.removeItem(i)
-                
+
+        self.sp_selector.clear()
+
         for model in self.nrg_models:
-            if self.sp_selector.findData(model) == -1:
-                self.sp_selector.addItem("%s (%s)" % (model.name, model.atomspec), model)
+            for co in self.nrg_cos[model]:
+                if self.sp_selector.findData(co) == -1:
+                    self.sp_selector.addItem("%s (%s)" % (basename(co.geometry.name), model.atomspec), co)
         
-        for i in range(self.thermo_selector.count(), -1, -1):
-            if self.thermo_selector.itemData(i) not in self.thermo_models:
-                self.thermo_selector.removeItem(i)
+        self.thermo_selector.clear()
                 
         for model in self.thermo_models:
-            if self.thermo_selector.findData(model) == -1:
-                self.thermo_selector.addItem("%s (%s)" % (model.name, model.atomspec), model)
+            for co in self.thermo_cos[model]:
+                if self.thermo_selector.findData(co) == -1:
+                    self.thermo_selector.addItem("%s (%s)" % (basename(co.geometry.name), model.atomspec), co)
 
     def set_sp(self):
         """set energy entry for when sp model changes"""
         if self.sp_selector.currentIndex() >= 0:
-            mdl = self.nrg_models[self.sp_selector.currentIndex()]
-            co = self.nrg_cos[mdl]
+            co = self.sp_selector.currentData()
                 
             self.sp_nrg_line.setText("%.6f" % co.energy)
         else:
@@ -453,9 +497,8 @@ class Thermochem(ToolInstance):
         
     def set_thermo_mdl(self):
         if self.thermo_selector.currentIndex() >= 0:
-            mdl = self.thermo_models[self.thermo_selector.currentIndex()]
-            co = self.thermo_cos[mdl]
-            
+            co = self.thermo_selector.currentData()
+
             if co.temperature is not None:
                 self.temperature_line.setValue(co.temperature)
 
@@ -465,8 +508,7 @@ class Thermochem(ToolInstance):
         """sets thermo entries for when thermo model changes"""
         #index of combobox is -1 when combobox has no entries
         if self.thermo_selector.currentIndex() >= 0:
-            mdl = self.thermo_models[self.thermo_selector.currentIndex()]
-            co = self.thermo_cos[mdl]
+            co = self.thermo_selector.currentData()
             
             v0 = self.v0_edit.value()
 
@@ -480,11 +522,11 @@ class Thermochem(ToolInstance):
             dZPE = co.ZPVE
             #compute enthalpy and entropy at this temperature
             #AaronTools uses Grimme's Quasi-RRHO, but this is the same as RRHO when w0=0
-            dE, dH, s = co.therm_corr(temperature=T, v0=0, quasi_harmonic=False)
+            dE, dH, s = co.therm_corr(temperature=T, v0=0, method="RRHO")
             rrho_dg = dH - T * s
             #compute G with quasi entropy treatments
-            qrrho_dg = co.calc_G_corr(v0=v0, temperature=T, quasi_harmonic=False)
-            qharm_dg = co.calc_G_corr(v0=v0, temperature=T, quasi_harmonic=True)
+            qrrho_dg = co.calc_G_corr(v0=v0, temperature=T, method="QRRHO")
+            qharm_dg = co.calc_G_corr(v0=v0, temperature=T, method="QHARM")
             
             self.zpe_line.setText("%.6f" % dZPE)
             self.enthalpy_line.setText("%.6f" % dH)

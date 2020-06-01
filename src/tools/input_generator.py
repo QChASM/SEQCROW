@@ -4,6 +4,7 @@ from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
 from chimerax.core.commands.cli import StringArg, BoolArg, ListOf, IntArg
+from chimerax.core.commands import run
 from chimerax.core.models import ADD_MODELS, REMOVE_MODELS
 
 from json import dumps, loads
@@ -20,6 +21,7 @@ from PyQt5.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.theory import *
 from SEQCROW.utils import iter2str, combine_dicts
+from SEQCROW.jobs import ORCAJob, GaussianJob, Psi4Job
 
 from AaronTools.const import TMETAL
 
@@ -30,6 +32,8 @@ class _InputGeneratorSettings(Settings):
         'last_opt': Value(False, BoolArg), 
         'last_ts': Value(False, BoolArg), 
         'last_freq': Value(False, BoolArg), 
+        'last_raman': Value(False, BoolArg), 
+        'last_num_freq': Value(False, BoolArg), 
         'previous_basis_names': Value([], ListOf(StringArg), iter2str),
         'previous_basis_paths': Value([], ListOf(StringArg), iter2str),
         'previous_ecp_names': Value([], ListOf(StringArg), iter2str),
@@ -117,7 +121,7 @@ class _InputGeneratorSettings(Settings):
                                                            "other": {}, \
                                                          }, \
                                         }), StringArg), \
-        'orca_presets':Value(dumps({"quick optimize":{"nproc":1, \
+        'orca_presets': Value(dumps({"quick optimize":{"nproc":1, \
                                                        "mem":0, \
                                                        "opt":True, \
                                                        "ts":False, \
@@ -148,7 +152,7 @@ class _InputGeneratorSettings(Settings):
                                                    "other": {Method.ORCA_ROUTE:['TightSCF']}, \
                                                   }, \
                                        }), StringArg), \
-         'psi4_presets':Value(dumps({"quick optimize":{"nproc":1, \
+         'psi4_presets': Value(dumps({"quick optimize":{"nproc":1, \
                                                        "mem":0, \
                                                        "opt":True, \
                                                        "ts":False, \
@@ -165,6 +169,8 @@ class _InputGeneratorSettings(Settings):
                                                       }, \
                                         },\
                                 ), StringArg),
+        'refresh_finished': Value(False, BoolArg), 
+        'open_finished': Value(False, BoolArg), 
     }
     
     #def save(self, *args, **kwargs):
@@ -176,7 +182,7 @@ class BuildQM(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False         
 
-    help = "https://github.com/QChASM/ChimAARON/wiki/Build-QM-Input-Tool"
+    help = "https://github.com/QChASM/SEQCROW/wiki/Build-QM-Input-Tool"
 
     def __init__(self, session, name):       
         super().__init__(session, name)
@@ -188,6 +194,7 @@ class BuildQM(ToolInstance):
         self.tool_window = MainToolWindow(self)        
         self.preview_window = None
         self.preset_window = None
+        self.job_local_prep = None
 
         self._build_ui()
 
@@ -285,6 +292,9 @@ class BuildQM(ToolInstance):
         preview = QAction("&Preview", self.tool_window.ui_area)
         preview.triggered.connect(self.show_preview)
         view.addAction(preview)
+        queue = QAction("&Queue", self.tool_window.ui_area)
+        queue.triggered.connect(self.show_queue)
+        view.addAction(queue)
         
         #TODO:
         #add Run ->
@@ -292,13 +302,7 @@ class BuildQM(ToolInstance):
         #       Remotely ->
         #           list of places?
         #               look at how AARON does jobs
-        
-        #run = menu.addMenu("&Run")
-        #locally = QAction("&Locally - coming soon", self.tool_window.ui_area)
-        #remotely = QAction("R&emotely - coming eventually", self.tool_window.ui_area)
-        #run.addAction(locally)
-        #run.addAction(remotely)
-        #
+
         #batch = menu.addMenu("&Batch")
         #multistructure = QAction("&Multiple structures - coming eventually", self.tool_window.ui_area)
         #focal_point = QAction("&Focal point table - coming eventually", self.tool_window.ui_area)
@@ -309,7 +313,14 @@ class BuildQM(ToolInstance):
         self.new_preset = QAction("Save Preset...", self.tool_window.ui_area)
         self.new_preset.triggered.connect(self.show_new_preset)
         self.presets_menu.addAction(self.new_preset)
-
+        
+        run = menu.addMenu("&Run")
+        locally = QAction("&Locally", self.tool_window.ui_area)
+        #remotely = QAction("R&emotely - coming eventually", self.tool_window.ui_area)
+        locally.triggered.connect(self.show_local_job_prep)
+        run.addAction(locally)
+        #run.addAction(remotely)
+        
         menu.setNativeMenuBar(False)
         layout.setMenuBar(menu)
 
@@ -365,6 +376,9 @@ class BuildQM(ToolInstance):
         if 'raman' in preset:
             self.job_widget.raman.setChecked(preset['raman'])
         
+        if 'num_freq' in preset:
+            self.job_widget.num_freq.setChecked(preset['num_freq'])
+        
         if 'nproc' in preset:
             self.job_widget.setProcessors(preset['nproc'])
             self.job_widget.setMemory(preset['mem'])
@@ -416,10 +430,13 @@ class BuildQM(ToolInstance):
     
         self.update_preview()
         
-        self.session.logger.info("applied \"%s\" (%s)"% (preset_name, program))
+        self.session.logger.info("applied \"%s\" (%s)" % (preset_name, program))
         
         if self.preset_window is not None:
             self.preset_window.basis_elements.refresh_basis()
+
+    def show_queue(self):
+        run(self.session, "ui tool show \"Job Queue\"")
 
     def show_preview(self):
         """open child tool that showns contents of input file"""
@@ -542,15 +559,15 @@ class BuildQM(ToolInstance):
         self.job_widget.setStructure(mdl)
 
         if mdl in self.session.filereader_manager.filereader_dict:
-            fr = self.session.filereader_manager.filereader_dict[mdl]
-            if 'charge' in fr.other:
-                self.job_widget.setCharge(fr.other['charge'])
-           
-            if 'multiplicity' in fr.other:
-                self.job_widget.setMultiplicity(fr.other['multiplicity'])
-                
-            if 'temperature' in fr.other:
-                self.job_widget.setTemperature(fr.other['temperature'])
+            for fr in self.session.filereader_manager.filereader_dict[mdl]:
+                if 'charge' in fr.other:
+                    self.job_widget.setCharge(fr.other['charge'])
+            
+                if 'multiplicity' in fr.other:
+                    self.job_widget.setMultiplicity(fr.other['multiplicity'])
+                    
+                if 'temperature' in fr.other:
+                    self.job_widget.setTemperature(fr.other['temperature'])
 
     def check_elements(self, *args, **kw):
         """ask self.basis_widget to check the elements"""
@@ -565,6 +582,35 @@ class BuildQM(ToolInstance):
         
         return BasisSet(basis, ecp)
 
+    def show_local_job_prep(self):
+        if self.job_local_prep is None:
+            self.job_local_prep = self.tool_window.create_child_window("Launch Job", window_class=PrepLocalJob)
+
+    def run_local_job(self, *args, name="local_job", auto_update=False, auto_open=False):
+        self.update_theory()
+        
+        kw_dict = self.job_widget.getKWDict()
+        other_kw_dict = self.other_keywords_widget.getKWDict()
+        self.settings.save()
+        
+        combined_dict = combine_dicts(kw_dict, other_kw_dict)
+        
+        self.settings.last_program = self.file_type.currentText()
+        
+        program = self.file_type.currentText()
+        if program == "Gaussian":
+            job = GaussianJob(name, self.session, self.theory, combined_dict, auto_update=auto_update, auto_open=auto_open)
+        elif program == "ORCA":
+            job = ORCAJob(name, self.session, self.theory, combined_dict, auto_update=auto_update, auto_open=auto_open)
+        elif program == "Psi4":
+            job = Psi4Job(name, self.session, self.theory, combined_dict, auto_update=auto_update, auto_open=auto_open)
+        
+        self.session.logger.info("adding %s to queue" % name)   
+
+        self.session.seqcrow_job_manager.add_job(job)
+
+        self.update_preview()
+        
     def copy_input(self):
         """copies input file to the clipboard"""
         self.update_theory()
@@ -594,7 +640,7 @@ class BuildQM(ToolInstance):
     
         self.update_preview()
     
-        print("copied to clipboard")
+        self.session.logger.info("copied to clipboard")
     
     def save_input(self):
         """save input to a file
@@ -609,9 +655,11 @@ class BuildQM(ToolInstance):
         
         self.settings.last_program = self.file_type.currentText()
 
+        warnings = []
+
         program = self.file_type.currentText()
         if program == "Gaussian":
-            filename, _ = QFileDialog.getSaveFileName(filter="Gaussian input files (*.com)")
+            filename, _ = QFileDialog.getSaveFileName(filter="Gaussian input files (*.com *.gjf)")
             if filename:
                 output, warnings = self.theory.write_gaussian_input(combined_dict, fname=filename)
         
@@ -628,9 +676,9 @@ class BuildQM(ToolInstance):
         for warning in warnings:
             self.session.logger.warning(warning)
             
-            self.update_preview()
-                
-            print("saved to %s" % filename)
+        self.update_preview()
+            
+        self.session.logger.info("saved to %s" % filename)
     
     def delete(self):
         """deregister trigger handlers"""
@@ -665,6 +713,7 @@ class JobTypeOption(QWidget):
     
     #TODO:
     #make selecting a row in one of the contraints tables select the atoms
+    #add option for numerical frequencies (ORCA requires numfreq for several popular dft functionals)
     
     def __init__(self, settings, session, init_form, parent=None):
         """layout has charge, multiplicity, and job type options up top
@@ -733,7 +782,7 @@ class JobTypeOption(QWidget):
         
         self.nprocs = QSpinBox()
         self.nprocs.setRange(0, 128)
-        self.nprocs.setSingleStep(2)
+        self.nprocs.setSingleStep(1)
         self.nprocs.setToolTip("set to 0 to not specify")
         self.nprocs.setValue(self.settings.last_nproc)
         self.nprocs.valueChanged.connect(self.something_changed)
@@ -741,7 +790,7 @@ class JobTypeOption(QWidget):
         
         self.mem = QSpinBox()
         self.mem.setRange(0, 512)
-        self.mem.setSingleStep(4)
+        self.mem.setSingleStep(2)
         self.mem.setSuffix(' GB')
         self.mem.setToolTip("set to 0 to not specify")
         self.mem.setValue(self.settings.last_mem)
@@ -920,9 +969,15 @@ class JobTypeOption(QWidget):
         freq_opt_form.addRow("high-precision modes:", self.hpmodes)
 
         self.raman = QCheckBox()
-        self.raman.setCheckState(Qt.Unchecked)
+        self.raman.setCheckState(self.settings.last_raman)
         self.raman.stateChanged.connect(self.something_changed)
         freq_opt_form.addRow("Raman intensities:", self.raman)
+
+        self.num_freq = QCheckBox()
+        self.num_freq.setChecked(self.settings.last_num_freq)
+        self.num_freq.stateChanged.connect(self.something_changed)
+        self.num_freq.setToolTip("numerical vibrational frequency algorithms are often slower than analytical algorithms,\nusually require less memory and available for functionals where analytical methods are not")
+        freq_opt_form.addRow("Numerical frequencies:", self.num_freq)
 
         self.job_type_opts.addTab(self.freq_opt, "frequency settings")
         
@@ -1042,7 +1097,6 @@ class JobTypeOption(QWidget):
         if program == "Gaussian":
             self.solvent_option.addItems(["None"])
             self.solvent_option.addItems(self.GAUSSIAN_SOLVENT_MODELS)
-            self.solvent_option.setEnabled(True)
             self.hpmodes.setEnabled(True)
             self.raman.setToolTip("ask Gaussian to compute Raman intensities")
             self.raman.setEnabled(True)
@@ -1050,8 +1104,7 @@ class JobTypeOption(QWidget):
             ndx = self.solvent_option.findText(self.settings.previous_gaussian_solvent_model)
             if ndx >= 0:
                 self.solvent_option.setCurrentIndex(ndx)
-            self.solvent_name.setEnabled(True)
-            self.solvent_name.setText(self.settings.previous_gaussian_solvent_name)
+            self.job_type_opts.setTabEnabled(3, True)
             self.use_checkpoint.setEnabled(True)
             self.chk_file_path.setEnabled(True)
             self.chk_browse_button.setEnabled(True)
@@ -1059,7 +1112,6 @@ class JobTypeOption(QWidget):
         elif program == "ORCA":
             self.solvent_option.addItems(["None"])
             self.solvent_option.addItems(self.ORCA_SOLVENT_MODELS)
-            self.solvent_option.setEnabled(True)
             self.hpmodes.setEnabled(False)
             self.raman.setToolTip("ask ORCA to compute Raman intensities")
             self.raman.setEnabled(True)
@@ -1068,13 +1120,14 @@ class JobTypeOption(QWidget):
             if ndx >= 0:
                 self.solvent_option.setCurrentIndex(ndx)
             self.solvent_name.setText(self.settings.previous_orca_solvent_name)
+            self.job_type_opts.setTabEnabled(3, True)
             self.use_checkpoint.setEnabled(False)
             self.chk_file_path.setEnabled(False)
             self.chk_browse_button.setEnabled(False)
             
         elif program == "Psi4":
             self.solvent_option.addItems(["None"])
-            self.solvent_option.setEnabled(False)
+            self.job_type_opts.setTabEnabled(3, False)
             self.hpmodes.setEnabled(False)
             self.raman.setEnabled(False)
             self.use_checkpoint.setEnabled(False)
@@ -1265,16 +1318,17 @@ class JobTypeOption(QWidget):
             self.constrained_atom_table.insertRow(row)
             item = QTableWidgetItem()
             item.setData(Qt.DisplayRole, atom.atomspec)
+            item.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
             self.constrained_atom_table.setItem(row, 0, item)
         
             widget_that_lets_me_horizontally_align_an_icon = QWidget()
             widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
             trash_button = QLabel()
-            trash_button.setMaximumSize(16, 16)
-            trash_button.setScaledContents(False)
-            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
+            dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
             trash_button.setToolTip("double click to unfreeze")
-            widget_layout.addWidget(trash_button)
+            widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+            widget_layout.setContentsMargins(2, 2, 2, 2)
             self.constrained_atom_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
 
             self.constrained_atom_table.resizeRowToContents(row)
@@ -1300,20 +1354,22 @@ class JobTypeOption(QWidget):
         
         item1 = QTableWidgetItem()
         item1.setData(Qt.DisplayRole, atom1.atomspec)
+        item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_bond_table.setItem(row, 0, item1)
                 
         item2 = QTableWidgetItem()
         item2.setData(Qt.DisplayRole, atom2.atomspec)
+        item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_bond_table.setItem(row, 1, item2)
         
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to unfreeze")
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.constrained_bond_table.setCellWidget(row, 2, widget_that_lets_me_horizontally_align_an_icon)
 
         self.constrained_bond_table.resizeRowToContents(row)
@@ -1337,20 +1393,22 @@ class JobTypeOption(QWidget):
 
             item1 = QTableWidgetItem()
             item1.setData(Qt.DisplayRole, atom1.atomspec)
+            item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
             self.constrained_bond_table.setItem(row, 0, item1)
             
             item2 = QTableWidgetItem()
             item2.setData(Qt.DisplayRole, atom2.atomspec)
+            item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
             self.constrained_bond_table.setItem(row, 1, item2)
         
             widget_that_lets_me_horizontally_align_an_icon = QWidget()
             widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
             trash_button = QLabel()
-            trash_button.setMaximumSize(16, 16)
-            trash_button.setScaledContents(False)
-            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
+            dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
             trash_button.setToolTip("double click to unfreeze")
-            widget_layout.addWidget(trash_button)
+            widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+            widget_layout.setContentsMargins(2, 2, 2, 2)
             self.constrained_bond_table.setCellWidget(row, 2, widget_that_lets_me_horizontally_align_an_icon)
 
             self.constrained_bond_table.resizeRowToContents(row)
@@ -1384,24 +1442,27 @@ class JobTypeOption(QWidget):
         
         item1 = QTableWidgetItem()
         item1.setData(Qt.DisplayRole, atom1.atomspec)
+        item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_angle_table.setItem(row, 0, item1)
 
         item2 = QTableWidgetItem()
         item2.setData(Qt.DisplayRole, atom2.atomspec)
+        item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_angle_table.setItem(row, 1, item2)
 
         item3 = QTableWidgetItem()
         item3.setData(Qt.DisplayRole, atom3.atomspec)
+        item3.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_angle_table.setItem(row, 2, item3)
         
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to unfreeze")
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.constrained_angle_table.setCellWidget(row, 3, widget_that_lets_me_horizontally_align_an_icon)
 
         self.constrained_angle_table.resizeRowToContents(row)
@@ -1448,24 +1509,27 @@ class JobTypeOption(QWidget):
         
         item1 = QTableWidgetItem()
         item1.setData(Qt.DisplayRole, atom1.atomspec)
+        item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_angle_table.setItem(row, 0, item1)
 
         item2 = QTableWidgetItem()
         item2.setData(Qt.DisplayRole, atom2.atomspec)
+        item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_angle_table.setItem(row, 1, item2)
 
         item3 = QTableWidgetItem()
         item3.setData(Qt.DisplayRole, atom3.atomspec)
+        item3.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_angle_table.setItem(row, 2, item3)
         
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to unfreeze")
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.constrained_angle_table.setCellWidget(row, 3, widget_that_lets_me_horizontally_align_an_icon)
 
         self.constrained_angle_table.resizeRowToContents(row)
@@ -1499,28 +1563,32 @@ class JobTypeOption(QWidget):
         
         item1 = QTableWidgetItem()
         item1.setData(Qt.DisplayRole, atom1.atomspec)
+        item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_torsion_table.setItem(row, 0, item1)
 
         item2 = QTableWidgetItem()
         item2.setData(Qt.DisplayRole, atom2.atomspec)
+        item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_torsion_table.setItem(row, 1, item2)
 
         item3 = QTableWidgetItem()
         item3.setData(Qt.DisplayRole, atom3.atomspec)
+        item3.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_torsion_table.setItem(row, 2, item3)
         
         item4 = QTableWidgetItem()
         item4.setData(Qt.DisplayRole, atom4.atomspec)
+        item4.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_torsion_table.setItem(row, 3, item4)
         
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to unfreeze")
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.constrained_torsion_table.setCellWidget(row, 4, widget_that_lets_me_horizontally_align_an_icon)
 
         self.constrained_torsion_table.resizeRowToContents(row)
@@ -1573,28 +1641,32 @@ class JobTypeOption(QWidget):
         
         item1 = QTableWidgetItem()
         item1.setData(Qt.DisplayRole, atom1.atomspec)
+        item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_torsion_table.setItem(row, 0, item1)
 
         item2 = QTableWidgetItem()
         item2.setData(Qt.DisplayRole, atom2.atomspec)
+        item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_torsion_table.setItem(row, 1, item2)
 
         item3 = QTableWidgetItem()
         item3.setData(Qt.DisplayRole, atom3.atomspec)
+        item3.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_torsion_table.setItem(row, 2, item3)
         
         item4 = QTableWidgetItem()
         item4.setData(Qt.DisplayRole, atom4.atomspec)
+        item4.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.constrained_torsion_table.setItem(row, 3, item4)
         
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to unfreeze")
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.constrained_torsion_table.setCellWidget(row, 4, widget_that_lets_me_horizontally_align_an_icon)
         
         self.constrained_torsion_table.resizeRowToContents(row)
@@ -1691,6 +1763,9 @@ class JobTypeOption(QWidget):
                 temp = self.temp.value()
                 route['freq'].append("temperature=%.2f" % temp)
                 
+                if self.num_freq.checkState() == Qt.Checked:
+                    route['freq'].append('Numerical')
+                
                 if self.raman.checkState() == Qt.Unchecked:
                     route['freq'].append("NoRaman")
                 else:
@@ -1737,6 +1812,8 @@ class JobTypeOption(QWidget):
                 self.settings.last_opt = self.do_geom_opt.checkState() == Qt.Checked
                 self.settings.last_ts = self.ts_opt.checkState() == Qt.Checked
                 self.settings.last_freq = self.do_freq.checkState() == Qt.Checked
+                self.settings.last_num_freq = self.num_freq.checkState() == Qt.Checked
+                self.settings.last_raman = self.raman.checkState() == Qt.Checked
 
             return {Method.GAUSSIAN_PRE_ROUTE:link0, Method.GAUSSIAN_ROUTE:route}
 
@@ -1750,11 +1827,13 @@ class JobTypeOption(QWidget):
                     route.append("Opt")
 
             if self.do_freq.checkState() == Qt.Checked:
-                if self.raman.checkState() != Qt.Checked:
+                if self.raman.checkState() == Qt.Unchecked and self.num_freq.checkState() == Qt.Unchecked:
                     route.append("Freq")
-                else:
+                elif self.raman.checkState() == Qt.Checked:
                     route.append("NumFreq")
                     blocks['elprop'] = ['Polar 1']
+                else:
+                    route.append("NumFreq")
                     
                 temp = self.temp.value()
                 blocks['freq'] = ["Temp    %.2f" % temp]
@@ -1783,6 +1862,8 @@ class JobTypeOption(QWidget):
                 self.settings.last_opt = self.do_geom_opt.checkState() == Qt.Checked
                 self.settings.last_ts = self.ts_opt.checkState() == Qt.Checked
                 self.settings.last_freq = self.do_freq.checkState() == Qt.Checked
+                self.settings.last_num_freq = self.num_freq.checkState() == Qt.Checked
+                self.settings.last_raman = self.raman.checkState() == Qt.Checked
 
             return {Method.ORCA_ROUTE:route, Method.ORCA_BLOCKS:blocks}
             
@@ -1798,7 +1879,10 @@ class JobTypeOption(QWidget):
                     
             
             if self.do_freq.checkState() == Qt.Checked:
-                after_geom.append("nrg, wfn = frequencies('$FUNCTIONAL', return_wfn=True)")
+                if self.num_freq.checkState() == Qt.Checked:
+                    after_geom.append("nrg, wfn = frequencies('$FUNCTIONAL', return_wfn=True, dertype='gradient')")
+                else:
+                    after_geom.append("nrg, wfn = frequencies('$FUNCTIONAL', return_wfn=True)")
 
             if update_settings:
                 self.settings.last_nproc = self.nprocs.value()
@@ -1806,7 +1890,9 @@ class JobTypeOption(QWidget):
                 self.settings.last_opt = self.do_geom_opt.checkState() == Qt.Checked
                 self.settings.last_ts = self.ts_opt.checkState() == Qt.Checked
                 self.settings.last_freq = self.do_freq.checkState() == Qt.Checked
-            
+                self.settings.last_num_freq = self.num_freq.checkState() == Qt.Checked
+                self.settings.last_raman = self.raman.checkState() == Qt.Checked
+                
             info = {Method.PSI4_AFTER_GEOM:after_geom}
             if len(settings.keys()) > 0:
                 info[Method.PSI4_SETTINGS] = settings
@@ -1852,7 +1938,7 @@ class FunctionalOption(QWidget):
         keyword_label = QLabel("keyword:")
         
         self.functional_kw = QLineEdit()
-        self.functional_kw.setPlaceholderText("functional name")
+        self.functional_kw.setPlaceholderText("filter functionals")
         self.functional_kw.setText(self.settings.previous_custom_func)
         self.functional_kw.setClearButtonEnabled(True)
         
@@ -1875,6 +1961,7 @@ class FunctionalOption(QWidget):
         self.previously_used_table.setSelectionBehavior(self.previously_used_table.SelectRows)
         self.previously_used_table.setEditTriggers(self.previously_used_table.NoEditTriggers)
         self.previously_used_table.setSelectionMode(self.previously_used_table.SingleSelection)
+        self.previously_used_table.setSortingEnabled(True)
         for i, (name, basis_required) in enumerate(zip(self.settings.previous_functional_names, self.settings.previous_functional_needs_basis)):
             row = self.previously_used_table.rowCount()
             self.add_previously_used(row, name, basis_required)
@@ -1945,16 +2032,17 @@ class FunctionalOption(QWidget):
             needs_basis.setData(Qt.DisplayRole, "no")
         else:
             needs_basis.setData(Qt.DisplayRole, "yes")
+        needs_basis.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.previously_used_table.setItem(row, 1, needs_basis)
         
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to remove from stored functionals")
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.previously_used_table.setCellWidget(row, 2, widget_that_lets_me_horizontally_align_an_icon)
         
         self.previously_used_table.resizeRowToContents(row)
@@ -2059,36 +2147,9 @@ class FunctionalOption(QWidget):
         func = self.settings.previous_functional
         disp = self.settings.previous_dispersion
         grid = self.settings.previous_grid
-        if self.form == "Gaussian":
-            #update functional
-            if func == "Gaussian's B3LYP":
-                ndx = self.functional_option.findText("B3LYP", Qt.MatchExactly)
-                self.functional_option.setCurrentIndex(ndx)
-                
-            elif func == "other":
-                ndx = self.functional_option.findText("other", Qt.MatchExactly)
-                self.functional_option.setCurrentIndex(ndx)
-                self.functional_kw.setText(self.settings.previous_custom_func)
-                
-            elif func in self.GAUSSIAN_FUNCTIONALS:
-                    ndx = self.functional_option.findText(func, Qt.MatchExactly)
-                    self.functional_option.setCurrentIndex(ndx)
-                    self.is_semiempirical.setCheckState(func in KNOWN_SEMI_EMPIRICAL)
-            
-            #omegas don't get decoded right
-            elif func.startswith("wB97"):
-                func = func.replace("w", "ω", 1)
-                ndx = self.functional_option.findText(func, Qt.MatchExactly)
-                self.functional_option.setCurrentIndex(ndx)
-    
-            #update_dispersion
-            if disp in self.GAUSSIAN_DISPERSION:
-                ndx = self.dispersion.findText(disp, Qt.MatchExactly)
-                self.dispersion.setCurrentIndex(ndx)
-                
-            if grid in self.GAUSSIAN_GRIDS:
-                ndx = self.grid.findText(grid, Qt.MatchExactly)
-                self.grid.setCurrentIndex(ndx)
+        self.setFunctional(func)
+        self.setGrid(grid)
+        self.setDispersion(disp)
         
         self.functionalChanged.emit()
 
@@ -2201,9 +2262,13 @@ class FunctionalOption(QWidget):
         
     def setFunctional(self, func):
         """sets functional option to match the given Functional"""
-        test_value = func.name
+        if isinstance(func, Functional):
+            test_value = func.name
+        else:
+            test_value = func
+
         if test_value in ["wB97X-D", "wB97X-D3"]:
-            test_value = value.replace('w', 'ω')
+            test_value = test_value.replace('w', 'ω')
         
         if self.form == "Gaussian" and test_value == "Gaussian's B3LYP":
             test_value = "B3LYP"
@@ -2211,11 +2276,14 @@ class FunctionalOption(QWidget):
         ndx = self.functional_option.findText(test_value, Qt.MatchExactly)
         if ndx < 0:
             ndx = self.functional_option.findText("other", Qt.MatchExactly)
-            self.functional_kw.setText(func.name)
+            if isinstance(func, Functional):
+                self.functional_kw.setText(func.name)
+                self.is_semiempirical.setChecked(func.is_semiempirical)
+            else:
+                self.functional_kw.setText(func)
+                self.is_semiempirical.setChecked(func in KNOWN_SEMI_EMPIRICAL)
 
         self.functional_option.setCurrentIndex(ndx)
-            
-        self.is_semiempirical.setChecked(func.is_semiempirical)
 
 
 class BasisOption(QWidget):
@@ -2299,7 +2367,7 @@ class BasisOption(QWidget):
         self.custom_basis_kw = QLineEdit()
         self.custom_basis_kw.textChanged.connect(self.apply_filter)
         self.custom_basis_kw.textChanged.connect(self.update_tooltab)
-        self.custom_basis_kw.setPlaceholderText("basis name")
+        self.custom_basis_kw.setPlaceholderText("filter basis sets")
         self.custom_basis_kw.setClearButtonEnabled(True)
         
         keyword_label = QLabel("keyword:")
@@ -2330,8 +2398,10 @@ class BasisOption(QWidget):
         self.previously_used_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.previously_used_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.previously_used_table.setSelectionMode(QTableWidget.SingleSelection)
+        #this sometimes causes an empty row to be added to the 'previous' table when the file is exported
+        #don't know why
+        #self.previously_used_table.setSortingEnabled(True)
         self.previously_used_table.verticalHeader().setVisible(False)
-        self.custom_basis_rows = []
         for i, (name, path) in enumerate(zip(self.settings.__getattr__(self.name_setting), self.settings.__getattr__(self.path_setting))):
             row = self.previously_used_table.rowCount()
             self.add_previously_used(row, name, path, False)
@@ -2649,7 +2719,6 @@ class BasisOption(QWidget):
         if add_to_others:
             self.parent.add_to_all_but(self, row, name, path)
         
-        self.custom_basis_rows.append((name, path))
         self.previously_used_table.insertRow(row)
         
         basis = QTableWidgetItem()
@@ -2660,11 +2729,11 @@ class BasisOption(QWidget):
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to remove from stored basis sets")
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.previously_used_table.setCellWidget(row, 2, widget_that_lets_me_horizontally_align_an_icon)
         
         self.previously_used_table.resizeRowToContents(row)
@@ -3274,10 +3343,11 @@ class OneLayerKeyWordOption(QWidget):
         self.current_kw_table.setColumnCount(2)
         self.current_kw_table.setHorizontalHeaderLabels(['current', 'remove'])
         self.current_kw_table.setSelectionMode(QTableWidget.SingleSelection)
-        self.current_kw_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.current_kw_table.setEditTriggers(QTableWidget.DoubleClicked)
         self.current_kw_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.current_kw_table.verticalHeader().setVisible(False)
         self.current_kw_table.cellActivated.connect(self.clicked_current_route_keyword)
+        self.current_kw_table.cellChanged.connect(self.edit_current_kw)
 
         new_kw_widget = QWidget()
         new_kw_widgets_layout = QGridLayout(new_kw_widget)
@@ -3290,7 +3360,7 @@ class OneLayerKeyWordOption(QWidget):
             self.new_kw.setClearButtonEnabled(True)
             self.new_kw.returnPressed.connect(self.add_kw)
           
-        self.new_kw.setPlaceholderText("new %s" % self.name)
+        self.new_kw.setPlaceholderText("filter %s%s" % (self.name[:-1], self.name[-1] + "s" if self.name[-1] != 'y' else "ies"))
         self.new_kw.textChanged.connect(self.apply_kw_filter)
         add_kw_button = QPushButton("add")
         add_kw_button.clicked.connect(self.add_kw)
@@ -3332,11 +3402,11 @@ class OneLayerKeyWordOption(QWidget):
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to remove from stored keywords")
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.previous_kw_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
     
         item = QTableWidgetItem(kw)
@@ -3361,25 +3431,34 @@ class OneLayerKeyWordOption(QWidget):
         self.previous_kw_table.removeRow(row)
     
     def add_item_to_current_kw_table(self, kw):
+        self.current_kw_table.blockSignals(True)
+        
         row = self.current_kw_table.rowCount()
         self.current_kw_table.insertRow(row)
 
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to not use this %s" % self.name)
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.current_kw_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
 
         item = QTableWidgetItem(kw)
+        if self.multiline:
+            item.setToolTip("double click to edit\n'\\n' will be replaced with newline")
+        else:
+            item.setToolTip("double click to edit")
+        
         self.current_kw_table.setItem(row, 0, item)
         
         self.current_kw_table.resizeRowToContents(row)
 
         self.optionChanged.emit()
+        
+        self.current_kw_table.blockSignals(False)
 
     def add_kw(self):
         if self.multiline:
@@ -3419,6 +3498,19 @@ class OneLayerKeyWordOption(QWidget):
 
             self.optionChanged.emit()
  
+    def edit_current_kw(self, row, column):
+        if column == 0:
+            if self.multiline:
+                self.last_list[row] = self.current_kw_table.item(row, column).text().replace('\\n', '\n')
+                self.current_kw_table.blockSignals(True)
+                self.current_kw_table.item(row, column).setText(self.last_list[row])
+                self.current_kw_table.resizeRowToContents(row)
+                self.current_kw_table.blockSignals(False)
+            else:
+                self.last_list[row] = self.current_kw_table.item(row, column).text()
+            
+            self.optionChanged.emit()
+
     def refresh_previous(self):
         for item in self.last_list:
             if item not in self.previous_list:
@@ -3451,13 +3543,16 @@ class OneLayerKeyWordOption(QWidget):
         self.previous_kw_table.resizeColumnToContents(0)    
     
     def setCurrentSettings(self, kw_list):
-        self.last_list = kw_list
+        self.last_list = kw_list.copy()
         
-        for i in range(self.current_kw_table.rowCount(), -1, -1):
-            self.current_kw_table.removeRow(i)
-            
+        self.clearCurrentSettings()
+        
         for kw in self.last_list:
             self.add_item_to_current_kw_table(kw)
+
+    def clearCurrentSettings(self):
+        for i in range(self.current_kw_table.rowCount(), -1, -1):
+            self.current_kw_table.removeRow(i)
 
 
 class TwoLayerKeyWordOption(QWidget):
@@ -3510,7 +3605,7 @@ class TwoLayerKeyWordOption(QWidget):
         new_kw_widget = QWidget()
         new_kw_widgets_layout = QGridLayout(new_kw_widget)
         self.new_kw = QLineEdit()
-        self.new_kw.setPlaceholderText("new %s" % self.name[:-1])
+        self.new_kw.setPlaceholderText("filter %s" % self.name)
         self.new_kw.textChanged.connect(self.apply_kw_filter)
         self.new_kw.returnPressed.connect(self.add_kw)
         self.new_kw.setClearButtonEnabled(True)
@@ -3537,16 +3632,17 @@ class TwoLayerKeyWordOption(QWidget):
         self.current_opt_table = QTableWidget()
         self.current_opt_table.setColumnCount(2)
         self.current_opt_table.setHorizontalHeaderLabels(['current', 'remove'])
-        self.current_opt_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.current_opt_table.setEditTriggers(QTableWidget.DoubleClicked)
         self.current_opt_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.current_opt_table.cellActivated.connect(self.clicked_current_keyword_option)
+        self.current_opt_table.cellChanged.connect(self.edit_current_opt)
         self.current_opt_table.verticalHeader().setVisible(False)
         option_layout.addWidget(self.current_opt_table, 0, 1)
 
         new_opt_widget = QWidget()
         new_opt_widgets_layout = QGridLayout(new_opt_widget)
         self.new_opt = QLineEdit()
-        self.new_opt.setPlaceholderText("new option")
+        self.new_opt.setPlaceholderText("filter options")
         self.new_opt.textChanged.connect(self.apply_opt_filter)
         self.new_opt.returnPressed.connect(self.add_opt)
         self.new_opt.setClearButtonEnabled(True)
@@ -3559,8 +3655,10 @@ class TwoLayerKeyWordOption(QWidget):
 
         self.current_kw_table.itemSelectionChanged.connect(self.update_route_opts)
 
+        self.selected_kw = None
         for kw in self.previous_dict:
             self.add_item_to_previous_kw_table(kw)
+            self.selected_kw = kw
                 
         for kw in self.last_dict:
             self.add_item_to_current_kw_table(kw)
@@ -3590,8 +3688,6 @@ class TwoLayerKeyWordOption(QWidget):
         splitter.addWidget(self.option_groupbox)
         layout.addWidget(splitter, 0, 0, 1, 1, Qt.AlignTop)
         layout.setContentsMargins(0, 0, 0, 0)
-        
-        self.selected_kw = None
 
     def add_item_to_previous_kw_table(self, kw):
         row = self.previous_kw_table.rowCount()
@@ -3603,11 +3699,11 @@ class TwoLayerKeyWordOption(QWidget):
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to remove from stored keywords")
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.previous_kw_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
     
         self.previous_kw_table.resizeRowToContents(row)
@@ -3636,11 +3732,11 @@ class TwoLayerKeyWordOption(QWidget):
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to not use this %s" % self.name[:-1])
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.current_kw_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
     
         self.current_kw_table.resizeRowToContents(row)
@@ -3661,11 +3757,11 @@ class TwoLayerKeyWordOption(QWidget):
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to remove from stored options")
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.previous_opt_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
     
         self.previous_opt_table.resizeRowToContents(row)
@@ -3686,6 +3782,9 @@ class TwoLayerKeyWordOption(QWidget):
         self.previous_opt_table.removeRow(row)
 
     def add_item_to_current_opt_table(self, opt):
+        #prevent edit signal from triggering
+        #it should break anything, but we don't need it
+        self.current_opt_table.blockSignals(True)
         if opt not in self.last_dict[self.selected_kw]:
             if self.one_opt_per_kw:
                 self.last_dict[self.selected_kw] = [opt]
@@ -3700,21 +3799,24 @@ class TwoLayerKeyWordOption(QWidget):
         row = self.current_opt_table.rowCount()
         self.current_opt_table.insertRow(row)
         item = QTableWidgetItem(opt)
+        item.setToolTip("double click to edit")
         self.current_opt_table.setItem(row, 0, item)
         
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
         trash_button = QLabel()
-        trash_button.setMaximumSize(16, 16)
-        trash_button.setScaledContents(False)
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(16, 16))
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
         trash_button.setToolTip("double click to not use this option")
-        widget_layout.addWidget(trash_button)
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
         self.current_opt_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
     
         self.current_opt_table.resizeRowToContents(row)
         self.current_opt_table.resizeColumnToContents(0)
         self.current_opt_table.resizeColumnToContents(1)
+        
+        self.current_opt_table.blockSignals(False)
 
     def add_kw(self):
         #TODO:
@@ -3825,6 +3927,11 @@ class TwoLayerKeyWordOption(QWidget):
             
             self.optionChanged.emit()
     
+    def edit_current_opt(self, row, column):
+        if column == 0:
+            self.last_dict[self.selected_kw][row] = self.current_opt_table.item(row, column).text()
+            self.optionChanged.emit()
+
     def refresh_previous(self):
         for item in self.last_dict.keys():
             if item not in self.previous_dict:
@@ -3881,15 +3988,19 @@ class TwoLayerKeyWordOption(QWidget):
         self.previous_opt_table.resizeColumnToContents(0)
     
     def setCurrentSettings(self, kw_dict):
-        self.last_dict = kw_dict
+        self.last_dict = kw_dict.copy()
+
+        self.clearCurrentSettings()
+            
+        for kw in self.last_dict:
+            self.add_item_to_current_kw_table(kw)
+
+    def clearCurrentSettings(self):
         for i in range(self.current_opt_table.rowCount(), -1, -1):
             self.current_opt_table.removeRow(i)
             
         for i in range(self.current_kw_table.rowCount(), -1, -1):
             self.current_kw_table.removeRow(i)
-            
-        for kw in self.last_dict:
-            self.add_item_to_current_kw_table(kw)
 
 
 class KeywordOptions(QWidget):
@@ -3973,6 +4084,9 @@ class KeywordOptions(QWidget):
         for item in self.widgets.keys():
             if self.items[item] in current_dict:
                 self.widgets[item].setCurrentSettings(current_dict[self.items[item]])
+                
+            else:
+                self.widgets[item].clearCurrentSettings()
     
     def something_changed(self, *args, **kw):
         """just for updating the preview"""
@@ -4009,10 +4123,32 @@ class KeywordOptions(QWidget):
         for item in self.widgets.keys():
             if isinstance(self.widgets[item], TwoLayerKeyWordOption):
                 last_dict[self.items[item]] = self.widgets[item].last_dict
+                if update_settings:
+                    for kw in self.widgets[item].last_dict:
+                        if kw not in self.widgets[item].previous_dict:
+                            self.widgets[item].previous_dict[kw] = [x for x in self.widgets[item].last_dict[kw]]
+                            self.widgets[item].add_item_to_previous_kw_table(kw)
+                            
+                            if self.widgets[item].selected_kw == kw:
+                                for opt in self.widgets[item].previous_dict[kw]:
+                                    self.widgets[item].add_item_to_previous_opt_table(opt)
+
+                        else:
+                            for opt in self.widgets[item].last_dict[kw]:
+                                if opt not in self.widgets[item].previous_dict[kw]:
+                                    self.widgets[item].previous_dict[kw].append(opt)
+                                    
+                                    if self.widgets[item].selected_kw == kw:
+                                        self.widgets[item].add_item_to_previous_opt_table(opt)
             
             elif isinstance(self.widgets[item], OneLayerKeyWordOption):
                 last_dict[self.items[item]] = self.widgets[item].last_list
-        
+                if update_settings:
+                    for kw in self.widgets[item].last_list:
+                        if kw not in self.widgets[item].previous_list:
+                            self.widgets[item].previous_list.append(kw)
+                            self.widgets[item].add_item_to_previous_kw_table(kw)
+
         if update_settings:
             self.settings_changed()
         
@@ -4510,7 +4646,10 @@ class SavePreset(ChildToolWindow):
             preset['ts'] = ts_opt
             
             freq = self.tool_instance.job_widget.getFrequencyCalculation()
-            preset['freq'] = freq
+            preset['freq'] = freq            
+            
+            num_freq = self.tool_instance.job_widget.num_freq.checkState() == Qt.Checked
+            preset['num_freq'] = num_freq
             
             raman = self.tool_instance.job_widget.raman.checkState() == Qt.Checked
             preset['raman'] = raman
@@ -4590,5 +4729,63 @@ class SavePreset(ChildToolWindow):
         
     def cleanup(self):
         self.tool_instance.preset_window = None
+        
+        super().cleanup()
+
+
+class PrepLocalJob(ChildToolWindow):
+    def __init__(self, tool_instance, title, **kwargs):
+        super().__init__(tool_instance, title, statusbar=False, **kwargs)
+        
+        self._build_ui()
+    
+        self.form = self.tool_instance.file_type.currentText()
+        self.tool_instance.file_type.currentTextChanged.connect(lambda program, widget=self: widget.__setattr__("form", program))
+    
+    def _build_ui(self):
+        layout = QFormLayout()
+        
+        
+        self.auto_update = QCheckBox()
+        self.auto_update.setChecked(self.tool_instance.settings.refresh_finished)
+        layout.addRow("update structure upon finish:", self.auto_update)
+        
+        self.auto_open = QCheckBox()
+        self.auto_open.setChecked(self.tool_instance.settings.open_finished)
+        layout.addRow("open structure upon finish:", self.auto_open)
+        
+        self.job_name = QLineEdit()
+        self.job_name.returnPressed.connect(self.run_job)
+        layout.addRow("job name:", self.job_name)
+
+        run = QPushButton("run")
+        run.clicked.connect(self.run_job)
+        layout.addRow(run)
+        
+        self.status = QStatusBar()
+        self.status.setSizeGripEnabled(False)
+        layout.addRow(self.status)
+        
+        self.ui_area.setLayout(layout)
+        self.manage(None)
+        
+    def run_job(self):
+        job_name = self.job_name.text().strip()
+        
+        if len(job_name.strip()) == 0 or any(x in job_name for x in "\\/;'\"?<>,`~!@#$%^&*"):
+            self.session.logger.error("invalid job name: '%s'" % job_name)
+            return
+
+        auto_update = self.auto_update.checkState() == Qt.Checked
+        self.tool_instance.settings.refresh_finished = auto_update
+        auto_open = self.auto_open.checkState() == Qt.Checked
+        self.tool_instance.settings.open_finished = auto_open
+
+        self.tool_instance.run_local_job(name=job_name, auto_update=auto_update, auto_open=auto_open)
+        
+        self.status.showMessage("queued \"%s\"; see the log for any details" % job_name)
+        
+    def cleanup(self):
+        self.tool_instance.job_local_prep = None
         
         super().cleanup()

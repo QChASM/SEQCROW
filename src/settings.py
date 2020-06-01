@@ -1,24 +1,76 @@
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
 from chimerax.core.commands.cli import StringArg
+from chimerax.ui.options import InputFolderOption, Option
 
-from os import getenv
+from os import getenv, path
 
-class _SEQCROWSettings(Settings):
-    EXPLICIT_SAVE = {
-        'AARONLIB': Value(getenv('AARONLIB', None), StringArg, str),
-    }
+from sys import platform
 
 # 'settings' module attribute will be set by manager initialization
+class _SEQCROWSettings(Settings):
+    EXPLICIT_SAVE = {
+        'AARONLIB': Value(getenv('AARONLIB', path.join(path.expanduser('~'), "AARON_libs")), StringArg),
+        'ORCA_EXE': Value("orca.exe" if platform == "win32" else "orca", StringArg),
+        'GAUSSIAN_EXE': Value("g09.exe" if platform == "win32" else "g09", StringArg),
+        'PSI4_EXE': Value("psi4", StringArg),
+        'SCRATCH_DIR': Value(path.join(path.expanduser('~'), "SEQCROW_SCRATCH"), StringArg), 
+    }
+
+# file option (mostly the same as InputFolderOption)
+class FileOption(InputFolderOption):
+    """Option for specifying an existing file"""
+
+    def get_value(self):
+        return self.line_edit.text()
+
+    def set_value(self, value):
+        self.line_edit.setText(value)
+
+    value = property(get_value, set_value)
+
+    def _make_widget(self, initial_text_width="10em", start_folder=None, browser_title="Choose File", **kw):
+        super()._make_widget(initial_text_width, start_folder, browser_title, **kw)
+
+
+    def _launch_browser(self, *args):
+        from PyQt5.QtWidgets import QFileDialog
+        import os
+        if self.start_folder is None or not os.path.exists(self.start_folder):
+            start_folder = os.getcwd()
+        else:
+            start_folder = self.start_folder
+        file = QFileDialog.getOpenFileName(self.widget, self.browser_title, start_folder, "All files (*)", "", QFileDialog.HideNameFilterDetails)
+        #file is a tuple of (filename, selected filter)
+        #unless no file was selected (e.g. dialog was closed by clicking 'cancel')
+        if len(file) == 2:
+            self.line_edit.setText(file[0])
+            self.line_edit.returnPressed.emit()
 
 def register_settings_options(session):
-    from chimerax.ui.options import InputFolderOption
     settings_info = {
-        'AARONLIB': (
+        "AARONLIB": (
             "Personal AaronTools library folder",
             InputFolderOption,
             "Directory containing your substituents (/Subs), ligands (/Ligands), rings (/Rings), and AARON templates (/TS_geoms)\nYou will need to restart ChimeraX for changes to take effect"),
+        "ORCA_EXE" : (
+            "ORCA executable", 
+            FileOption, 
+            "Path to ORCA executable\nFull path is required for parallel/multithreaded execution"),
+        "GAUSSIAN_EXE" : (
+            "Gaussian executable", 
+            FileOption, 
+            "Path to Gaussian executable"),
+        "PSI4_EXE" : (
+            "Psi4 executable", 
+            FileOption, 
+            "Path to Psi4 executable"), 
+        "SCRATCH_DIR" : (
+            "Scratch directory",
+            InputFolderOption,
+            "Directory for staging QM jobs"),
     }
+    
     for setting, setting_info in settings_info.items():
         opt_name, opt_class, balloon = setting_info
         
@@ -32,7 +84,8 @@ def register_settings_options(session):
                 
             os.environ[setting] = val
             
-            warn("Environment variable has been set for ChimeraX. Please restart ChimeraX for changes to take effect.")
+            if setting == "Personal AaronTools library folder":
+                warn("Environment variable has been set for ChimeraX. Please restart ChimeraX for changes to take effect.")
             
         opt = opt_class(opt_name, getattr(settings, setting), _opt_cb,
             attr_name=setting, settings=settings, balloon=balloon, auto_set_attr=False)
