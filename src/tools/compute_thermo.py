@@ -522,11 +522,11 @@ class Thermochem(ToolInstance):
             dZPE = co.ZPVE
             #compute enthalpy and entropy at this temperature
             #AaronTools uses Grimme's Quasi-RRHO, but this is the same as RRHO when w0=0
-            dE, dH, s = co.therm_corr(temperature=T, v0=0, quasi_harmonic=False)
+            dE, dH, s = co.therm_corr(temperature=T, v0=0, method="RRHO")
             rrho_dg = dH - T * s
             #compute G with quasi entropy treatments
-            qrrho_dg = co.calc_G_corr(v0=v0, temperature=T, quasi_harmonic=False)
-            qharm_dg = co.calc_G_corr(v0=v0, temperature=T, quasi_harmonic=True)
+            qrrho_dg = co.calc_G_corr(v0=v0, temperature=T, method="QRRHO")
+            qharm_dg = co.calc_G_corr(v0=v0, temperature=T, method="QHARM")
             
             self.zpe_line.setText("%.6f" % dZPE)
             self.enthalpy_line.setText("%.6f" % dH)

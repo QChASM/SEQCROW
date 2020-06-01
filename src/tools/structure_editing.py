@@ -60,9 +60,6 @@ def minimal_ring_convert(atomic_structure, atom1, atom2):
                 
         start = new_start
 
-    for residue in residues:
-        atomic_structure.session.logger.info(residue.atomspec)
-
     return residues
 
 

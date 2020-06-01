@@ -34,6 +34,7 @@ class _NormalModeSettings(Settings):
         'arrow_scale': Value(1.5, FloatArg, str),
         'anim_scale': Value(0.2, FloatArg, str),
         'anim_duration': Value(101, IntArg, str),
+        'anim_time': Value(4.0, FloatArg), 
     }
 
 class NormalModes(ToolInstance):
@@ -137,9 +138,16 @@ class NormalModes(ToolInstance):
         self.anim_duration = QSpinBox()
         self.anim_duration.setRange(1, 1001)
         self.anim_duration.setValue(self.settings.anim_duration)
-        self.anim_duration.setToolTip("number of frames in animation")
+        self.anim_duration.setToolTip("number of frames in animation\nmore frames results in a smoother animation")
         self.anim_duration.setSingleStep(10)
-        anim_opts.addRow("duration:", self.anim_duration)
+        anim_opts.addRow("frames:", self.anim_duration)
+        
+        self.time = QDoubleSpinBox()
+        self.time.setRange(0.1, 60)
+        self.time.setValue(self.settings.anim_time)
+        self.time.setToolTip("animation duration in seconds")
+        self.time.setSingleStep(0.5)
+        anim_opts.addRow("saved movie duration:", self.time)
         
         self.animate_layout.addWidget(anim_opts_form)
         
@@ -307,34 +315,33 @@ class NormalModes(ToolInstance):
 
         scale = self.anim_scale.value()
         frames = self.anim_duration.value()
-        
+        time = self.time.value()
+
         self.settings.anim_scale = scale
         self.settings.anim_duration = frames
-        
+        self.settings.anim_time = time
+
         geom = Geometry(fr)
         #if the filereader has been processed somewhere else, the atoms might
         #have a chimerax atom associated with them that prevents them from being pickled 
         for atom in geom.atoms:
             if hasattr(atom, "chix_atom"):
                 atom.chix_atom = None
-                
-        coords = np.array([geom.coords()])
-        
+
         vector = fr.other['frequency'].data[mode].vector
 
         dX = self._get_coord_change(geom, vector, scale)
         
         #atoms can't be deep copied for some reason
-        geom_forward = geom.copy()
-        geom_forward.update_geometry(geom.coords() + dX)
-        geom_reverse = geom.copy()
-        geom_reverse.update_geometry(geom.coords() - dX)
+        Xf = geom.coords() + dX
+        X = geom.coords()
+        Xr = geom.coords() - dX
         
-        S = Pathway([geom_forward, geom, geom_reverse, geom, geom_forward])
+        S = Pathway(geom, np.array([Xf, X, Xr, X, Xf]))
         
         coordsets = np.zeros((frames, len(geom.atoms), 3))
         for i, t in enumerate(np.linspace(0, 1, num=frames, endpoint=False)):
-            coordsets[i] = S.Geom_func(t).coords()
+            coordsets[i] = S.coords_func(t)
             
         model.add_coordsets(coordsets, replace=True)
         for i, coordset in enumerate(coordsets):
@@ -348,8 +355,10 @@ class NormalModes(ToolInstance):
         
         if hasattr(model, "seqcrow_freq_slider") and model.seqcrow_freq_slider.structure is not None:
             model.seqcrow_freq_slider.delete()
-            
-        model.seqcrow_freq_slider = CoordinateSetSlider(self.session, model)
+
+        fps = frames / time
+
+        model.seqcrow_freq_slider = CoordinateSetSlider(self.session, model, movie_framerate=fps)
         model.seqcrow_freq_slider.play_cb()
 
     def display_help(self):
