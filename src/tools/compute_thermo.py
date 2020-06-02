@@ -416,10 +416,10 @@ class Thermochem(ToolInstance):
         qharm_G = float(self.qharm_g_sum_line.text())
         
         sp_mdl = self.sp_selector.currentData()
-        sp_name = sp_mdl.geometry.name
+        sp_name = sp_mdl.name
                     
         therm_mdl = self.thermo_selector.currentData()
-        therm_name = therm_mdl.geometry.name
+        therm_name = therm_mdl.name
         
         s += fmt % (E, ZPE, H, rrho_G, qrrho_G, qharm_G, dZPE, dH, rrho_dG, qrrho_dG, qharm_dG, sp_name, therm_name)
         
