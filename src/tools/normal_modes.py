@@ -3,11 +3,12 @@ import numpy as np
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.widgets import ColorButton
 from chimerax.bild.bild import read_bild
-from chimerax.core.models import MODEL_DISPLAY_CHANGED, ADD_MODELS
+from chimerax.core.models import ADD_MODELS, REMOVE_MODELS
 from chimerax.std_commands.coordset_gui import CoordinateSetSlider
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
 from chimerax.core.commands.cli import FloatArg, TupleOf, IntArg
+from chimerax.core.commands import run
 
 from AaronTools.atoms import Atom
 from AaronTools.geometry import Geometry
@@ -42,7 +43,7 @@ class NormalModes(ToolInstance):
     SESSION_SAVE = False         
     help = "https://github.com/QChASM/SEQCROW/wiki/Visualize-Normal-Modes-Tool"
     
-    def __init__(self, session, name):       
+    def __init__(self, session, name):
         super().__init__(session, name)
         
         from chimerax.ui import MainToolWindow
@@ -50,16 +51,14 @@ class NormalModes(ToolInstance):
         
         self.vec_mw_bool = False
         
-        self.settings = _NormalModeSettings(self.session, name)
+        self.settings = _NormalModeSettings(session, name)
         
-        self.models_with_freq = self.session.filereader_manager.frequency_models
-
         self._build_ui()
 
         self.refresh_models()
 
-        self._add_handler = self.session.triggers.add_handler(ADD_MODELS, self.refresh_models)
-        self._refresh_handler = self.session.filereader_manager.triggers.add_handler(FILEREADER_CHANGE, self.refresh_models)
+        self._add_handler = session.triggers.add_handler(ADD_MODELS, self.refresh_models)
+        self._refresh_handler = session.triggers.add_handler(REMOVE_MODELS, self.refresh_models)
 
     def _build_ui(self):
         layout = QGridLayout()
@@ -92,10 +91,8 @@ class NormalModes(ToolInstance):
         #tab thing to select animation or vectors
         self.display_tabs = QTabWidget()
 
-        self.vector_tab = QWidget()
-        self.vector_layout = QVBoxLayout(self.vector_tab)
-        vec_opts_form = QWidget()
-        vector_opts = QFormLayout(vec_opts_form)
+        vector_tab = QWidget()
+        vector_opts = QFormLayout(vector_tab)
         
         self.vec_scale = QDoubleSpinBox()
         self.vec_scale.setDecimals(1)
@@ -111,21 +108,21 @@ class NormalModes(ToolInstance):
         self.vec_use_mass_weighted.setToolTip("if checked, vectors will show mass-weighted displacements")
         vector_opts.addRow("use mass-weighted:", self.vec_use_mass_weighted)
         
-        self.vector_layout.addWidget(vec_opts_form)
-        
-        self.vector_color = ColorButton("vector color", has_alpha_channel=True)
+        self.vector_color = ColorButton(has_alpha_channel=True, max_size=(16, 16))
         self.vector_color.setToolTip("color of vectors")
         self.vector_color.set_color(self.settings.arrow_color)
-        self.vector_layout.addWidget(self.vector_color)
+        vector_opts.addRow("vector color:", self.vector_color)
         
-        show_vec_button = QPushButton("display selected modes")
+        show_vec_button = QPushButton("display selected mode")
         show_vec_button.clicked.connect(self.show_vec)
-        self.vector_layout.addWidget(show_vec_button)
+        vector_opts.addRow(show_vec_button)
         
-        self.animate_tab = QWidget()
-        self.animate_layout = QVBoxLayout(self.animate_tab)
-        anim_opts_form = QWidget()
-        anim_opts = QFormLayout(anim_opts_form)
+        close_vec_button = QPushButton("remove selected mode vectors")
+        close_vec_button.clicked.connect(self.close_vec)
+        vector_opts.addRow(close_vec_button)
+        
+        animate_tab = QWidget()
+        anim_opts = QFormLayout(animate_tab)
         
         self.anim_scale = QDoubleSpinBox()
         self.anim_scale.setSingleStep(0.1)
@@ -148,15 +145,17 @@ class NormalModes(ToolInstance):
         self.time.setToolTip("animation duration in seconds")
         self.time.setSingleStep(0.5)
         anim_opts.addRow("saved movie duration:", self.time)
-        
-        self.animate_layout.addWidget(anim_opts_form)
-        
+
         show_anim_button = QPushButton("animate selected mode")
         show_anim_button.clicked.connect(self.show_anim)
-        self.animate_layout.addWidget(show_anim_button)
+        anim_opts.addRow(show_anim_button)
         
-        self.display_tabs.addTab(self.vector_tab, "vectors")
-        self.display_tabs.addTab(self.animate_tab, "animate")
+        stop_anim_button = QPushButton("stop animation")
+        stop_anim_button.clicked.connect(self.stop_anim)
+        anim_opts.addRow(stop_anim_button)
+        
+        self.display_tabs.addTab(vector_tab, "vectors")
+        self.display_tabs.addTab(animate_tab, "animate")
         
         layout.addWidget(self.display_tabs)
         
@@ -167,13 +166,13 @@ class NormalModes(ToolInstance):
         
         self.tool_window.ui_area.setLayout(layout)
 
-        if len(self.models_with_freq) > 0:
+        if len(self.session.filereader_manager.frequency_models) > 0:
             self.create_freq_table(0)
 
         self.tool_window.manage(None)
-        
+
     def create_freq_table(self, state):
-        """populate the table with frequencies from self.models_with_freq[state]"""
+        """populate the table with frequencies"""
         
         self.table.setRowCount(0)
 
@@ -205,16 +204,14 @@ class NormalModes(ToolInstance):
             self.table.setItem(row, 1, intensity)
     
     def refresh_models(self, *args, **kwargs):
-        """refresh the list of models with frequency data and add or remove items from the combobox"""
-        self.models_with_freq = self.session.filereader_manager.frequency_models
-        
+        """refresh the list of models with frequency data and add or remove items from the combobox"""        
         #remove in reverse order b/c sometimes they don't get removed in forwards order
         #TODO: we use FileReaders now, not models - look for those
         for i in range(self.model_selector.count(), -1, -1):
-            if self.model_selector.itemData(i) not in self.models_with_freq:
+            if self.model_selector.itemData(i) not in self.session.filereader_manager.frequency_filereaders:
                 self.model_selector.removeItem(i)
                 
-        for model in self.models_with_freq:
+        for model in self.session.filereader_manager.frequency_models:
             for fr in self.session.filereader_manager.filereader_dict[model]:
                 if 'frequency' not in fr.other:
                     continue
@@ -228,7 +225,7 @@ class NormalModes(ToolInstance):
             self.vec_mw_bool = True
         else:
             self.vec_mw_bool = False
-        
+
     def _get_coord_change(self, geom, vector, scaling):
         """determine displacement given scaling and vector"""
         max_norm = None
@@ -247,6 +244,22 @@ class NormalModes(ToolInstance):
                 dX[i] *= geom.atoms[i].mass()
         
         return dX
+
+    def close_vec(self):
+        modes = self.table.selectedItems()
+        if len([mode for mode in modes if mode.column() == 0]) != 1:
+            return 
+            
+        fr = self.model_selector.currentData()
+        model = self.session.filereader_manager.get_model(fr)
+        mode = modes[::2][0]
+        mode = self.rows.index(mode)
+        
+        name = "%.2f cm^-1" % fr.other['frequency'].data[mode].frequency
+        
+        for child in model.child_models():
+            if child.name == name:
+                run(self.session, "close %s" % child.atomspec)
 
     def show_vec(self):
         """display normal mode displacement vector"""
@@ -271,8 +284,6 @@ class NormalModes(ToolInstance):
         
         #reset coordinates b/c movie maight be playing
         geom = Geometry(fr)
-        for atom, coord in zip(model.atoms, geom.coords()):
-            atom.coord = coord
         
         vector = fr.other['frequency'].data[mode].vector
 
@@ -295,12 +306,6 @@ class NormalModes(ToolInstance):
         bild_obj, status = read_bild(self.session, stream, "%.2f cm^-1" % fr.other['frequency'].data[mode].frequency)
 
         self.session.models.add(bild_obj, parent=model)
-        
-        if hasattr(model, "seqcrow_freq_slider") and model.seqcrow_freq_slider.structure is not None:
-            #close animation slider
-            #TODO:
-            #put this in a manager - not an attribute on the model
-            model.seqcrow_freq_slider.delete()
     
     def show_anim(self):
         """play selected modes as an animation"""
@@ -353,14 +358,28 @@ class NormalModes(ToolInstance):
         for atom, chix_atom in zip(geom.atoms, model.atoms):
             atom.chix_atom = chix_atom
         
-        if hasattr(model, "seqcrow_freq_slider") and model.seqcrow_freq_slider.structure is not None:
-            model.seqcrow_freq_slider.delete()
-
+        for tool in self.session.tools.list():
+            if isinstance(tool, CoordinateSetSlider):
+                if tool.structure is model:
+                    tool.delete()
+    
         fps = frames / time
 
-        model.seqcrow_freq_slider = CoordinateSetSlider(self.session, model, movie_framerate=fps)
-        model.seqcrow_freq_slider.play_cb()
+        slider =  CoordinateSetSlider(self.session, model, movie_framerate=fps)
+        slider.play_cb()
 
+    def stop_anim(self):
+        fr = self.model_selector.currentData()
+        model = self.session.filereader_manager.get_model(fr)
+        for tool in self.session.tools.list():
+            if isinstance(tool, CoordinateSetSlider):
+                if tool.structure is model:
+                    tool.delete()
+                    
+        geom = Geometry(fr)
+        for atom, coord in zip(model.atoms, geom.coords()):
+            atom.coord = coord
+    
     def display_help(self):
         """Show the help for this tool in the help viewer."""
         from chimerax.core.commands import run
@@ -370,5 +389,5 @@ class NormalModes(ToolInstance):
     def delete(self):
         """overload delete"""
         self.session.triggers.remove_handler(self._add_handler)
-        self.session.filereader_manager.triggers.remove_handler(self._refresh_handler)
+        self.session.triggers.remove_handler(self._refresh_handler)
         super().delete()

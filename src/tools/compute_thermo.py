@@ -4,7 +4,7 @@ from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
 from chimerax.core.commands import run
 from chimerax.core.commands.cli import FloatArg, BoolArg, StringArg
-from chimerax.core.models import ADD_MODELS
+from chimerax.core.models import ADD_MODELS, REMOVE_MODELS
 
 from PyQt5.Qt import QClipboard
 from PyQt5.QtCore import Qt
@@ -46,12 +46,13 @@ class Thermochem(ToolInstance):
         self._build_ui()
 
 
-        self.nrg_cos = {}
-        self.thermo_cos = {}
+        self.nrg_fr = {}
+        self.thermo_fr = {}
+        self.thermo_co = {}
         self.refresh_models()
         
         self._add_handler = self.session.triggers.add_handler(ADD_MODELS, self.refresh_models)
-        self._remove_handler = self.session.filereader_manager.triggers.add_handler(FILEREADER_CHANGE, self.refresh_models)
+        self._remove_handler = self.session.triggers.add_handler(REMOVE_MODELS, self.refresh_models)
 
     def _build_ui(self):
         #each group has an empty widget at the bottom so they resize the way I want while also having the
@@ -354,11 +355,11 @@ class Thermochem(ToolInstance):
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(None)
-        
+
     def open_link(self, theory):
         link = self.theory_helper[theory]
         run(self.session, "open %s" % link)
-        
+
     def save_csv(self):
         filename, _ = QFileDialog.getSaveFileName(filter="CSV Files (*.csv)")
         if filename:
@@ -435,80 +436,84 @@ class Thermochem(ToolInstance):
         
         #purge old models
         models_to_del = []
-        for mdl in self.nrg_cos.keys():
-            if self.nrg_cos[mdl] not in models:
+        for mdl in self.nrg_fr.keys():
+            if self.nrg_fr[mdl] not in models:
                 models_to_del.append(mdl)
         
-        for mdl in self.thermo_cos.keys():
-            if self.thermo_cos[mdl] not in models:
+        for mdl in self.thermo_fr.keys():
+            if self.thermo_fr[mdl] not in models:
                 models_to_del.append(mdl)
 
         for mdl in models_to_del:
-            if mdl in self.nrg_cos:
-                del self.nrg_cos[mdl]
+            if mdl in self.nrg_fr:
+                del self.nrg_fr[mdl]
                 
-            if mdl in self.thermo_cos:
-                del self.thermo_cos[mdl]
+            if mdl in self.thermo_fr:
+                del self.thermo_fr[mdl]
         
         #TODO:
         #figure out new CompOutputs instead of models
         #figure out new models
-        new_models = [model for model in models if model not in self.nrg_cos.keys()]
-        new_models.extend([model for model in models if model not in self.nrg_cos.keys() and model not in new_models])
+        new_models = [model for model in models if model not in self.nrg_fr.keys()]
+        new_models.extend([model for model in models if model not in self.nrg_fr.keys() and model not in new_models])
 
         for mdl in models:
-            self.nrg_cos[mdl] = []
-            self.thermo_cos[mdl] = []
+            self.nrg_fr[mdl] = []
+            self.thermo_fr[mdl] = []
             for fr in self.session.filereader_manager.filereader_dict[mdl]:
-                co = CompOutput(fr)
-                if co.energy is not None:
-                    self.nrg_cos[mdl].append(co)
+                if 'energy' in fr.other is not None:
+                    self.nrg_fr[mdl].append(fr)
                 
-                if co.grimme_g is not None:    
-                    self.thermo_cos[mdl].append(co)
-        
-        self.nrg_models = list(self.nrg_cos.keys())
-        self.thermo_models = list(self.thermo_cos.keys())
+                if 'frequency' in fr.other:    
+                    self.thermo_fr[mdl].append(fr)
+                    self.thermo_co[fr] = CompOutput(fr)
 
-        self.sp_selector.clear()
+        self.nrg_models = list(self.nrg_fr.keys())
+        self.thermo_models = list(self.thermo_fr.keys())
+
+        for i in range(self.sp_selector.count(), -1, -1):
+            if self.sp_selector.itemData(i) not in self.session.filereader_manager.filereaders:
+                self.sp_selector.removeItem(i)        
+        
+        for i in range(self.thermo_selector.count(), -1, -1):
+            if self.thermo_selector.itemData(i) not in self.session.filereader_manager.filereaders:
+                self.thermo_selector.removeItem(i)
 
         for model in self.nrg_models:
-            for co in self.nrg_cos[model]:
-                if self.sp_selector.findData(co) == -1:
-                    self.sp_selector.addItem("%s (%s)" % (basename(co.geometry.name), model.atomspec), co)
-        
-        self.thermo_selector.clear()
-                
+            for fr in self.nrg_fr[model]:
+                if self.sp_selector.findData(fr) == -1:
+                    self.sp_selector.addItem("%s (%s)" % (basename(fr.name), model.atomspec), fr)
+
         for model in self.thermo_models:
-            for co in self.thermo_cos[model]:
-                if self.thermo_selector.findData(co) == -1:
-                    self.thermo_selector.addItem("%s (%s)" % (basename(co.geometry.name), model.atomspec), co)
+            for fr in self.thermo_fr[model]:
+                if self.thermo_selector.findData(fr) == -1:
+                    self.thermo_selector.addItem("%s (%s)" % (basename(fr.name), model.atomspec), fr)
 
     def set_sp(self):
         """set energy entry for when sp model changes"""
         if self.sp_selector.currentIndex() >= 0:
-            co = self.sp_selector.currentData()
+            fr = self.sp_selector.currentData()
                 
-            self.sp_nrg_line.setText("%.6f" % co.energy)
+            self.sp_nrg_line.setText("%.6f" % fr.other['energy'])
         else:
             self.sp_nrg_line.setText("")
             
         self.update_sum()
-        
+
     def set_thermo_mdl(self):
         if self.thermo_selector.currentIndex() >= 0:
-            co = self.thermo_selector.currentData()
+            fr = self.thermo_selector.currentData()
 
-            if co.temperature is not None:
-                self.temperature_line.setValue(co.temperature)
+            if 'temperature' in fr.other:
+                self.temperature_line.setValue(fr.other['temperature'])
 
         self.set_thermo()
-                
+
     def set_thermo(self):
         """sets thermo entries for when thermo model changes"""
         #index of combobox is -1 when combobox has no entries
         if self.thermo_selector.currentIndex() >= 0:
-            co = self.thermo_selector.currentData()
+            co = self.thermo_co[self.thermo_selector.currentData()]
             
             v0 = self.v0_edit.value()
 
@@ -541,7 +546,7 @@ class Thermochem(ToolInstance):
             self.qharm_g_line.setText("")
         
         self.update_sum()
-        
+
     def update_sum(self):
         """updates the sum of energy and thermo corrections"""
         dZPE = self.zpe_line.text()
@@ -585,9 +590,9 @@ class Thermochem(ToolInstance):
         from chimerax.core.commands import run
         run(self.session,
             'open %s' % self.help if self.help is not None else "")
-            
+
     def delete(self):
         #overload delete ro de-register handler
         self.session.triggers.remove_handler(self._add_handler)
-        self.session.filereader_manager.triggers.remove_handler(self._remove_handler)
+        self.session.triggers.remove_handler(self._remove_handler)
         super().delete()           
