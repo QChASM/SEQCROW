@@ -161,6 +161,16 @@ class _SEQCROW_API(BundleAPI):
                         return {'coordsets': BoolArg}
                         
                 return Info()
+            elif name == "Psi4 output file":
+                class Info(OpenerInfo):
+                    def open(self, session, data, file_name, **kw):
+                        return open_aarontools(session, data, format_name="Psi4 output file", **kw)
+            
+                    @property
+                    def open_args(self):
+                        return {'coordsets': BoolArg}
+                        
+                return Info()
                                            
             elif name == "XYZ file":
                 class Info(OpenerInfo):

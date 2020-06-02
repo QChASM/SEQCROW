@@ -79,6 +79,13 @@ presets:
                           nicknames="out" 
                           synopsis="ORCA output file"/>
                           
+                <Provider name="Psi4 output file" 
+                          category="Molecular structure" 
+                          suffixes=".dat" 
+                          encoding="utf-8" 
+                          nicknames="dat" 
+                          synopsis="Psi4 output file"/>
+                
                 <Provider name="XYZ file" 
                           category="Molecular structure" 
                           suffixes=".xyz" 
@@ -91,6 +98,7 @@ presets:
                 <Provider name="Gaussian input file" want_path="true"/>
                 <Provider name="Gaussian output file" want_path="true"/>
                 <Provider name="ORCA output file" want_path="true"/>
+                <Provider name="Psi4 output file" want_path="true"/>
                 <Provider name="XYZ file" want_path="true"/>
             </Providers>
             
