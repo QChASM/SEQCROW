@@ -150,7 +150,7 @@ class Thermochem(ToolInstance):
 
         self.rrho_g_line = QLineEdit()
         self.rrho_g_line.setReadOnly(True)
-        self.rrho_g_line.setToolTip("""RRHO free energy correction""")
+        self.rrho_g_line.setToolTip("""RRHO free energy correction\nRotational motion is completely independent from vibrations\nNormal mode vibrations behave like harmonic oscillators""")
         self.thermo_layout.addWidget(self.rrho_g_line, row, 1, 1, 1, Qt.AlignTop)
         
         self.thermo_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignVCenter)        
@@ -237,7 +237,7 @@ class Thermochem(ToolInstance):
         
         self.rrho_g_sum_line = QLineEdit()
         self.rrho_g_sum_line.setReadOnly(True)
-        self.rrho_g_sum_line.setToolTip("sum of electronic energy and RRHO free energy correction")
+        self.rrho_g_sum_line.setToolTip("sum of electronic energy and RRHO free energy correction\nRotational motion is completely independent from vibrations\nNormal mode vibrations behave like harmonic oscillators")
         self.sum_layout.addWidget(self.rrho_g_sum_line, row, 1, 1, 1, Qt.AlignTop)
         
         self.sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignVCenter)        
@@ -368,14 +368,14 @@ class Thermochem(ToolInstance):
             with open(filename, 'w') as f:
                 f.write(s.strip())
                 
-            print("saved to %s" % filename)
+            self.session.logger.status("saved to %s" % filename)
 
     def copy_csv(self):
         app = QApplication.instance()
         clipboard = app.clipboard()
         csv = self.get_csv()
         clipboard.setText(csv)
-        print("copied to clipboard")
+        self.session.logger.status("copied to clipboard")
 
     def get_csv(self):
         if self.settings.delimiter == "comma":

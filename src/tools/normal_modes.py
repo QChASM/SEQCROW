@@ -99,8 +99,8 @@ class NormalModes(ToolInstance):
         self.vec_scale.setRange(-100.0, 100.0)
         self.vec_scale.setValue(self.settings.arrow_scale)
         self.vec_scale.setSuffix(" \u212B")
-        self.vec_scale.setSingleStep(1.0)
-        self.vec_scale.setToolTip("vectors will be scaled so that this is the length of the longest vector")
+        self.vec_scale.setSingleStep(0.1)
+        self.vec_scale.setToolTip("vectors will be scaled so that this is the length of the longest vector\nvectors shorter than 0.1 \u212B will not be displayed")
         vector_opts.addRow("vector scale:", self.vec_scale)
         
         self.vec_use_mass_weighted = QCheckBox()
