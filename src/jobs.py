@@ -31,7 +31,7 @@ class LocalJob(QThread):
             self.session.logger.warning("%s might finish an in-progess calculation step before exiting" % self)
         
         self.killed = True
-
+       
         #use exit b/c terminate can cause chimera to freeze
         super().exit(1)
 
@@ -78,6 +78,9 @@ class ORCAJob(LocalJob):
         
         log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
         log.write("executing:\n%s\n\n" % " ".join(args))
+
+        log.close()
+        log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'a')
 
         if " " in infile:
             raise RuntimeError("ORCA input files cannot contain spaces")
@@ -166,7 +169,6 @@ class Psi4Job(LocalJob):
         log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
         log.write("executing:\n%s\n\n" % " ".join(args))
 
-        
         if platform == "win32":
             self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
         else:

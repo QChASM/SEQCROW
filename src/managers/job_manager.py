@@ -14,7 +14,7 @@ from PyQt5.QtCore import QThread
 
 JOB_FINISHED = "job finished"
 JOB_STARTED = "job started"
-JOB_QUEUED = "job added"
+JOB_QUEUED = "job changed"
 
 class JobManager(ProviderManager):
     def __init__(self, *args, **kwargs):
@@ -22,7 +22,7 @@ class JobManager(ProviderManager):
         
         self.local_jobs = []
         self.remote_jobs = []
-        self.paused = False
+        self.paused = True
         self._thread = None
 
         self.triggers = TriggerSet()
@@ -38,7 +38,7 @@ class JobManager(ProviderManager):
             if val:
                 print("paused SEQCROW queue")
             else:
-                print("unpaused SEQCROW queue")
+                print("resumed SEQCROW queue")
         
         super().__setattr__(attr, val)
     
@@ -107,7 +107,41 @@ class JobManager(ProviderManager):
         if isinstance(job, LocalJob):
             self.local_jobs.append(job)
             self.triggers.activate_trigger(JOB_QUEUED, job)
-            
+
+    def increase_priotity(self, job):
+        if isinstance(job, LocalJob):
+            ndx = self.local_jobs.index(job)
+            if ndx != 0:
+                self.local_jobs.remove(job)
+                new_ndx = 0
+                for i in range(min(ndx-1, len(self.local_jobs)-1), -1, -1):
+                    if not self.local_jobs[i].killed and \
+                            not self.local_jobs[i].isFinished() and \
+                            not self.local_jobs[i].isRunning():
+                        new_ndx = i
+                        break
+                        
+                self.local_jobs.insert(new_ndx, job)    
+                
+                self.triggers.activate_trigger(JOB_QUEUED, job)
+
+    def decrease_priotity(self, job):
+        if isinstance(job, LocalJob):
+            ndx = self.local_jobs.index(job)
+            if ndx != (len(self.local_jobs) - 1):
+                self.local_jobs.remove(job)
+                new_ndx = len(self.local_jobs)
+                for i in range(ndx, len(self.local_jobs)+1):
+                    if not self.local_jobs[i].killed and \
+                            not self.local_jobs[i].isFinished() and \
+                            not self.local_jobs[i].isRunning():
+                        new_ndx = i + 1
+                        break
+                        
+                self.local_jobs.insert(new_ndx, job)
+                
+                self.triggers.activate_trigger(JOB_QUEUED, job)
+
     def check_queue(self, *args):
         if not self.has_job_running:
             unstarted_local_jobs = []

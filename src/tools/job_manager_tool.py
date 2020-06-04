@@ -4,9 +4,10 @@ from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.core.tools import ToolInstance
 from chimerax.core.commands import run
 
+from PyQt5.Qt import QIcon, QStyle
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFontDatabase
-from PyQt5.QtWidgets import QGridLayout, QTextBrowser, QPushButton, QTreeWidget, QTreeWidgetItem
+from PyQt5.QtWidgets import QGridLayout, QTextBrowser, QPushButton, QTreeWidget, QTreeWidgetItem, QWidget
 
 from SEQCROW.managers.job_manager import JOB_QUEUED, JOB_STARTED, JOB_FINISHED
 from SEQCROW.jobs import LocalJob
@@ -18,6 +19,8 @@ class JobQueue(ToolInstance):
     NAME_COL = 0
     STATUS_COL = 1
     SERVER_COL = 2
+    CHANGE_PRIORITY = 3
+    KILL_COL = 4
 
     def __init__(self, session, name):       
         super().__init__(session, name)
@@ -38,6 +41,7 @@ class JobQueue(ToolInstance):
         self.fill_tree()
 
     def _build_ui(self):
+        #TODO: browse local files button
         layout = QGridLayout()
         
         layout.setContentsMargins(0,0,0,0)
@@ -45,29 +49,20 @@ class JobQueue(ToolInstance):
         
         self.tree = QTreeWidget()
         self.tree.setSelectionMode(QTreeWidget.ExtendedSelection)
-        self.tree.setHeaderLabels(["Name", "Status", "Server"])
+        self.tree.setHeaderLabels(["name", "status", "server", "change priority", "kill"])
         self.tree.setUniformRowHeights(True)
 
-        self.tree.setColumnWidth(0, 200)
+        self.tree.setColumnWidth(0, 150)
         layout.addWidget(self.tree, 0, 0, 6, 1, Qt.AlignTop)
         
         row = 0
         
-        pause_button = QPushButton("pause new jobs")
+        pause_button = QPushButton("pause new jobs" if not self.session.seqcrow_job_manager.paused else "resume jobs")
+        pause_button.setCheckable(True)
+        pause_button.clicked.connect(lambda check: pause_button.setText("pause new jobs" if not check else "resume jobs"))
+        pause_button.setChecked(self.session.seqcrow_job_manager.paused)
         pause_button.clicked.connect(self.pause_queue)
         layout.addWidget(pause_button, row, 1, 1, 1, Qt.AlignTop)
-        
-        row += 1
-        
-        resume_button = QPushButton("unpause queue")
-        resume_button.clicked.connect(self.resume_queue)
-        layout.addWidget(resume_button, row, 1, 1, 1, Qt.AlignTop)
-        
-        row += 1
-        
-        kill_button = QPushButton("kill selected")
-        kill_button.clicked.connect(self.kill_running)
-        layout.addWidget(kill_button,row, 1, 1, 1, Qt.AlignTop)
 
         row += 1
 
@@ -121,22 +116,67 @@ class JobQueue(ToolInstance):
                 elif job.isRunning():
                     item.setText(self.STATUS_COL, "running")
                 
+                    kill_widget = QWidget()
+                    kill_layout = QGridLayout(kill_widget)
+                    kill = QPushButton()
+                    kill.setIcon(QIcon(kill_widget.style().standardIcon(QStyle.SP_DialogCancelButton)))
+                    kill.setFlat(True)
+                    kill.clicked.connect(lambda *args, job=job: job.kill())
+                    kill.clicked.connect(lambda *args, session=self.session: session.seqcrow_job_manager.triggers.activate_trigger(JOB_QUEUED, "resume"))
+                    kill_layout.addWidget(kill, 0, 0, 1, 1, Qt.AlignLeft)
+                    kill_layout.setColumnStretch(0, 0)
+                    kill_layout.setContentsMargins(0, 0, 0, 0)
+                    self.tree.setItemWidget(item, self.KILL_COL, kill_widget)
+
                 elif job.isFinished():
                     item.setText(self.STATUS_COL, "finished")
 
                 else:
                     item.setText(self.STATUS_COL, "queued")
-                    
+    
+                    priority_widget = QWidget()
+                    priority_layout = QGridLayout(priority_widget)
+                    inc_priority = QPushButton()
+                    inc_priority.setIcon(QIcon(priority_widget.style().standardIcon(QStyle.SP_ArrowUp)))
+                    inc_priority.setFlat(True)
+                    inc_priority.clicked.connect(lambda *args, job=job: self.session.seqcrow_job_manager.increase_priotity(job))
+                    priority_layout.addWidget(inc_priority, 0, 0, 1, 1, Qt.AlignRight)
+                    dec_priority = QPushButton()
+                    dec_priority.setIcon(QIcon(priority_widget.style().standardIcon(QStyle.SP_ArrowDown)))
+                    dec_priority.setFlat(True)
+                    dec_priority.clicked.connect(lambda *args, job=job: self.session.seqcrow_job_manager.decrease_priotity(job))
+                    priority_layout.addWidget(dec_priority, 0, 1, 1, 1, Qt.AlignLeft)
+                    priority_layout.setColumnStretch(0, 1)
+                    priority_layout.setColumnStretch(1, 1)
+                    priority_layout.setContentsMargins(0, 0, 0, 0)
+                    self.tree.setItemWidget(item, self.CHANGE_PRIORITY, priority_widget)
+                
+                    kill_widget = QWidget()
+                    kill_layout = QGridLayout(kill_widget)
+                    kill = QPushButton()
+                    kill.setIcon(QIcon(kill_widget.style().standardIcon(QStyle.SP_DialogCancelButton)))
+                    kill.setFlat(True)
+                    kill.clicked.connect(lambda *args, job=job: job.kill())
+                    kill.clicked.connect(lambda *args, session=self.session: session.seqcrow_job_manager.triggers.activate_trigger(JOB_QUEUED, "resume"))
+                    kill_layout.addWidget(kill, 0, 0, 1, 1, Qt.AlignLeft)
+                    kill_layout.setColumnStretch(0, 0)
+                    kill_layout.setContentsMargins(0, 0, 0, 0)
+                    self.tree.setItemWidget(item, self.KILL_COL, kill_widget)
+                
                 item.setText(self.SERVER_COL, "local")
+
     
             self.tree.expandItem(item)
     
-        #self.tree.resizeColumnToContents(self.NAME_COL)
+        self.tree.resizeColumnToContents(self.STATUS_COL)
         self.tree.resizeColumnToContents(self.SERVER_COL)
+        self.tree.resizeColumnToContents(self.CHANGE_PRIORITY)
+        self.tree.resizeColumnToContents(self.KILL_COL)
 
     def pause_queue(self):
-        self.session.seqcrow_job_manager.paused = True
-        
+        self.session.seqcrow_job_manager.paused = not self.session.seqcrow_job_manager.paused
+        self.session.seqcrow_job_manager.triggers.activate_trigger(JOB_QUEUED, "pauseunpause")
+
     def resume_queue(self):
         self.session.seqcrow_job_manager.paused = False
         self.session.seqcrow_job_manager.triggers.activate_trigger(JOB_QUEUED, "resume")
