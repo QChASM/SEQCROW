@@ -22,7 +22,7 @@ class JobManager(ProviderManager):
         
         self.local_jobs = []
         self.remote_jobs = []
-        self.paused = True
+        self.paused = False
         self._thread = None
 
         self.triggers = TriggerSet()
@@ -131,7 +131,7 @@ class JobManager(ProviderManager):
             if ndx != (len(self.local_jobs) - 1):
                 self.local_jobs.remove(job)
                 new_ndx = len(self.local_jobs)
-                for i in range(ndx, len(self.local_jobs)+1):
+                for i in range(ndx, len(self.local_jobs)):
                     if not self.local_jobs[i].killed and \
                             not self.local_jobs[i].isFinished() and \
                             not self.local_jobs[i].isRunning():
