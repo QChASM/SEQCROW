@@ -51,8 +51,9 @@ class Thermochem(ToolInstance):
         self.thermo_co = {}
         self.refresh_models()
         
-        self._add_handler = self.session.triggers.add_handler(ADD_MODELS, self.refresh_models)
-        self._remove_handler = self.session.triggers.add_handler(REMOVE_MODELS, self.refresh_models)
+        self._add_handler = session.triggers.add_handler(ADD_MODELS, self.refresh_models)
+        self._remove_handler = session.triggers.add_handler(REMOVE_MODELS, self.refresh_models)
+        self._fr_update_handler = session.filereader_manager.triggers.add_handler(FILEREADER_CHANGE, self.refresh_models)
 
     def _build_ui(self):
         #each group has an empty widget at the bottom so they resize the way I want while also having the
@@ -595,4 +596,5 @@ class Thermochem(ToolInstance):
         #overload delete ro de-register handler
         self.session.triggers.remove_handler(self._add_handler)
         self.session.triggers.remove_handler(self._remove_handler)
+        self.session.filereader_manager.triggers.remove_handler(self._fr_update_handler)
         super().delete()           

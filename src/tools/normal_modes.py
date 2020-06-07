@@ -59,6 +59,7 @@ class NormalModes(ToolInstance):
 
         self._add_handler = session.triggers.add_handler(ADD_MODELS, self.refresh_models)
         self._refresh_handler = session.triggers.add_handler(REMOVE_MODELS, self.refresh_models)
+        self._fr_update_handler = session.filereader_manager.triggers.add_handler(FILEREADER_CHANGE, self.refresh_models)
 
     def _build_ui(self):
         layout = QGridLayout()
@@ -390,4 +391,5 @@ class NormalModes(ToolInstance):
         """overload delete"""
         self.session.triggers.remove_handler(self._add_handler)
         self.session.triggers.remove_handler(self._refresh_handler)
+        self.session.filereader_manager.triggers.remove_handler(self._fr_update_handler)
         super().delete()

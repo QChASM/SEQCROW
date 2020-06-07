@@ -10,8 +10,6 @@ from SEQCROW.jobs import LocalJob, GaussianJob, ORCAJob, Psi4Job
 from SEQCROW.managers import FILEREADER_ADDED
 from SEQCROW.residue_collection import ResidueCollection
 
-from PyQt5.QtCore import QThread
-
 JOB_FINISHED = "job finished"
 JOB_STARTED = "job started"
 JOB_QUEUED = "job changed"
