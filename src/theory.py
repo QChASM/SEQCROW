@@ -277,6 +277,16 @@ class Method:
             basis_info = {}
         
         combined_dict = combine_dicts(other_kw_dict, basis_info)
+        
+        if self.grid is not None:
+            grid_info, warning = self.grid.get_orca()
+            if warning is not None:
+                warnings.append(warning)
+
+            if any('finalgrid' in x.lower() for x in combined_dict[self.ORCA_ROUTE]):
+                grid_info[self.ORCA_ROUTE].pop(1)
+                
+            combined_dict = combine_dicts(combined_dict, grid_info)
 
         if self.constraints is not None and self.structure is not None:
             if 'geom' not in combined_dict[self.ORCA_BLOCKS]:
@@ -339,16 +349,6 @@ class Method:
                 warnings.append(warning)
 
             s += "%s" % dispersion
-
-        if self.grid is not None:
-            if not s.endswith(' '):
-                s += " "
-                
-            grid, warning = self.grid.get_orca()
-            if warning is not None:
-                warnings.append(warning)
-
-            s += "%s" % grid
 
         if self.ORCA_ROUTE in combined_dict:
             if not s.endswith(' '):
@@ -1410,7 +1410,7 @@ class IntegrationGrid:
     def get_orca(self):
         """translates grid to something ORCA accepts
         current just returns self.name"""
-        return (self.name, None)
+        return ({Method.ORCA_ROUTE:[self.name, "Final%s" % self.name]}, None)
         
     def get_psi4(self):
         radial, spherical = [x.strip() for x in self.name[1:-1].split(', ')]
