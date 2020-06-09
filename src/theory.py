@@ -556,6 +556,9 @@ class Functional:
         elif self.name.startswith("M06-"):
             return (self.name.replace("M06-", "M06", 1), None)
         
+        elif self.name == "PBE0":
+            return ("PBE1PBE", None)
+        
         #methods available in ORCA but not Gaussian
         elif self.name == "𝜔ωB97X-D3":
             return ("wB97XD", "ωB97X-D3 is not available in Gaussian, switching to ωB97X-D2")
