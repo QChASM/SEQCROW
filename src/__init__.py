@@ -29,6 +29,10 @@ class _SEQCROW_API(BundleAPI):
             os.environ['AARONLIB'] = seqcrow_settings.settings.AARONLIB
 
         session.seqcrow_settings = seqcrow_settings
+        
+        #XXX:
+        #initialize is called after init_manager 
+        session.seqcrow_job_manager.init_queue()
 
         ##register selectors from the user's personal library
         #from AaronTools.substituent import Substituent
@@ -74,14 +78,17 @@ class _SEQCROW_API(BundleAPI):
             from .managers import FileReaderManager
             session.filereader_manager = FileReaderManager(session)
             return session.filereader_manager
+            
         elif name == "seqcrow_ordered_selection_manager":
             from SEQCROW.managers import OrderedSelectionManager
             session.seqcrow_ordered_selection_manager = OrderedSelectionManager(session)
             return session.seqcrow_ordered_selection_manager
+            
         elif name == "seqcrow_job_manager":
             from SEQCROW.managers import JobManager
-            session.seqcrow_job_manager = JobManager()
+            session.seqcrow_job_manager = JobManager(session)
             return session.seqcrow_job_manager
+            
         else:
             raise RuntimeError("manager named '%s' is unknown to SEQCROW" % name)
   

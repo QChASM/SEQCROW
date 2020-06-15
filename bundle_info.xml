@@ -15,8 +15,9 @@
 
 SEQCROW adds the following to ChimeraX:
 I/O:
-    read XYZ, Gaussian COM, Gaussian LOG files, and ORCA output files
-    save models to XYZ files
+    * Read XYZ, Gaussian input and output, ORCA output, and Psi4 output files
+    * Save models to XYZ files
+    * A tool is also available to save Gaussian, ORCA, or Psi4 input files
 
 tools:
     AaronTools
@@ -49,6 +50,7 @@ presets:
             <Categories>
                 <Category name="General"/>
                 <Category name="Input/Output"/>
+                <Category name="External Program"/>
             </Categories>
             
             <Managers>

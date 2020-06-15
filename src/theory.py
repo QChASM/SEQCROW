@@ -2,6 +2,11 @@ import os
 
 from SEQCROW.utils import combine_dicts
 
+from AaronTools.atoms import Atom
+from AaronTools.geometry import Geometry
+
+from chimerax.atomic import AtomicStructure
+
 KNOWN_SEMI_EMPIRICAL = ["AM1", "PM3", "PM6", "PM7", "HF-3c"]
 
 
@@ -52,7 +57,7 @@ class Method:
                         'memory', \
                         'processors', \
                         'empirical_dispersion', \
-                        'comment', \
+                        #'comment', \
                         'charge', \
                         'multiplicity', \
                         'grid']
@@ -72,18 +77,15 @@ class Method:
         corresponding to options/keywords
         returns warnings if a certain feature is not available in Gaussian"""
 
-        from AaronTools.geometry import Geometry
-        from chimerax.atomic import AtomicStructure
-
         warnings = []
         s = ""
-        
+
         if self.processors is not None:
             s += "%%NProcShared=%i\n" % self.processors
-            
+
         if self.memory is not None:
             s += "%%Mem=%iGB\n" % self.memory
-        
+
         if self.GAUSSIAN_PRE_ROUTE in other_kw_dict:
             for key in other_kw_dict[self.GAUSSIAN_PRE_ROUTE]:
                 s += "%%%s" % key
@@ -92,20 +94,21 @@ class Method:
 
                 if not s.endswith('\n'):
                     s += '\n'
-        
+
         #start route line with functional
-        func, warning = self.functional.get_gaussian09()
+        func, warning = self.functional.get_gaussian()
         if warning is not None:
             warnings.append(warning)
+
         s += "#n %s" % func
         if not self.functional.is_semiempirical:
-            basis_info = self.basis.get_gaussian09_basis_info()
+            basis_info = self.basis.get_gaussian_basis_info()
             basis_elements = self.basis.elements_in_basis
             #check if any element is in multiple basis sets
             for element in basis_elements:
                 if basis_elements.count(element) > 1:
                     warnings.append("%s is in basis set multiple times" % element)
-                    
+
             #check to make sure all elements have a basis set
             if self.structure is not None:
                 if isinstance(self.structure, Geometry):
@@ -117,55 +120,55 @@ class Method:
                 for ele in struc_elements:
                     if ele not in basis_elements:
                         elements_wo_basis.append(ele)
-                        
+
                 if len(elements_wo_basis) > 0:
                     warnings.append("no basis set for %s" % ", ".join(elements_wo_basis))
-            
+
             if self.GAUSSIAN_ROUTE in basis_info:
                 s += "%s" % basis_info[self.GAUSSIAN_ROUTE]
-        
+
         s += " "
-        
+
         if self.empirical_dispersion is not None:
-            disp, warning = self.empirical_dispersion.get_gaussian09()
+            disp, warning = self.empirical_dispersion.get_gaussian()
             s += disp + " "
             if warning is not None:
                 warnings.append(warning)
-        
+
         if self.grid is not None:
-            grid, warning = self.grid.get_gaussian09()
+            grid, warning = self.grid.get_gaussian()
             if warning is not None:
                 warnings.append(warning)
             s += grid
             s += " "
-        
+
         if self.GAUSSIAN_ROUTE in other_kw_dict:
             for option in other_kw_dict[self.GAUSSIAN_ROUTE]:
                 s += option
                 if len(other_kw_dict[self.GAUSSIAN_ROUTE][option]) > 0:
                     s += "=(%s)" % ",".join(other_kw_dict[self.GAUSSIAN_ROUTE][option])
                 s += " "
-        
+
         s += "\n\n"
-        
+
         if self.GAUSSIAN_COMMENT in other_kw_dict:
             if len(other_kw_dict[self.GAUSSIAN_COMMENT]) > 0:
                 #TODO: make it impossible to break up te comment with newlines
                 s += "\n".join([x.rstrip() for x in other_kw_dict[self.GAUSSIAN_COMMENT]])
             else:
                 s += "comment"
-                
+
             if not s.endswith('\n'):
                 s += '\n'
-        
+
         else:
             if self.comment is None:
                 s += "comment\n"
             else:
                 s += "%s\n" % self.comment
-            
+
         s += "\n"
-        
+
         s += "%i %i\n" % (self.charge, self.multiplicity)
         if self.structure is not None:
             if self.constraints is not None and len(self.constraints['atoms']) > 0:
@@ -183,7 +186,7 @@ class Method:
                         else:
                             flag = 0
                         s += "%-2s %2i %12.6f %12.6f %12.6f\n" % (atom.element.name, flag, *atom.coord)
-            
+
             else:    
                 if isinstance(self.structure, Geometry):
                     for atom in self.structure.atoms:
@@ -193,9 +196,9 @@ class Method:
                         s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element.name, *atom.coord)
         else:
             s += "None\n"
-        
+
         s += "\n"
-        
+
         if self.constraints is not None and self.structure is not None:
             for constraint in self.constraints['bonds']:
                 atom1, atom2 = constraint
@@ -209,7 +212,7 @@ class Method:
                 ndx2 = self.structure.atoms.index(atom2) + 1
                 ndx3 = self.structure.atoms.index(atom3) + 1
                 s += "A %2i %2i %2i F\n" % (ndx1, ndx2, ndx3)
-            
+
             for constraint in self.constraints['torsions']:
                 atom1, atom2, atom3, atom4 = constraint
                 ndx1 = self.structure.atoms.index(atom1) + 1
@@ -217,33 +220,33 @@ class Method:
                 ndx3 = self.structure.atoms.index(atom3) + 1
                 ndx4 = self.structure.atoms.index(atom4) + 1
                 s += "D %2i %2i %2i %2i F\n" % (ndx1, ndx2, ndx3, ndx4)
-                
+
             s += '\n'
-        
+
         if not self.functional.is_semiempirical:
             if self.GAUSSIAN_GEN_BASIS in basis_info:
                 s += basis_info[self.GAUSSIAN_GEN_BASIS]
             
                 s += "\n"
-            
+
             if self.GAUSSIAN_GEN_ECP in basis_info:
                 s += basis_info[self.GAUSSIAN_GEN_ECP]
                 
                 s += '\n'
-                
+
         if self.GAUSSIAN_POST in other_kw_dict:
             for item in other_kw_dict[self.GAUSSIAN_POST]:
                 s += item
                 s += " "
-                
+
             s += '\n'
-        
+
         s += '\n\n'
-        
+
         if fname is not None:
             with open(fname, "w") as f:
                 f.write(s)
-                
+
         return s, warnings
 
     def write_orca_input(self, other_kw_dict, fname=None):
@@ -251,16 +254,9 @@ class Method:
         other_kw_dict is a dictionary with file positions (using ORCA_* int map)
         corresponding to options/keywords
         returns file content and warnings e.g. if a certain feature is not available in ORCA"""
-        #TODO:
-        #add constraints
-        #allow structure to be Geometry
-        #probably other stuff
-
-        from AaronTools.geometry import Geometry
-        from chimerax.atomic import AtomicStructure
-
-        warnings = []
         
+        warnings = []
+
         if not self.functional.is_semiempirical:
             basis_info = self.basis.get_orca_basis_info()
             if self.structure is not None:
@@ -272,12 +268,12 @@ class Method:
                 warning = self.basis.check_for_elements(struc_elements)
                 if warning is not None:
                     warnings.append(warning)
-        
+
         else:
             basis_info = {}
-        
+
         combined_dict = combine_dicts(other_kw_dict, basis_info)
-        
+
         if self.grid is not None:
             grid_info, warning = self.grid.get_orca()
             if warning is not None:
@@ -285,7 +281,7 @@ class Method:
 
             if any('finalgrid' in x.lower() for x in combined_dict[self.ORCA_ROUTE]):
                 grid_info[self.ORCA_ROUTE].pop(1)
-                
+
             combined_dict = combine_dicts(combined_dict, grid_info)
 
         if self.constraints is not None and self.structure is not None:
@@ -338,12 +334,11 @@ class Method:
             if warning is not None:
                 warnings.append(warning)
             s += " %s" % func
-        
 
         if self.empirical_dispersion is not None:
             if not s.endswith(' '):
                 s += " "
-                
+
             dispersion, warning = self.empirical_dispersion.get_orca()
             if warning is not None:
                 warnings.append(warning)
@@ -355,15 +350,15 @@ class Method:
                 s += " "
                 
                 s += " ".join(combined_dict[self.ORCA_ROUTE])
-        
+
         s += "\n"
-        
+
         if self.processors is not None:
             s += "%%pal\n    nprocs %i\nend\n" % self.processors
-            
+
             if self.memory is not None:
                 s += "%%MaxCore %i\n" % (int(1000 * self.memory / self.processors))
-        
+
         if self.ORCA_BLOCKS in combined_dict:
             for kw in combined_dict[self.ORCA_BLOCKS]:
                 if any(len(x) > 0 for x in combined_dict[self.ORCA_BLOCKS][kw]):
@@ -371,21 +366,25 @@ class Method:
                     for opt in combined_dict[self.ORCA_BLOCKS][kw]:
                         s += "    %s\n" % opt
                     s += "end\n"
-                
+
             s += "\n"
-            
+
         s += "*xyz %i %i\n" % (self.charge, self.multiplicity)
         if self.structure is not None:
             if isinstance(self.structure, AtomicStructure):
                 for atom in self.structure.atoms:
                     s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element.name, *atom.coord)
-                    
-        s += "*\n"
-        
+
+            elif isinstance(self.structure, Geometry):
+                for atom in self.structure.atoms:
+                    s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element, *atom.coords)
+
+            s += "*\n"
+
         if fname is not None:
             with open(fname, "w") as f:
                 f.write(s)
-                
+
         return s, warnings
 
     def write_psi4_input(self, other_kw_dict, fname=None):
@@ -393,16 +392,9 @@ class Method:
         other_kw_dict is a dictionary with file positions (using PSI4_* int map)
         corresponding to options/keywords
         returns file content and warnings e.g. if a certain feature is not available in Psi4"""
-        #TODO:
-        #add constraints
-        #allow structure to be Geometry
-        #probably other stuff
-
-        from AaronTools.geometry import Geometry
-        from chimerax.atomic import AtomicStructure
 
         warnings = []
-        
+
         if not self.functional.is_semiempirical:
             basis_info = self.basis.get_psi4_basis_info()
             if self.structure is not None:
@@ -410,35 +402,35 @@ class Method:
                     struc_elements = set([atom.element for atom in self.structure.atoms])
                 elif isinstance(self.structure, AtomicStructure):
                     struc_elements = set(self.structure.atoms.elements.names)
-            
+
                 warning = self.basis.check_for_elements(struc_elements)
                 if warning is not None:
                     warnings.append(warning)
-            
+
             for key in basis_info:
                 for i in range(0, len(basis_info[key])):
                     if "%s" in basis_info[key][i]:
                         if 'cc' in self.functional.name.lower():
                             basis_info[key][i] = basis_info[key][i].replace("%s", "CC")
-                        
+
                         elif 'dct' in self.functional.name.lower():
                             basis_info[key][i] = basis_info[key][i].replace("%s", "DCT")
-                        
+
                         elif 'mp2' in self.functional.name.lower():
                             basis_info[key][i] = basis_info[key][i].replace("%s", "MP2")
-        
+
                         elif 'sapt' in self.functional.name.lower():
                             basis_info[key][i] = basis_info[key][i].replace("%s", "SAPT")
-        
+
                         elif 'scf' in self.functional.name.lower():
                             basis_info[key][i] = basis_info[key][i].replace("%s", "SCF")
-                    
+
                         elif 'ci' in self.functional.name.lower():
                             basis_info[key][i] = basis_info[key][i].replace("%s", "MCSCF")
 
         else:
             basis_info = {}
-        
+
         combined_dict = combine_dicts(other_kw_dict, basis_info)
         if self.grid is not None:
             grid_info = self.grid.get_psi4()
@@ -453,7 +445,7 @@ class Method:
 
         if self.processors is not None:
             s += "set_num_threads(%i)\n" % self.processors
-            
+
         if self.memory is not None:
             s += "memory %i GB\n" % self.memory
 
@@ -461,24 +453,28 @@ class Method:
             for opt in combined_dict[self.PSI4_BEFORE_GEOM]:
                 s += opt
                 s += '\n'
-        
+
         s += '\n'
-        
+
         s += "molecule {\n"
         s += "%2i %i\n" % (self.charge, self.multiplicity)
         if self.structure is not None:
             if isinstance(self.structure, AtomicStructure):
                 for atom in self.structure.atoms:
                     s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element.name, *atom.coord)
-                    
+
+            elif isinstance(self.structure, Geometry):
+                for atom in self.structure.atoms:
+                    s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element, *atom.coords)
+
         s += "}\n\n"
-        
+
         if self.PSI4_SETTINGS in combined_dict and any(len(combined_dict[self.PSI4_SETTINGS][setting]) > 0 for setting in combined_dict[self.PSI4_SETTINGS]):
             s += "set {\n"
             for setting in combined_dict[self.PSI4_SETTINGS]:
                 if len(combined_dict[self.PSI4_SETTINGS][setting]) > 0:
                     s += "    %-20s    %s\n" % (setting, combined_dict[self.PSI4_SETTINGS][setting][0])
-            
+
             s += "}\n\n"
 
         if self.constraints is not None:
@@ -486,12 +482,12 @@ class Method:
                 s += "freeze_list = \"\"\"\n"
                 for atom in self.constraints['atoms']:
                     s += "    %2i xyz\n" % (self.structure.atoms.index(atom) + 1)
-                
+
                 s += "\"\"\"\n"
                 s += "    \n"
 
             s += "set optking {\n"
-            
+
             if len(self.constraints['atoms']) > 0 and self.structure is not None:
                 s += "    frozen_cartesian $freeze_list\n"
 
@@ -500,7 +496,7 @@ class Method:
                 for bond in self.constraints['bonds']:
                     atom1, atom2 = bond
                     s += "        %2i %2i\n" % (self.structure.atoms.index(atom1) + 1, self.structure.atoms.index(atom2) + 1)
-                    
+
                 s += "    \")\n"
 
             if len(self.constraints['angles']) > 0 and self.structure is not None:
@@ -508,40 +504,636 @@ class Method:
                 for angle in self.constraints['angles']:
                     atom1, atom2, atom3 = angle
                     s += "        %2i %2i %2i\n" % (self.structure.atoms.index(atom1) + 1, self.structure.atoms.index(atom2) + 1, self.structure.atoms.index(atom3) + 1)
-                    
+
                 s += "    \")\n"
-            
+
             if len(self.constraints['torsions']) > 0 and self.structure is not None:
                 s += "    frozen_dihedral = (\"\n"
                 for torsion in self.constraints['torsions']:
                     atom1, atom2, atom3, atom4 = torsion
                     s += "        %2i %2i %2i %2i\n" % (self.structure.atoms.index(atom1) + 1, self.structure.atoms.index(atom2) + 1, self.structure.atoms.index(atom3) + 1, self.structure.atoms.index(atom4) + 1)
-                    
+
                 s += "    \")\n"
-                
+
             s += "}\n\n"
 
         if self.PSI4_AFTER_GEOM in combined_dict:
             for opt in combined_dict[self.PSI4_AFTER_GEOM]:
                 if "$FUNCTIONAL" in opt:
                     opt = opt.replace("$FUNCTIONAL", self.functional.get_psi4()[0])
-                
+
                 s += opt
                 s += '\n'
-                
+
         if fname is not None:
             with open(fname, "w") as f:
                 f.write(s)
-                
+
         return s, warnings
 
+    def get_gaussian_json(self, other_kw_dict):
+        out = {}
+        out['other'] = other_kw_dict
         
+        out['charge'] = self.charge
+        out['multiplicity'] = self.multiplicity
+        out['processors'] = self.processors
+        out['memory'] = self.memory
+        
+        if self.functional is not None:
+            out['functional'] = self.functional.get_gaussian()[0]
+            out['semi_empirical'] = self.functional.is_semiempirical
+            
+            if not self.functional.is_semiempirical and self.basis is not None:
+                out['basis_info'] = self.basis.get_gaussian_basis_info()
+        
+        else:
+            out['functional'] = None
+
+        if self.grid is not None:
+            out['grid'] = self.grid.get_gaussian()[0]
+        
+        else:
+            out['grid'] = None
+        
+        if self.structure is not None:
+            atoms = []
+            for atom in self.structure.atoms:
+                if isinstance(self.structure, AtomicStructure):
+                    atoms.append("%-2s %13.6f %13.6f %13.6f\n" % (atom.element.name, *atom.coord))
+                
+                elif isinstance(self.structure, Geometry):
+                    atoms.append("%-2s %13.6f %13.6f %13.6f\n" % (atom.element, *atom.coords))
+        
+            out['structure'] = atoms
+        
+            if self.constraints is not None:
+                out['constraints'] = {'atoms':[], 'bonds':[], 'angles':[], 'torsions':[]}
+                for atom in self.constraints['atoms']:
+                    out['constraints']['atoms'].append(str(self.structure.atoms.index(atom) + 1))
+
+                for bond in self.constraints['bonds']:
+                    atom1, atom2 = bond
+                    out['constraints']['bonds'].append((str(self.structure.atoms.index(atom1) + 1), \
+                                                        str(self.structure.atoms.index(atom2) + 1)
+                                                    ))
+
+                for angle in self.constraints['angles']:
+                    atom1, atom2, atom3 = angle
+                    out['constraints']['angles'].append((str(self.structure.atoms.index(atom1) + 1), \
+                                                        str(self.structure.atoms.index(atom2) + 1), \
+                                                        str(self.structure.atoms.index(atom3) + 1)
+                                                    ))
+
+                for torsion in self.constraints['torsions']:
+                    atom1, atom2, atom3, atom4 = torsion
+                    out['constraints']['torsion'].append((str(self.structure.atoms.index(atom1) + 1), \
+                                                        str(self.structure.atoms.index(atom2) + 1), \
+                                                        str(self.structure.atoms.index(atom3) + 1), \
+                                                        str(self.structure.atoms.index(atom4) + 1)
+                                                        ))
+            
+            else:
+                out['constraints'] = None
+
+        else:
+            out['structure'] = None
+        
+        if self.empirical_dispersion is not None:
+            out['empirical_dispersion'] = self.empirical_dispersion.get_gaussian()[0]
+        else:
+            out['empirical_dispersion'] = None
+            
+        return out
+
+    def get_orca_json(self, other_kw_dict):
+        out = {}
+        out['other'] = other_kw_dict
+        
+        out['charge'] = self.charge
+        out['multiplicity'] = self.multiplicity
+        out['processors'] = self.processors
+        out['memory'] = self.memory
+        
+        if self.functional is not None:
+            out['functional'] = self.functional.get_orca()[0]
+            out['semi_empirical'] = self.functional.is_semiempirical
+            
+            if not self.functional.is_semiempirical and self.basis is not None:
+                out['basis_info'] = self.basis.get_orca_basis_info()
+        
+        else:
+            out['functional'] = None
+
+        if self.grid is not None:
+            out['grid'] = self.grid.get_orca()[0]
+        
+        else:
+            out['grid'] = None
+        
+        if self.structure is not None:
+            atoms = []
+            for atom in self.structure.atoms:
+                if isinstance(self.structure, AtomicStructure):
+                    atoms.append("%-2s %13.6f %13.6f %13.6f\n" % (atom.element.name, *atom.coord))
+                
+                elif isinstance(self.structure, Geometry):
+                    atoms.append("%-2s %13.6f %13.6f %13.6f\n" % (atom.element, *atom.coords))
+        
+            out['structure'] = atoms
+        
+            if self.constraints is not None:
+                out['constraints'] = {'atoms':[], 'bonds':[], 'angles':[], 'torsions':[]}
+                for atom in self.constraints['atoms']:
+                    out['constraints']['atoms'].append(str(self.structure.atoms.index(atom) + 1))
+
+                for bond in self.constraints['bonds']:
+                    atom1, atom2 = bond
+                    out['constraints']['bonds'].append((str(self.structure.atoms.index(atom1) + 1), \
+                                                        str(self.structure.atoms.index(atom2) + 1)
+                                                    ))
+
+                for angle in self.constraints['angles']:
+                    atom1, atom2, atom3 = angle
+                    out['constraints']['angles'].append((str(self.structure.atoms.index(atom1) + 1), \
+                                                        str(self.structure.atoms.index(atom2) + 1), \
+                                                        str(self.structure.atoms.index(atom3) + 1)
+                                                    ))
+
+                for torsion in self.constraints['torsions']:
+                    atom1, atom2, atom3, atom4 = torsion
+                    out['constraints']['torsion'].append((str(self.structure.atoms.index(atom1) + 1), \
+                                                        str(self.structure.atoms.index(atom2) + 1), \
+                                                        str(self.structure.atoms.index(atom3) + 1), \
+                                                        str(self.structure.atoms.index(atom4) + 1)
+                                                        ))
+            
+            else:
+                out['constraints'] = None
+
+        else:
+            out['structure'] = None
+        
+        if self.empirical_dispersion is not None:
+            out['empirical_dispersion'] = self.empirical_dispersion.get_orca()[0]
+        else:
+            out['empirical_dispersion'] = None    
+            
+        return out
+
+    def get_psi4_json(self, other_kw_dict):
+        out = {}
+        out['other'] = other_kw_dict
+        
+        out['charge'] = self.charge
+        out['multiplicity'] = self.multiplicity
+        out['processors'] = self.processors
+        out['memory'] = self.memory
+        
+        if self.functional is not None:
+            out['functional'] = self.functional.get_psi4()[0]
+            out['semi_empirical'] = self.functional.is_semiempirical
+            
+            if not self.functional.is_semiempirical and self.basis is not None:
+                out['basis_info'] = self.basis.get_psi4_basis_info()
+        
+        else:
+            out['functional'] = None
+
+        if self.grid is not None:
+            out['grid'] = self.grid.get_psi4()[0]
+        
+        else:
+            out['grid'] = None
+        
+        if self.structure is not None:
+            atoms = []
+            for atom in self.structure.atoms:
+                if isinstance(self.structure, AtomicStructure):
+                    atoms.append("%-2s %13.6f %13.6f %13.6f\n" % (atom.element.name, *atom.coord))
+                
+                elif isinstance(self.structure, Geometry):
+                    atoms.append("%-2s %13.6f %13.6f %13.6f\n" % (atom.element, *atom.coords))
+        
+            out['structure'] = atoms
+        
+            if self.constraints is not None:
+                out['constraints'] = {'atoms':[], 'bonds':[], 'angles':[], 'torsions':[]}
+                for atom in self.constraints['atoms']:
+                    out['constraints']['atoms'].append(str(self.structure.atoms.index(atom) + 1))
+
+                for bond in self.constraints['bonds']:
+                    atom1, atom2 = bond
+                    out['constraints']['bonds'].append((str(self.structure.atoms.index(atom1) + 1), \
+                                                        str(self.structure.atoms.index(atom2) + 1)
+                                                    ))
+
+                for angle in self.constraints['angles']:
+                    atom1, atom2, atom3 = angle
+                    out['constraints']['angles'].append((str(self.structure.atoms.index(atom1) + 1), \
+                                                        str(self.structure.atoms.index(atom2) + 1), \
+                                                        str(self.structure.atoms.index(atom3) + 1)
+                                                    ))
+
+                for torsion in self.constraints['torsions']:
+                    atom1, atom2, atom3, atom4 = torsion
+                    out['constraints']['torsion'].append((str(self.structure.atoms.index(atom1) + 1), \
+                                                        str(self.structure.atoms.index(atom2) + 1), \
+                                                        str(self.structure.atoms.index(atom3) + 1), \
+                                                        str(self.structure.atoms.index(atom4) + 1)
+                                                        ))
+            
+            else:
+                out['constraints'] = None
+
+        else:
+            out['structure'] = None
+        
+        if self.empirical_dispersion is not None:
+            out['empirical_dispersion'] = self.empirical_dispersion.get_psi4()[0]
+        else:
+            out['empirical_dispersion'] = None
+
+        return out
+
+    @classmethod
+    def gaussian_input_from_dict(cls, json_dict, fname=None):
+        """write gaussian input file to fname using info in dict
+        any keys (self.GAUSSIAN_*) should be strings instead of integers"""
+        s = ""
+        if json_dict['processors'] is not None:
+            s += "%%NProcShared=%s\n" % json_dict['processors']
+
+        if json_dict['memory'] is not None:
+            s += "%%Mem=%sGB\n" % json_dict['memory']
+
+        if str(cls.GAUSSIAN_PRE_ROUTE) in json_dict['other']:
+            for key in json_dict['other'][str(cls.GAUSSIAN_PRE_ROUTE)]:
+                s += "%%%s" % key
+                if len(json_dict['other'][str(cls.GAUSSIAN_PRE_ROUTE)][key]) > 0:
+                    s += "=%s" % ",".join(json_dict['other'][str(cls.GAUSSIAN_PRE_ROUTE)][key])
+
+                if not s.endswith('\n'):
+                    s += '\n'
+
+        #start route line with functional
+        func = json_dict['functional']
+
+        s += "#n %s" % func
+        if not json_dict['semi_empirical']:
+            basis_info = json_dict['basis_info']
+            
+            if str(cls.GAUSSIAN_ROUTE) in basis_info:
+                s += "%s" % basis_info[str(cls.GAUSSIAN_ROUTE)]
+
+        s += " "
+
+        if json_dict['empirical_dispersion'] is not None:
+            s += json_dict['empirical_dispersion'] + " "
+
+        if json_dict['grid'] is not None:
+            s += json_dict['grid']
+            s += " "
+
+        if str(cls.GAUSSIAN_ROUTE) in json_dict['other']:
+            for option in json_dict['other'][str(cls.GAUSSIAN_ROUTE)]:
+                s += option
+                if len(json_dict['other'][str(cls.GAUSSIAN_ROUTE)][option]) > 0:
+                    s += "=(%s)" % ",".join(json_dict['other'][str(cls.GAUSSIAN_ROUTE)][option])
+                s += " "
+
+        s += "\n\n"
+
+        if str(cls.GAUSSIAN_COMMENT) in json_dict['other']:
+            if len(json_dict['other'][str(cls.GAUSSIAN_COMMENT)]) > 0:
+                #TODO: make it impossible to break up te comment with newlines
+                s += "\n".join([x.rstrip() for x in json_dict['other'][str(cls.GAUSSIAN_COMMENT)]])
+            else:
+                s += "comment"
+
+            if not s.endswith('\n'):
+                s += '\n'
+
+        s += "\n"
+
+        s += "%s %s\n" % (json_dict['charge'], json_dict['multiplicity'])
+        if json_dict['structure'] is not None:
+            atoms = []
+            for atom in json_dict['structure']:
+                atom_info = atom.split()
+                atoms.append(Atom(element=atom_info[0], coords=[float(x) for x in atom_info[1:]]))
+            
+            structure = Geometry(atoms)
+
+            if json_dict['constraints'] is not None and len(json_dict['constraints']['atoms']) > 0:
+                atom_constraints = structure.find(json_dict['constraints']['atoms'])
+                for atom in structure.atoms:
+                    if atom in atom_constraints:
+                        flag = -1
+                    else:
+                        flag = 0
+                    s += "%-2s %2i %13.6f %13.6f %13.6f\n" % (atom.element, flag, *atom.coords)
+
+            else:    
+                for atom in structure.atoms:
+                    s += "%-2s %13.6f %13.6f %13.6f\n" % (atom.element, *atom.coords)
+
+        else:
+            s += "None\n"
+
+        s += "\n"
+
+        if json_dict['constraints']['bonds'] is not None and json_dict['structure'] is not None:
+            for constraint in json_dict['constraints']['bonds']:
+                atom1, atom2 = constraint
+                s += "B %2s %2s F\n" % (atom1, atom2)
+
+            for constraint in json_dict['constraints']['angles']:
+                atom1, atom2, atom3 = constraint
+                s += "A %2s %2s %2s F\n" % (atom1, atom2, atom3)
+
+            for constraint in json_dict['constraints']['torsions']:
+                atom1, atom2, atom3, atom4 = constraint
+                s += "D %2s %2s %2s %2s F\n" % (atom1, atom2, atom3, atom4)
+
+            s += '\n'
+
+        if not json_dict['semi_empirical']:
+            if str(cls.GAUSSIAN_GEN_BASIS) in basis_info:
+                s += basis_info[str(cls.GAUSSIAN_GEN_BASIS)]
+            
+                s += "\n"
+
+            if str(cls.GAUSSIAN_GEN_ECP) in basis_info:
+                s += basis_info[str(cls.GAUSSIAN_GEN_ECP)]
+                
+                s += '\n'
+
+        if str(cls.GAUSSIAN_POST) in json_dict['other']:
+            for item in json_dict['other'][str(cls.GAUSSIAN_POST)]:
+                s += item
+                s += " "
+
+            s += '\n'
+
+        s += '\n\n'
+
+        if fname is not None:
+            with open(fname, "w") as f:
+                f.write(s)
+
+        return s
+
+    @classmethod
+    def orca_input_from_dict(cls, json_dict, fname=None):
+        """write orca input file to fname using info in dict
+        any keys (self.ORCA_*) should be strings instead of integers"""
+        if not json_dict['semi_empirical']:
+            basis_info = json_dict['basis_info']
+
+        else:
+            basis_info = {}
+
+        combined_dict = combine_dicts(json_dict['other'], basis_info)
+
+        if json_dict['grid'] is not None:
+            grid_info = json_dict['grid']
+
+            if any('finalgrid' in x.lower() for x in combined_dict[str(cls.ORCA_ROUTE)]):
+                grid_info[str(cls.ORCA_ROUTE)].pop(1)
+
+            combined_dict = combine_dicts(combined_dict, grid_info)
+
+        if json_dict['structure'] is not None:
+            atoms = []
+            for atom in json_dict['structure']:
+                atom_info = atom.split()
+                atoms.append(Atom(element=atom_info[0], coords=[float(x) for x in atom_info[1:]]))
+            
+            structure = Geometry(atoms)
+
+        if json_dict['constraints'] is not None and json_dict['structure'] is not None:
+            if 'geom' not in combined_dict[str(cls.ORCA_BLOCKS)]:
+                combined_dict[str(cls.ORCA_BLOCKS)]['geom'] = []
+
+            combined_dict[str(cls.ORCA_BLOCKS)]['geom'].append("constraints")
+            for constraint in json_dict['constraints']['atoms']:
+                atom1 = constraint
+                s = "    {C %2s C}" % (atom1)
+                combined_dict[str(cls.ORCA_BLOCKS)]['geom'].append(s)
+
+            for constraint in json_dict['constraints']['bonds']:
+                atom1, atom2 = constraint
+                s = "    {B %2s %2s C}" % (atom1, atom2)
+                combined_dict[str(cls.ORCA_BLOCKS)]['geom'].append(s)
+
+            for constraint in json_dict['constraints']['angles']:
+                atom1, atom2, atom3 = constraint
+                s = "    {A %2s %2s %2s C}" % (atom1, atom2, atom3)
+                combined_dict[str(cls.ORCA_BLOCKS)]['geom'].append(s)
+
+            for constraint in json_dict['constraints']['torsions']:
+                atom1, atom2, atom3, atom4 = constraint
+                s = "    {D %2s %2s %2s %2s C}" % (atom1, atom2, atom3, atom4)
+                combined_dict[str(cls.ORCA_BLOCKS)]['geom'].append(s)
+
+            combined_dict[str(cls.ORCA_BLOCKS)]['geom'].append("end")
+
+        s = ""
+
+        if str(cls.ORCA_COMMENT) in combined_dict:
+            for comment in combined_dict[str(cls.ORCA_COMMENT)]:
+                for line in comment.split('\n'):
+                    s += "#%s\n" % line
+
+        s += "!"
+        if json_dict['functional'] is not None:
+            s += " %s" % json_dict['functional']
+
+        if json_dict['empirical_dispersion'] is not None:
+            if not s.endswith(' '):
+                s += " "
+
+            s += "%s" % json_dict['empirical_dispersion']
+
+        if str(cls.ORCA_ROUTE) in combined_dict:
+            if not s.endswith(' '):
+                s += " "
+                
+                s += " ".join(combined_dict[str(cls.ORCA_ROUTE)])
+
+        s += "\n"
+
+        if json_dict['processors'] is not None:
+            s += "%%pal\n    nprocs %i\nend\n" % json_dict['processors']
+
+            if json_dict['memory'] is not None:
+                s += "%%MaxCore %i\n" % (int(1000 * json_dict['memory'] / json_dict['processors']))
+
+        if str(cls.ORCA_BLOCKS) in combined_dict:
+            for kw in combined_dict[str(cls.ORCA_BLOCKS)]:
+                if any(len(x) > 0 for x in combined_dict[str(cls.ORCA_BLOCKS)][kw]):
+                    s += "%%%s\n" % kw
+                    for opt in combined_dict[str(cls.ORCA_BLOCKS)][kw]:
+                        s += "    %s\n" % opt
+                    s += "end\n"
+
+            s += "\n"
+
+        s += "*xyz %s %s\n" % (json_dict['charge'], json_dict['multiplicity'])
+        if json_dict['structure'] is not None:
+            for atom in structure.atoms:
+                s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element, *atom.coords)
+
+            s += "*\n"
+
+        if fname is not None:
+            with open(fname, "w") as f:
+                f.write(s)
+
+        return s
+
+    @classmethod
+    def psi4_input_from_dict(cls, json_dict, fname=None):
+        """write psi4 input file to fname using info in dict
+        any keys (self.PSI4_*) should be strings instead of integers"""
+        if json_dict['structure'] is not None:
+            atoms = []
+            for atom in json_dict['structure']:
+                atom_info = atom.split()
+                atoms.append(Atom(element=atom_info[0], coords=[float(x) for x in atom_info[1:]]))
+            
+            structure = Geometry(atoms)
+
+        if not json_dict['semi_empirical']:
+            basis_info = json_dict['basis_info']
+
+            for key in basis_info:
+                for i in range(0, len(basis_info[key])):
+                    if "%s" in basis_info[key][i]:
+                        if 'cc' in json_dict['functional'].lower():
+                            basis_info[key][i] = basis_info[key][i].replace("%s", "CC")
+
+                        elif 'dct' in json_dict['functional'].lower():
+                            basis_info[key][i] = basis_info[key][i].replace("%s", "DCT")
+
+                        elif 'mp2' in json_dict['functional'].lower():
+                            basis_info[key][i] = basis_info[key][i].replace("%s", "MP2")
+
+                        elif 'sapt' in json_dict['functional'].lower():
+                            basis_info[key][i] = basis_info[key][i].replace("%s", "SAPT")
+
+                        elif 'scf' in json_dict['functional'].lower():
+                            basis_info[key][i] = basis_info[key][i].replace("%s", "SCF")
+
+                        elif 'ci' in json_dict['functional'].lower():
+                            basis_info[key][i] = basis_info[key][i].replace("%s", "MCSCF")
+
+        else:
+            basis_info = {}
+
+        combined_dict = combine_dicts(json_dict['other'], basis_info)
+        if json_dict['grid'] is not None:
+            combined_dict = combine_dicts(combined_dict, json_dict['grid'])
+
+        s = ""
+
+        if str(cls.PSI4_COMMENT) in combined_dict:
+            for comment in combined_dict[str(cls.PSI4_COMMENT)]:
+                for line in comment.split('\n'):
+                    s += "#%s\n" % line
+
+        if json_dict['processors'] is not None:
+            s += "set_num_threads(%s)\n" % json_dict['processors']
+
+        if json_dict['memory'] is not None:
+            s += "memory %s GB\n" % json_dict['memory']
+
+        if str(cls.PSI4_BEFORE_GEOM) in combined_dict:
+            for opt in combined_dict[str(cls.PSI4_BEFORE_GEOM)]:
+                s += opt
+                s += '\n'
+
+        s += '\n'
+
+        s += "molecule {\n"
+        s += "%2s %s\n" % (json_dict['charge'], json_dict['multiplicity'])
+        if json_dict['structure'] is not None:
+            for atom in structure.atoms:
+                s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element, *atom.coords)
+
+        s += "}\n\n"
+
+        if str(cls.PSI4_SETTINGS) in combined_dict and any(len(combined_dict[str(cls.PSI4_SETTINGS)][setting]) > 0 \
+                                                       for setting in combined_dict[str(cls.PSI4_SETTINGS)]):
+            s += "set {\n"
+            for setting in combined_dict[str(cls.PSI4_SETTINGS)]:
+                if len(combined_dict[str(cls.PSI4_SETTINGS)][setting]) > 0:
+                    s += "    %-20s    %s\n" % (setting, combined_dict[str(cls.PSI4_SETTINGS)][setting][0])
+
+            s += "}\n\n"
+
+        if json_dict['structure'] is not None and json_dict['constraints'] is not None:
+            if len(json_dict['constraints']['atoms']) > 0:
+                s += "freeze_list = \"\"\"\n"
+                for atom in json_dict['constraints']['atoms']:
+                    s += "    %2s xyz\n" % (atom)
+
+                s += "\"\"\"\n"
+                s += "    \n"
+
+            s += "set optking {\n"
+
+            if len(json_dict['constraints']['atoms']) > 0:
+                s += "    frozen_cartesian $freeze_list\n"
+
+            if len(json_dict['constraints']['bonds']) > 0:
+                s += "    frozen_distance = (\"\n"
+                for bond in json_dict['constraints']['bonds']:
+                    atom1, atom2 = bond
+                    s += "        %2s %2s\n" % (atom1, atom2)
+
+                s += "    \")\n"
+
+            if len(json_dict['constraints']['angles']) > 0:
+                s += "    frozen_bend = (\"\n"
+                for angle in json_dict['constraints']['angles']:
+                    atom1, atom2, atom3 = angle
+                    s += "        %2s %2s %2s\n" % (atom1, atom2, atom3)
+
+                s += "    \")\n"
+
+            if len(json_dict['constraints']['torsions']) > 0:
+                s += "    frozen_dihedral = (\"\n"
+                for torsion in json_dict['constraints']['torsions']:
+                    atom1, atom2, atom3, atom4 = torsion
+                    s += "        %2s %2s %2s %2s\n" % (atom1, atom2, atom3, atom4)
+
+                s += "    \")\n"
+
+            s += "}\n\n"
+
+        if str(cls.PSI4_AFTER_GEOM) in combined_dict:
+            for opt in combined_dict[str(cls.PSI4_AFTER_GEOM)]:
+                if "$FUNCTIONAL" in opt:
+                    opt = opt.replace("$FUNCTIONAL", json_dict['functional'])
+
+                s += opt
+                s += '\n'
+
+        if fname is not None:
+            with open(fname, "w") as f:
+                f.write(s)
+
+        return s
+
+
 class Functional:
     def __init__(self, name, is_semiempirical):
         self.name = name
         self.is_semiempirical = is_semiempirical
 
-    def get_gaussian09(self):
+    def get_gaussian(self):
         """maps proper functional name to one Gaussian accepts
         the following methods are available in other software, but not Gaussian:
         B3LYP (as originally reported)
@@ -607,7 +1199,7 @@ class BasisSet:
             
         return elements
     
-    def get_gaussian09_basis_info(self):
+    def get_gaussian_basis_info(self):
         info = {}
 
         if self.basis is not None:
@@ -990,7 +1582,7 @@ class Basis:
             return False
         
         return self.get_basis_name() == other.get_basis_name()
-            
+
     def get_basis_name(self):
         """returns basis set name taking into account diffusion and polarization"""
         #this isn't used
@@ -1028,7 +1620,7 @@ class Basis:
                 name += ")"
             
         return name
-            
+
     @staticmethod
     def map_gaussian09_basis(name):
         """returns the Gaussian09/16 name of the basis set
@@ -1037,13 +1629,14 @@ class Basis:
             return name.replace('def2-', 'def2', 1)
         else:
             return name    
-            
+
     @staticmethod
     def map_orca_basis(name):
         """returns the ORCA name of the basis set
         currently doesn't do anything"""
         return name
-        
+    
+    @staticmethod
     def map_psi4_basis(name):
         """returns the Psi4 name of the basis set
         currently doesn't do anything"""
@@ -1097,7 +1690,7 @@ class EmpiricalDispersion:
     def __init__(self, name):
         self.name = name
         
-    def get_gaussian09(self):
+    def get_gaussian(self):
         """Acceptable dispersion methods for Gaussian are:
         Grimme D2
         Grimme D3
@@ -1351,7 +1944,7 @@ class ImplicitSolvent:
         self.name = name
         self.solvent = solvent
         
-    def get_gaussian09(self):
+    def get_gaussian(self):
         warning = None
         s = "scrf=("
         if self.name == "Polarizable Continuum Model":
@@ -1361,10 +1954,10 @@ class ImplicitSolvent:
         #I think this is CPCM...
         elif self.name == "Conductor-like PCM":
             s += "CPCM, "
-            
+
         else:
             s += "%s, " % self.name
-            
+
         s += "solvent=%s)" % self.solvent
 
         if not any(self.solvent.lower() == x.lower() for x in self.KNOWN_GAUSSIAN_SOLVENTS):
@@ -1376,15 +1969,15 @@ class ImplicitSolvent:
 class IntegrationGrid:
     def __init__(self, name):
         self.name = name
-        
-    def get_gaussian09(self):
+
+    def get_gaussian(self):
         if self.name == "UltraFine":
             return ("Integral=(grid=UltraFine)", None)
         elif self.name == "FineGrid":
             return ("Integral=(grid=FineGrid)", None)
         elif self.name == "SuperFineGrid":
             return ("Integral=(grid=SuperFineGrid)", None)
-            
+
         #Grids available in ORCA but not Gaussian
         #uses n_rad from K-Kr as specified in ORCA 4.2.1 manual (section 9.3)
         #XXX: there's probably IOp's that can get closer
@@ -1406,15 +1999,15 @@ class IntegrationGrid:
         elif self.name == "Grid 7":
             n_rad = 60
             return ("Integral=(grid=%i770)" % n_rad, "Approximating ORCA Grid 7")
-            
+
         else:
             return ("Integral=(grid=%s)" % self.name, "grid may not be available in Gaussian")
-            
+
     def get_orca(self):
         """translates grid to something ORCA accepts
         current just returns self.name"""
         return ({Method.ORCA_ROUTE:[self.name, "Final%s" % self.name]}, None)
-        
+
     def get_psi4(self):
         radial, spherical = [x.strip() for x in self.name[1:-1].split(', ')]
         return {Method.PSI4_SETTINGS:{'dft_radial_points':[radial], 'dft_spherical_points':[spherical]}}

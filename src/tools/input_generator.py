@@ -199,6 +199,7 @@ class BuildQM(ToolInstance):
         self.preset_window = None
         self.job_local_prep = None
         self.remove_preset_window = None
+        self.export_preset_window = None
 
         self._build_ui()
 
@@ -328,7 +329,7 @@ class BuildQM(ToolInstance):
         self.presets_menu.addAction(self.import_preset)
 
         self.export_preset = QAction("Export Presets...", self.tool_window.ui_area)
-        self.export_preset.triggered.connect(lambda *args, tool=self.tool_window: tool.create_child_window("Export Presets", window_class=ExportPreset))
+        self.export_preset.triggered.connect(self.show_export_preset)
         self.presets_menu.addAction(self.export_preset)
 
         run = menu.addMenu("&Run")
@@ -458,6 +459,10 @@ class BuildQM(ToolInstance):
     def show_remove_preset(self):
         if self.remove_preset_window is None:
             self.remove_preset_window = self.tool_window.create_child_window("Remove Presets", window_class=RemovePreset)
+
+    def show_export_preset(self):
+        if self.export_preset_window is None:
+            self.export_preset_window = self.tool_window.create_child_window("Export Presets", window_class=ExportPreset)
 
     def import_preset_file(self):
         filename, _ = QFileDialog.getOpenFileName(filter="JSON files (*.json)")
@@ -922,7 +927,7 @@ class JobTypeOption(QWidget):
 
         self.constrained_atom_table = QTableWidget()
         self.constrained_atom_table.setColumnCount(2)
-        self.constrained_atom_table.cellActivated.connect(self.clicked_atom_table)
+        self.constrained_atom_table.cellClicked.connect(self.clicked_atom_table)
         self.constrained_atom_table.setHorizontalHeaderLabels(["atom", "unfreeze"])
         self.constrained_atom_table.setEditTriggers(QTableWidget.NoEditTriggers)
         atom_constraints_layout.addWidget(self.constrained_atom_table, 1, 0)
@@ -943,7 +948,7 @@ class JobTypeOption(QWidget):
 
         self.constrained_bond_table = QTableWidget()
         self.constrained_bond_table.setColumnCount(3)
-        self.constrained_bond_table.cellActivated.connect(self.clicked_bond_table)
+        self.constrained_bond_table.cellClicked.connect(self.clicked_bond_table)
         self.constrained_bond_table.setHorizontalHeaderLabels(["atom 1", "atom 2", "unfreeze"])
         self.constrained_bond_table.setEditTriggers(QTableWidget.NoEditTriggers)
         bond_constraints_layout.addWidget(self.constrained_bond_table, 1, 0, 1, 2)
@@ -964,7 +969,7 @@ class JobTypeOption(QWidget):
 
         self.constrained_angle_table = QTableWidget()
         self.constrained_angle_table.setColumnCount(4)
-        self.constrained_angle_table.cellActivated.connect(self.clicked_angle_table)
+        self.constrained_angle_table.cellClicked.connect(self.clicked_angle_table)
         self.constrained_angle_table.setHorizontalHeaderLabels(["atom 1", "atom 2", "atom 3", "unfreeze"])
         self.constrained_angle_table.setEditTriggers(QTableWidget.NoEditTriggers)
         angle_constraints_layout.addWidget(self.constrained_angle_table, 1, 0, 1, 2)
@@ -985,7 +990,7 @@ class JobTypeOption(QWidget):
 
         self.constrained_torsion_table = QTableWidget()
         self.constrained_torsion_table.setColumnCount(5)
-        self.constrained_torsion_table.cellActivated.connect(self.clicked_torsion_table)
+        self.constrained_torsion_table.cellClicked.connect(self.clicked_torsion_table)
         self.constrained_torsion_table.setHorizontalHeaderLabels(["atom 1", "atom 2", "atom 3", "atom 4", "unfreeze"])
         self.constrained_torsion_table.setEditTriggers(QTableWidget.NoEditTriggers)
         torsion_constrains_layout.addWidget(self.constrained_torsion_table, 1, 0, 1, 2)
@@ -1388,7 +1393,7 @@ class JobTypeOption(QWidget):
             trash_button = QLabel()
             dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
             trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-            trash_button.setToolTip("double click to unfreeze")
+            trash_button.setToolTip("click to unfreeze")
             widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
             widget_layout.setContentsMargins(2, 2, 2, 2)
             self.constrained_atom_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
@@ -1429,7 +1434,7 @@ class JobTypeOption(QWidget):
         trash_button = QLabel()
         dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
         trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-        trash_button.setToolTip("double click to unfreeze")
+        trash_button.setToolTip("click to unfreeze")
         widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
         widget_layout.setContentsMargins(2, 2, 2, 2)
         self.constrained_bond_table.setCellWidget(row, 2, widget_that_lets_me_horizontally_align_an_icon)
@@ -1468,7 +1473,7 @@ class JobTypeOption(QWidget):
             trash_button = QLabel()
             dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
             trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-            trash_button.setToolTip("double click to unfreeze")
+            trash_button.setToolTip("click to unfreeze")
             widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
             widget_layout.setContentsMargins(2, 2, 2, 2)
             self.constrained_bond_table.setCellWidget(row, 2, widget_that_lets_me_horizontally_align_an_icon)
@@ -1522,7 +1527,7 @@ class JobTypeOption(QWidget):
         trash_button = QLabel()
         dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
         trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-        trash_button.setToolTip("double click to unfreeze")
+        trash_button.setToolTip("click to unfreeze")
         widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
         widget_layout.setContentsMargins(2, 2, 2, 2)
         self.constrained_angle_table.setCellWidget(row, 3, widget_that_lets_me_horizontally_align_an_icon)
@@ -1589,7 +1594,7 @@ class JobTypeOption(QWidget):
         trash_button = QLabel()
         dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
         trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-        trash_button.setToolTip("double click to unfreeze")
+        trash_button.setToolTip("click to unfreeze")
         widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
         widget_layout.setContentsMargins(2, 2, 2, 2)
         self.constrained_angle_table.setCellWidget(row, 3, widget_that_lets_me_horizontally_align_an_icon)
@@ -1648,7 +1653,7 @@ class JobTypeOption(QWidget):
         trash_button = QLabel()
         dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
         trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-        trash_button.setToolTip("double click to unfreeze")
+        trash_button.setToolTip("click to unfreeze")
         widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
         widget_layout.setContentsMargins(2, 2, 2, 2)
         self.constrained_torsion_table.setCellWidget(row, 4, widget_that_lets_me_horizontally_align_an_icon)
@@ -1726,7 +1731,7 @@ class JobTypeOption(QWidget):
         trash_button = QLabel()
         dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
         trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-        trash_button.setToolTip("double click to unfreeze")
+        trash_button.setToolTip("click to unfreeze")
         widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
         widget_layout.setContentsMargins(2, 2, 2, 2)
         self.constrained_torsion_table.setCellWidget(row, 4, widget_that_lets_me_horizontally_align_an_icon)
@@ -1970,10 +1975,10 @@ class FunctionalOption(QWidget):
     
     ORCA_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D3", "B3PW91", "B97-D", "BP86", "PBE0", "HF-3c", "AM1"]
     ORCA_DISPERSION = ["Grimme D2", "Undamped Grimme D3", "Becke-Johnson damped Grimme D3", "Grimme D4"]
-    ORCA_GRIDS = ["Default", "Grid7", "Grid6", "Grid5", "Grid4", "Grid3"]
+    ORCA_GRIDS = ["Default", "Grid7", "Grid6", "Grid5", "Grid4"]
 
     PSI4_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D", "B3PW91", "B97-D", "BP86", "PBE0", "CCSD", "CCSD(T)"]
-    PSI4_GRIDS = ["Default", "(175, 974)", "(99, 590)", "(75, 302)"]
+    PSI4_GRIDS = ["Default", "(175, 974)", "(60, 770)", "(99, 590)", "(55, 590)", "(50, 434)", "(75, 302)"]
 
     functionalChanged = pyqtSignal()
     
@@ -3414,7 +3419,7 @@ class OneLayerKeyWordOption(QWidget):
         self.current_kw_table.setEditTriggers(QTableWidget.DoubleClicked)
         self.current_kw_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.current_kw_table.verticalHeader().setVisible(False)
-        self.current_kw_table.cellActivated.connect(self.clicked_current_route_keyword)
+        self.current_kw_table.cellClicked.connect(self.clicked_current_route_keyword)
         self.current_kw_table.cellChanged.connect(self.edit_current_kw)
 
         new_kw_widget = QWidget()
@@ -3509,7 +3514,7 @@ class OneLayerKeyWordOption(QWidget):
         trash_button = QLabel()
         dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
         trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-        trash_button.setToolTip("double click to not use this %s" % self.name)
+        trash_button.setToolTip("click to not use this %s" % self.name)
         widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
         widget_layout.setContentsMargins(2, 2, 2, 2)
         self.current_kw_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
@@ -3667,7 +3672,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.current_kw_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.current_kw_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.current_kw_table.verticalHeader().setVisible(False)
-        self.current_kw_table.cellActivated.connect(self.clicked_current_route_keyword)
+        self.current_kw_table.cellClicked.connect(self.clicked_current_route_keyword)
         self.keyword_layout.addWidget(self.current_kw_table, 0, 1)
 
         new_kw_widget = QWidget()
@@ -3702,7 +3707,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.current_opt_table.setHorizontalHeaderLabels(['current', 'remove'])
         self.current_opt_table.setEditTriggers(QTableWidget.DoubleClicked)
         self.current_opt_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.current_opt_table.cellActivated.connect(self.clicked_current_keyword_option)
+        self.current_opt_table.cellClicked.connect(self.clicked_current_keyword_option)
         self.current_opt_table.cellChanged.connect(self.edit_current_opt)
         self.current_opt_table.verticalHeader().setVisible(False)
         option_layout.addWidget(self.current_opt_table, 0, 1)
@@ -3802,7 +3807,7 @@ class TwoLayerKeyWordOption(QWidget):
         trash_button = QLabel()
         dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
         trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-        trash_button.setToolTip("double click to not use this %s" % self.name[:-1])
+        trash_button.setToolTip("click to not use this %s" % self.name[:-1])
         widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
         widget_layout.setContentsMargins(2, 2, 2, 2)
         self.current_kw_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
@@ -3875,7 +3880,7 @@ class TwoLayerKeyWordOption(QWidget):
         trash_button = QLabel()
         dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
         trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-        trash_button.setToolTip("double click to not use this option")
+        trash_button.setToolTip("click to not use this option")
         widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
         widget_layout.setContentsMargins(2, 2, 2, 2)
         self.current_opt_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
@@ -4791,6 +4796,10 @@ class SavePreset(ChildToolWindow):
         if self.tool_instance.remove_preset_window is not None:
             self.tool_instance.remove_preset_window.fill_tree()
         
+        if self.tool_instance.export_preset_window is not None:
+            self.tool_instance.export_preset_window.fill_tree()
+
+        
         self.status.showMessage("saved \"%s\"" % name)
         
         #sometimes this causes an error
@@ -5039,3 +5048,8 @@ class ExportPreset(ChildToolWindow):
         self.tool_instance.session.logger.status("saved presets to %s" % filename)
 
         self.destroy()
+        
+    def cleanup(self):
+        self.tool_instance.export_preset_window = None
+        
+        super().cleanup()

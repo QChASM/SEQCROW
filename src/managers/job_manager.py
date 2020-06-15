@@ -6,6 +6,8 @@ from chimerax.core.toolshed import ProviderManager
 from chimerax.core.triggerset import TriggerSet
 from chimerax.core.commands import run
 
+from json import load, dump
+
 from SEQCROW.jobs import LocalJob, GaussianJob, ORCAJob, Psi4Job
 from SEQCROW.managers import FILEREADER_ADDED
 from SEQCROW.residue_collection import ResidueCollection
@@ -15,13 +17,15 @@ JOB_STARTED = "job started"
 JOB_QUEUED = "job changed"
 
 class JobManager(ProviderManager):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, session, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
+        self.session = session
         self.local_jobs = []
         self.remote_jobs = []
         self.paused = False
         self._thread = None
+        self.queue_dict = {}
 
         self.triggers = TriggerSet()
         self.triggers.add_trigger(JOB_FINISHED)
@@ -30,7 +34,10 @@ class JobManager(ProviderManager):
         self.triggers.add_handler(JOB_STARTED, self.job_started)
         self.triggers.add_trigger(JOB_QUEUED)
         self.triggers.add_handler(JOB_QUEUED, self.check_queue)
-    
+        #switch write_json triggers for debugging
+        #self.triggers.add_handler(JOB_QUEUED, self.write_json)
+        self.session.triggers.add_handler('app quit', self.write_json)
+
     def __setattr__(self, attr, val):
         if attr == "paused":
             if val:
@@ -39,20 +46,86 @@ class JobManager(ProviderManager):
                 print("resumed SEQCROW queue")
         
         super().__setattr__(attr, val)
-    
+
     @property
     def jobs(self):
         return self.local_jobs + self.remote_jobs
-        
+
     @property
     def has_job_running(self):
         if self._thread is None:
             return False
         else:
             return self._thread.isRunning()
-    
-    def add_provider(self):
+
+    def add_provider(self, *args, **kwargs):
         self._thread = None
+
+    def init_queue(self):
+        scr_dir = os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR)
+        self.jobs_list_filename = os.path.join(scr_dir, "job_list.json")
+        if os.path.exists(self.jobs_list_filename):
+            with open(self.jobs_list_filename, 'r') as f:
+                queue_dict = load(f)
+
+
+            for job in queue_dict['queued']:
+                if job['server'] == 'local':
+                    if job['format'] == 'Psi4':
+                        local_job = Psi4Job(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
+                    
+                    elif job['format'] == 'ORCA':
+                        local_job = ORCAJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
+                    
+                    elif job['format'] == 'Gaussian':
+                        local_job = GaussianJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
+                
+                    self.local_jobs.append(local_job)
+                    self.session.logger.info("added %s (%s job) from previous session" % (job['name'], job['format']))
+            
+            for job in queue_dict['finished']:
+                if job['server'] == 'local':
+                    if job['format'] == 'Psi4':
+                        local_job = Psi4Job(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
+                        
+                    elif job['format'] == 'ORCA':
+                        local_job = ORCAJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
+                    
+                    elif job['format'] == 'Gaussian':
+                        local_job = GaussianJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
+                
+                    #shh it's finished
+                    local_job.isFinished = lambda *args, **kwargs: True
+                    local_job.output_name = job['output']
+                    local_job.scratch_dir = job['scratch']
+                    self.local_jobs.append(local_job)
+
+            self.paused = queue_dict['job_running']
+
+            if len(queue_dict['queued']) > 0:
+                self.check_queue()
+            
+            if self.paused:
+                self.session.logger.warning("SEQCROW's queue has been paused because a local job was running when ChimeraX was closed. The queue can be resumed with SEQCROW's job manager tool")
+
+    def write_json(self, *args, **kwargs):
+        d = {'finished':[], 'queued':[]}
+        job_running = False
+        for job in self.jobs:
+            if not job.killed:
+                if not job.isFinished() and not job.isRunning():
+                    d['queued'].append(job.get_json())
+
+                else:
+                    d['finished'].append(job.get_json())
+                    
+                if job.isRunning():
+                    job_running = True
+
+        d['job_running'] = job_running
+
+        with open(self.jobs_list_filename, 'w') as f:
+            dump(d, f)
 
     def job_finished(self, trigger_name, job):
         job.session.logger.info("%s: %s" % (trigger_name, job))
@@ -144,7 +217,7 @@ class JobManager(ProviderManager):
         if not self.has_job_running:
             unstarted_local_jobs = []
             for job in self.local_jobs:
-                if job.start_time is None and not job.killed:
+                if not job.isFinished() and not job.killed:
                     unstarted_local_jobs.append(job)
                     
             if len(unstarted_local_jobs) > 0 and not self.paused:

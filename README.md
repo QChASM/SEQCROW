@@ -4,6 +4,8 @@ SEQCROW is an AaronTools-based plugin for <a href="https://www.cgl.ucsf.edu/chim
 SEQCROW extends ChimeraX by adding tools to build and modify complex molecular structures, map new catalysts and ligands onto previously-computed structures, and manage AaronTools libraries.
 These tools enable users to rapidly modify several structures simultaneously, providing an intuitive interface to build libraries of the complex molecular structures frequently encountered in modern quantum chemistry applications.
 
+More information about SEQCROW features can be found on the [GitHub wiki](https://github.com/QChASM/SEQCROW/wiki).
+
 ## Installation
 1. Download <a href="https://github.com/QChASM/ChimAARON/raw/dev/dist/SEQCROW-0.1-py3-none-any.whl" target="_blank">SEQCROW-0.1-py3-none-any.whl</a>
 2. Open ChimeraX
