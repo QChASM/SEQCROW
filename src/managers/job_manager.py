@@ -68,7 +68,6 @@ class JobManager(ProviderManager):
             with open(self.jobs_list_filename, 'r') as f:
                 queue_dict = load(f)
 
-
             for job in queue_dict['queued']:
                 if job['server'] == 'local':
                     if job['format'] == 'Psi4':
@@ -116,7 +115,7 @@ class JobManager(ProviderManager):
                 if not job.isFinished() and not job.isRunning():
                     d['queued'].append(job.get_json())
 
-                else:
+                elif not job.error:
                     d['finished'].append(job.get_json())
                     
                 if job.isRunning():
@@ -131,25 +130,34 @@ class JobManager(ProviderManager):
         job.session.logger.info("%s: %s" % (trigger_name, job))
         if isinstance(job, LocalJob):
             self._thread = None
+            if not hasattr(job, "output_name") or \
+               not os.path.exists(job.output_name):
+                job.error = True
+            
+            else:
+                fr = FileReader(job.output_name, just_geom=False)
+                #XXX: finished is not added to the FileReader for ORCA and Psi4 when finished = False
+                if 'finished' not in fr.other or not fr.other['finished']:
+                    job.error = True
 
         if job.auto_update and not job.theory.structure.deleted:
             if os.path.exists(job.output_name):
                 finfo = job.output_name
                 if isinstance(job, GaussianJob):
-                    finfo = (job.output_name, "com", None)                
+                    finfo = (job.output_name, "log", None)
                 elif isinstance(job, ORCAJob):
-                    finfo = (job.output_name, "out", None)                
+                    finfo = (job.output_name, "out", None)
                 elif isinstance(job, Psi4Job):
                     #coming eventually...
                     finfo = (job.output_name, "dat", None)
-                    
+
                 fr = FileReader(finfo, get_all=True, just_geom=False)
-                
+
                 job.session.filereader_manager.triggers.activate_trigger(FILEREADER_ADDED, ([job.theory.structure], [fr]))
 
                 rescol = ResidueCollection(fr, refresh_connected=True)
                 rescol.update_chix(job.theory.structure)
-            
+
             if fr.all_geom is not None and len(fr.all_geom) > 1:
                 coordsets = rescol.all_geom_coordsets(fr)
 

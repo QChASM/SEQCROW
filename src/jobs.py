@@ -24,12 +24,13 @@ class LocalJob(QThread):
         self.auto_update = auto_update
         self.auto_open = auto_open
         self.killed = False
+        self.error = False
         
         self.process = None
         self.start_time = None
         
         super().__init__()
-        
+
     def kill(self):
         self.session.logger.warning("killing %s..." % self)
 
@@ -60,14 +61,14 @@ class ORCAJob(LocalJob):
 
     def run(self):
         self.start_time = asctime(localtime())
-        
+
         self.scratch_dir = os.path.join(
                         os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
                         "%s %s" % (self.name, self.start_time.replace(':', '.')), \
                     )
 
         cwd = os.getcwd()
-        
+
         if not os.path.exists(self.scratch_dir):
             os.makedirs(self.scratch_dir)
 
@@ -81,12 +82,12 @@ class ORCAJob(LocalJob):
         executable = os.path.abspath(self.session.seqcrow_settings.settings.ORCA_EXE)
         if not os.path.exists(executable):
             executable = self.session.seqcrow_settings.settings.ORCA_EXE
-            
+
         self.output_name = os.path.join(self.scratch_dir, self.name.replace(' ', '_') + '.out')
         outfile = open(self.output_name, 'w')
-        
+
         args = [executable, infile]
-        
+
         log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
         log.write("executing:\n%s\n\n" % " ".join(args))
 
@@ -100,7 +101,7 @@ class ORCAJob(LocalJob):
             self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
         else:        
             self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log)
-        
+
         self.process.communicate()
         self.process = None
 
@@ -117,7 +118,7 @@ class ORCAJob(LocalJob):
             d = {}
             d['output'] = self.output_name
             d['scratch'] = self.scratch_dir
-        
+
         d['server'] = 'local'
         d['start_time'] = self.start_time
         d['name'] = self.name
@@ -203,14 +204,14 @@ class Psi4Job(LocalJob):
 
     def run(self):
         self.start_time = asctime(localtime())
-        
+
         self.scratch_dir = os.path.join(
                         os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
                         "%s %s" % (self.name, self.start_time.replace(':', '.')), \
                     )
 
         cwd = os.getcwd()
-        
+
         if not os.path.exists(self.scratch_dir):
             os.makedirs(self.scratch_dir)
 
@@ -219,15 +220,15 @@ class Psi4Job(LocalJob):
             self.theory.write_psi4_input(self.kw_dict, os.path.join(self.scratch_dir, infile))
         else:
             Method.psi4_input_from_dict(self.theory, os.path.join(self.scratch_dir, infile))
-            
+
         executable = os.path.abspath(self.session.seqcrow_settings.settings.PSI4_EXE)
         if not os.path.exists(executable):
             executable = self.session.seqcrow_settings.settings.PSI4_EXE
 
         self.output_name = os.path.join(self.scratch_dir, self.name + '.dat')
-        
+
         args = [executable, infile, self.output_name]
-        
+
         log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
         log.write("executing:\n%s\n\n" % " ".join(args))
 
@@ -240,7 +241,7 @@ class Psi4Job(LocalJob):
         self.process = None
 
         return 
-    
+
     def get_json(self):
         if self.start_time is None:
             #we don't need to keep the theory stuff around if the job has started
@@ -253,7 +254,7 @@ class Psi4Job(LocalJob):
             d = {}
             d['output'] = self.output_name
             d['scratch'] = self.scratch_dir
-        
+
         d['server'] = 'local'
         d['start_time'] = self.start_time
         d['name'] = self.name
