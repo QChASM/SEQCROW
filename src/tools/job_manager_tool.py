@@ -54,7 +54,7 @@ class JobQueue(ToolInstance):
         
         self.tree = QTreeWidget()
         self.tree.setSelectionMode(QTreeWidget.ExtendedSelection)
-        self.tree.setHeaderLabels(["name", "status", "server", "change priority", "kill", "delete", "browse"])
+        self.tree.setHeaderLabels(["name", "status", "server", "prioritize", "kill", "delete", "browse"])
         self.tree.setUniformRowHeights(True)
 
         self.tree.setColumnWidth(0, 150)
@@ -210,7 +210,7 @@ class JobQueue(ToolInstance):
                     browse.clicked.connect(lambda *args, job=job: self.browse_local(job))
                     browse.setIcon(QIcon(browse_widget.style().standardIcon(QStyle.SP_DirOpenIcon)))
                     browse.setFlat(True)
-                    browse_layout.addWidget(browse, 0, 0, 1, 1, Qt.AlignHCenter)
+                    browse_layout.addWidget(browse, 0, 0, 1, 1, Qt.AlignLeft)
                     browse_layout.setColumnStretch(0, 1)
                     browse_layout.setContentsMargins(0, 0, 0, 0)
                     self.tree.setItemWidget(item, self.BROWSE_COL, browse_widget)

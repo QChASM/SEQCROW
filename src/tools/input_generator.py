@@ -736,7 +736,7 @@ class BuildQM(ToolInstance):
                 output, warnings = self.theory.write_orca_input(combined_dict, fname=filename)
         
         elif program == "Psi4":
-            filename, _ = QFileDialog.getSaveFileName(filter="Psi4 input files (*.in4)")
+            filename, _ = QFileDialog.getSaveFileName(filter="Psi4 input files (*.in)")
             if filename:
                 output, warnings = self.theory.write_psi4_input(combined_dict, fname=filename)
 
@@ -3616,14 +3616,16 @@ class OneLayerKeyWordOption(QWidget):
         self.previous_kw_table.resizeColumnToContents(0)    
     
     def setCurrentSettings(self, kw_list):
-        self.last_list = kw_list.copy()
-        
         self.clearCurrentSettings()
+
+        self.last_list = kw_list.copy()        
         
         for kw in self.last_list:
             self.add_item_to_current_kw_table(kw)
 
     def clearCurrentSettings(self):
+        self.last_list = []
+
         for i in range(self.current_kw_table.rowCount(), -1, -1):
             self.current_kw_table.removeRow(i)
 
@@ -4061,14 +4063,15 @@ class TwoLayerKeyWordOption(QWidget):
         self.previous_opt_table.resizeColumnToContents(0)
     
     def setCurrentSettings(self, kw_dict):
+        self.clearCurrentSettings()
+
         self.last_dict = kw_dict.copy()
 
-        self.clearCurrentSettings()
-            
         for kw in self.last_dict:
             self.add_item_to_current_kw_table(kw)
 
     def clearCurrentSettings(self):
+        self.last_dict = {}
         for i in range(self.current_opt_table.rowCount(), -1, -1):
             self.current_opt_table.removeRow(i)
             

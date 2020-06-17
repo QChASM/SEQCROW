@@ -215,7 +215,7 @@ class Psi4Job(LocalJob):
         if not os.path.exists(self.scratch_dir):
             os.makedirs(self.scratch_dir)
 
-        infile = self.name + '.in4'
+        infile = self.name + '.in'
         if isinstance(self.theory, Method):
             self.theory.write_psi4_input(self.kw_dict, os.path.join(self.scratch_dir, infile))
         else:
