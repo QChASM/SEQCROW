@@ -12,6 +12,8 @@ def open_aarontools(session, path, format_name=None, coordsets=False):
         fmt = "log"    
     elif format_name == "ORCA output file":
         fmt = "out"
+    elif format_name == "Psi4 output file":
+        fmt = "dat"
     elif format_name == "XYZ file":
         fmt = "xyz"
     else:

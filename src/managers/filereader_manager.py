@@ -67,7 +67,11 @@ class FileReaderManager(ProviderManager):
     def frequency_models(self):
         """returns a list of models with frequency data"""
         return [model for model in self.filereader_dict.keys() if any('frequency' in fr.other for fr in self.filereader_dict[model])]
-        
+    
+    @property
+    def frequency_filereaders(self):
+        return [filereader for filereader in self.filereaders if 'frequency' in filereader.other]
+
     @property
     def filereader_dict(self):
         """returns a dictionary with atomic structures:FileReader pairs"""

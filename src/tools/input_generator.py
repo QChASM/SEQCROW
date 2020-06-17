@@ -7,7 +7,7 @@ from chimerax.core.commands.cli import StringArg, BoolArg, ListOf, IntArg
 from chimerax.core.commands import run
 from chimerax.core.models import ADD_MODELS, REMOVE_MODELS
 
-from json import dumps, loads
+from json import dumps, loads, dump, load
 
 from PyQt5.Qt import QClipboard, QStyle, QIcon
 from PyQt5.QtCore import Qt, QRegularExpression, pyqtSignal
@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter
                             QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, \
                             QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, \
                             QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView, QTextBrowser, \
-                            QStatusBar, QTextEdit, QMessageBox
+                            QStatusBar, QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem 
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.theory import *
@@ -105,7 +105,8 @@ class _InputGeneratorSettings(Settings):
         }
         
     AUTO_SAVE = {
-        'gaussian_presets': Value(dumps({"quick optimize":{"nproc":1, \
+        'gaussian_presets': Value(dumps({
+                                       "quick optimize":{"nproc":1, \
                                                            "mem":0, \
                                                            "opt":True, \
                                                            "ts":False, \
@@ -121,7 +122,8 @@ class _InputGeneratorSettings(Settings):
                                                            "other": {}, \
                                                          }, \
                                         }), StringArg), \
-        'orca_presets': Value(dumps({"quick optimize":{"nproc":1, \
+        'orca_presets': Value(dumps({
+                                       "quick optimize":{"nproc":1, \
                                                        "mem":0, \
                                                        "opt":True, \
                                                        "ts":False, \
@@ -152,7 +154,8 @@ class _InputGeneratorSettings(Settings):
                                                    "other": {Method.ORCA_ROUTE:['TightSCF']}, \
                                                   }, \
                                        }), StringArg), \
-         'psi4_presets': Value(dumps({"quick optimize":{"nproc":1, \
+        'psi4_presets': Value(dumps({
+                                       "quick optimize":{"nproc":1, \
                                                        "mem":0, \
                                                        "opt":True, \
                                                        "ts":False, \
@@ -195,6 +198,8 @@ class BuildQM(ToolInstance):
         self.preview_window = None
         self.preset_window = None
         self.job_local_prep = None
+        self.remove_preset_window = None
+        self.export_preset_window = None
 
         self._build_ui()
 
@@ -310,10 +315,23 @@ class BuildQM(ToolInstance):
         #batch.addAction(focal_point)
 
         self.presets_menu = menu.addMenu("Presets")
+
         self.new_preset = QAction("Save Preset...", self.tool_window.ui_area)
         self.new_preset.triggered.connect(self.show_new_preset)
         self.presets_menu.addAction(self.new_preset)
-        
+
+        self.remove_preset = QAction("Remove Presets...")
+        self.remove_preset.triggered.connect(self.show_remove_preset)
+        self.presets_menu.addAction(self.remove_preset)
+
+        self.import_preset = QAction("Import Presets...", self.tool_window.ui_area)
+        self.import_preset.triggered.connect(self.import_preset_file)
+        self.presets_menu.addAction(self.import_preset)
+
+        self.export_preset = QAction("Export Presets...", self.tool_window.ui_area)
+        self.export_preset.triggered.connect(self.show_export_preset)
+        self.presets_menu.addAction(self.export_preset)
+
         run = menu.addMenu("&Run")
         locally = QAction("&Locally", self.tool_window.ui_area)
         #remotely = QAction("R&emotely - coming eventually", self.tool_window.ui_area)
@@ -346,6 +364,9 @@ class BuildQM(ToolInstance):
         sep = self.presets_menu.addSeparator()
         self.presets_menu.addAction(sep)
         self.presets_menu.addAction(self.new_preset)
+        self.presets_menu.addAction(self.remove_preset)
+        self.presets_menu.addAction(self.import_preset)
+        self.presets_menu.addAction(self.export_preset)
 
     def show_new_preset(self):
         """open 'save preset' child tool"""
@@ -434,6 +455,52 @@ class BuildQM(ToolInstance):
         
         if self.preset_window is not None:
             self.preset_window.basis_elements.refresh_basis()
+
+    def show_remove_preset(self):
+        if self.remove_preset_window is None:
+            self.remove_preset_window = self.tool_window.create_child_window("Remove Presets", window_class=RemovePreset)
+
+    def show_export_preset(self):
+        if self.export_preset_window is None:
+            self.export_preset_window = self.tool_window.create_child_window("Export Presets", window_class=ExportPreset)
+
+    def import_preset_file(self):
+        filename, _ = QFileDialog.getOpenFileName(filter="JSON files (*.json)")
+
+        if not filename:
+            return
+            
+        with open(filename, 'r') as f:
+            new_presets = load(f)
+            
+        for program in ["Gaussian", "ORCA", "Psi4"]:
+            if program in new_presets:
+                for preset_name in new_presets[program]:
+                    if preset_name in self.presets[program]:
+                        yes = QMessageBox.question(self.presets_menu, \
+                                                    "%s preset named \"%s\" already exists" % (program, preset_name), \
+                                                    "would you like to overwrite \"%s\"?" % preset_name, \
+                                                    QMessageBox.Yes | QMessageBox.No)
+
+                        if yes != QMessageBox.Yes:
+                            continue
+
+                    self.presets[program][preset_name] = new_presets[program][preset_name]
+
+                    self.session.logger.info("imported %s preset \"%s\"" % (program, preset_name))
+
+                    if 'basis' in self.presets[program][preset_name]:
+                        #print(any(file is not False for file in self.presets[program][preset_name]['basis']['file']))
+                        if any(file is not False for file in self.presets[program][preset_name]['basis']['file']):
+                            self.session.logger.warning("preset contains a basis set that is not built-in\n" +
+                                                        "the external basis file location may need to be updated")
+
+                    if 'ecp' in self.presets[program][preset_name]:
+                        if any(file is not False for file in self.presets[program][preset_name]['ecp']['file']):
+                            self.session.logger.warning("preset contains an ECP that is not built-in\n" +
+                                                        "the external ECP file location may need to be updated")
+
+        self.refresh_presets()
 
     def show_queue(self):
         run(self.session, "ui tool show \"Job Queue\"")
@@ -610,7 +677,7 @@ class BuildQM(ToolInstance):
         self.session.seqcrow_job_manager.add_job(job)
 
         self.update_preview()
-        
+
     def copy_input(self):
         """copies input file to the clipboard"""
         self.update_theory()
@@ -669,7 +736,7 @@ class BuildQM(ToolInstance):
                 output, warnings = self.theory.write_orca_input(combined_dict, fname=filename)
         
         elif program == "Psi4":
-            filename, _ = QFileDialog.getSaveFileName(filter="Psi4 input files (*.in4)")
+            filename, _ = QFileDialog.getSaveFileName(filter="Psi4 input files (*.in)")
             if filename:
                 output, warnings = self.theory.write_psi4_input(combined_dict, fname=filename)
 
@@ -860,7 +927,7 @@ class JobTypeOption(QWidget):
 
         self.constrained_atom_table = QTableWidget()
         self.constrained_atom_table.setColumnCount(2)
-        self.constrained_atom_table.cellActivated.connect(self.clicked_atom_table)
+        self.constrained_atom_table.cellClicked.connect(self.clicked_atom_table)
         self.constrained_atom_table.setHorizontalHeaderLabels(["atom", "unfreeze"])
         self.constrained_atom_table.setEditTriggers(QTableWidget.NoEditTriggers)
         atom_constraints_layout.addWidget(self.constrained_atom_table, 1, 0)
@@ -881,7 +948,7 @@ class JobTypeOption(QWidget):
 
         self.constrained_bond_table = QTableWidget()
         self.constrained_bond_table.setColumnCount(3)
-        self.constrained_bond_table.cellActivated.connect(self.clicked_bond_table)
+        self.constrained_bond_table.cellClicked.connect(self.clicked_bond_table)
         self.constrained_bond_table.setHorizontalHeaderLabels(["atom 1", "atom 2", "unfreeze"])
         self.constrained_bond_table.setEditTriggers(QTableWidget.NoEditTriggers)
         bond_constraints_layout.addWidget(self.constrained_bond_table, 1, 0, 1, 2)
@@ -902,7 +969,7 @@ class JobTypeOption(QWidget):
 
         self.constrained_angle_table = QTableWidget()
         self.constrained_angle_table.setColumnCount(4)
-        self.constrained_angle_table.cellActivated.connect(self.clicked_angle_table)
+        self.constrained_angle_table.cellClicked.connect(self.clicked_angle_table)
         self.constrained_angle_table.setHorizontalHeaderLabels(["atom 1", "atom 2", "atom 3", "unfreeze"])
         self.constrained_angle_table.setEditTriggers(QTableWidget.NoEditTriggers)
         angle_constraints_layout.addWidget(self.constrained_angle_table, 1, 0, 1, 2)
@@ -923,7 +990,7 @@ class JobTypeOption(QWidget):
 
         self.constrained_torsion_table = QTableWidget()
         self.constrained_torsion_table.setColumnCount(5)
-        self.constrained_torsion_table.cellActivated.connect(self.clicked_torsion_table)
+        self.constrained_torsion_table.cellClicked.connect(self.clicked_torsion_table)
         self.constrained_torsion_table.setHorizontalHeaderLabels(["atom 1", "atom 2", "atom 3", "atom 4", "unfreeze"])
         self.constrained_torsion_table.setEditTriggers(QTableWidget.NoEditTriggers)
         torsion_constrains_layout.addWidget(self.constrained_torsion_table, 1, 0, 1, 2)
@@ -1258,21 +1325,21 @@ class JobTypeOption(QWidget):
     def setFrequencyCalculation(self, value):
         """sets job type to freq"""
         self.do_freq.setChecked(value)
-        
+
     def setProcessors(self, value):
         """sets nproc"""
         self.nprocs.setValue(value)
-        
+
     def setMemory(self, value):
         """sets memory"""
         self.mem.setValue(value)
-        
+
     def setSolventModel(self, value):
         """sets solvent model if model is available"""
         ndx = self.solvent_option.findText(value, Qt.MatchExactly)
         if ndx >= 0:
             self.solvent_option.setCurrentIndex(ndx)
-            
+
     def setSolvent(self, value):
         """sets solvent to value"""
         self.solvent_name.setText(value)
@@ -1326,7 +1393,7 @@ class JobTypeOption(QWidget):
             trash_button = QLabel()
             dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
             trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-            trash_button.setToolTip("double click to unfreeze")
+            trash_button.setToolTip("click to unfreeze")
             widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
             widget_layout.setContentsMargins(2, 2, 2, 2)
             self.constrained_atom_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
@@ -1367,7 +1434,7 @@ class JobTypeOption(QWidget):
         trash_button = QLabel()
         dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
         trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-        trash_button.setToolTip("double click to unfreeze")
+        trash_button.setToolTip("click to unfreeze")
         widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
         widget_layout.setContentsMargins(2, 2, 2, 2)
         self.constrained_bond_table.setCellWidget(row, 2, widget_that_lets_me_horizontally_align_an_icon)
@@ -1406,7 +1473,7 @@ class JobTypeOption(QWidget):
             trash_button = QLabel()
             dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
             trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-            trash_button.setToolTip("double click to unfreeze")
+            trash_button.setToolTip("click to unfreeze")
             widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
             widget_layout.setContentsMargins(2, 2, 2, 2)
             self.constrained_bond_table.setCellWidget(row, 2, widget_that_lets_me_horizontally_align_an_icon)
@@ -1460,7 +1527,7 @@ class JobTypeOption(QWidget):
         trash_button = QLabel()
         dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
         trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-        trash_button.setToolTip("double click to unfreeze")
+        trash_button.setToolTip("click to unfreeze")
         widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
         widget_layout.setContentsMargins(2, 2, 2, 2)
         self.constrained_angle_table.setCellWidget(row, 3, widget_that_lets_me_horizontally_align_an_icon)
@@ -1527,7 +1594,7 @@ class JobTypeOption(QWidget):
         trash_button = QLabel()
         dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
         trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-        trash_button.setToolTip("double click to unfreeze")
+        trash_button.setToolTip("click to unfreeze")
         widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
         widget_layout.setContentsMargins(2, 2, 2, 2)
         self.constrained_angle_table.setCellWidget(row, 3, widget_that_lets_me_horizontally_align_an_icon)
@@ -1586,7 +1653,7 @@ class JobTypeOption(QWidget):
         trash_button = QLabel()
         dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
         trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-        trash_button.setToolTip("double click to unfreeze")
+        trash_button.setToolTip("click to unfreeze")
         widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
         widget_layout.setContentsMargins(2, 2, 2, 2)
         self.constrained_torsion_table.setCellWidget(row, 4, widget_that_lets_me_horizontally_align_an_icon)
@@ -1664,7 +1731,7 @@ class JobTypeOption(QWidget):
         trash_button = QLabel()
         dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
         trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-        trash_button.setToolTip("double click to unfreeze")
+        trash_button.setToolTip("click to unfreeze")
         widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
         widget_layout.setContentsMargins(2, 2, 2, 2)
         self.constrained_torsion_table.setCellWidget(row, 4, widget_that_lets_me_horizontally_align_an_icon)
@@ -1908,10 +1975,10 @@ class FunctionalOption(QWidget):
     
     ORCA_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D3", "B3PW91", "B97-D", "BP86", "PBE0", "HF-3c", "AM1"]
     ORCA_DISPERSION = ["Grimme D2", "Undamped Grimme D3", "Becke-Johnson damped Grimme D3", "Grimme D4"]
-    ORCA_GRIDS = ["Default", "Grid7", "Grid6", "Grid5", "Grid4", "Grid3"]
+    ORCA_GRIDS = ["Default", "Grid7", "Grid6", "Grid5", "Grid4"]
 
     PSI4_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D", "B3PW91", "B97-D", "BP86", "PBE0", "CCSD", "CCSD(T)"]
-    PSI4_GRIDS = ["Default", "(175, 974)", "(99, 590)", "(75, 302)"]
+    PSI4_GRIDS = ["Default", "(175, 974)", "(60, 770)", "(99, 590)", "(55, 590)", "(50, 434)", "(75, 302)"]
 
     functionalChanged = pyqtSignal()
     
@@ -1986,13 +2053,18 @@ class FunctionalOption(QWidget):
         disp_form_layout.setContentsMargins(*new_margins)
         
         self.dispersion = QComboBox()
+        self.dispersion.setToolTip("Dispersion correction for DFT functionals without built-in dispersion\n" + \
+                                   "Important for long- or medium-range noncovalent interactions")
         self.dispersion.currentIndexChanged.connect(self.something_changed)
 
         disp_form_layout.addRow("empirical dispersion:", self.dispersion)
         
         self.grid = QComboBox()
         self.grid.currentIndexChanged.connect(self.something_changed)
-        self.grid.setToolTip("integration grid for methods without analytical exchange")
+        self.grid.setToolTip("Integration grid for methods without analytical exchange\n" + \
+                             "Finer grids result in more trustworthy results\n" + \
+                             "Analysis calculations should be performed on a structure that\n" + \
+                             "was optimized with the same grid")
         
         disp_form_layout.addRow("integration grid:", self.grid)
         
@@ -2250,7 +2322,7 @@ class FunctionalOption(QWidget):
             ndx = self.grid.findText(grid)
 
         self.grid.setCurrentIndex(ndx)
-        
+
     def setDispersion(self, dispersion):
         """sets dispersion to what's specified"""
         if dispersion is None:
@@ -2259,7 +2331,7 @@ class FunctionalOption(QWidget):
             ndx = self.dispersion.findText(dispersion)
 
         self.dispersion.setCurrentIndex(ndx)
-        
+
     def setFunctional(self, func):
         """sets functional option to match the given Functional"""
         if isinstance(func, Functional):
@@ -2321,13 +2393,13 @@ class BasisOption(QWidget):
     last_custom_path = "last_basis_path"
     last_elements = "last_basis_elements"
     aux_setting = "last_basis_aux"
-        
+
     toolbox_name = "basis_toolbox"
     
     aux_available = True
     
     basis_class = Basis
-        
+
     def __init__(self, parent, settings, form):
         self.parent = parent
         self.settings = settings
@@ -2374,7 +2446,8 @@ class BasisOption(QWidget):
         self.basis_name_options.addRow(keyword_label, self.custom_basis_kw)
 
         self.is_builtin = QCheckBox()
-            
+        self.is_builtin.setToolTip("checked: basis set is avaiable in the software with a keyword\n" + \
+                                   "unchecked: basis set is stored in an external file")
         self.is_builtin.stateChanged.connect(self.show_gen_path)
         
         is_builtin_label = QLabel("built-in:")
@@ -3160,7 +3233,7 @@ class BasisWidget(QWidget):
             self.settings.last_number_ecp = len(self.ecp_options)
         
         return basis_set, ecp
-        
+
     def getBasis(self, update_settings=True):
         """returns BasisSet object corresponding to the current settings"""
         basis, ecp = self.get_basis(update_settings=update_settings)
@@ -3188,7 +3261,7 @@ class BasisWidget(QWidget):
     
                 self.ecp_options[i].setBasis(basis.name, basis_path=basis.user_defined)
                 self.ecp_options[i].setSelectedElements(basis.elements)
-            
+
     def add_to_all_but(self, exclude_option, row, name, path):
         """called by child BasisOption
         adds a previously-used basis set to the previously-used basis set table of all other child BasisOptions"""
@@ -3346,7 +3419,7 @@ class OneLayerKeyWordOption(QWidget):
         self.current_kw_table.setEditTriggers(QTableWidget.DoubleClicked)
         self.current_kw_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.current_kw_table.verticalHeader().setVisible(False)
-        self.current_kw_table.cellActivated.connect(self.clicked_current_route_keyword)
+        self.current_kw_table.cellClicked.connect(self.clicked_current_route_keyword)
         self.current_kw_table.cellChanged.connect(self.edit_current_kw)
 
         new_kw_widget = QWidget()
@@ -3394,7 +3467,7 @@ class OneLayerKeyWordOption(QWidget):
         layout.setRowStretch(0, 1)
         layout.setRowStretch(1, 0)
         layout.setContentsMargins(0, 0, 0, 0)
-        
+
     def add_item_to_previous_kw_table(self, kw):
         row = self.previous_kw_table.rowCount()
         self.previous_kw_table.insertRow(row)
@@ -3441,7 +3514,7 @@ class OneLayerKeyWordOption(QWidget):
         trash_button = QLabel()
         dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
         trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-        trash_button.setToolTip("double click to not use this %s" % self.name)
+        trash_button.setToolTip("click to not use this %s" % self.name)
         widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
         widget_layout.setContentsMargins(2, 2, 2, 2)
         self.current_kw_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
@@ -3543,14 +3616,16 @@ class OneLayerKeyWordOption(QWidget):
         self.previous_kw_table.resizeColumnToContents(0)    
     
     def setCurrentSettings(self, kw_list):
-        self.last_list = kw_list.copy()
-        
         self.clearCurrentSettings()
+
+        self.last_list = kw_list.copy()        
         
         for kw in self.last_list:
             self.add_item_to_current_kw_table(kw)
 
     def clearCurrentSettings(self):
+        self.last_list = []
+
         for i in range(self.current_kw_table.rowCount(), -1, -1):
             self.current_kw_table.removeRow(i)
 
@@ -3599,7 +3674,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.current_kw_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.current_kw_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.current_kw_table.verticalHeader().setVisible(False)
-        self.current_kw_table.cellActivated.connect(self.clicked_current_route_keyword)
+        self.current_kw_table.cellClicked.connect(self.clicked_current_route_keyword)
         self.keyword_layout.addWidget(self.current_kw_table, 0, 1)
 
         new_kw_widget = QWidget()
@@ -3634,7 +3709,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.current_opt_table.setHorizontalHeaderLabels(['current', 'remove'])
         self.current_opt_table.setEditTriggers(QTableWidget.DoubleClicked)
         self.current_opt_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.current_opt_table.cellActivated.connect(self.clicked_current_keyword_option)
+        self.current_opt_table.cellClicked.connect(self.clicked_current_keyword_option)
         self.current_opt_table.cellChanged.connect(self.edit_current_opt)
         self.current_opt_table.verticalHeader().setVisible(False)
         option_layout.addWidget(self.current_opt_table, 0, 1)
@@ -3734,7 +3809,7 @@ class TwoLayerKeyWordOption(QWidget):
         trash_button = QLabel()
         dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
         trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-        trash_button.setToolTip("double click to not use this %s" % self.name[:-1])
+        trash_button.setToolTip("click to not use this %s" % self.name[:-1])
         widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
         widget_layout.setContentsMargins(2, 2, 2, 2)
         self.current_kw_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
@@ -3807,7 +3882,7 @@ class TwoLayerKeyWordOption(QWidget):
         trash_button = QLabel()
         dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
         trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-        trash_button.setToolTip("double click to not use this option")
+        trash_button.setToolTip("click to not use this option")
         widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
         widget_layout.setContentsMargins(2, 2, 2, 2)
         self.current_opt_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
@@ -3988,14 +4063,15 @@ class TwoLayerKeyWordOption(QWidget):
         self.previous_opt_table.resizeColumnToContents(0)
     
     def setCurrentSettings(self, kw_dict):
+        self.clearCurrentSettings()
+
         self.last_dict = kw_dict.copy()
 
-        self.clearCurrentSettings()
-            
         for kw in self.last_dict:
             self.add_item_to_current_kw_table(kw)
 
     def clearCurrentSettings(self):
+        self.last_dict = {}
         for i in range(self.current_opt_table.rowCount(), -1, -1):
             self.current_opt_table.removeRow(i)
             
@@ -4091,7 +4167,7 @@ class KeywordOptions(QWidget):
     def something_changed(self, *args, **kw):
         """just for updating the preview"""
         self.optionsChanged.emit()
-        
+
     def settings_changed(self, *args, **kw):
         """update settings"""
         last_dict = {}
@@ -4559,7 +4635,7 @@ class SavePreset(ChildToolWindow):
         super().__init__(tool_instance, title, statusbar=False, **kwargs)
         
         self._build_ui()
-        
+
     def _build_ui(self):
         
         layout = QFormLayout()
@@ -4720,15 +4796,108 @@ class SavePreset(ChildToolWindow):
         self.tool_instance.presets[program][name] = preset
 
         self.tool_instance.refresh_presets()
+        if self.tool_instance.remove_preset_window is not None:
+            self.tool_instance.remove_preset_window.fill_tree()
+        
+        if self.tool_instance.export_preset_window is not None:
+            self.tool_instance.export_preset_window.fill_tree()
+
         
         self.status.showMessage("saved \"%s\"" % name)
         
         #sometimes this causes an error
         #I haven't seen any pattern
         #self.destroy()
-        
+
     def cleanup(self):
         self.tool_instance.preset_window = None
+        
+        super().cleanup()
+
+
+class RemovePreset(ChildToolWindow):
+    def __init__(self, tool_instance, title, **kwargs):
+        super().__init__(tool_instance, title, statusbar=False, **kwargs)
+        
+        self._build_ui()
+
+    def _build_ui(self):
+        
+        layout = QGridLayout()
+        
+        self.tree = QTreeWidget()
+        self.tree.setHeaderLabels(["", "trash"])
+        self.fill_tree()
+        self.tree.resizeColumnToContents(1)
+        self.tree.setColumnWidth(0, 200)
+        layout.addWidget(self.tree)
+
+        self.ui_area.setLayout(layout)
+        self.manage(None)
+        
+    def fill_tree(self):
+        self.tree.clear()
+        root = self.tree.invisibleRootItem()
+        
+        gaussian_preset = QTreeWidgetItem(root)
+        gaussian_preset.setData(0, Qt.DisplayRole, "Gaussian")
+        for preset in self.tool_instance.presets['Gaussian']:
+            preset_item = QTreeWidgetItem(gaussian_preset)
+            preset_item.setData(0, Qt.DisplayRole, preset)
+            
+            remove_widget = QWidget()
+            remove_layout = QGridLayout(remove_widget)
+            remove = QPushButton()
+            remove.setIcon(QIcon(remove_widget.style().standardIcon(QStyle.SP_DialogDiscardButton)))
+            remove.setFlat(True)
+            remove.clicked.connect(lambda *args, name=preset, tool=self.tool_instance: tool.presets['Gaussian'].pop(name))
+            remove.clicked.connect(self.tool_instance.refresh_presets)
+            remove.clicked.connect(lambda *args, item=preset_item, parent=gaussian_preset: parent.removeChild(item))
+            remove_layout.addWidget(remove, 0, 0, 1, 1, Qt.AlignLeft)
+            remove_layout.setColumnStretch(0, 0)
+            remove_layout.setContentsMargins(0, 0, 0, 0)
+            self.tree.setItemWidget(preset_item, 1, remove_widget)
+        
+        orca_preset = QTreeWidgetItem(root)
+        orca_preset.setData(0, Qt.DisplayRole, "ORCA")
+        for preset in self.tool_instance.presets['ORCA']:
+            preset_item = QTreeWidgetItem(orca_preset)
+            preset_item.setData(0, Qt.DisplayRole, preset)
+            
+            remove_widget = QWidget()
+            remove_layout = QGridLayout(remove_widget)
+            remove = QPushButton()
+            remove.setIcon(QIcon(remove_widget.style().standardIcon(QStyle.SP_DialogDiscardButton)))
+            remove.setFlat(True)
+            remove.clicked.connect(lambda *args, name=preset, tool=self.tool_instance: tool.presets['ORCA'].pop(name))
+            remove.clicked.connect(self.tool_instance.refresh_presets)
+            remove.clicked.connect(lambda *args, item=preset_item, parent=orca_preset: parent.removeChild(item))
+            remove_layout.addWidget(remove, 0, 0, 1, 1, Qt.AlignLeft)
+            remove_layout.setColumnStretch(0, 0)
+            remove_layout.setContentsMargins(0, 0, 0, 0)
+            self.tree.setItemWidget(preset_item, 1, remove_widget)
+        
+        psi4_preset = QTreeWidgetItem(root)
+        psi4_preset.setData(0, Qt.DisplayRole, "Psi4")
+        for preset in self.tool_instance.presets['Psi4']:
+            preset_item = QTreeWidgetItem(psi4_preset)
+            preset_item.setData(0, Qt.DisplayRole, preset)
+            
+            remove_widget = QWidget()
+            remove_layout = QGridLayout(remove_widget)
+            remove = QPushButton()
+            remove.setIcon(QIcon(remove_widget.style().standardIcon(QStyle.SP_DialogDiscardButton)))
+            remove.setFlat(True)
+            remove.clicked.connect(lambda *args, name=preset, tool=self.tool_instance: tool.presets['Psi4'].pop(name))
+            remove.clicked.connect(self.tool_instance.refresh_presets)
+            remove.clicked.connect(lambda *args, item=preset_item, parent=psi4_preset: parent.removeChild(item))
+            remove_layout.addWidget(remove, 0, 0, 1, 1, Qt.AlignLeft)
+            remove_layout.setColumnStretch(0, 0)
+            remove_layout.setContentsMargins(0, 0, 0, 0)
+            self.tree.setItemWidget(preset_item, 1, remove_widget)
+
+    def cleanup(self):
+        self.tool_instance.remove_preset_window = None
         
         super().cleanup()
 
@@ -4744,7 +4913,6 @@ class PrepLocalJob(ChildToolWindow):
     
     def _build_ui(self):
         layout = QFormLayout()
-        
         
         self.auto_update = QCheckBox()
         self.auto_update.setChecked(self.tool_instance.settings.refresh_finished)
@@ -4768,7 +4936,7 @@ class PrepLocalJob(ChildToolWindow):
         
         self.ui_area.setLayout(layout)
         self.manage(None)
-        
+
     def run_job(self):
         job_name = self.job_name.text().strip()
         
@@ -4784,8 +4952,107 @@ class PrepLocalJob(ChildToolWindow):
         self.tool_instance.run_local_job(name=job_name, auto_update=auto_update, auto_open=auto_open)
         
         self.status.showMessage("queued \"%s\"; see the log for any details" % job_name)
-        
+
     def cleanup(self):
         self.tool_instance.job_local_prep = None
+        
+        super().cleanup()
+
+
+class ExportPreset(ChildToolWindow):
+    def __init__(self, tool_instance, title, **kwargs):
+        super().__init__(tool_instance, title, statusbar=False, **kwargs)
+        
+        self._build_ui()
+
+    def _build_ui(self):
+        
+        layout = QGridLayout()
+        
+        self.tree = QTreeWidget()
+        self.tree.setHeaderLabels(["", "save"])
+        self.fill_tree()
+        self.tree.resizeColumnToContents(1)
+        self.tree.setColumnWidth(0, 200)
+        layout.addWidget(self.tree, 0, 0, 1, 2)
+        
+        save_button = QPushButton("save")
+        save_button.clicked.connect(self.save_presets)
+        layout.addWidget(save_button, 1, 0, 1, 2, Qt.AlignTop)
+        
+        layout.setRowStretch(0, 1)
+        layout.setRowStretch(1, 0)
+        
+        self.ui_area.setLayout(layout)
+        self.manage(None)
+
+    def fill_tree(self):
+        self.tree.clear()
+        root = self.tree.invisibleRootItem()
+        
+        self.gaussian_preset = QTreeWidgetItem(root)
+        self.gaussian_preset.setData(0, Qt.DisplayRole, "Gaussian")
+        for preset in self.tool_instance.presets['Gaussian']:
+            preset_item = QTreeWidgetItem(self.gaussian_preset)
+            preset_item.setData(0, Qt.DisplayRole, preset)
+            preset_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+            preset_item.setCheckState(1, Qt.Unchecked)
+        
+        self.orca_preset = QTreeWidgetItem(root)
+        self.orca_preset.setData(0, Qt.DisplayRole, "ORCA")
+        for preset in self.tool_instance.presets['ORCA']:
+            preset_item = QTreeWidgetItem(self.orca_preset)
+            preset_item.setData(0, Qt.DisplayRole, preset)
+            preset_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+            preset_item.setCheckState(1, Qt.Unchecked)
+        
+        self.psi4_preset = QTreeWidgetItem(root)
+        self.psi4_preset.setData(0, Qt.DisplayRole, "Psi4")
+        for preset in self.tool_instance.presets['Psi4']:
+            preset_item = QTreeWidgetItem(self.psi4_preset)
+            preset_item.setData(0, Qt.DisplayRole, preset)
+            preset_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+            preset_item.setCheckState(1, Qt.Unchecked)
+
+    def save_presets(self):
+        filename, _ = QFileDialog.getSaveFileName(filter="JSON files (*.json)")
+        if not filename:
+            return
+
+        out = {}
+        
+        for i in range(0, self.gaussian_preset.childCount()):
+            if self.gaussian_preset.child(i).checkState(1) == Qt.Checked:
+                if "Gaussian" not in out:
+                    out["Gaussian"] = {}
+                    
+                preset_name = self.gaussian_preset.child(i).data(0, Qt.DisplayRole)
+                out["Gaussian"][preset_name] = self.tool_instance.presets["Gaussian"][preset_name]
+
+        for i in range(0, self.orca_preset.childCount()):
+            if self.orca_preset.child(i).checkState(1) == Qt.Checked:
+                if "ORCA" not in out:
+                    out["ORCA"] = {}
+                    
+                preset_name = self.orca_preset.child(i).data(0, Qt.DisplayRole)
+                out["ORCA"][preset_name] = self.tool_instance.presets["ORCA"][preset_name]
+
+        for i in range(0, self.psi4_preset.childCount()):
+            if self.psi4_preset.child(i).checkState(1) == Qt.Checked:
+                if "Psi4" not in out:
+                    out["Psi4"] = {}
+                    
+                preset_name = self.psi4_preset.child(i).data(0, Qt.DisplayRole)
+                out["Psi4"][preset_name] = self.tool_instance.presets["Psi4"][preset_name]
+
+        with open(filename, "w") as f:
+            dump(out, f, indent=4)
+            
+        self.tool_instance.session.logger.status("saved presets to %s" % filename)
+
+        self.destroy()
+        
+    def cleanup(self):
+        self.tool_instance.export_preset_window = None
         
         super().cleanup()

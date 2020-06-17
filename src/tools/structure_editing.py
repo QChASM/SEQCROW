@@ -22,14 +22,18 @@ from PyQt5.QtWidgets import QLabel, QLineEdit, QGridLayout, QPushButton, QTabWid
 from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.libraries import SubstituentTable, LigandTable, RingTable
 
-def minimal_ring_convert(atomic_structure, atom1, atom2):
+def minimal_ring_convert(atomic_structure, atom1, atom2, avoid=None):
     tm_bonds = atomic_structure.pseudobond_group(atomic_structure.PBG_METAL_COORDINATION, create_type=None)
     residues = [atom1.residue]
     if atom2.residue not in residues:
         residues.append(atom2.residue)
-        
+    
+    if avoid is None:
+        avoid = []
+    
     max_iter = len(atomic_structure.atoms)
     start = atom1
+    path = [atom1]
     i = 0
     while start != atom2:
         if start.residue not in residues:
@@ -41,24 +45,38 @@ def minimal_ring_convert(atomic_structure, atom1, atom2):
             
         v1 = atom2.coord - start.coord
         max_overlap = None
+        new_start = None
         pseudobonds = []
         if tm_bonds is not None:
             for bond in tm_bonds.pseudobonds:
-                atom1, atom2 = bond.atoms
-                if start is atom1:
-                    pseudobonds.append(atom2)
+                a1, a2 = bond.atoms
+                if start is a1:
+                    pseudobonds.append(a2)
                     
-                if start is atom2:
-                    pseudobonds.append(atom1)
+                if start is a2:
+                    pseudobonds.append(a1)
 
         for atom in start.neighbors + pseudobonds:
-            v2 = atom.coord - start.coord
-            overlap = np.dot(v1, v2)
-            if max_overlap is None or overlap > max_overlap:
-                new_start = atom
-                max_overlap = overlap
-                
-        start = new_start
+            if atom not in path and atom not in avoid:
+                v2 = atom.coord - start.coord
+                overlap = np.dot(v1, v2)
+                if max_overlap is None or overlap > max_overlap:
+                    new_start = atom
+                    max_overlap = overlap
+        
+        if new_start is None:
+            path.remove(start)
+            avoid.append(start)
+            if len(path) > 1:
+                start = path[-1]
+            else:
+                raise RuntimeError(
+                    "could not determine bet path between %s and %s"
+                    % (str(atom1), str(atom2))
+                )
+        else:
+            path.append(new_start)
+            start = new_start
 
     return residues
 

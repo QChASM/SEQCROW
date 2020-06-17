@@ -185,7 +185,7 @@ class FileReaderPanel(ToolInstance):
                         atom.coord = coord
                 
                 mdl.active_coordset_id = 1
-                    
+
     def open_nrg_plot(self):
         items = [item for item in self.tree.selectedItems()]
         model_dict = self.session.filereader_manager.filereader_dict
