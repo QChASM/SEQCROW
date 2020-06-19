@@ -2,7 +2,8 @@ import os
 
 from chimerax.core.toolshed import BundleAPI
 from chimerax.core.toolshed.info import SelectorInfo
-from chimerax.core.commands import BoolArg, ModelsArg, StringArg
+from chimerax.core.commands import BoolArg, ModelsArg, StringArg, register
+
 
 class _SEQCROW_API(BundleAPI):
 
@@ -205,6 +206,12 @@ class _SEQCROW_API(BundleAPI):
                         return {'models': ModelsArg, 'comment': StringArg}
                         
                 return Info()
-                            
-                
+
+    @staticmethod
+    def register_command(bundle_info, command_info, logger):
+        if command_info.name == "rmsdAlign":
+            from .commands.rmsdAlign import rmsdAlign, rmsdAlign_description
+            register("rmsdAlign", rmsdAlign_description, rmsdAlign)
+
+
 bundle_api = _SEQCROW_API()

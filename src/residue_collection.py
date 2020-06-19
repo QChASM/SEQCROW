@@ -192,7 +192,8 @@ class ResidueCollection(Geometry):
         
         if isinstance(molecule, Catalyst):
             super().__init__(molecule, refresh_connected=refresh_connected, comment=molecule.comment, **kwargs)
-                
+            
+            self.atomspec = None
             self.residues = []
             i = 1
             for comp in molecule.components['substrate']:                    
@@ -211,6 +212,7 @@ class ResidueCollection(Geometry):
         
         elif isinstance(molecule, AtomicStructure):
             self.residues = []
+            self.atomspec = molecule.atomspec
             
             #convert chimerax stuff to AaronTools
             all_atoms = []
@@ -258,6 +260,7 @@ class ResidueCollection(Geometry):
         else:
             #assume whatever we got is something AaronTools can turn into a Geometry
             super().__init__(molecule, refresh_connected=refresh_connected, **kwargs)
+            self.atomspec = None
             if "comment" in kwargs:
                 self.residues = [Residue(molecule, resnum=1, name="UNK", refresh_connected=refresh_connected, comment=kwargs['comment'])]
             elif hasattr(molecule, "comment"):

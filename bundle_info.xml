@@ -148,7 +148,9 @@ presets:
                 <ChimeraXClassifier>ChimeraX :: Open :: LOG :: LOG :: false :: coordsets:Bool</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: DataFormat :: OUT :: OUT :: Molecular structure :: .out :: :: :: :: :: ORCA output file :: utf-8</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Open :: OUT :: OUT :: false :: coordsets:Bool</ChimeraXClassifier>
-        </Classifiers>
+    
+                <ChimeraXClassifier>ChimeraX :: Command :: rmsdAlign :: Structure Analysis :: Calculate RMSD between structures</ChimeraXClassifier>
+       </Classifiers>
             
 </BundleInfo>
             

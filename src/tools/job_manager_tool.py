@@ -203,7 +203,7 @@ class JobQueue(ToolInstance):
                 
                 item.setText(self.SERVER_COL, "local")
 
-                if hasattr(job, "scratch_dir"):
+                if hasattr(job, "scratch_dir") and os.path.exists(job.scratch_dir):
                     browse_widget = QWidget()
                     browse_layout = QGridLayout(browse_widget)
                     browse = QPushButton()
@@ -245,7 +245,7 @@ class JobQueue(ToolInstance):
         ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
         for ndx in ndxs:
             job = jobs[ndx]
-            if hasattr(job, "scratch_dir"):
+            if hasattr(job, "scratch_dir") and os.path.exists(job.scratch_dir):
                 self.tool_window.create_child_window("%s log" % job.name, window_class=JobLog, scr_dir=job.scratch_dir)        
 
     def open_output(self):
@@ -278,7 +278,7 @@ class JobQueue(ToolInstance):
         if isinstance(job, LocalJob):
             self.tree.takeTopLevelItem(self.session.seqcrow_job_manager.jobs.index(job))
             self.session.seqcrow_job_manager.local_jobs.remove(job)
-            if hasattr(job, "scratch_dir"):
+            if hasattr(job, "scratch_dir") and os.path.exists(job.scratch_dir):
                 yes = QMessageBox.question(self.tool_window.ui_area, \
                                             "Remove local files?", \
                                             "%s has been removed from the queue.\n" % (job.name) + \

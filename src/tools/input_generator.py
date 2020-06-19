@@ -585,7 +585,8 @@ class BuildQM(ToolInstance):
     def update_theory(self, update_settings=True):
         """grabs the current settings and updates self.theory
         always called before creating an input file"""
-        if self.model_selector.currentIndex() >= 0:
+        if self.model_selector.currentIndex() >= 0 and \
+            self.model_selector.currentIndex() < len(self.models):
             model = self.models[self.model_selector.currentIndex()]
         else:
             model = None

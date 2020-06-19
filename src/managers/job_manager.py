@@ -98,7 +98,29 @@ class JobManager(ProviderManager):
                     local_job.output_name = job['output']
                     local_job.scratch_dir = job['scratch']
                     self.local_jobs.append(local_job)
+            
+            if 'check' in queue_dict:
+                for job in queue_dict['check']:
+                    if job['server'] == 'local':
+                        if job['format'] == 'Psi4':
+                            local_job = Psi4Job(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
 
+                        elif job['format'] == 'ORCA':
+                            local_job = ORCAJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
+
+                        elif job['format'] == 'Gaussian':
+                            local_job = GaussianJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
+
+                        if 'output' in job and os.path.exists(job['output']):
+                            fr = FileReader(job['output'], just_geom=False)
+                            if 'finished' in fr.other and fr.other['finished']:
+                                local_job.isFinished = lambda *args, **kwargs: True
+
+                            local_job.output_name = job['output']
+                            local_job.scratch_dir = job['scratch']
+
+                        self.local_jobs.append(local_job)
+                    
             self.paused = queue_dict['job_running']
 
             if len(queue_dict['queued']) > 0:
@@ -108,17 +130,18 @@ class JobManager(ProviderManager):
                 self.session.logger.warning("SEQCROW's queue has been paused because a local job was running when ChimeraX was closed. The queue can be resumed with SEQCROW's job manager tool")
 
     def write_json(self, *args, **kwargs):
-        d = {'finished':[], 'queued':[]}
+        d = {'finished':[], 'queued':[], 'check':[]}
         job_running = False
         for job in self.jobs:
             if not job.killed:
                 if not job.isFinished() and not job.isRunning():
                     d['queued'].append(job.get_json())
 
-                elif not job.error:
+                elif not job.error and not job.isRunning():
                     d['finished'].append(job.get_json())
-                    
-                if job.isRunning():
+
+                elif job.isRunning():
+                    d['check'].append(job.get_json())
                     job_running = True
 
         d['job_running'] = job_running
