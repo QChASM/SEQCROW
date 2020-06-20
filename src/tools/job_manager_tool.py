@@ -89,6 +89,13 @@ class JobQueue(ToolInstance):
         
         row += 1
 
+        refresh_button = QPushButton()
+        refresh_button.setIcon(QIcon(refresh_button.style().standardIcon(QStyle.SP_BrowserReload)))
+        refresh_button.clicked.connect(lambda *args: self.session.seqcrow_job_manager.triggers.activate_trigger(JOB_QUEUED, "refresh"))
+        layout.addWidget(refresh_button, row, 1, 1, 1, Qt.AlignTop)
+
+        row += 1
+
         for i in range(0, row-1):
             layout.setRowStretch(i, 0)
             
@@ -130,19 +137,33 @@ class JobQueue(ToolInstance):
                     self.tree.setItemWidget(item, self.DEL_COL, del_job_widget)
 
                 elif job.isRunning():
-                    item.setText(self.STATUS_COL, "running")
-                
-                    kill_widget = QWidget()
-                    kill_layout = QGridLayout(kill_widget)
-                    kill = QPushButton()
-                    kill.setIcon(QIcon(kill_widget.style().standardIcon(QStyle.SP_DialogCancelButton)))
-                    kill.setFlat(True)
-                    kill.clicked.connect(lambda *args, job=job: job.kill())
-                    kill.clicked.connect(lambda *args, session=self.session: session.seqcrow_job_manager.triggers.activate_trigger(JOB_QUEUED, "resume"))
-                    kill_layout.addWidget(kill, 0, 0, 1, 1, Qt.AlignLeft)
-                    kill_layout.setColumnStretch(0, 0)
-                    kill_layout.setContentsMargins(0, 0, 0, 0)
-                    self.tree.setItemWidget(item, self.KILL_COL, kill_widget)
+                    if job in self.session.seqcrow_job_manager.unknown_status_jobs:
+                        unk_widget = QWidget()
+                        unk_layout = QGridLayout(unk_widget)
+                        unk = QPushButton()
+                        unk.setIcon(QIcon(unk_widget.style().standardIcon(QStyle.SP_MessageBoxQuestion)))
+                        unk.setFlat(True)
+                        unk.clicked.connect(lambda *args, job=job: self.show_ask_if_running(job))
+                        unk_layout.addWidget(unk, 0, 0, 1, 1, Qt.AlignHCenter)
+                        unk_layout.setColumnStretch(0, 1)
+                        unk_layout.setContentsMargins(0, 0, 0, 0)
+                        self.tree.setItemWidget(item, self.STATUS_COL, unk_widget)
+                    
+                    else:
+                        item.setText(self.STATUS_COL, "running")
+                    
+                        kill_widget = QWidget()
+                        kill_layout = QGridLayout(kill_widget)
+                        kill = QPushButton()
+                        kill.setIcon(QIcon(kill_widget.style().standardIcon(QStyle.SP_DialogCancelButton)))
+                        kill.setFlat(True)
+                        kill.clicked.connect(lambda *args, job=job: job.kill())
+                        kill.clicked.connect(lambda *args, job=job: self.remove_job(job))
+                        kill.clicked.connect(lambda *args, session=self.session: session.seqcrow_job_manager.triggers.activate_trigger(JOB_QUEUED, "resume"))
+                        kill_layout.addWidget(kill, 0, 0, 1, 1, Qt.AlignLeft)
+                        kill_layout.setColumnStretch(0, 0)
+                        kill_layout.setContentsMargins(0, 0, 0, 0)
+                        self.tree.setItemWidget(item, self.KILL_COL, kill_widget)
 
                 elif job.isFinished():
                     if not job.error:
@@ -153,6 +174,7 @@ class JobQueue(ToolInstance):
                         error = QPushButton()
                         error.setIcon(QIcon(error_widget.style().standardIcon(QStyle.SP_MessageBoxWarning)))
                         error.setFlat(True)
+                        error.setToolTip("job did not finish without errors or output file cannot be found")
                         error_layout.addWidget(error, 0, 0, 1, 1, Qt.AlignHCenter)
                         error_layout.setColumnStretch(0, 1)
                         error_layout.setContentsMargins(0, 0, 0, 0)
@@ -287,6 +309,23 @@ class JobQueue(ToolInstance):
 
                 if yes == QMessageBox.Yes:
                     send2trash(job.scratch_dir)
+
+    def show_ask_if_running(self, job):
+        if isinstance(job, LocalJob):
+            yes = QMessageBox.question(self.tool_window.ui_area, \
+                                       "Job status unknown", \
+                                       "%s was running the last time ChimeraX was closed.\n" % (str(job)) + \
+                                       "If the job is still running, it might compete with other jobs for you computer's resources, " + \
+                                       "which could prevent any running job to error out.\n\n" + \
+                                       "Has this job finished running?", \
+                                       QMessageBox.Yes | QMessageBox.No)
+            
+            if yes == QMessageBox.Yes:
+                self.session.seqcrow_job_manager.unknown_status_jobs.remove(job)
+                job.isRunning = lambda *args, **kwargs: False
+                job.isFinished = lambda *args, **kwargs: True
+
+                self.session.seqcrow_job_manager.triggers.activate_trigger(JOB_FINISHED, job)
 
     def delete(self):
         """overload delete"""

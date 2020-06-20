@@ -213,12 +213,13 @@ class NormalModes(ToolInstance):
                 self.model_selector.removeItem(i)
                 
         for model in self.session.filereader_manager.frequency_models:
-            for fr in self.session.filereader_manager.filereader_dict[model]:
-                if 'frequency' not in fr.other:
-                    continue
-                    
-                if self.model_selector.findData(fr) == -1:
-                    self.model_selector.addItem("%s (%s)" % (basename(fr.name), model.atomspec), fr)
+            if len(model.atomspec) > 1:
+                for fr in self.session.filereader_manager.filereader_dict[model]:
+                    if 'frequency' not in fr.other:
+                        continue
+                        
+                    if self.model_selector.findData(fr) == -1:
+                        self.model_selector.addItem("%s (%s)" % (basename(fr.name), model.atomspec), fr)
 
     def change_mw_option(self, state):
         """toggle bool associated with mass-weighting option"""

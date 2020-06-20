@@ -23,6 +23,7 @@ class JobManager(ProviderManager):
         self.session = session
         self.local_jobs = []
         self.remote_jobs = []
+        self.unknown_status_jobs = []
         self.paused = False
         self._thread = None
         self.queue_dict = {}
@@ -53,10 +54,7 @@ class JobManager(ProviderManager):
 
     @property
     def has_job_running(self):
-        if self._thread is None:
-            return False
-        else:
-            return self._thread.isRunning()
+        return any([job.isRunning() for job in self.local_jobs])
 
     def add_provider(self, *args, **kwargs):
         self._thread = None
@@ -99,6 +97,25 @@ class JobManager(ProviderManager):
                     local_job.scratch_dir = job['scratch']
                     self.local_jobs.append(local_job)
             
+            if 'error' in queue_dict:
+                for job in queue_dict['error']:
+                    if job['server'] == 'local':
+                        if job['format'] == 'Psi4':
+                            local_job = Psi4Job(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
+                            
+                        elif job['format'] == 'ORCA':
+                            local_job = ORCAJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
+                        
+                        elif job['format'] == 'Gaussian':
+                            local_job = GaussianJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
+                    
+                        #shh it's finished
+                        local_job.isFinished = lambda *args, **kwargs: True
+                        local_job.error = True
+                        local_job.output_name = job['output']
+                        local_job.scratch_dir = job['scratch']
+                        self.local_jobs.append(local_job)
+            
             if 'check' in queue_dict:
                 for job in queue_dict['check']:
                     if job['server'] == 'local':
@@ -115,6 +132,9 @@ class JobManager(ProviderManager):
                             fr = FileReader(job['output'], just_geom=False)
                             if 'finished' in fr.other and fr.other['finished']:
                                 local_job.isFinished = lambda *args, **kwargs: True
+                            else:
+                                local_job.isRunning = lambda *args, **kwargs: True
+                                self.unknown_status_jobs.append(local_job)
 
                             local_job.output_name = job['output']
                             local_job.scratch_dir = job['scratch']
@@ -130,15 +150,18 @@ class JobManager(ProviderManager):
                 self.session.logger.warning("SEQCROW's queue has been paused because a local job was running when ChimeraX was closed. The queue can be resumed with SEQCROW's job manager tool")
 
     def write_json(self, *args, **kwargs):
-        d = {'finished':[], 'queued':[], 'check':[]}
+        d = {'finished':[], 'queued':[], 'check':[], 'error':[]}
         job_running = False
         for job in self.jobs:
             if not job.killed:
                 if not job.isFinished() and not job.isRunning():
                     d['queued'].append(job.get_json())
 
-                elif not job.error and not job.isRunning():
+                elif job.isFinished() and not job.error:
                     d['finished'].append(job.get_json())
+                
+                elif job.isFinished() and job.error:
+                    d['error'].append(job.get_json())
 
                 elif job.isRunning():
                     d['check'].append(job.get_json())
@@ -245,6 +268,14 @@ class JobManager(ProviderManager):
                 self.triggers.activate_trigger(JOB_QUEUED, job)
 
     def check_queue(self, *args):
+        for job in self.unknown_status_jobs:
+            if isinstance(job, LocalJob):
+                fr = FileReader(job.output_name, just_geom=False)
+                if 'finished' in fr.other and fr.other['finished']:
+                    job.isFinished = lambda *args, **kwargs: True
+                    job.isRunning = lambda *args, **kwargs: False
+                    self.unknown_status_jobs.remove(job)
+        
         if not self.has_job_running:
             unstarted_local_jobs = []
             for job in self.local_jobs:

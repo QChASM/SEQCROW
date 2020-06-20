@@ -212,6 +212,10 @@ class _SEQCROW_API(BundleAPI):
         if command_info.name == "rmsdAlign":
             from .commands.rmsdAlign import rmsdAlign, rmsdAlign_description
             register("rmsdAlign", rmsdAlign_description, rmsdAlign)
+        
+        elif command_info.name == "substitute":
+            from .commands.substitute import substitute, substitute_description
+            register("substitute", substitute_description, substitute)
 
 
 bundle_api = _SEQCROW_API()
