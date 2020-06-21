@@ -8,6 +8,8 @@ from chimerax.core.commands import run
 
 from json import load, dump
 
+from PyQt5.QtWidgets import QMessageBox, QApplication
+
 from SEQCROW.jobs import LocalJob, GaussianJob, ORCAJob, Psi4Job
 from SEQCROW.managers import FILEREADER_ADDED
 from SEQCROW.residue_collection import ResidueCollection
@@ -173,7 +175,15 @@ class JobManager(ProviderManager):
             dump(d, f)
 
     def job_finished(self, trigger_name, job):
-        job.session.logger.info("%s: %s" % (trigger_name, job))
+        if self.session.seqcrow_settings.settings.JOB_FINISHED_NOTIFICATION == \
+          'log and popup notifications' and self.session.ui.is_gui:
+            #it's just an error message for now
+            #TODO: make my own logger
+            self.session.logger.error("%s: %s" % (trigger_name, job))
+        
+        else:
+            job.session.logger.info("%s: %s" % (trigger_name, job))
+
         if isinstance(job, LocalJob):
             self._thread = None
             if not hasattr(job, "output_name") or \
@@ -194,15 +204,14 @@ class JobManager(ProviderManager):
                 elif isinstance(job, ORCAJob):
                     finfo = (job.output_name, "out", None)
                 elif isinstance(job, Psi4Job):
-                    #coming eventually...
                     finfo = (job.output_name, "dat", None)
 
                 fr = FileReader(finfo, get_all=True, just_geom=False)
-
-                job.session.filereader_manager.triggers.activate_trigger(FILEREADER_ADDED, ([job.theory.structure], [fr]))
-
-                rescol = ResidueCollection(fr, refresh_connected=True)
-                rescol.update_chix(job.theory.structure)
+                if len(fr.atoms) > 0:
+                    job.session.filereader_manager.triggers.activate_trigger(FILEREADER_ADDED, ([job.theory.structure], [fr]))
+    
+                    rescol = ResidueCollection(fr, refresh_connected=True)
+                    rescol.update_chix(job.theory.structure)
 
             if fr.all_geom is not None and len(fr.all_geom) > 1:
                 coordsets = rescol.all_geom_coordsets(fr)
@@ -221,7 +230,7 @@ class JobManager(ProviderManager):
         elif job.auto_open:
             run(job.session, "open \"%s\"" % job.output_name, log=False)
             
-        self.check_queue()
+        self.triggers.activate_trigger(JOB_QUEUED, trigger_name)
         pass
     
     def job_started(self, trigger_name, job):
@@ -275,6 +284,8 @@ class JobManager(ProviderManager):
                     job.isFinished = lambda *args, **kwargs: True
                     job.isRunning = lambda *args, **kwargs: False
                     self.unknown_status_jobs.remove(job)
+                    self.triggers.activate_trigger(JOB_FINISHED, job)
+                    return
         
         if not self.has_job_running:
             unstarted_local_jobs = []

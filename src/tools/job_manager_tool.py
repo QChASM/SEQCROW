@@ -8,7 +8,7 @@ from PyQt5.Qt import QIcon, QStyle
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFontDatabase
 from PyQt5.QtWidgets import QGridLayout, QTextBrowser, QPushButton, QTreeWidget, QTreeWidgetItem, \
-                            QWidget, QMessageBox, QFileDialog
+                            QWidget, QMessageBox, QFileDialog, QToolButton, QSizePolicy
 
 from send2trash import send2trash
 
@@ -77,20 +77,23 @@ class JobQueue(ToolInstance):
         
         row += 1
 
-        log_button = QPushButton("view log")
+        log_button = QPushButton("log")
         log_button.clicked.connect(self.open_log)
         layout.addWidget(log_button, row, 1, 1, 1, Qt.AlignTop)
         
         row += 1
 
-        output_button = QPushButton("view raw output")
+        output_button = QPushButton("raw output")
         output_button.clicked.connect(self.open_output)
         layout.addWidget(output_button, row, 1, 1, 1, Qt.AlignTop)
         
         row += 1
 
-        refresh_button = QPushButton()
+        refresh_button = QToolButton()
+        refresh_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.MinimumExpanding)
+        refresh_button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         refresh_button.setIcon(QIcon(refresh_button.style().standardIcon(QStyle.SP_BrowserReload)))
+        refresh_button.setText('check jobs')
         refresh_button.clicked.connect(lambda *args: self.session.seqcrow_job_manager.triggers.activate_trigger(JOB_QUEUED, "refresh"))
         layout.addWidget(refresh_button, row, 1, 1, 1, Qt.AlignTop)
 
@@ -98,13 +101,15 @@ class JobQueue(ToolInstance):
 
         for i in range(0, row-1):
             layout.setRowStretch(i, 0)
-            
+
         layout.setRowStretch(row-1, 1)
+        layout.setColumnStretch(0, 1)
+        layout.setColumnStretch(1, 0)
         
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(None)
-        
+
     def fill_tree(self, trigger_name=None, trigger_job=None):        
         item_stack = [self.tree.invisibleRootItem()]
         
@@ -158,7 +163,6 @@ class JobQueue(ToolInstance):
                         kill.setIcon(QIcon(kill_widget.style().standardIcon(QStyle.SP_DialogCancelButton)))
                         kill.setFlat(True)
                         kill.clicked.connect(lambda *args, job=job: job.kill())
-                        kill.clicked.connect(lambda *args, job=job: self.remove_job(job))
                         kill.clicked.connect(lambda *args, session=self.session: session.seqcrow_job_manager.triggers.activate_trigger(JOB_QUEUED, "resume"))
                         kill_layout.addWidget(kill, 0, 0, 1, 1, Qt.AlignLeft)
                         kill_layout.setColumnStretch(0, 0)
