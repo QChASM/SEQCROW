@@ -66,9 +66,7 @@ class _SEQCROW_API(BundleAPI):
     @staticmethod
     def register_selector(bundle_info, selector_info, logger):
         """select all transition metals with one easy `select` command!"""
-        
-        print(bundle_info.selectors)
-        
+
         from .selectors import register_selectors
         register_selectors(logger)
 

@@ -27,10 +27,17 @@ class NavigationToolbar(NavigationToolbar2QT):
         
     toolitems = list(NavigationToolbar2QT.toolitems)
     for i in range(0, len(toolitems)):
-        if toolitems[i][0] in ['Back', 'Forward', 'Home', 'Subplots', 'Edit']:
+        if toolitems[i][0] in ['Back', 'Forward', 'Subplots', 'Edit']:
             toolitems[i] = None
     
     toolitems = tuple(ti for ti in toolitems if ti is not None and ti != (None, None, None, None))
+    
+    def home(self, *args, **kwargs):
+        """make pressing the home button autoscale the axes instead of whatever
+        it normally does"""
+        ax = self.canvas.figure.gca()
+        ax.autoscale()
+        self.canvas.draw()
 
 class EnergyPlot(ToolInstance):
     SESSION_ENDURING = False
@@ -58,7 +65,7 @@ class EnergyPlot(ToolInstance):
         self.drag_prev = None
         self.dragging = False
         
-        self.session.triggers.add_handler(REMOVE_MODELS, self.check_closed_models)
+        self._model_closed = self.session.triggers.add_handler(REMOVE_MODELS, self.check_closed_models)
         
     def _build_ui(self):
         layout = QGridLayout()
@@ -66,7 +73,7 @@ class EnergyPlot(ToolInstance):
         self.figure = Figure(figsize=(2,2))
         self.canvas = Canvas(self.figure)
         
-        ax = self.figure.add_axes((0.22, 0.22, 0.66, 0.66))
+        ax = self.figure.add_axes((0.15, 0.20, 0.80, 0.70))
 
         fr = self.filereader
 
@@ -104,16 +111,18 @@ class EnergyPlot(ToolInstance):
         ax.ticklabel_format(axis='y', style='sci', scilimits=(0,0), useOffset=True)
         ax.ticklabel_format(axis='x', style='plain', useOffset=False)
         
-        self.canvas.draw()
-        
         self.canvas.mpl_connect('button_release_event', self.unclick)
         self.canvas.mpl_connect('button_press_event', self.onclick)
         self.canvas.mpl_connect('motion_notify_event', self.drag)
-        self.canvas.wheelEvent = self._wheel_event
+        self.canvas.mpl_connect('scroll_event', self.zoom)
 
         self.annotation = ax.annotate("", xy=(0,0), xytext=(0, 10), textcoords="offset points", fontfamily='Arial')
         self.annotation.set_visible(False)
 
+        ax.autoscale()
+        self.canvas.draw()
+        self.canvas.setMinimumWidth(400)
+        self.canvas.setMinimumHeight(200)
         layout.addWidget(self.canvas)
         
         toolbar_widget = QWidget()
@@ -128,7 +137,7 @@ class EnergyPlot(ToolInstance):
         file = menu.addMenu("&Export")
         file.addAction("&Save CSV...")
         
-        file.triggered[QAction].connect(self.process_file_trigger)
+        file.triggered.connect(self.save)
         
         menu.setNativeMenuBar(False)
         
@@ -139,11 +148,7 @@ class EnergyPlot(ToolInstance):
         self.tool_window.manage(None)
         
         self.opened = True
-    
-    def process_file_trigger(self, trigger):
-        if "Save" in trigger.text():
-            self.save()
-            
+
     def save(self):
         filename, _ = QFileDialog.getSaveFileName(filter="CSV Files (*.csv)")
         if filename:
@@ -156,27 +161,29 @@ class EnergyPlot(ToolInstance):
                 
             print("saved to %s" % filename)
     
-    def zoom(self, factor):
-        '''
-        Zoom plot objects by specified factor by changing
-        the displayed limits of the plot.  Objects do not change size.
-        '''
+    def zoom(self, event):
+        if event.xdata is None:
+            return
         a = self.figure.gca()
         x0, x1 = a.get_xlim()
-        xmid, xsize = 0.5*(x0+x1), x1-x0
-        xh = 0.5*xsize/factor
-        nx0, nx1 = xmid-xh, xmid+xh
+        x_range = x1 - x0
+        xdiff = -0.05 * event.step * x_range
+        xshift = 0.2 * (event.xdata - (x0 + x1)/2)
+        nx0 = x0 - xdiff + xshift
+        nx1 = x1 + xdiff + xshift
+        
         y0, y1 = a.get_ylim()
-        ymid, ysize = 0.5*(y0+y1), y1-y0
-        yh = 0.5*ysize/factor
-        ny0, ny1 = ymid-yh, ymid+yh
+        y_range = y1 - y0
+        ydiff = -0.05 * event.step * y_range
+        yshift = 0.2 * (event.ydata - (y0 + y1)/2)
+        ny0 = y0 - ydiff + yshift
+        ny1 = y1 + ydiff + yshift
+
         a.set_xlim(nx0, nx1)
         a.set_ylim(ny0, ny1)
-        self.canvas.draw()    
+        self.canvas.draw()
     
     def move(self, dx, dy):
-        '''Move plot objects by delta values in window pixels.'''
-
         win = self.tool_window.ui_area
         w,h = win.width(), win.height()
         if w == 0 or h == 0:
@@ -191,19 +198,11 @@ class EnergyPlot(ToolInstance):
         a.set_xlim(nx0, nx1)
         a.set_ylim(ny0, ny1)
         self.canvas.draw()
-        
-    def _wheel_event(self, event):
-        #copy-pasted from chimerax.interfaces.Graph
-        delta = event.angleDelta().y()  # Typically 120 per wheel click, positive down.
-        from math import exp
-        factor = exp(delta / 1200)
-        self.zoom(factor)
 
     def onclick(self, event):
         if self.toolbar.mode != "":
             return
 
-            
         self.press = event.x, event.y, event.xdata, event.ydata
 
     def unclick(self, event):
@@ -294,3 +293,8 @@ class EnergyPlot(ToolInstance):
     def check_closed_models(self, name, models):
         if self.structure in models:
             self.delete()
+    
+    def delete(self):
+        self.session.triggers.remove_handler(self._model_closed)
+        
+        super().delete()
