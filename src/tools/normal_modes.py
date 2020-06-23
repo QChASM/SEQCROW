@@ -19,6 +19,7 @@ from io import BytesIO
 from os.path import basename
 
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QValidator
 from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, QTabWidget, QComboBox, \
                             QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, \
                             QFormLayout, QCheckBox, QHeaderView
@@ -34,9 +35,59 @@ class _NormalModeSettings(Settings):
         'arrow_color': Value((0.0, 1.0, 0.0, 1.0), TupleOf(FloatArg, 4), iter2str),
         'arrow_scale': Value(1.5, FloatArg, str),
         'anim_scale': Value(0.2, FloatArg, str),
-        'anim_duration': Value(101, IntArg, str),
-        'anim_time': Value(4.0, FloatArg), 
+        'anim_duration': Value(120, IntArg, str),
+        'anim_fps': Value(60, IntArg), 
     }
+
+class FPSSpinBox(QSpinBox):
+    """spinbox that makes sure the value goes evenly into 60"""
+    def validate(self, text, pos):
+        if pos < len(text) or len(text) < 2:
+            return (QValidator.Intermediate, text, pos)
+        
+        try:
+            value = int(text)
+        except:
+            return (QValidator.Invalid, text, pos)
+        
+        if 60 % value != 0:
+            return (QValidator.Invalid, text, pos)
+        elif value > self.maximum():
+            return (QValidator.Invalid, text, pos)
+        elif value < self.minimum():
+            return (QValidator.Invalid, text, pos)
+        else:
+            return (QValidator.Acceptable, text, pos)
+    
+    def fixUp(self, text):
+        try:
+            value = int(text)
+            new_value = 1
+            for i in range(1, value+1):
+                if 60 % i == 0:
+                    new_value = i
+            
+            self.setValue(new_value)
+        
+        except:
+            pass
+    
+    def stepBy(self, step):
+        val = self.value()
+        while step > 0:
+            val += 1
+            while 60 % val != 0:
+                val += 1
+            step -= 1
+        
+        while step < 0:
+            val -= 1
+            while 60 % val != 0:
+                val -= 1
+            step += 1
+        
+        self.setValue(val)
+
 
 class NormalModes(ToolInstance):
     SESSION_ENDURING = False
@@ -140,12 +191,13 @@ class NormalModes(ToolInstance):
         self.anim_duration.setSingleStep(10)
         anim_opts.addRow("frames:", self.anim_duration)
         
-        self.time = QDoubleSpinBox()
-        self.time.setRange(0.1, 60)
-        self.time.setValue(self.settings.anim_time)
-        self.time.setToolTip("animation duration in seconds")
-        self.time.setSingleStep(0.5)
-        anim_opts.addRow("saved movie duration:", self.time)
+        self.anim_fps = FPSSpinBox()
+        self.anim_fps.setRange(1, 60)
+        self.anim_fps.setValue(self.settings.anim_fps)
+        self.anim_fps.setToolTip("animation and recorded movie frames per second\n" +
+                                 "60 must be evenly divisible by this number\n" +
+                                 "animation speed in ChimeraX might be slower, depending on your hardware")
+        anim_opts.addRow("animation FPS:", self.anim_fps)
 
         show_anim_button = QPushButton("animate selected mode")
         show_anim_button.clicked.connect(self.show_anim)
@@ -322,11 +374,11 @@ class NormalModes(ToolInstance):
 
         scale = self.anim_scale.value()
         frames = self.anim_duration.value()
-        time = self.time.value()
+        anim_fps = self.anim_fps.value()
 
         self.settings.anim_scale = scale
         self.settings.anim_duration = frames
-        self.settings.anim_time = time
+        self.settings.anim_fps = anim_fps
 
         geom = Geometry(fr)
         #if the filereader has been processed somewhere else, the atoms might
@@ -365,9 +417,9 @@ class NormalModes(ToolInstance):
                 if tool.structure is model:
                     tool.delete()
     
-        fps = frames / time
+        pause_frames = (60 // anim_fps)
 
-        slider =  CoordinateSetSlider(self.session, model, movie_framerate=fps)
+        slider =  CoordinateSetSlider(self.session, model, movie_framerate=anim_fps, pause_frames=pause_frames)
         slider.play_cb()
 
     def stop_anim(self):
