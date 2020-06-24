@@ -215,5 +215,9 @@ class _SEQCROW_API(BundleAPI):
             from .commands.substitute import substitute, substitute_description
             register("substitute", substitute_description, substitute)
 
+        elif command_info.name == "closeRing":
+            from .commands.closeRing import closeRing, closeRing_description
+            register("closeRing", closeRing_description, closeRing)
+
 
 bundle_api = _SEQCROW_API()

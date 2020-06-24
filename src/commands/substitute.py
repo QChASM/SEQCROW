@@ -6,16 +6,16 @@ from chimerax.core.commands import BoolArg, CmdDesc, StringArg, DynamicEnum, Lis
 from SEQCROW.residue_collection import ResidueCollection, Residue
 
 substitute_description = CmdDesc(required=[("selection", AtomsArg)], \
-                                keyword=[("substituents", ListOf(DynamicEnum(Substituent.list, \
+                                 keyword=[("substituents", ListOf(DynamicEnum(Substituent.list, \
                                                                   name="substituent", \
                                                                   case_sensitive=True, \
                                                                   url="http://catalysttrends.wheelergroupresearch.com/AaronTools/substituents.php")
-                                                          )), 
-                                         ("newName", ListOf(StringArg)), 
-                                         ("guessAvoid", BoolArg),
-                                         ("modify", BoolArg)], \
-                                required_arguments=['substituents'], synopsis=\
-                                "modify substituents")
+                                                           )), 
+                                          ("newName", ListOf(StringArg)), 
+                                          ("guessAvoid", BoolArg),
+                                          ("modify", BoolArg)], \
+                                 required_arguments=['substituents'], 
+                                 synopsis="modify substituents")
 
 def substitute(session, selection, substituents, newName=None, guessAvoid=True, modify=True):
     models = {}
@@ -25,7 +25,7 @@ def substitute(session, selection, substituents, newName=None, guessAvoid=True, 
         pass
     elif any(len(name.strip()) > 4 for name in newName):
         raise RuntimeError("residue names must be 4 characters or less")
-    elif any(x in newName for x in "!@#$%^&*()\\/.<><;':\"[]{}|-=_+"):
+    elif any(x in "".join(newName) for x in "!@#$%^&*()\\/.<><;':\"[]{}|-=_+"):
         raise RuntimeError("invalid residue name: %s" % " ".join(newName))
     elif len(substituents) != len(newName):
         raise RuntimeError("number of substituents is not the same as the number of new names")

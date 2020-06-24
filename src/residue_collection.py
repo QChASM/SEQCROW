@@ -267,7 +267,7 @@ class ResidueCollection(Geometry):
                 self.residues = [Residue(molecule, resnum=1, name="UNK", refresh_connected=refresh_connected, comment=molecule.comment)]
             else:
                 self.residues = [Residue(molecule, resnum=1, name="UNK", refresh_connected=refresh_connected)]
-            
+
             return
   
     def _atom_update(self):
@@ -377,14 +377,14 @@ class ResidueCollection(Geometry):
             
             for residue in atomic_structure.residues[len(self.residues):]:
                 residue.delete()
-        
+
         else:
             for residue in atomic_structure.residues:
                 if residue in self.convert_residues and not any(residue is res.chix_residue for res in self.residues):
                     residue.delete()
-        
+
         self.refresh_chix_connected(atomic_structure, sanity_check=False)
-    
+
     def refresh_chix_connected(self, atomic_structure, sanity_check=True):
         """updates atomic_structure's bonds to match self's connectivity
         sanity_check - bool; check to make sure atomic_structure corresponds to self"""
@@ -421,17 +421,13 @@ class ResidueCollection(Geometry):
                 #if any([atom2 in bond.atoms for bond in atom1.bonds]):
                 #    continue
                 
-                try:
+                if atom2 not in atom1.neighbors:
                     new_bond = atomic_structure.new_bond(atom1, atom2)
 
                     if any([aaron_atom.element in TMETAL for aaron_atom in [aaron_atom1, aaron_atom2]]):
                         pbg = atomic_structure.pseudobond_group(atomic_structure.PBG_METAL_COORDINATION, create_type='normal') 
                         pbg.new_pseudobond(atom1, atom2)
                         new_bond.delete()
-                
-                except Exception as e:
-                    print("failed to create bond", e)
-                    pass
 
     def all_geom_coordsets(self, filereader):
         if filereader.all_geom is None:
@@ -445,8 +441,8 @@ class ResidueCollection(Geometry):
                 else:
                     atom_list = all_geom
                 for j, atom in enumerate(atom_list):
-                    coordsets[i][j] = atom.coords  
-        
+                    coordsets[i][j] = atom.coords
+
         return coordsets                    
     
     def get_chimera(self, session, coordsets=False, filereader=None):

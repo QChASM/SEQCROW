@@ -642,6 +642,7 @@ class BuildQM(ToolInstance):
         if mdl is not None:
             elements = set(mdl.atoms.elements.names)
             self.basis_widget.setElements(elements)
+            self.job_widget.check_deleted_atoms()
     
     def get_basis_set(self, update_settings=False):
         """get BasisSet object from the basis widget"""
@@ -1964,6 +1965,27 @@ class JobTypeOption(QWidget):
                 info[Method.PSI4_SETTINGS] = settings
             
             return info
+
+    def check_deleted_atoms(self):
+        for atom in self.constrained_atoms[::-1]:
+            if atom.deleted:
+                self.constrained_atom_table.removeRow(self.constrained_atoms.index(atom))
+                self.constrained_atoms.remove(atom)
+
+        for bond in self.constrained_bonds:
+            if any (atom.deleted for atom in bond):
+                self.constrained_bond_table.removeRow(self.constrained_bonds.index(bond))
+                self.constrained_bonds.remove(bond)
+
+        for angle in self.constrained_angles:
+            if any (atom.deleted for atom in angle):
+                self.constrained_angle_table.removeRow(self.constrained_angles.index(angle))
+                self.constrained_angles.remove(angle)
+
+        for torsion in self.constrained_torsions:
+            if any (atom.deleted for atom in torsion):
+                self.constrained_torsion_table.removeRow(self.constrained_torsions.index(torsion))
+                self.constrained_torsions.remove(torsion)
 
 
 class FunctionalOption(QWidget):

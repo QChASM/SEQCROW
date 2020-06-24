@@ -29,6 +29,9 @@ from SEQCROW.utils import iter2str
 
 #TODO:
 #make double clicking something in the table visualize it
+#add an option to reset coordinates
+#  - vectors sometimes end up in the wrong place b/c 
+#    geom coords don't match model coords for opt + freq jobs
 
 class _NormalModeSettings(Settings):
     AUTO_SAVE = {
@@ -42,7 +45,7 @@ class _NormalModeSettings(Settings):
 class FPSSpinBox(QSpinBox):
     """spinbox that makes sure the value goes evenly into 60"""
     def validate(self, text, pos):
-        if pos < len(text) or len(text) < 2:
+        if pos < len(text) or pos == 0:
             return (QValidator.Intermediate, text, pos)
         
         try:
@@ -51,7 +54,10 @@ class FPSSpinBox(QSpinBox):
             return (QValidator.Invalid, text, pos)
         
         if 60 % value != 0:
-            return (QValidator.Invalid, text, pos)
+            if pos == 1:
+                return (QValidator.Intermediate, text, pos)
+            else:
+                return (QValidator.Invalid, text, pos)
         elif value > self.maximum():
             return (QValidator.Invalid, text, pos)
         elif value < self.minimum():
@@ -159,19 +165,23 @@ class NormalModes(ToolInstance):
         self.vec_use_mass_weighted.stateChanged.connect(self.change_mw_option)
         self.vec_use_mass_weighted.setToolTip("if checked, vectors will show mass-weighted displacements")
         vector_opts.addRow("use mass-weighted:", self.vec_use_mass_weighted)
-        
+
         self.vector_color = ColorButton(has_alpha_channel=True, max_size=(16, 16))
         self.vector_color.setToolTip("color of vectors")
         self.vector_color.set_color(self.settings.arrow_color)
         vector_opts.addRow("vector color:", self.vector_color)
-        
+
         show_vec_button = QPushButton("display selected mode")
         show_vec_button.clicked.connect(self.show_vec)
         vector_opts.addRow(show_vec_button)
-        
+
         close_vec_button = QPushButton("remove selected mode vectors")
         close_vec_button.clicked.connect(self.close_vec)
         vector_opts.addRow(close_vec_button)
+
+        stop_anim_button = QPushButton("reset coordinates")
+        stop_anim_button.clicked.connect(self.stop_anim)
+        vector_opts.addRow(stop_anim_button)
         
         animate_tab = QWidget()
         anim_opts = QFormLayout(animate_tab)
@@ -196,22 +206,22 @@ class NormalModes(ToolInstance):
         self.anim_fps.setValue(self.settings.anim_fps)
         self.anim_fps.setToolTip("animation and recorded movie frames per second\n" +
                                  "60 must be evenly divisible by this number\n" +
-                                 "animation speed in ChimeraX might be slower, depending on your hardware")
+                                 "animation speed in ChimeraX might be slower, depending on your hardware or graphics settings")
         anim_opts.addRow("animation FPS:", self.anim_fps)
 
         show_anim_button = QPushButton("animate selected mode")
         show_anim_button.clicked.connect(self.show_anim)
         anim_opts.addRow(show_anim_button)
-        
+
         stop_anim_button = QPushButton("stop animation")
         stop_anim_button.clicked.connect(self.stop_anim)
         anim_opts.addRow(stop_anim_button)
-        
+
         self.display_tabs.addTab(vector_tab, "vectors")
         self.display_tabs.addTab(animate_tab, "animate")
-        
+
         layout.addWidget(self.display_tabs)
-        
+
         #only the table can stretch
         layout.setRowStretch(0, 0)
         layout.setRowStretch(1, 1)
@@ -287,16 +297,16 @@ class NormalModes(ToolInstance):
             n = np.linalg.norm(displacement)
             if self.vec_mw_bool and self.display_tabs.currentIndex() == 0:
                 n *= geom.atoms[i].mass()
-            
+
             if max_norm is None or n > max_norm:
                 max_norm = n
-                
+
         dX = vector * scaling/max_norm
-        
+
         if self.vec_mw_bool and self.display_tabs.currentIndex() == 0:
             for i, x in enumerate(dX):
                 dX[i] *= geom.atoms[i].mass()
-        
+
         return dX
 
     def close_vec(self):
@@ -327,18 +337,18 @@ class NormalModes(ToolInstance):
             mode = self.rows.index(mode)
 
         scale = self.vec_scale.value()
-                
+
         self.settings.arrow_scale = scale
-                
+
         color = self.vector_color.get_color()
-        
+
         color = [c/255. for c in color]
-        
+
         self.settings.arrow_color = tuple(color)
-        
-        #reset coordinates b/c movie maight be playing
+
+        #reset coordinates if movie isn't playing
         geom = Geometry(fr)
-        
+
         vector = fr.other['frequency'].data[mode].vector
 
         dX = self._get_coord_change(geom, vector, scale)
@@ -348,14 +358,14 @@ class NormalModes(ToolInstance):
         s += ".transparency %f\n" % (1. - color[-1])
         for i in range(0, len(geom.atoms)):
             n = np.linalg.norm(dX[i])
-            
+
             info = tuple(t for s in [[x for x in geom.atoms[i].coords], \
                                      [x for x in geom.atoms[i].coords + dX[i]], \
                                      [n/(n + 0.75)]] for t in s)
                                     
             if n > 0.1:
                 s += ".arrow %10.6f %10.6f %10.6f   %10.6f %10.6f %10.6f   0.02 0.05 %5.3f\n" % info
-                
+
         stream = BytesIO(bytes(s, 'utf-8'))
         bild_obj, status = read_bild(self.session, stream, "%.2f cm^-1" % fr.other['frequency'].data[mode].frequency)
 

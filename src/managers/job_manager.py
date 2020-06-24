@@ -81,7 +81,7 @@ class JobManager(ProviderManager):
                 
                     self.local_jobs.append(local_job)
                     self.session.logger.info("added %s (%s job) from previous session" % (job['name'], job['format']))
-            
+
             for job in queue_dict['finished']:
                 if job['server'] == 'local':
                     if job['format'] == 'Psi4':
@@ -98,7 +98,7 @@ class JobManager(ProviderManager):
                     local_job.output_name = job['output']
                     local_job.scratch_dir = job['scratch']
                     self.local_jobs.append(local_job)
-            
+
             if 'error' in queue_dict:
                 for job in queue_dict['error']:
                     if job['server'] == 'local':
@@ -117,7 +117,7 @@ class JobManager(ProviderManager):
                         local_job.output_name = job['output']
                         local_job.scratch_dir = job['scratch']
                         self.local_jobs.append(local_job)
-            
+
             if 'check' in queue_dict:
                 for job in queue_dict['check']:
                     if job['server'] == 'local':
@@ -142,7 +142,26 @@ class JobManager(ProviderManager):
                             local_job.scratch_dir = job['scratch']
 
                         self.local_jobs.append(local_job)
-                    
+
+            if 'killed' in queue_dict:
+                for job in queue_dict['killed']:
+                    if job['server'] == 'local':
+                        if job['format'] == 'Psi4':
+                            local_job = Psi4Job(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
+
+                        elif job['format'] == 'ORCA':
+                            local_job = ORCAJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
+
+                        elif job['format'] == 'Gaussian':
+                            local_job = GaussianJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
+
+                        #shh it's finished
+                        local_job.isFinished = lambda *args, **kwargs: True
+                        local_job.killed = True
+                        local_job.output_name = job['output']
+                        local_job.scratch_dir = job['scratch']
+                        self.local_jobs.append(local_job)
+
             self.paused = queue_dict['job_running']
 
             if len(queue_dict['queued']) > 0:
@@ -152,7 +171,7 @@ class JobManager(ProviderManager):
                 self.session.logger.warning("SEQCROW's queue has been paused because a local job was running when ChimeraX was closed. The queue can be resumed with SEQCROW's job manager tool")
 
     def write_json(self, *args, **kwargs):
-        d = {'finished':[], 'queued':[], 'check':[], 'error':[]}
+        d = {'finished':[], 'queued':[], 'check':[], 'error':[], 'killed':[]}
         job_running = False
         for job in self.jobs:
             if not job.killed:
@@ -168,6 +187,9 @@ class JobManager(ProviderManager):
                 elif job.isRunning():
                     d['check'].append(job.get_json())
                     job_running = True
+            
+            elif job.isFinished():
+                d['killed'].append(job.get_json())
 
         d['job_running'] = job_running
 
