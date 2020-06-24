@@ -1,11 +1,15 @@
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
-from chimerax.core.commands.cli import StringArg, BoolArg
-from chimerax.ui.options import InputFolderOption, Option
+from chimerax.core.commands.cli import StringArg, EnumOf
+from chimerax.ui.options import InputFolderOption, EnumOption
 
 from os import getenv, path
 
 from sys import platform
+
+class JobFinishedNotification(EnumOption):
+    values = ['log notification', 'log and popup notifications']
+    labels = ['log notification', 'log and popup notifications']
 
 # 'settings' module attribute will be set by manager initialization
 class _SEQCROWSettings(Settings):
@@ -15,7 +19,11 @@ class _SEQCROWSettings(Settings):
         'GAUSSIAN_EXE': Value("g09.exe" if platform == "win32" else "g09", StringArg),
         'PSI4_EXE': Value("psi4", StringArg),
         'SCRATCH_DIR': Value(path.join(path.expanduser('~'), "SEQCROW_SCRATCH"), StringArg), 
+        'JOB_FINISHED_NOTIFICATION': Value('log notification', 
+                                           EnumOf(JobFinishedNotification.values)
+                                          ), 
     }
+
 
 # file option (mostly the same as InputFolderOption)
 class FileOption(InputFolderOption):
@@ -60,18 +68,26 @@ def register_settings_options(session):
             "ORCA executable", 
             FileOption, 
             "Path to ORCA executable\nFull path is required for parallel/multithreaded execution"),
+        
         "GAUSSIAN_EXE" : (
             "Gaussian executable", 
             FileOption, 
             "Path to Gaussian executable"),
+        
         "PSI4_EXE" : (
             "Psi4 executable", 
             FileOption, 
             "Path to Psi4 executable"), 
+        
         "SCRATCH_DIR" : (
             "Scratch directory",
             InputFolderOption,
             "Directory for staging QM jobs"),
+        
+        "JOB_FINISHED_NOTIFICATION" : (
+            "Finished notification", 
+            JobFinishedNotification, 
+            "type of notification when job finished"),
     }
     
     for setting, setting_info in settings_info.items():
@@ -100,8 +116,10 @@ def register_settings_options(session):
             from warnings import warn
             setting = opt.attr_name
             val = opt.value
-
+        
         opt = opt_class(opt_name, getattr(settings, setting), _opt_cb,
             attr_name=setting, settings=settings, balloon=balloon, auto_set_attr=False)
+
+        
         
         session.ui.main_window.add_settings_option("SEQCROW Jobs", opt)

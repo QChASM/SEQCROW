@@ -8,7 +8,7 @@ from PyQt5.Qt import QIcon, QStyle
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFontDatabase
 from PyQt5.QtWidgets import QGridLayout, QTextBrowser, QPushButton, QTreeWidget, QTreeWidgetItem, \
-                            QWidget, QMessageBox, QFileDialog
+                            QWidget, QMessageBox, QFileDialog, QToolButton, QSizePolicy
 
 from send2trash import send2trash
 
@@ -77,27 +77,39 @@ class JobQueue(ToolInstance):
         
         row += 1
 
-        log_button = QPushButton("view log")
+        log_button = QPushButton("log")
         log_button.clicked.connect(self.open_log)
         layout.addWidget(log_button, row, 1, 1, 1, Qt.AlignTop)
         
         row += 1
 
-        output_button = QPushButton("view raw output")
+        output_button = QPushButton("raw output")
         output_button.clicked.connect(self.open_output)
         layout.addWidget(output_button, row, 1, 1, 1, Qt.AlignTop)
         
         row += 1
 
+        refresh_button = QToolButton()
+        refresh_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.MinimumExpanding)
+        refresh_button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        refresh_button.setIcon(QIcon(refresh_button.style().standardIcon(QStyle.SP_BrowserReload)))
+        refresh_button.setText('check jobs')
+        refresh_button.clicked.connect(lambda *args: self.session.seqcrow_job_manager.triggers.activate_trigger(JOB_QUEUED, "refresh"))
+        layout.addWidget(refresh_button, row, 1, 1, 1, Qt.AlignTop)
+
+        row += 1
+
         for i in range(0, row-1):
             layout.setRowStretch(i, 0)
-            
+
         layout.setRowStretch(row-1, 1)
+        layout.setColumnStretch(0, 1)
+        layout.setColumnStretch(1, 0)
         
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(None)
-        
+
     def fill_tree(self, trigger_name=None, trigger_job=None):        
         item_stack = [self.tree.invisibleRootItem()]
         
@@ -130,19 +142,32 @@ class JobQueue(ToolInstance):
                     self.tree.setItemWidget(item, self.DEL_COL, del_job_widget)
 
                 elif job.isRunning():
-                    item.setText(self.STATUS_COL, "running")
-                
-                    kill_widget = QWidget()
-                    kill_layout = QGridLayout(kill_widget)
-                    kill = QPushButton()
-                    kill.setIcon(QIcon(kill_widget.style().standardIcon(QStyle.SP_DialogCancelButton)))
-                    kill.setFlat(True)
-                    kill.clicked.connect(lambda *args, job=job: job.kill())
-                    kill.clicked.connect(lambda *args, session=self.session: session.seqcrow_job_manager.triggers.activate_trigger(JOB_QUEUED, "resume"))
-                    kill_layout.addWidget(kill, 0, 0, 1, 1, Qt.AlignLeft)
-                    kill_layout.setColumnStretch(0, 0)
-                    kill_layout.setContentsMargins(0, 0, 0, 0)
-                    self.tree.setItemWidget(item, self.KILL_COL, kill_widget)
+                    if job in self.session.seqcrow_job_manager.unknown_status_jobs:
+                        unk_widget = QWidget()
+                        unk_layout = QGridLayout(unk_widget)
+                        unk = QPushButton()
+                        unk.setIcon(QIcon(unk_widget.style().standardIcon(QStyle.SP_MessageBoxQuestion)))
+                        unk.setFlat(True)
+                        unk.clicked.connect(lambda *args, job=job: self.show_ask_if_running(job))
+                        unk_layout.addWidget(unk, 0, 0, 1, 1, Qt.AlignHCenter)
+                        unk_layout.setColumnStretch(0, 1)
+                        unk_layout.setContentsMargins(0, 0, 0, 0)
+                        self.tree.setItemWidget(item, self.STATUS_COL, unk_widget)
+                    
+                    else:
+                        item.setText(self.STATUS_COL, "running")
+                    
+                        kill_widget = QWidget()
+                        kill_layout = QGridLayout(kill_widget)
+                        kill = QPushButton()
+                        kill.setIcon(QIcon(kill_widget.style().standardIcon(QStyle.SP_DialogCancelButton)))
+                        kill.setFlat(True)
+                        kill.clicked.connect(lambda *args, job=job: job.kill())
+                        kill.clicked.connect(lambda *args, session=self.session: session.seqcrow_job_manager.triggers.activate_trigger(JOB_QUEUED, "resume"))
+                        kill_layout.addWidget(kill, 0, 0, 1, 1, Qt.AlignLeft)
+                        kill_layout.setColumnStretch(0, 0)
+                        kill_layout.setContentsMargins(0, 0, 0, 0)
+                        self.tree.setItemWidget(item, self.KILL_COL, kill_widget)
 
                 elif job.isFinished():
                     if not job.error:
@@ -153,6 +178,7 @@ class JobQueue(ToolInstance):
                         error = QPushButton()
                         error.setIcon(QIcon(error_widget.style().standardIcon(QStyle.SP_MessageBoxWarning)))
                         error.setFlat(True)
+                        error.setToolTip("job did not finish without errors or output file cannot be found")
                         error_layout.addWidget(error, 0, 0, 1, 1, Qt.AlignHCenter)
                         error_layout.setColumnStretch(0, 1)
                         error_layout.setContentsMargins(0, 0, 0, 0)
@@ -203,7 +229,7 @@ class JobQueue(ToolInstance):
                 
                 item.setText(self.SERVER_COL, "local")
 
-                if hasattr(job, "scratch_dir"):
+                if hasattr(job, "scratch_dir") and os.path.exists(job.scratch_dir):
                     browse_widget = QWidget()
                     browse_layout = QGridLayout(browse_widget)
                     browse = QPushButton()
@@ -245,7 +271,7 @@ class JobQueue(ToolInstance):
         ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
         for ndx in ndxs:
             job = jobs[ndx]
-            if hasattr(job, "scratch_dir"):
+            if hasattr(job, "scratch_dir") and os.path.exists(job.scratch_dir):
                 self.tool_window.create_child_window("%s log" % job.name, window_class=JobLog, scr_dir=job.scratch_dir)        
 
     def open_output(self):
@@ -278,7 +304,7 @@ class JobQueue(ToolInstance):
         if isinstance(job, LocalJob):
             self.tree.takeTopLevelItem(self.session.seqcrow_job_manager.jobs.index(job))
             self.session.seqcrow_job_manager.local_jobs.remove(job)
-            if hasattr(job, "scratch_dir"):
+            if hasattr(job, "scratch_dir") and os.path.exists(job.scratch_dir):
                 yes = QMessageBox.question(self.tool_window.ui_area, \
                                             "Remove local files?", \
                                             "%s has been removed from the queue.\n" % (job.name) + \
@@ -287,6 +313,23 @@ class JobQueue(ToolInstance):
 
                 if yes == QMessageBox.Yes:
                     send2trash(job.scratch_dir)
+
+    def show_ask_if_running(self, job):
+        if isinstance(job, LocalJob):
+            yes = QMessageBox.question(self.tool_window.ui_area, \
+                                       "Job status unknown", \
+                                       "%s was running the last time ChimeraX was closed.\n" % (str(job)) + \
+                                       "If the job is still running, it might compete with other jobs for you computer's resources, " + \
+                                       "which could prevent any running job to error out.\n\n" + \
+                                       "Has this job finished running?", \
+                                       QMessageBox.Yes | QMessageBox.No)
+            
+            if yes == QMessageBox.Yes:
+                self.session.seqcrow_job_manager.unknown_status_jobs.remove(job)
+                job.isRunning = lambda *args, **kwargs: False
+                job.isFinished = lambda *args, **kwargs: True
+
+                self.session.seqcrow_job_manager.triggers.activate_trigger(JOB_FINISHED, job)
 
     def delete(self):
         """overload delete"""

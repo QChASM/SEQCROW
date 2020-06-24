@@ -19,6 +19,7 @@ from io import BytesIO
 from os.path import basename
 
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QValidator
 from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, QTabWidget, QComboBox, \
                             QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, \
                             QFormLayout, QCheckBox, QHeaderView
@@ -28,15 +29,71 @@ from SEQCROW.utils import iter2str
 
 #TODO:
 #make double clicking something in the table visualize it
+#add an option to reset coordinates
+#  - vectors sometimes end up in the wrong place b/c 
+#    geom coords don't match model coords for opt + freq jobs
 
 class _NormalModeSettings(Settings):
     AUTO_SAVE = {
         'arrow_color': Value((0.0, 1.0, 0.0, 1.0), TupleOf(FloatArg, 4), iter2str),
         'arrow_scale': Value(1.5, FloatArg, str),
         'anim_scale': Value(0.2, FloatArg, str),
-        'anim_duration': Value(101, IntArg, str),
-        'anim_time': Value(4.0, FloatArg), 
+        'anim_duration': Value(120, IntArg, str),
+        'anim_fps': Value(60, IntArg), 
     }
+
+class FPSSpinBox(QSpinBox):
+    """spinbox that makes sure the value goes evenly into 60"""
+    def validate(self, text, pos):
+        if pos < len(text) or pos == 0:
+            return (QValidator.Intermediate, text, pos)
+        
+        try:
+            value = int(text)
+        except:
+            return (QValidator.Invalid, text, pos)
+        
+        if 60 % value != 0:
+            if pos == 1:
+                return (QValidator.Intermediate, text, pos)
+            else:
+                return (QValidator.Invalid, text, pos)
+        elif value > self.maximum():
+            return (QValidator.Invalid, text, pos)
+        elif value < self.minimum():
+            return (QValidator.Invalid, text, pos)
+        else:
+            return (QValidator.Acceptable, text, pos)
+    
+    def fixUp(self, text):
+        try:
+            value = int(text)
+            new_value = 1
+            for i in range(1, value+1):
+                if 60 % i == 0:
+                    new_value = i
+            
+            self.setValue(new_value)
+        
+        except:
+            pass
+    
+    def stepBy(self, step):
+        val = self.value()
+        while step > 0:
+            val += 1
+            while 60 % val != 0:
+                val += 1
+            step -= 1
+        
+        while step < 0:
+            val -= 1
+            while 60 % val != 0:
+                val -= 1
+            step += 1
+        
+        self.setValue(val)
+
 
 class NormalModes(ToolInstance):
     SESSION_ENDURING = False
@@ -108,19 +165,23 @@ class NormalModes(ToolInstance):
         self.vec_use_mass_weighted.stateChanged.connect(self.change_mw_option)
         self.vec_use_mass_weighted.setToolTip("if checked, vectors will show mass-weighted displacements")
         vector_opts.addRow("use mass-weighted:", self.vec_use_mass_weighted)
-        
+
         self.vector_color = ColorButton(has_alpha_channel=True, max_size=(16, 16))
         self.vector_color.setToolTip("color of vectors")
         self.vector_color.set_color(self.settings.arrow_color)
         vector_opts.addRow("vector color:", self.vector_color)
-        
+
         show_vec_button = QPushButton("display selected mode")
         show_vec_button.clicked.connect(self.show_vec)
         vector_opts.addRow(show_vec_button)
-        
+
         close_vec_button = QPushButton("remove selected mode vectors")
         close_vec_button.clicked.connect(self.close_vec)
         vector_opts.addRow(close_vec_button)
+
+        stop_anim_button = QPushButton("reset coordinates")
+        stop_anim_button.clicked.connect(self.stop_anim)
+        vector_opts.addRow(stop_anim_button)
         
         animate_tab = QWidget()
         anim_opts = QFormLayout(animate_tab)
@@ -140,26 +201,27 @@ class NormalModes(ToolInstance):
         self.anim_duration.setSingleStep(10)
         anim_opts.addRow("frames:", self.anim_duration)
         
-        self.time = QDoubleSpinBox()
-        self.time.setRange(0.1, 60)
-        self.time.setValue(self.settings.anim_time)
-        self.time.setToolTip("animation duration in seconds")
-        self.time.setSingleStep(0.5)
-        anim_opts.addRow("saved movie duration:", self.time)
+        self.anim_fps = FPSSpinBox()
+        self.anim_fps.setRange(1, 60)
+        self.anim_fps.setValue(self.settings.anim_fps)
+        self.anim_fps.setToolTip("animation and recorded movie frames per second\n" +
+                                 "60 must be evenly divisible by this number\n" +
+                                 "animation speed in ChimeraX might be slower, depending on your hardware or graphics settings")
+        anim_opts.addRow("animation FPS:", self.anim_fps)
 
         show_anim_button = QPushButton("animate selected mode")
         show_anim_button.clicked.connect(self.show_anim)
         anim_opts.addRow(show_anim_button)
-        
+
         stop_anim_button = QPushButton("stop animation")
         stop_anim_button.clicked.connect(self.stop_anim)
         anim_opts.addRow(stop_anim_button)
-        
+
         self.display_tabs.addTab(vector_tab, "vectors")
         self.display_tabs.addTab(animate_tab, "animate")
-        
+
         layout.addWidget(self.display_tabs)
-        
+
         #only the table can stretch
         layout.setRowStretch(0, 0)
         layout.setRowStretch(1, 1)
@@ -213,12 +275,13 @@ class NormalModes(ToolInstance):
                 self.model_selector.removeItem(i)
                 
         for model in self.session.filereader_manager.frequency_models:
-            for fr in self.session.filereader_manager.filereader_dict[model]:
-                if 'frequency' not in fr.other:
-                    continue
-                    
-                if self.model_selector.findData(fr) == -1:
-                    self.model_selector.addItem("%s (%s)" % (basename(fr.name), model.atomspec), fr)
+            if len(model.atomspec) > 1:
+                for fr in self.session.filereader_manager.filereader_dict[model]:
+                    if 'frequency' not in fr.other:
+                        continue
+                        
+                    if self.model_selector.findData(fr) == -1:
+                        self.model_selector.addItem("%s (%s)" % (basename(fr.name), model.atomspec), fr)
 
     def change_mw_option(self, state):
         """toggle bool associated with mass-weighting option"""
@@ -234,16 +297,16 @@ class NormalModes(ToolInstance):
             n = np.linalg.norm(displacement)
             if self.vec_mw_bool and self.display_tabs.currentIndex() == 0:
                 n *= geom.atoms[i].mass()
-            
+
             if max_norm is None or n > max_norm:
                 max_norm = n
-                
+
         dX = vector * scaling/max_norm
-        
+
         if self.vec_mw_bool and self.display_tabs.currentIndex() == 0:
             for i, x in enumerate(dX):
                 dX[i] *= geom.atoms[i].mass()
-        
+
         return dX
 
     def close_vec(self):
@@ -274,18 +337,18 @@ class NormalModes(ToolInstance):
             mode = self.rows.index(mode)
 
         scale = self.vec_scale.value()
-                
+
         self.settings.arrow_scale = scale
-                
+
         color = self.vector_color.get_color()
-        
+
         color = [c/255. for c in color]
-        
+
         self.settings.arrow_color = tuple(color)
-        
-        #reset coordinates b/c movie maight be playing
+
+        #reset coordinates if movie isn't playing
         geom = Geometry(fr)
-        
+
         vector = fr.other['frequency'].data[mode].vector
 
         dX = self._get_coord_change(geom, vector, scale)
@@ -295,14 +358,14 @@ class NormalModes(ToolInstance):
         s += ".transparency %f\n" % (1. - color[-1])
         for i in range(0, len(geom.atoms)):
             n = np.linalg.norm(dX[i])
-            
+
             info = tuple(t for s in [[x for x in geom.atoms[i].coords], \
                                      [x for x in geom.atoms[i].coords + dX[i]], \
                                      [n/(n + 0.75)]] for t in s)
                                     
             if n > 0.1:
                 s += ".arrow %10.6f %10.6f %10.6f   %10.6f %10.6f %10.6f   0.02 0.05 %5.3f\n" % info
-                
+
         stream = BytesIO(bytes(s, 'utf-8'))
         bild_obj, status = read_bild(self.session, stream, "%.2f cm^-1" % fr.other['frequency'].data[mode].frequency)
 
@@ -321,11 +384,11 @@ class NormalModes(ToolInstance):
 
         scale = self.anim_scale.value()
         frames = self.anim_duration.value()
-        time = self.time.value()
+        anim_fps = self.anim_fps.value()
 
         self.settings.anim_scale = scale
         self.settings.anim_duration = frames
-        self.settings.anim_time = time
+        self.settings.anim_fps = anim_fps
 
         geom = Geometry(fr)
         #if the filereader has been processed somewhere else, the atoms might
@@ -364,9 +427,9 @@ class NormalModes(ToolInstance):
                 if tool.structure is model:
                     tool.delete()
     
-        fps = frames / time
+        pause_frames = (60 // anim_fps)
 
-        slider =  CoordinateSetSlider(self.session, model, movie_framerate=fps)
+        slider =  CoordinateSetSlider(self.session, model, movie_framerate=anim_fps, pause_frames=pause_frames)
         slider.play_cb()
 
     def stop_anim(self):

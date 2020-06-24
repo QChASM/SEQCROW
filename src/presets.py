@@ -18,9 +18,13 @@ def seqcrow_bse(session):
     lighting_profile.key_light_intensity = 1.
     lighting_profile.depth_cue = True
     lighting_profile.shadows = False
-    lighting_profile.key_light_color = [1., 1., 1., 0]   
+    lighting_profile.multishadow = 0
+    lighting_profile.fill_light_intensity = 0.5
+    lighting_profile.ambient_light_intensity = 0.4
+    lighting_profile.key_light_color = [1., 1., 1., 0]
     lighting_profile.fill_light_color = [1., 1., 1., 0]
     lighting_profile.ambient_light_color = [1., 1., 1., 0]
+    lighting_profile.depth_cue_color = [1., 1., 1.]
     
     view.update_lighting = True
     view.redraw_needed = True
@@ -67,10 +71,16 @@ def seqcrow_s(session):
     lighting_profile.key_light_intensity = 1.
     lighting_profile.depth_cue = True
     lighting_profile.shadows = True
-    lighting_profile.key_light_color = [1., 1., 1., 0]   
+    lighting_profile.multishadow = 8
+    lighting_profile.multishadow_map_size = 1024
+    lighting_profile.multishadow_depth_bias = 0.01
+    lighting_profile.fill_light_intensity = 0.5
+    lighting_profile.ambient_light_intensity = 0.4
+    lighting_profile.key_light_color = [1., 1., 1., 0]
     lighting_profile.fill_light_color = [1., 1., 1., 0]
     lighting_profile.ambient_light_color = [1., 1., 1., 0]
-    
+    lighting_profile.depth_cue_color = [1., 1., 1.]
+
     view.update_lighting = True
     view.redraw_needed = True
     

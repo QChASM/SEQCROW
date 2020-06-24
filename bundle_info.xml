@@ -148,7 +148,12 @@ presets:
                 <ChimeraXClassifier>ChimeraX :: Open :: LOG :: LOG :: false :: coordsets:Bool</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: DataFormat :: OUT :: OUT :: Molecular structure :: .out :: :: :: :: :: ORCA output file :: utf-8</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Open :: OUT :: OUT :: false :: coordsets:Bool</ChimeraXClassifier>
-        </Classifiers>
+    
+                <!--NOTE: this synopsis will not appear when `help rmsdAlign` is used-->
+                <ChimeraXClassifier>ChimeraX :: Command :: rmsdAlign :: Structure Analysis :: Calculate RMSD between structures</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: substitute :: Structure Editing :: change substiuents</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: closeRing :: Structure Editing :: close or fuse a ring</ChimeraXClassifier>
+       </Classifiers>
             
 </BundleInfo>
             

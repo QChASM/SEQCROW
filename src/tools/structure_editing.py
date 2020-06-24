@@ -1,5 +1,3 @@
-import numpy as np
-
 from AaronTools.substituent import Substituent
 from AaronTools.component import Component
 from AaronTools.catalyst import Catalyst
@@ -10,7 +8,7 @@ from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
-from chimerax.core.commands.cli import BoolArg
+from chimerax.core.commands import BoolArg, run
 
 from io import BytesIO
 
@@ -22,63 +20,6 @@ from PyQt5.QtWidgets import QLabel, QLineEdit, QGridLayout, QPushButton, QTabWid
 from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.libraries import SubstituentTable, LigandTable, RingTable
 
-def minimal_ring_convert(atomic_structure, atom1, atom2, avoid=None):
-    tm_bonds = atomic_structure.pseudobond_group(atomic_structure.PBG_METAL_COORDINATION, create_type=None)
-    residues = [atom1.residue]
-    if atom2.residue not in residues:
-        residues.append(atom2.residue)
-    
-    if avoid is None:
-        avoid = []
-    
-    max_iter = len(atomic_structure.atoms)
-    start = atom1
-    path = [atom1]
-    i = 0
-    while start != atom2:
-        if start.residue not in residues:
-            residues.append(start.residue)
-            
-        i += 1
-        if i > max_iter:
-            return atomic_structure.residues
-            
-        v1 = atom2.coord - start.coord
-        max_overlap = None
-        new_start = None
-        pseudobonds = []
-        if tm_bonds is not None:
-            for bond in tm_bonds.pseudobonds:
-                a1, a2 = bond.atoms
-                if start is a1:
-                    pseudobonds.append(a2)
-                    
-                if start is a2:
-                    pseudobonds.append(a1)
-
-        for atom in start.neighbors + pseudobonds:
-            if atom not in path and atom not in avoid:
-                v2 = atom.coord - start.coord
-                overlap = np.dot(v1, v2)
-                if max_overlap is None or overlap > max_overlap:
-                    new_start = atom
-                    max_overlap = overlap
-        
-        if new_start is None:
-            path.remove(start)
-            avoid.append(start)
-            if len(path) > 1:
-                start = path[-1]
-            else:
-                raise RuntimeError(
-                    "could not determine bet path between %s and %s"
-                    % (str(atom1), str(atom2))
-                )
-        else:
-            path.append(new_start)
-            start = new_start
-
-    return residues
 
 
 class _EditStructureSettings(Settings):
@@ -259,108 +200,25 @@ class EditStructure(ToolInstance):
     
     def do_substitute(self):
         subnames = self.subname.text()
-        selection = selected_atoms(self.session)
         
         new_name = self.new_sub_name.text()
-        if len(new_name.strip()) == 0:
-            new_name = None
-        elif any(len(name.strip()) > 4 for name in new_name.split(',')):
-            raise RuntimeError("residue names must be 4 characters or less")
-        elif any(x in new_name for x in "!@#$%^&*()\\/.<><;':\"[]{}|-=_+"):
-            raise RuntimeError("invalid residue name: %s" % new_name)
-        elif len(subnames.split(',')) != len(new_name.split(',')):
-            raise RuntimeError("number of substituents is not the same as the number of new names")
-        else:
-            new_name = [x.strip() for x in new_name.split(',')]
-        
-        if len(selection) < 1:
-            raise RuntimeWarning("nothing selected")
-        
+
         use_attached = not self.guess_old.isChecked()
-        
-        models = {}
-        attached = {}
-        for atom in selection:
-            if use_attached:
-                for bond in atom.bonds:
-                    atom2 = bond.other_atom(atom)
-                    if atom2 not in selection:
-                        if atom in attached:
-                            raise RuntimeError("cannot determine previous substituent; multiple fragments unselected")
-                        
-                        attached[atom] = atom2
-           
-                        if atom.structure not in models:
-                            models[atom.structure] = {atom.residue:[atom]}
-            
-                        else:
-                            if atom.residue not in models[atom.structure]:
-                                models[atom.structure][atom.residue] = [atom]
-                            else:
-                                models[atom.structure][atom.residue].append(atom)
-            
-            else:
-                if atom.structure not in models:
-                    models[atom.structure] = {atom.residue:[atom]}
-    
-                else:
-                    if atom.residue not in models[atom.structure]:
-                        models[atom.structure][atom.residue] = [atom]
-                    else:
-                        models[atom.structure][atom.residue].append(atom)
 
-        first_pass = True
-        new_structures = []
-        for ndx, subname in enumerate(subnames.split(',')):
-            subname = subname.strip()
-            sub = Substituent(subname)
-            for model in models:
-                if self.close_previous_bool and first_pass:
-                    for res in models[model]:
-                        residue = Residue(res)
-                        if new_name is not None:
-                            residue.name = new_name[ndx]
-                            
-                        for target in models[model][res]:
-                            if use_attached:
-                                end = attached[target].atomspec
-                            else:
-                                end = None 
-                            
-                            residue.substitute(sub.copy(), target.atomspec, attached_to=end)
-                    
-                        residue.update_chix(res)
+        if len(new_name.strip()) > 0:
+            run(self.session, "substitute sel substituents %s newName %s guessAvoid %s modify %s" %
+                              (subnames, \
+                               new_name, \
+                               not use_attached, \
+                               self.close_previous_bool)
+                )
 
-                    
-                elif self.close_previous_bool and not first_pass:
-                    raise RuntimeError("only the first model can be replaced")
-                else:
-                    model_copy = model.copy()
-                    
-                    residues = [model_copy.residues[i] for i in [model.residues.index(res) for res in models[model]]]
-                    
-                    rescol = ResidueCollection(model_copy, convert_residues=residues)
-                    for res_copy, res in zip(residues, models[model]):                        
-                        residue = Residue(res_copy)
-                        if new_name is not None:
-                            residue.name = new_name[ndx]
-                        
-                        for target in models[model][res]:
-                            if use_attached:
-                                end = attached[target].atomspec
-                            else:
-                                end = None
-
-                            residue.substitute(sub.copy(), model_copy.atoms[model.atoms.index(target)].atomspec, attached_to=end)
-                            
-                        residue.update_chix(res_copy)
-
-                    new_structures.append(model_copy)
-            
-            first_pass = False
-        
-        if not self.close_previous_bool:
-            self.session.models.add(new_structures)
+        else:
+            run(self.session, "substitute sel substituents %s guessAvoid %s modify %s" %
+                              (subnames, \
+                               not use_attached, \
+                               self.close_previous_bool)
+                )
 
     def open_sub_selector(self):
         self.tool_window.create_child_window("select substituents", window_class=SubstituentSelection, textBox=self.subname)
@@ -446,80 +304,22 @@ class EditStructure(ToolInstance):
         self.tool_window.create_child_window("select ligands", window_class=LigandSelection, textBox=self.ligname)
     
     def do_closering(self):
-        ringnames = self.ringname.text()
-        selection = self.session.seqcrow_ordered_selection_manager.selection
+        ring_names = self.ringname.text()
+        
         new_name = self.new_ring_name.text()
-        
-        if len(new_name.strip()) == 0:
-            new_name = None
-        elif any(len(name.strip()) > 4 for name in new_name.split(',')):
-            raise RuntimeError("residue names must be 4 characters or less")
-        elif any(x in new_name for x in "!@#$%^&*()\\/.<><;':\"[]{}|-=_+"):
-            raise RuntimeError("invalid residue name: %s" % new_name)
-        elif len(ringnames.split(',')) != len(new_name.split(',')):
-            raise RuntimeError("number of substituents is not the same as the number of new names")
+
+        if len(new_name.strip()) > 0:
+            run(self.session, "closeRing sel rings %s newName %s modify %s" %
+                              (ring_names, \
+                               new_name, \
+                               self.close_previous_bool)
+                )
+
         else:
-            new_name = [x.strip() for x in new_name.split(',')]
-        
-        if len(selection) < 2:
-            raise RuntimeWarning("two atoms must be selected per molecule")
-        
-        models = {}
-        for atom in selection:
-            if atom.structure not in models:
-                models[atom.structure] = [atom]
-            else:
-                models[atom.structure].append(atom)
-        
-            if len(models[atom.structure]) > 2:
-                raise RuntimeError("only two atoms can be selected on any model")
-        
-        first_pass = True
-        new_structures = []
-        for i, ringname in enumerate(ringnames.split(',')):
-            ringname = ringname.strip()
-            
-            for model in models:
-                atom1 = models[model][0]
-                atom2 = models[model][1]
-                if self.close_previous_bool and first_pass:
-                    convert = minimal_ring_convert(model, *models[model])
-                    if new_name is not None:
-                        for res in convert:
-                            res.name = new_name[i]
-
-                    rescol = ResidueCollection(model, convert_residues=convert)
-
-                    target = rescol.find([atom1.atomspec, atom2.atomspec])
-
-                elif self.close_previous_bool and not first_pass:
-                    raise RuntimeError("only the first model can be replaced")
-                else:
-                    model_copy = model.copy()
-                    a1 = model_copy.atoms[model.atoms.index(models[model][0])]
-                    a2 = model_copy.atoms[model.atoms.index(models[model][1])]
-                    convert = minimal_ring_convert(model_copy, a1, a2)
-                    if new_name is not None:
-                        for res in convert:
-                            res.name = new_name[i]
-
-                    rescol = ResidueCollection(model_copy, convert_residues=convert)
-
-                    target = rescol.find([model_copy.atoms[model.atoms.index(atom1)].atomspec, \
-                                          model_copy.atoms[model.atoms.index(atom2)].atomspec])
-
-                rescol.ring_substitute(target, ringname)
-                
-                if self.close_previous_bool:                    
-                    rescol.update_chix(model)
-                else:
-                    rescol.update_chix(model_copy)
-                    new_structures.append(model_copy)
-            
-            first_pass = False
-        
-        if not self.close_previous_bool:
-            self.session.models.add(new_structures)
+            run(self.session, "closeRing sel rings %s modify %s" %
+                              (ring_names, \
+                               self.close_previous_bool)
+                )
 
     def open_ring_selector(self):
         self.tool_window.create_child_window("select rings", window_class=RingSelection, textBox=self.ringname)

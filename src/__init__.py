@@ -2,7 +2,8 @@ import os
 
 from chimerax.core.toolshed import BundleAPI
 from chimerax.core.toolshed.info import SelectorInfo
-from chimerax.core.commands import BoolArg, ModelsArg, StringArg
+from chimerax.core.commands import BoolArg, ModelsArg, StringArg, register
+
 
 class _SEQCROW_API(BundleAPI):
 
@@ -65,9 +66,7 @@ class _SEQCROW_API(BundleAPI):
     @staticmethod
     def register_selector(bundle_info, selector_info, logger):
         """select all transition metals with one easy `select` command!"""
-        
-        print(bundle_info.selectors)
-        
+
         from .selectors import register_selectors
         register_selectors(logger)
 
@@ -205,6 +204,20 @@ class _SEQCROW_API(BundleAPI):
                         return {'models': ModelsArg, 'comment': StringArg}
                         
                 return Info()
-                            
-                
+
+    @staticmethod
+    def register_command(bundle_info, command_info, logger):
+        if command_info.name == "rmsdAlign":
+            from .commands.rmsdAlign import rmsdAlign, rmsdAlign_description
+            register("rmsdAlign", rmsdAlign_description, rmsdAlign)
+        
+        elif command_info.name == "substitute":
+            from .commands.substitute import substitute, substitute_description
+            register("substitute", substitute_description, substitute)
+
+        elif command_info.name == "closeRing":
+            from .commands.closeRing import closeRing, closeRing_description
+            register("closeRing", closeRing_description, closeRing)
+
+
 bundle_api = _SEQCROW_API()

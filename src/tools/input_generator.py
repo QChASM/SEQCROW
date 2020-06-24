@@ -172,8 +172,7 @@ class _InputGeneratorSettings(Settings):
                                                       }, \
                                         },\
                                 ), StringArg),
-        'refresh_finished': Value(False, BoolArg), 
-        'open_finished': Value(False, BoolArg), 
+        'on_finished': Value('do nothing', StringArg), 
     }
     
     #def save(self, *args, **kwargs):
@@ -585,7 +584,8 @@ class BuildQM(ToolInstance):
     def update_theory(self, update_settings=True):
         """grabs the current settings and updates self.theory
         always called before creating an input file"""
-        if self.model_selector.currentIndex() >= 0:
+        if self.model_selector.currentIndex() >= 0 and \
+            self.model_selector.currentIndex() < len(self.models):
             model = self.models[self.model_selector.currentIndex()]
         else:
             model = None
@@ -642,6 +642,7 @@ class BuildQM(ToolInstance):
         if mdl is not None:
             elements = set(mdl.atoms.elements.names)
             self.basis_widget.setElements(elements)
+            self.job_widget.check_deleted_atoms()
     
     def get_basis_set(self, update_settings=False):
         """get BasisSet object from the basis widget"""
@@ -780,7 +781,6 @@ class JobTypeOption(QWidget):
     
     #TODO:
     #make selecting a row in one of the contraints tables select the atoms
-    #add option for numerical frequencies (ORCA requires numfreq for several popular dft functionals)
     
     def __init__(self, settings, session, init_form, parent=None):
         """layout has charge, multiplicity, and job type options up top
@@ -1965,6 +1965,27 @@ class JobTypeOption(QWidget):
                 info[Method.PSI4_SETTINGS] = settings
             
             return info
+
+    def check_deleted_atoms(self):
+        for atom in self.constrained_atoms[::-1]:
+            if atom.deleted:
+                self.constrained_atom_table.removeRow(self.constrained_atoms.index(atom))
+                self.constrained_atoms.remove(atom)
+
+        for bond in self.constrained_bonds:
+            if any (atom.deleted for atom in bond):
+                self.constrained_bond_table.removeRow(self.constrained_bonds.index(bond))
+                self.constrained_bonds.remove(bond)
+
+        for angle in self.constrained_angles:
+            if any (atom.deleted for atom in angle):
+                self.constrained_angle_table.removeRow(self.constrained_angles.index(angle))
+                self.constrained_angles.remove(angle)
+
+        for torsion in self.constrained_torsions:
+            if any (atom.deleted for atom in torsion):
+                self.constrained_torsion_table.removeRow(self.constrained_torsions.index(torsion))
+                self.constrained_torsions.remove(torsion)
 
 
 class FunctionalOption(QWidget):
@@ -3253,7 +3274,12 @@ class BasisWidget(QWidget):
 
             self.basis_options[i].setBasis(basis.name, basis_path=basis.user_defined)
             self.basis_options[i].setAux(basis.aux_type)
-            self.basis_options[i].setSelectedElements(basis.elements)
+            if len(basis_set.basis) == 1 and (basis_set.ecp is None or len(basis_set.ecp) == 0):
+                #a preset might have only saved one basis set
+                #we'll use it for all elements
+                self.basis_options[i].setSelectedElements(['all'])
+            else:
+                self.basis_options[i].setSelectedElements(basis.elements)
             
         if basis_set.ecp is not None:
             for i, basis in enumerate(basis_set.ecp):
@@ -3894,8 +3920,6 @@ class TwoLayerKeyWordOption(QWidget):
         self.current_opt_table.blockSignals(False)
 
     def add_kw(self):
-        #TODO:
-        #automatically select new kw
         kw = self.new_kw.text()
         if len(kw.strip()) == 0:
             return
@@ -3912,8 +3936,6 @@ class TwoLayerKeyWordOption(QWidget):
 
         kw = self.selected_kw
         if kw is None:
-            #no keyword is selected - do nothing
-            #TODO: raise error so the user doesn't wonder why nothing is happening
             raise RuntimeWarning("no keyword selected")
             return
 
@@ -4419,8 +4441,6 @@ class Psi4KeywordOptions(KeywordOptions):
 
 
 class KeywordWidget(QWidget):
-    #TODO:
-    #add new keywords/options to the table as soon as they are used
     additionalOptionsChanged = pyqtSignal()
 
     def __init__(self, settings, init_form, parent=None):
@@ -4551,6 +4571,7 @@ class InputPreview(ChildToolWindow):
 
 class SavePreset(ChildToolWindow):
     class BasisElements(QWidget):
+        """widget to select what elements belong in which basis"""
         def __init__(self, parent=None, tool_instance=None):
             super().__init__(parent)
             self.tool_instance = tool_instance
@@ -4567,6 +4588,7 @@ class SavePreset(ChildToolWindow):
             self.setBasis(basis_set)
             
         def setBasis(self, basis_set):
+            """display current basis sets and element selectors"""
             self.basis_elements = []
             self.ecp_elements = []
             for i in range(self.basis_form.rowCount()-1, -1, -1):
@@ -4583,9 +4605,14 @@ class SavePreset(ChildToolWindow):
                         label = "    %s/%s" % (basis_name, aux)
                     else:
                         label = "    %s" % basis_name
-                        
+
+                    #if there's only one basis, it should only be used for all elements
+                    if len(basis_set.basis) == 1 and (basis_set.ecp is None or len(basis_set.ecp) == 0):
+                        element_selector.setCurrentIndex(1)
+                        element_selector.setEnabled(False)
+
                     self.basis_form.addRow(label, element_selector)
-                
+
             if basis_set.ecp is not None:
                 for ecp in basis_set.ecp:
                     element_selector = QComboBox()
@@ -4594,9 +4621,9 @@ class SavePreset(ChildToolWindow):
                     basis_name = ecp.name
                     aux = basis.aux_type
                     label = "    %s" % basis_name
-                        
+
                     self.basis_form.addRow(label, element_selector)
-                    
+
         def getElements(self):
             basis = []
             ecp = []
@@ -4834,7 +4861,7 @@ class RemovePreset(ChildToolWindow):
 
         self.ui_area.setLayout(layout)
         self.manage(None)
-        
+
     def fill_tree(self):
         self.tree.clear()
         root = self.tree.invisibleRootItem()
@@ -4914,13 +4941,11 @@ class PrepLocalJob(ChildToolWindow):
     def _build_ui(self):
         layout = QFormLayout()
         
-        self.auto_update = QCheckBox()
-        self.auto_update.setChecked(self.tool_instance.settings.refresh_finished)
-        layout.addRow("update structure upon finish:", self.auto_update)
-        
-        self.auto_open = QCheckBox()
-        self.auto_open.setChecked(self.tool_instance.settings.open_finished)
-        layout.addRow("open structure upon finish:", self.auto_open)
+        self.auto_update = QComboBox()
+        self.auto_update.addItems(['do nothing', 'open structure', 'change model'])
+        ndx = self.auto_update.findText(self.tool_instance.settings.on_finished)
+        self.auto_update.setCurrentIndex(ndx)
+        layout.addRow("when finished:", self.auto_update)
         
         self.job_name = QLineEdit()
         self.job_name.returnPressed.connect(self.run_job)
@@ -4944,10 +4969,9 @@ class PrepLocalJob(ChildToolWindow):
             self.session.logger.error("invalid job name: '%s'" % job_name)
             return
 
-        auto_update = self.auto_update.checkState() == Qt.Checked
-        self.tool_instance.settings.refresh_finished = auto_update
-        auto_open = self.auto_open.checkState() == Qt.Checked
-        self.tool_instance.settings.open_finished = auto_open
+        auto_update = self.auto_update.currentText() == 'change model'
+        auto_open = self.auto_update.currentText() == 'open structure'
+        self.tool_instance.settings.on_finished = self.auto_update.currentText()
 
         self.tool_instance.run_local_job(name=job_name, auto_update=auto_update, auto_open=auto_open)
         
@@ -5051,7 +5075,7 @@ class ExportPreset(ChildToolWindow):
         self.tool_instance.session.logger.status("saved presets to %s" % filename)
 
         self.destroy()
-        
+
     def cleanup(self):
         self.tool_instance.export_preset_window = None
         
