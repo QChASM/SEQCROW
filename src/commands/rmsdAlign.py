@@ -12,6 +12,7 @@ rmsdAlign_description = CmdDesc(required=[("models", ModelsArg)], \
 
 def rmsdAlign(session, models, reference, align=True, sort=False):   
     ref = ResidueCollection(reference)
+    order1 = None
     
     for model in models:
         rescol = ResidueCollection(model)
@@ -24,7 +25,16 @@ def rmsdAlign(session, models, reference, align=True, sort=False):
         else:
             #get ordering of atoms
             #XXX: RMSD returns early (without giving ordered atoms) if align=False (which is the default)
-            aligned_rmsd, order1, order2 = rescol.RMSD(ref, sort=sort, debug=True, align=True)
+            if order1 is None:
+                if sort:
+                    order1, _ = ref.reorder(canonical=True)
+                else:
+                    order1 = ref.atoms
+
+            if sort:
+                order2, _ = rescol.reorder(canonical=True)
+            else:
+                order2 = rescol.atoms
             
             #recompute rmsd using untranslated coordinates (from original AtomicStructures)
             rmsd = 0

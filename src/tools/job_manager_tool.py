@@ -320,7 +320,7 @@ class JobQueue(ToolInstance):
                                        "Job status unknown", \
                                        "%s was running the last time ChimeraX was closed.\n" % (str(job)) + \
                                        "If the job is still running, it might compete with other jobs for you computer's resources, " + \
-                                       "which could prevent any running job to error out.\n\n" + \
+                                       "which could cause any running job to error out.\n\n" + \
                                        "Has this job finished running?", \
                                        QMessageBox.Yes | QMessageBox.No)
             
