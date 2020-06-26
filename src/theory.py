@@ -40,6 +40,7 @@ class Method:
     PSI4_BEFORE_GEOM = 2
     PSI4_AFTER_GEOM = 3
     PSI4_COMMENT = 4
+    PSI4_COORDINATES = 5
     
     GAUSSIAN_PRE_ROUTE = 1 #can be used for things like %chk=some.chk
     GAUSSIAN_ROUTE = 2 #route specifies most options, e.g. #n B3LYP/3-21G opt 
@@ -395,6 +396,8 @@ class Method:
 
         warnings = []
 
+        use_bohr = False
+
         if not self.functional.is_semiempirical:
             basis_info = self.basis.get_psi4_basis_info()
             if self.structure is not None:
@@ -411,22 +414,22 @@ class Method:
                 for i in range(0, len(basis_info[key])):
                     if "%s" in basis_info[key][i]:
                         if 'cc' in self.functional.name.lower():
-                            basis_info[key][i] = basis_info[key][i].replace("%s", "CC")
+                            basis_info[key][i] = basis_info[key][i].replace("%s", "cc")
 
                         elif 'dct' in self.functional.name.lower():
-                            basis_info[key][i] = basis_info[key][i].replace("%s", "DCT")
+                            basis_info[key][i] = basis_info[key][i].replace("%s", "dct")
 
                         elif 'mp2' in self.functional.name.lower():
-                            basis_info[key][i] = basis_info[key][i].replace("%s", "MP2")
+                            basis_info[key][i] = basis_info[key][i].replace("%s", "mp2")
 
                         elif 'sapt' in self.functional.name.lower():
-                            basis_info[key][i] = basis_info[key][i].replace("%s", "SAPT")
+                            basis_info[key][i] = basis_info[key][i].replace("%s", "sapt")
 
                         elif 'scf' in self.functional.name.lower():
-                            basis_info[key][i] = basis_info[key][i].replace("%s", "SCF")
+                            basis_info[key][i] = basis_info[key][i].replace("%s", "scf")
 
                         elif 'ci' in self.functional.name.lower():
-                            basis_info[key][i] = basis_info[key][i].replace("%s", "MCSCF")
+                            basis_info[key][i] = basis_info[key][i].replace("%s", "mcscf")
 
         else:
             basis_info = {}
@@ -458,14 +461,36 @@ class Method:
 
         s += "molecule {\n"
         s += "%2i %i\n" % (self.charge, self.multiplicity)
+        if self.PSI4_COORDINATES in combined_dict:
+            for kw in combined_dict[self.PSI4_COORDINATES]:
+                if 'pubchem' in kw.lower():
+                    self.structure = None
+                if len(combined_dict[self.PSI4_COORDINATES][kw]) > 0:
+                    opt = combined_dict[self.PSI4_COORDINATES][kw][0]
+                    if 'pubchem' in kw.lower() and not kw.strip().endswith(':'):
+                        kw = kw.strip() + ':'
+                    s += "%s %s\n" % (kw.strip(), opt)
+                    if kw == 'units':
+                        if opt.lower() in ['bohr', 'au', 'a.u.']:
+                            use_bohr = True
+                else:
+                    s += "%s\n" % kw
         if self.structure is not None:
             if isinstance(self.structure, AtomicStructure):
                 for atom in self.structure.atoms:
-                    s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element.name, *atom.coord)
+                    if use_bohr:
+                        coords = [x / 0.52917720859 for x in atom.coord]
+                    else:
+                        coords = atom.coord
+                    s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element.name, *coords)
 
             elif isinstance(self.structure, Geometry):
                 for atom in self.structure.atoms:
-                    s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element, *atom.coords)
+                    if use_bohr:
+                        coords = [x / 0.52917720859 for x in atom.coords]
+                    else:
+                        coords = atom.coords
+                    s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element, *coords)
 
         s += "}\n\n"
 
@@ -683,6 +708,7 @@ class Method:
 
     def get_psi4_json(self, other_kw_dict):
         out = {}
+
         out['other'] = other_kw_dict
         
         out['charge'] = self.charge
@@ -705,6 +731,10 @@ class Method:
         
         else:
             out['grid'] = None
+        
+        if self.PSI4_COORDINATES in other_kw_dict:
+            if any(['pubchem' in x.lower() for x in other_kw_dict[self.PSI4_COORDINATES]]):
+                self.structure = None
         
         if self.structure is not None:
             atoms = []
@@ -997,6 +1027,9 @@ class Method:
     def psi4_input_from_dict(cls, json_dict, fname=None):
         """write psi4 input file to fname using info in dict
         any keys (self.PSI4_*) should be strings instead of integers"""
+        use_bohr = False
+
+
         if json_dict['structure'] is not None:
             atoms = []
             for atom in json_dict['structure']:
@@ -1058,9 +1091,26 @@ class Method:
 
         s += "molecule {\n"
         s += "%2s %s\n" % (json_dict['charge'], json_dict['multiplicity'])
+        if str(cls.PSI4_COORDINATES) in combined_dict:
+            for kw in combined_dict[str(cls.PSI4_COORDINATES)]:
+                if len(combined_dict[str(cls.PSI4_COORDINATES)][kw]) > 0:
+                    opt = combined_dict[str(cls.PSI4_COORDINATES)][kw][0]
+                    if 'pubchem' in kw.lower() and not kw.strip().endswith(':'):
+                        kw = kw.strip() + ':'
+                    s += "%s %s\n" % (kw.strip(), opt)
+                    if kw == 'units':
+                        if opt.lower() in ['bohr', 'au', 'a.u.']:
+                            use_bohr = True
+                else:
+                    s += "%s\n" % kw
+
         if json_dict['structure'] is not None:
             for atom in structure.atoms:
-                s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element, *atom.coords)
+                if use_bohr:
+                    coords = [x / 0.52917720859 for x in atom.coords]
+                else:
+                    coords = atom.coords
+                s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element, *coords)
 
         s += "}\n\n"
 

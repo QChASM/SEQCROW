@@ -99,6 +99,12 @@ class _InputGeneratorSettings(Settings):
                                                                    Method.PSI4_BEFORE_GEOM: [], \
                                                                    Method.PSI4_AFTER_GEOM: ["nrg, wfn = energy('$FUNCTIONAL', return_wfn=True)"], \
                                                                    Method.PSI4_COMMENT: [], \
+                                                                   Method.PSI4_COORDINATES: {'units':['angstrom', 'bohr'], 
+                                                                                             'pubchem':['benzene'], 
+                                                                                             'symmetry':['c1', 'c2', 'ci', 'cs', 'd2', 'c2h', 'c2v', 'd2h'], 
+                                                                                             'no_reorient':[], 
+                                                                                             'no_com':[], 
+                                                                                            }, \
                                              }), StringArg),
         'last_psi4_options': Value(dumps({}), StringArg),
         'last_program': Value("Gaussian", StringArg),
@@ -4355,6 +4361,7 @@ class Psi4KeywordOptions(KeywordOptions):
              'before geometry': Method.PSI4_BEFORE_GEOM, \
              'after job': Method.PSI4_AFTER_GEOM, \
              'comment': Method.PSI4_COMMENT, \
+             'molecule': Method.PSI4_COORDINATES, \
             }
 
     previous_option_name = "previous_psi4_options"
@@ -4413,6 +4420,19 @@ class Psi4KeywordOptions(KeywordOptions):
                 previous_dict = previous
                 
             return TwoLayerKeyWordOption("settings", last_dict, previous_dict, "double click to use \"set { %s %s }\"", one_opt_per_kw=True)
+
+        elif name == "molecule":
+            if last is None:
+                last_dict = {}
+            else:
+                last_dict = last
+            
+            if previous is None:
+                previous_dict = {}
+            else:
+                previous_dict = previous
+            
+            return TwoLayerKeyWordOption("molecule", last_dict, previous_dict, "double click to use \"%s %s\"", one_opt_per_kw=True)
 
 
 class KeywordWidget(QWidget):
