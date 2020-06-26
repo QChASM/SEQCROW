@@ -3657,10 +3657,11 @@ class TwoLayerKeyWordOption(QWidget):
         
         super().__init__(parent)
 
-        layout = QGridLayout(self)        
+        layout = QGridLayout(self)
         
         self.keyword_groupbox = QGroupBox(self.name)
-        self.keyword_layout = QGridLayout(self.keyword_groupbox)
+        keyword_layout = QGridLayout(self.keyword_groupbox)
+        keyword_layout.setContentsMargins(0, 0, 0, 0)
         
         self.previous_kw_table = QTableWidget()
         self.previous_kw_table.setColumnCount(2)
@@ -3669,7 +3670,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.previous_kw_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.previous_kw_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.previous_kw_table.verticalHeader().setVisible(False)
-        self.keyword_layout.addWidget(self.previous_kw_table, 0, 0)
+        keyword_layout.addWidget(self.previous_kw_table, 0, 0)
         
         self.current_kw_table = QTableWidget()
         self.current_kw_table.setColumnCount(2)
@@ -3679,10 +3680,11 @@ class TwoLayerKeyWordOption(QWidget):
         self.current_kw_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.current_kw_table.verticalHeader().setVisible(False)
         self.current_kw_table.cellClicked.connect(self.clicked_current_route_keyword)
-        self.keyword_layout.addWidget(self.current_kw_table, 0, 1)
+        keyword_layout.addWidget(self.current_kw_table, 0, 1)
 
         new_kw_widget = QWidget()
         new_kw_widgets_layout = QGridLayout(new_kw_widget)
+        new_kw_widgets_layout.setContentsMargins(4, 2, 4, 1)
         self.new_kw = QLineEdit()
         self.new_kw.setPlaceholderText("filter %s" % self.name)
         self.new_kw.textChanged.connect(self.apply_kw_filter)
@@ -3696,11 +3698,12 @@ class TwoLayerKeyWordOption(QWidget):
             new_kw_widgets_layout.addWidget(QLabel("%s:" % self.name), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
         new_kw_widgets_layout.addWidget(self.new_kw, 0, 1)
         new_kw_widgets_layout.addWidget(add_kw_button, 0, 2)
-        self.keyword_layout.addWidget(new_kw_widget, 1, 0, 1, 2)
+        keyword_layout.addWidget(new_kw_widget, 1, 0, 1, 2)
         
 
         self.option_groupbox = QGroupBox("options")
         option_layout = QGridLayout(self.option_groupbox)
+        option_layout.setContentsMargins(0, 0, 0, 0)
         
         self.previous_opt_table = QTableWidget()
         self.previous_opt_table.setColumnCount(2)
@@ -3723,6 +3726,7 @@ class TwoLayerKeyWordOption(QWidget):
 
         new_opt_widget = QWidget()
         new_opt_widgets_layout = QGridLayout(new_opt_widget)
+        new_opt_widgets_layout.setContentsMargins(4, 2, 4, 1)
         self.new_opt = QLineEdit()
         self.new_opt.setPlaceholderText("filter options")
         self.new_opt.textChanged.connect(self.apply_opt_filter)
@@ -4358,7 +4362,7 @@ class ORCAKeywordOptions(KeywordOptions):
 
 class Psi4KeywordOptions(KeywordOptions):
     items = {'settings': Method.PSI4_SETTINGS, \
-             'before geometry': Method.PSI4_BEFORE_GEOM, \
+             'before molecule': Method.PSI4_BEFORE_GEOM, \
              'after job': Method.PSI4_AFTER_GEOM, \
              'comment': Method.PSI4_COMMENT, \
              'molecule': Method.PSI4_COORDINATES, \
@@ -4382,7 +4386,7 @@ class Psi4KeywordOptions(KeywordOptions):
                 
             return OneLayerKeyWordOption("after job", last_list, previous_list, multiline=True)
             
-        elif name == "before geometry":
+        elif name == "before molecule":
             if last is None:
                 last_list = []
             else:
@@ -4393,7 +4397,7 @@ class Psi4KeywordOptions(KeywordOptions):
             else:
                 previous_list = previous
                 
-            return OneLayerKeyWordOption("before geometry", last_list, previous_list, multiline=True)
+            return OneLayerKeyWordOption("before molecule", last_list, previous_list, multiline=True)
             
         elif name == "comment":
             if last is None:

@@ -1521,38 +1521,37 @@ class BasisSet:
         if self.basis is not None:
             s += "basis {\n"
             for basis in self.basis:
-                if len(basis.elements) > 0:
-                    if basis.aux_type not in first_basis:
-                        first_basis.append(basis.aux_type)
-                        if basis.aux_type is None or basis.user_defined:
-                            s += "    assign    %s\n" % Basis.map_psi4_basis(basis.get_basis_name())
+                if basis.aux_type not in first_basis:
+                    first_basis.append(basis.aux_type)
+                    if basis.aux_type is None or basis.user_defined:
+                        s += "    assign    %s\n" % Basis.map_psi4_basis(basis.get_basis_name())
+                        
+                    elif basis.aux_type == "JK":
+                        s2 = "df_basis_%s {\n"
+                        s2 += "    assign %s-jkfit\n" % Basis.map_psi4_basis(basis.get_basis_name())
+                    
+                    elif basis.aux_type == "RI":
+                        s2 = "df_basis_%s {\n"
+                        if basis.name.lower() == "sto-3g" or basis.name.lower() == "3-21g":
+                            s2 += "    assign %s-rifit\n" % Basis.map_psi4_basis(basis.get_basis_name())
+                        else:
+                            s2 += "    assign %s-ri\n" % Basis.map_psi4_basis(basis.get_basis_name())
+
+                else:
+                    if basis.aux_type is None or basis.user_defined:
+                        for ele in basis.elements:
+                            s += "    assign %2s %s\n" % (ele, Basis.map_psi4_basis(basis.get_basis_name()))
+                    
+                    elif basis.aux_type == "JK":
+                        for ele in basis.elements:
+                            s2 += "    assign %2s %s-jkfit\n" % (ele, Basis.map_psi4_basis(basis.get_basis_name()))
                             
-                        elif basis.aux_type == "JK":
-                            s2 = "df_basis_%s {\n"
-                            s2 += "    assign %s-jkfit\n" % Basis.map_psi4_basis(basis.get_basis_name())
-                        
-                        elif basis.aux_type == "RI":
-                            s2 = "df_basis_%s {\n"
+                    elif basis.aux_type == "RI":
+                        for ele in basis.elements:
                             if basis.name.lower() == "sto-3g" or basis.name.lower() == "3-21g":
-                                s2 += "    assign %s-rifit\n" % Basis.map_psi4_basis(basis.get_basis_name())
+                                s2 += "    assign %2s %s-rifit\n" % (ele, Basis.map_psi4_basis(basis.get_basis_name()))
                             else:
-                                s2 += "    assign %s-ri\n" % Basis.map_psi4_basis(basis.get_basis_name())
-    
-                    else:
-                        if basis.aux_type is None or basis.user_defined:
-                            for ele in basis.elements:
-                                s += "    assign %2s %s\n" % (ele, Basis.map_psi4_basis(basis.get_basis_name()))
-                        
-                        elif basis.aux_type == "JK":
-                            for ele in basis.elements:
-                                s2 += "    assign %2s %s-jkfit\n" % (ele, Basis.map_psi4_basis(basis.get_basis_name()))
-                                
-                        elif basis.aux_type == "RI":
-                            for ele in basis.elements:
-                                if basis.name.lower() == "sto-3g" or basis.name.lower() == "3-21g":
-                                    s2 += "    assign %2s %s-rifit\n" % (ele, Basis.map_psi4_basis(basis.get_basis_name()))
-                                else:
-                                    s2 += "    assign %2s %s-ri\n" % (ele, Basis.map_psi4_basis(basis.get_basis_name()))
+                                s2 += "    assign %2s %s-ri\n" % (ele, Basis.map_psi4_basis(basis.get_basis_name()))
                                     
             if any(basis.user_defined for basis in self.basis):
                 s3 = ""
@@ -1578,7 +1577,7 @@ class BasisSet:
         info = {Method.PSI4_BEFORE_GEOM:[s]}
 
         return info
-        
+
     def check_for_elements(self, elements):
         warning = ""
         if self.basis is not None:
