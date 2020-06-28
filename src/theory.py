@@ -903,7 +903,7 @@ class Method:
 
         s += "\n"
 
-        if json_dict['constraints']['bonds'] is not None and json_dict['structure'] is not None:
+        if json_dict['constraints'] is not None and json_dict['structure'] is not None:
             for constraint in json_dict['constraints']['bonds']:
                 atom1, atom2 = constraint
                 s += "B %2s %2s F\n" % (atom1, atom2)

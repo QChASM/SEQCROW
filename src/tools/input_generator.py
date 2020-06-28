@@ -1,4 +1,4 @@
-from chimerax.atomic import AtomicStructure, selected_atoms, selected_bonds, get_triggers
+from chimerax.atomic import AtomicStructure, selected_atoms, selected_bonds, selected_pseudobonds, get_triggers
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.core.settings import Settings
@@ -1398,11 +1398,11 @@ class JobTypeOption(QWidget):
     def constrain_bonds(self):
         """adds selected bonds to list of constrained bonds"""
         current_bonds = [bond for bond in selected_bonds(self.session) if bond.structure is self.structure]
+        current_bonds.extend([bond for bond in selected_pseudobonds(self.session) if bond.group.structure is self.structure])
         for bond in current_bonds:
             atom1, atom2 = bond.atoms
-            for bond in self.constrained_bonds:
-                if atom1 in bond and atom2 in bond:
-                    continue
+            if any(atom1 in constrained_bond and atom2 in constrained_bond for constrained_bond in self.constrained_bonds):
+                continue
 
             self.constrained_bonds.append((atom1, atom2))
             
@@ -1474,6 +1474,7 @@ class JobTypeOption(QWidget):
         """adds selected bonds to list of contrained angles"""
         #try to use ordered selection so that if the user selected 1 -> 2 -> 3, they appear in that order
         current_bonds = [bond for bond in selected_bonds(self.session) if bond.structure is self.structure]
+        current_bonds.extend([bond for bond in selected_pseudobonds(self.session) if bond.group.structure is self.structure])
         #if the user didn't pick the atoms one by one, fall back on selected_atoms
         if len(current_bonds) != 2 and len(current_bonds) != 0:
             self.session.logger.error("can only select two bonds on %s" % self.structure.atomspec)
@@ -1590,6 +1591,7 @@ class JobTypeOption(QWidget):
     def constrain_torsions(self):
         """adds selected bonds/atoms to list of constrained torsions"""
         current_bonds = [bond for bond in selected_bonds(self.session) if bond.structure is self.structure]
+        current_bonds.extend([bond for bond in selected_pseudobonds(self.session) if bond.group.structure is self.structure])
         #if the user didn't pick the atoms one by one, fall back on selected_atoms
         if len(current_bonds) != 3 and len(current_bonds) != 0:
             self.session.logger.error("can only select three bonds on %s" % self.structure.atomspec)
@@ -1616,9 +1618,22 @@ class JobTypeOption(QWidget):
                 current_atoms.remove(atom2)
                 current_atoms.remove(atom3)
                 
-                atom1 = [atom for atom in current_atoms if atom2 in atom.neighbors][0]
-                atom4 = [atom for atom in current_atoms if atom3 in atom.neighbors][0]
+                atom1 = [atom for atom in current_atoms if atom2 in atom.neighbors]
+                if len(atom1) < 1:
+                    for pbond in selected_pseudobonds(self.session):
+                        if atom2 in pbond.atoms and any(atom in pbond.atoms for atom in current_atoms):
+                            atom1 = pbond.other_atom(atom2)
+                else:
+                    atom1 = atom1[0]
                 
+                atom4 = [atom for atom in current_atoms if atom3 in atom.neighbors]
+                if len(atom4) < 1:
+                    for pbond in selected_pseudobonds(self.session):
+                        if atom3 in pbond.atoms and any(atom in pbond.atoms for atom in current_atoms):
+                            atom4 = pbond.other_atom(atom3)
+                else:
+                    atom4 = atom4[0]
+
             for torsion in self.constrained_torsions:
                 if atom1 is torsion[0] and atom2 is torsion[1] and atom3 is torsion[2] and atom4 is torsion[3]:
                     return

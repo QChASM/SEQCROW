@@ -250,7 +250,10 @@ class JobManager(ProviderManager):
                 job.theory.structure.active_coordset_id = job.theory.structure.num_coordsets
 
         elif job.auto_open:
-            run(job.session, "open \"%s\"" % job.output_name, log=False)
+            if hasattr(job, "output_name") and os.path.exists(job.output_name):
+                run(job.session, "open \"%s\"" % job.output_name)
+            else:
+                self.session.logger.error("could not open output of %s" % repr(job))
             
         self.triggers.activate_trigger(JOB_QUEUED, trigger_name)
         pass
