@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter
                             QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, \
                             QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, \
                             QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView, QTextBrowser, \
-                            QStatusBar, QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem 
+                            QStatusBar, QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem, QSizePolicy
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.theory import *
@@ -62,12 +62,11 @@ class _InputGeneratorSettings(Settings):
         'previous_gaussian_solvent_model': Value("None", StringArg),
         'previous_gaussian_solvent_name': Value("", StringArg),
         #shh these are just jsons
-        'previous_gaussian_options': Value(dumps({Method.GAUSSIAN_ROUTE: {'opt': \
-                                                                                ['NoEigenTest', 'Tight', 'VeryTight'], \
-                                                                        'DensityFit': \
-                                                                                [], \
-                                                                        'pop': \
-                                                                                ['NBO', 'NBOREAD', 'NBO7'] \
+        'previous_gaussian_options': Value(dumps({Method.GAUSSIAN_ROUTE: {'opt': ['NoEigenTest', 'Tight', 'VeryTight'], \
+                                                                          'DensityFit': [], \
+                                                                          'pop': ['NBO', 'NBOREAD', 'NBO7'], \
+                                                                          'scrf': ['COSMORS'], \
+                                                                          'Integral':['grid=99302'], \
                                                                         }, \
                                                   Method.GAUSSIAN_COMMENT:[], \
                                                   Method.GAUSSIAN_PRE_ROUTE: {'LindaWorkers':
@@ -80,9 +79,12 @@ class _InputGeneratorSettings(Settings):
         'last_gaussian_options': Value(dumps({Method.GAUSSIAN_ROUTE:{}}), StringArg),
         'previous_orca_solvent_model': Value("None", StringArg),
         'previous_orca_solvent_name': Value("", StringArg),
-        #shh these are just jsons
         'previous_orca_options': Value(dumps({Method.ORCA_ROUTE:['TightSCF'], \
-                                              Method.ORCA_BLOCKS:{'basis':['decontract true'], 'elprop':[], 'freq':[], 'geom':[]}}), StringArg),
+                                              Method.ORCA_BLOCKS:{'basis':['decontract true'], \
+                                                                  'elprop':['Quadrupole True'], \
+                                                                  'freq':['Increment 0.001'], \
+                                                                  'geom':['Calc_Hess true']}, \
+                                                                 }), StringArg),
         #just the blocks that are used by the tool
         'last_orca_options': Value(dumps({}), StringArg),
         'previous_psi4_options': Value(dumps({Method.PSI4_SETTINGS:{'reference': \
@@ -598,11 +600,9 @@ class BuildQM(ToolInstance):
 
         func = self.functional_widget.getFunctional(update_settings)        
         basis = self.get_basis_set(update_settings)
-        
-        if self.file_type.currentText() != "Psi4":
-            dispersion = self.functional_widget.getDispersion(update_settings)
-        else:
-            dispersion = None
+
+        dispersion = self.functional_widget.getDispersion(update_settings)
+
         
         grid = self.functional_widget.getGrid(update_settings)      
         charge = self.job_widget.getCharge(update_settings)
@@ -1062,6 +1062,7 @@ class JobTypeOption(QWidget):
         self.solvent_names = QListWidget()
         self.solvent_names.setSelectionMode(self.solvent_names.SingleSelection)
         self.solvent_names.itemSelectionChanged.connect(self.change_selected_solvent)
+        self.solvent_names.itemDoubleClicked.connect(self.change_selected_solvent)
         
         solvent_layout.addWidget(self.solvent_names)
         
@@ -1968,15 +1969,20 @@ class JobTypeOption(QWidget):
 
 class FunctionalOption(QWidget):
     #TODO: make checking the "is_semiempirical" box disable the basis functions tab of the parent tab widget
+    #      dispersion names can be moved to EmpiricalDispersion
     GAUSSIAN_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D", "B3PW91", "B97-D", "BP86", "PBE0", "PM6", "AM1"]
-    GAUSSIAN_DISPERSION = ["Grimme D2", "Grimme D3", "Becke-Johnson damped Grimme D3", "Petersson-Frisch"]
+    GAUSSIAN_DISPERSION = ["Grimme D2", "Zero-damped Grimme D3", "Becke-Johnson damped Grimme D3", "Petersson-Frisch"]
     GAUSSIAN_GRIDS = ["Default", "SuperFineGrid", "UltraFine", "FineGrid"]
     
     ORCA_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D3", "B3PW91", "B97-D", "BP86", "PBE0", "HF-3c", "AM1"]
-    ORCA_DISPERSION = ["Grimme D2", "Undamped Grimme D3", "Becke-Johnson damped Grimme D3", "Grimme D4"]
+    ORCA_DISPERSION = ["Grimme D2", "Zero-damped Grimme D3", "Becke-Johnson damped Grimme D3", "Grimme D4"]
     ORCA_GRIDS = ["Default", "Grid7", "Grid6", "Grid5", "Grid4"]
 
     PSI4_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D", "B3PW91", "B97-D", "BP86", "PBE0", "CCSD", "CCSD(T)"]
+    PSI4_DISPERSION = ["Grimme D1", "Grimme D2", "Zero-damped Grimme D3", "Becke-Johnson damped Grimme D3", \
+                       "Becke-Johnson damped modified Grimme D3", "Chai & Head-Gordon", "Nonlocal Approximation", \
+                       "Pernal, Podeszwa, Patkowski, & Szalewicz", "Podeszwa, Katarzyna, Patkowski, & Szalewicz", \
+                       "Řezác, Greenwell, & Beran"]
     PSI4_GRIDS = ["Default", "(175, 974)", "(60, 770)", "(99, 590)", "(55, 590)", "(50, 434)", "(75, 302)"]
 
     functionalChanged = pyqtSignal()
@@ -2179,7 +2185,6 @@ class FunctionalOption(QWidget):
             self.functional_option.addItems(self.GAUSSIAN_FUNCTIONALS)
             self.functional_option.addItem("other")
             
-            self.dispersion.setEnabled(True)
             self.dispersion.addItem("None")
             self.dispersion.addItems(self.GAUSSIAN_DISPERSION)
             
@@ -2189,7 +2194,6 @@ class FunctionalOption(QWidget):
             self.functional_option.addItems(self.ORCA_FUNCTIONALS)
             self.functional_option.addItem("other")
             
-            self.dispersion.setEnabled(True)
             self.dispersion.addItem("None")
             self.dispersion.addItems(self.ORCA_DISPERSION)
             
@@ -2198,8 +2202,9 @@ class FunctionalOption(QWidget):
         elif program == "Psi4":
             self.functional_option.addItems(self.PSI4_FUNCTIONALS)
             self.functional_option.addItem("other")
-            #Psi4 doesn't seem to have an 'empirical dispersion' keyword like Gaussian or ORCA
-            self.dispersion.setEnabled(False)
+            
+            self.dispersion.addItem("None")
+            self.dispersion.addItems(self.PSI4_DISPERSION)
             
             self.grid.addItems(self.PSI4_GRIDS)
             
@@ -3660,8 +3665,11 @@ class TwoLayerKeyWordOption(QWidget):
         layout = QGridLayout(self)
         
         self.keyword_groupbox = QGroupBox(self.name)
+        self.keyword_groupbox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         keyword_layout = QGridLayout(self.keyword_groupbox)
         keyword_layout.setContentsMargins(0, 0, 0, 0)
+        keyword_layout.setRowStretch(0, 1)
+        keyword_layout.setRowStretch(1, 0)
         
         self.previous_kw_table = QTableWidget()
         self.previous_kw_table.setColumnCount(2)
@@ -3670,6 +3678,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.previous_kw_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.previous_kw_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.previous_kw_table.verticalHeader().setVisible(False)
+        self.previous_kw_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         keyword_layout.addWidget(self.previous_kw_table, 0, 0)
         
         self.current_kw_table = QTableWidget()
@@ -3680,11 +3689,12 @@ class TwoLayerKeyWordOption(QWidget):
         self.current_kw_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.current_kw_table.verticalHeader().setVisible(False)
         self.current_kw_table.cellClicked.connect(self.clicked_current_route_keyword)
+        self.current_kw_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         keyword_layout.addWidget(self.current_kw_table, 0, 1)
 
         new_kw_widget = QWidget()
         new_kw_widgets_layout = QGridLayout(new_kw_widget)
-        new_kw_widgets_layout.setContentsMargins(4, 2, 4, 1)
+        new_kw_widgets_layout.setContentsMargins(4, 2, 4, 2)
         self.new_kw = QLineEdit()
         self.new_kw.setPlaceholderText("filter %s" % self.name)
         self.new_kw.textChanged.connect(self.apply_kw_filter)
@@ -3698,12 +3708,18 @@ class TwoLayerKeyWordOption(QWidget):
             new_kw_widgets_layout.addWidget(QLabel("%s:" % self.name), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
         new_kw_widgets_layout.addWidget(self.new_kw, 0, 1)
         new_kw_widgets_layout.addWidget(add_kw_button, 0, 2)
+        new_kw_widgets_layout.setColumnStretch(0, 0)
+        new_kw_widgets_layout.setColumnStretch(1, 1)
+        new_kw_widgets_layout.setColumnStretch(2, 0)
         keyword_layout.addWidget(new_kw_widget, 1, 0, 1, 2)
         
 
         self.option_groupbox = QGroupBox("options")
+        self.option_groupbox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         option_layout = QGridLayout(self.option_groupbox)
         option_layout.setContentsMargins(0, 0, 0, 0)
+        option_layout.setRowStretch(0, 1)
+        option_layout.setRowStretch(1, 0)
         
         self.previous_opt_table = QTableWidget()
         self.previous_opt_table.setColumnCount(2)
@@ -3712,6 +3728,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.previous_opt_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.previous_opt_table.verticalHeader().setVisible(False)
         self.previous_opt_table.cellActivated.connect(self.clicked_keyword_option)
+        self.previous_opt_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         option_layout.addWidget(self.previous_opt_table, 0, 0)
         
         self.current_opt_table = QTableWidget()
@@ -3722,11 +3739,12 @@ class TwoLayerKeyWordOption(QWidget):
         self.current_opt_table.cellClicked.connect(self.clicked_current_keyword_option)
         self.current_opt_table.cellChanged.connect(self.edit_current_opt)
         self.current_opt_table.verticalHeader().setVisible(False)
+        self.current_opt_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         option_layout.addWidget(self.current_opt_table, 0, 1)
 
         new_opt_widget = QWidget()
         new_opt_widgets_layout = QGridLayout(new_opt_widget)
-        new_opt_widgets_layout.setContentsMargins(4, 2, 4, 1)
+        new_opt_widgets_layout.setContentsMargins(4, 2, 4, 2)
         self.new_opt = QLineEdit()
         self.new_opt.setPlaceholderText("filter options")
         self.new_opt.textChanged.connect(self.apply_opt_filter)
@@ -3737,6 +3755,9 @@ class TwoLayerKeyWordOption(QWidget):
         new_opt_widgets_layout.addWidget(QLabel("option:"), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
         new_opt_widgets_layout.addWidget(self.new_opt, 0, 1)
         new_opt_widgets_layout.addWidget(add_opt_button, 0, 2)
+        new_opt_widgets_layout.setColumnStretch(0, 0)
+        new_opt_widgets_layout.setColumnStretch(1, 1)
+        new_opt_widgets_layout.setColumnStretch(2, 0)
         option_layout.addWidget(new_opt_widget, 1, 0, 1, 2)
 
         self.current_kw_table.itemSelectionChanged.connect(self.update_route_opts)
@@ -3772,7 +3793,8 @@ class TwoLayerKeyWordOption(QWidget):
         splitter.setChildrenCollapsible(True)
         splitter.addWidget(self.keyword_groupbox)
         splitter.addWidget(self.option_groupbox)
-        layout.addWidget(splitter, 0, 0, 1, 1, Qt.AlignTop)
+        splitter.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        layout.addWidget(splitter, 0, 0)
         layout.setContentsMargins(0, 0, 0, 0)
 
     def add_item_to_previous_kw_table(self, kw):
@@ -4154,7 +4176,7 @@ class KeywordOptions(QWidget):
             self.widgets[item] = self.get_options_for(item, last, previous)
             self.widgets[item].optionChanged.connect(self.something_changed)
             self.widgets[item].settingsChanged.connect(self.settings_changed)
-            self.layout.addWidget(self.widgets[item], 1, 0, Qt.AlignTop)
+            self.layout.addWidget(self.widgets[item], 1, 0)
 
         position_selector.currentTextChanged.connect(self.change_widget)            
         self.change_widget(position_selector.currentText())
@@ -4162,6 +4184,7 @@ class KeywordOptions(QWidget):
         self.layout.setContentsMargins(0, 0, 0, 0)        
         self.layout.setRowStretch(0, 0)
         self.layout.setRowStretch(1, 1)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
     
     def setKeywords(self, current_dict):
         for item in self.widgets.keys():
@@ -4363,9 +4386,9 @@ class ORCAKeywordOptions(KeywordOptions):
 class Psi4KeywordOptions(KeywordOptions):
     items = {'settings': Method.PSI4_SETTINGS, \
              'before molecule': Method.PSI4_BEFORE_GEOM, \
+             'molecule': Method.PSI4_COORDINATES, \
              'after job': Method.PSI4_AFTER_GEOM, \
              'comment': Method.PSI4_COMMENT, \
-             'molecule': Method.PSI4_COORDINATES, \
             }
 
     previous_option_name = "previous_psi4_options"
@@ -4436,7 +4459,7 @@ class Psi4KeywordOptions(KeywordOptions):
             else:
                 previous_dict = previous
             
-            return TwoLayerKeyWordOption("molecule", last_dict, previous_dict, "double click to use \"%s %s\"", one_opt_per_kw=True)
+            return TwoLayerKeyWordOption("molecule options", last_dict, previous_dict, "double click to use \"%s %s\"", one_opt_per_kw=True)
 
 
 class KeywordWidget(QWidget):
@@ -4450,18 +4473,22 @@ class KeywordWidget(QWidget):
         self.layout = QGridLayout(self)
         
         self.gaussian_widget = GaussianKeywordOptions(self.settings)
+        self.gaussian_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.gaussian_widget.optionsChanged.connect(self.options_changed)
         self.layout.addWidget(self.gaussian_widget, 0, 0)
         
         self.orca_widget = ORCAKeywordOptions(self.settings)
+        self.orca_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.orca_widget.optionsChanged.connect(self.options_changed)
         self.layout.addWidget(self.orca_widget, 0, 0)
 
         self.psi4_widget = Psi4KeywordOptions(self.settings)
+        self.psi4_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.psi4_widget.optionsChanged.connect(self.options_changed)
         self.layout.addWidget(self.psi4_widget, 0, 0)
 
         self.setOptions(init_form)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
     
     def setOptions(self, program):
         self.form = program
@@ -4797,15 +4824,16 @@ class SavePreset(ChildToolWindow):
             
             basis_set = self.tool_instance.basis_widget.getBasis(update_settings=False)
             preset['basis'] = {'name':[], 'file':[], 'auxiliary':[], 'elements':[]}
-            for basis, elements in zip(basis_set.basis, basis_elements):
-                preset['basis']['name'].append(basis.name)
-                preset['basis']['file'].append(basis.user_defined)
-                preset['basis']['auxiliary'].append(basis.aux_type)
-                if elements == "current":
-                    preset['basis']['elements'].append(basis.elements)
-                else:
-                    preset['basis']['elements'].append([elements])
-                        
+            if basis_set.basis is not None:
+                for basis, elements in zip(basis_set.basis, basis_elements):
+                    preset['basis']['name'].append(basis.name)
+                    preset['basis']['file'].append(basis.user_defined)
+                    preset['basis']['auxiliary'].append(basis.aux_type)
+                    if elements == "current":
+                        preset['basis']['elements'].append(basis.elements)
+                    else:
+                        preset['basis']['elements'].append([elements])
+
             preset['ecp'] = {'name':[], 'file':[], 'elements':[]}
             if basis_set.ecp is not None:
                 for basis, elements in zip(basis_set.ecp, ecp_elements):
@@ -4964,8 +4992,8 @@ class PrepLocalJob(ChildToolWindow):
     def run_job(self):
         job_name = self.job_name.text().strip()
         
-        if len(job_name.strip()) == 0 or any(x in job_name for x in "\\/;'\"?<>,`~!@#$%^&*"):
-            self.session.logger.error("invalid job name: '%s'" % job_name)
+        if not job_name.isalnum():
+            self.session.logger.error("invalid job name: '%s'\nmust be alphanumeric" % job_name)
             return
 
         auto_update = self.auto_update.currentText() == 'change model'

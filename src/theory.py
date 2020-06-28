@@ -132,22 +132,39 @@ class Method:
 
         if self.empirical_dispersion is not None:
             disp, warning = self.empirical_dispersion.get_gaussian()
-            s += disp + " "
+            other_kw_dict = combine_dicts(other_kw_dict, disp)
             if warning is not None:
                 warnings.append(warning)
 
         if self.grid is not None:
             grid, warning = self.grid.get_gaussian()
+            other_kw_dict = combine_dicts(other_kw_dict, grid)
             if warning is not None:
                 warnings.append(warning)
-            s += grid
-            s += " "
 
         if self.GAUSSIAN_ROUTE in other_kw_dict:
             for option in other_kw_dict[self.GAUSSIAN_ROUTE]:
+                known_opts = []
                 s += option
-                if len(other_kw_dict[self.GAUSSIAN_ROUTE][option]) > 0:
-                    s += "=(%s)" % ",".join(other_kw_dict[self.GAUSSIAN_ROUTE][option])
+                if len(other_kw_dict[self.GAUSSIAN_ROUTE][option]) > 1 or \
+                   (len(other_kw_dict[self.GAUSSIAN_ROUTE][option]) == 1 and \
+                   ('=' in other_kw_dict[self.GAUSSIAN_ROUTE][option][0] or \
+                    '(' in other_kw_dict[self.GAUSSIAN_ROUTE][option][0])):
+                    opts = [opt.split('=')[0] for opt in other_kw_dict[self.GAUSSIAN_ROUTE][option]]
+
+                    s += "=("
+                    for x in other_kw_dict[self.GAUSSIAN_ROUTE][option]:
+                        opt = x.split('=')[0]
+                        if opt not in known_opts:
+                            if len(known_opts) > 0:
+                                s += ','
+                            known_opts.append(opt)
+                            s += x
+                    s += ")"
+                
+                elif len(other_kw_dict[self.GAUSSIAN_ROUTE][option]) == 1:
+                    s += "=%s" % other_kw_dict[self.GAUSSIAN_ROUTE][option][0]
+
                 s += " "
 
         s += "\n\n"
@@ -399,7 +416,7 @@ class Method:
         use_bohr = False
 
         if not self.functional.is_semiempirical:
-            basis_info = self.basis.get_psi4_basis_info()
+            basis_info = self.basis.get_psi4_basis_info('sapt' in self.functional.get_psi4()[0].lower())
             if self.structure is not None:
                 if isinstance(self.structure, Geometry):
                     struc_elements = set([atom.element for atom in self.structure.atoms])
@@ -479,6 +496,7 @@ class Method:
             if isinstance(self.structure, AtomicStructure):
                 for atom in self.structure.atoms:
                     if use_bohr:
+                        #this is the angstrom-bohr conversion that psi4 uses
                         coords = [x / 0.52917720859 for x in atom.coord]
                     else:
                         coords = atom.coord
@@ -543,9 +561,12 @@ class Method:
             s += "}\n\n"
 
         if self.PSI4_AFTER_GEOM in combined_dict:
+            functional = self.functional.get_psi4()[0]
+            if self.empirical_dispersion is not None:
+                functional += self.empirical_dispersion.get_psi4()[0]
             for opt in combined_dict[self.PSI4_AFTER_GEOM]:
                 if "$FUNCTIONAL" in opt:
-                    opt = opt.replace("$FUNCTIONAL", self.functional.get_psi4()[0])
+                    opt = opt.replace("$FUNCTIONAL", functional)
 
                 s += opt
                 s += '\n'
@@ -558,7 +579,6 @@ class Method:
 
     def get_gaussian_json(self, other_kw_dict):
         out = {}
-        out['other'] = other_kw_dict
         
         out['charge'] = self.charge
         out['multiplicity'] = self.multiplicity
@@ -575,12 +595,6 @@ class Method:
         else:
             out['functional'] = None
 
-        if self.grid is not None:
-            out['grid'] = self.grid.get_gaussian()[0]
-        
-        else:
-            out['grid'] = None
-        
         if self.structure is not None:
             atoms = []
             for atom in self.structure.atoms:
@@ -625,9 +639,14 @@ class Method:
             out['structure'] = None
         
         if self.empirical_dispersion is not None:
-            out['empirical_dispersion'] = self.empirical_dispersion.get_gaussian()[0]
-        else:
-            out['empirical_dispersion'] = None
+            disp, warning = self.empirical_dispersion.get_gaussian()
+            other_kw_dict = combine_dicts(other_kw_dict, disp)
+
+        if self.grid is not None:
+            grid, warning = self.grid.get_gaussian()
+            other_kw_dict = combine_dicts(other_kw_dict, grid)
+
+        out['other'] = other_kw_dict
             
         return out
 
@@ -721,7 +740,7 @@ class Method:
             out['semi_empirical'] = self.functional.is_semiempirical
             
             if not self.functional.is_semiempirical and self.basis is not None:
-                out['basis_info'] = self.basis.get_psi4_basis_info()
+                out['basis_info'] = self.basis.get_psi4_basis_info('sapt' in self.functional.get_psi4()[0].lower())
         
         else:
             out['functional'] = None
@@ -818,18 +837,29 @@ class Method:
 
         s += " "
 
-        if json_dict['empirical_dispersion'] is not None:
-            s += json_dict['empirical_dispersion'] + " "
-
-        if json_dict['grid'] is not None:
-            s += json_dict['grid']
-            s += " "
-
         if str(cls.GAUSSIAN_ROUTE) in json_dict['other']:
             for option in json_dict['other'][str(cls.GAUSSIAN_ROUTE)]:
+                known_opts = []
                 s += option
-                if len(json_dict['other'][str(cls.GAUSSIAN_ROUTE)][option]) > 0:
-                    s += "=(%s)" % ",".join(json_dict['other'][str(cls.GAUSSIAN_ROUTE)][option])
+                if len(json_dict['other'][str(cls.GAUSSIAN_ROUTE)][option]) > 1 or \
+                   (len(json_dict['other'][str(cls.GAUSSIAN_ROUTE)][option]) == 1 and \
+                   ('=' in json_dict['other'][str(cls.GAUSSIAN_ROUTE)][option][0] or \
+                    '(' in json_dict['other'][str(cls.GAUSSIAN_ROUTE)][option][0])):
+                    opts = [opt.split('=')[0] for opt in json_dict['other'][str(cls.GAUSSIAN_ROUTE)][option]]
+
+                    s += "=("
+                    for x in json_dict['other'][str(cls.GAUSSIAN_ROUTE)][option]:
+                        opt = x.split('=')[0]
+                        if opt not in known_opts:
+                            if len(known_opts) > 0:
+                                s += ','
+                            known_opts.append(opt)
+                            s += x
+                    s += ")"
+                
+                elif len(json_dict['other'][str(cls.GAUSSIAN_ROUTE)][option]) == 1:
+                    s += "=%s" % json_dict['other'][str(cls.GAUSSIAN_ROUTE)][option][0]
+
                 s += " "
 
         s += "\n\n"
@@ -1164,6 +1194,9 @@ class Method:
             s += "}\n\n"
 
         if str(cls.PSI4_AFTER_GEOM) in combined_dict:
+            functional = json_dict['functional']
+            if json_dict['empirical_dispersion'] is not None:
+                function += json_dict['empirical_dispersion']
             for opt in combined_dict[str(cls.PSI4_AFTER_GEOM)]:
                 if "$FUNCTIONAL" in opt:
                     opt = opt.replace("$FUNCTIONAL", json_dict['functional'])
@@ -1208,7 +1241,7 @@ class Functional:
             return ("B3LYP", "Gaussian's B3LYP uses a different LDA")
         
         else:
-            return self.name, None
+            return self.name.replace('ω', 'w'), None
 
     def get_orca(self):
         """maps proper functional name to one ORCA accepts"""
@@ -1509,26 +1542,30 @@ class BasisSet:
             
         return info
 
-    def get_psi4_basis_info(self):
+    def get_psi4_basis_info(self, sapt=False):
         #for psi4, ecp info should be included in basis definitions
         #ecp is ignored
         s = ""
         s2 = None
         s3 = None
+        s4 = None
 
         first_basis = []
 
         if self.basis is not None:
-            s += "basis {\n"
             for basis in self.basis:
                 if basis.aux_type not in first_basis:
                     first_basis.append(basis.aux_type)
                     if basis.aux_type is None or basis.user_defined:
+                        s += "basis {\n"
                         s += "    assign    %s\n" % Basis.map_psi4_basis(basis.get_basis_name())
                         
                     elif basis.aux_type == "JK":
-                        s2 = "df_basis_%s {\n"
-                        s2 += "    assign %s-jkfit\n" % Basis.map_psi4_basis(basis.get_basis_name())
+                        if sapt:
+                            s4 = "df_basis_sapt {\n"
+                        else:
+                            s4 = "df_basis_scf {\n"
+                        s4 += "    assign %s-jkfit\n" % Basis.map_psi4_basis(basis.get_basis_name())
                     
                     elif basis.aux_type == "RI":
                         s2 = "df_basis_%s {\n"
@@ -1567,12 +1604,18 @@ class BasisSet:
             if s3 is not None:
                 s += s3
     
-            s += "}"
+            if len(s) > 0:
+                s += "}"
             
             if s2 is not None:
                 s2 += "}"
                 
                 s += "\n\n%s" % s2
+                    
+            if s4 is not None:
+                s4 += "}"
+                
+                s += "\n\n%s" % s4
         
         info = {Method.PSI4_BEFORE_GEOM:[s]}
 
@@ -1738,7 +1781,7 @@ class ECP(Basis):
 class EmpiricalDispersion:
     def __init__(self, name):
         self.name = name
-        
+
     def get_gaussian(self):
         """Acceptable dispersion methods for Gaussian are:
         Grimme D2
@@ -1753,19 +1796,19 @@ class EmpiricalDispersion:
         other methods will raise RuntimeError"""
         
         if self.name == "Grimme D2":
-            return ("EmpiricalDispersion=GD2", None)
-        elif self.name == "Grimme D3":
-            return ("EmpiricalDispersion=GD3", None)
+            return ({Method.GAUSSIAN_ROUTE:{"EmpiricalDispersion":["GD2"]}}, None)
+        elif self.name == "Zero-damped Grimme D3":
+            return ({Method.GAUSSIAN_ROUTE:{"EmpiricalDispersion":["GD3"]}}, None)
         elif self.name == "Becke-Johnson damped Grimme D3":
-            return ("EmpiricalDispersion=GD3BJ", None)
+            return ({Method.GAUSSIAN_ROUTE:{"EmpiricalDispersion":["GD3BJ"]}}, None)
         elif self.name == "Petersson-Frisch":
-            return ("EmpiricalDispersion=PFD", None)
+            return ({Method.GAUSSIAN_ROUTE:{"EmpiricalDispersion":["PFD"]}}, None)
             
         #dispersions in ORCA but not Gaussian
         elif self.name == "Grimme D4":
-            return ("EmpiricalDispersion=GD3BJ", "Grimme's D4 has no keyword in Gaussian, switching to GD3BJ")
+            return ({Method.GAUSSIAN_ROUTE:{"EmpiricalDispersion":["GD3BJ"]}}, "Grimme's D4 has no keyword in Gaussian, switching to GD3BJ")
         elif self.name == "undampened Grimme D3":
-            return ("EmpiricalDispersion=GD3", "undampened Grimme's D3 is unavailable in Gaussian, switching to GD3")
+            return ({Method.GAUSSIAN_ROUTE:{"EmpiricalDispersion":["GD3"]}}, "undampened Grimme's D3 is unavailable in Gaussian, switching to GD3")
         
         #unrecognized
         else:
@@ -1774,17 +1817,41 @@ class EmpiricalDispersion:
     def get_orca(self):
         if self.name == "Grimme D2":
             return ("D2", None)
-        elif self.name == "Undamped Grimme D3":
+        elif self.name == "Zero-damped Grimme D3":
             return ("D3", None)
         elif self.name == "Becke-Johnson damped Grimme D3":
             return ("D3BJ", None)
         elif self.name == "Grimme D4":
             return ("D4", None)
 
+    def get_psi4(self):
+        if self.name == "Grimme D1":
+            return ("-d1", None)        
+        if self.name == "Grimme D2":
+            return ("-d2", None)
+        elif self.name == "Zero-damped Grimme D3":
+            return ("-d3", None)
+        elif self.name == "Becke-Johnson damped Grimme D3":
+            return ("-d3bj", None)
+        elif self.name == "Becke-Johnson damped modified Grimme D3":
+            return ("-d3mbj", None)
+        elif self.name == "Chai & Head-Gordon":
+            return ("-chg", None)
+        elif self.name == "Nonlocal Approximation":
+            return ("-nl", None)
+        elif self.name == "Pernal, Podeszwa, Patkowski, & Szalewicz":
+            return ("-das2009", None)        
+        elif self.name == "Podeszwa, Katarzyna, Patkowski, & Szalewicz":
+            return ("-das2010", None)        
+        elif self.name == "Řezác, Greenwell, & Beran":
+            return ("dmp2", None)
+
 
 class ImplicitSolvent:
     #solvent names look weird, but I'm leaving them this way to make them easier to read 
     #many look similar (dichloromethane and dichloroethane, etc)
+    """this isn't really used
+    solvents are added by directly using {*_ROUTE:[PCM, water]} or whatever"""
     KNOWN_GAUSSIAN_SOLVENTS = ["Water", 
                                "Acetonitrile", 
                                "Methanol", 
@@ -1992,27 +2059,6 @@ class ImplicitSolvent:
     def __init__(self, name, solvent):
         self.name = name
         self.solvent = solvent
-        
-    def get_gaussian(self):
-        warning = None
-        s = "scrf=("
-        if self.name == "Polarizable Continuum Model":
-            s += "PCM, "
-        elif self.name == "Continuum Solvent with Solute Electron Density":
-            s += "SMD, "
-        #I think this is CPCM...
-        elif self.name == "Conductor-like PCM":
-            s += "CPCM, "
-
-        else:
-            s += "%s, " % self.name
-
-        s += "solvent=%s)" % self.solvent
-
-        if not any(self.solvent.lower() == x.lower() for x in self.KNOWN_GAUSSIAN_SOLVENTS):
-            warning = ["%s might not be a Gaussian solvent"]
-
-        return (s, warning)
 
 
 class IntegrationGrid:
@@ -2020,37 +2066,39 @@ class IntegrationGrid:
         self.name = name
 
     def get_gaussian(self):
+        """gets gaussian integration grid info and a warning as tuple(dict, str or None)
+        dict is of the form {Method.GAUSSIAN_ROUTE:[x]}"""
         if self.name == "UltraFine":
-            return ("Integral=(grid=UltraFine)", None)
+            return ({Method.GAUSSIAN_ROUTE:{"Integral":["grid=UltraFine"]}}, None)
         elif self.name == "FineGrid":
-            return ("Integral=(grid=FineGrid)", None)
+            return ({Method.GAUSSIAN_ROUTE:{"Integral":["grid=FineGrid"]}}, None)
         elif self.name == "SuperFineGrid":
-            return ("Integral=(grid=SuperFineGrid)", None)
+            return ({Method.GAUSSIAN_ROUTE:{"Integral":["grid=SuperFineGrid"]}}, None)
 
         #Grids available in ORCA but not Gaussian
         #uses n_rad from K-Kr as specified in ORCA 4.2.1 manual (section 9.3)
         #XXX: there's probably IOp's that can get closer
         elif self.name == "Grid 2":
             n_rad = 45
-            return ("Integral=(grid=%i110)" % n_rad, "Approximating ORCA Grid 2")
+            return ({Method.GAUSSIAN_ROUTE:{"Integral":["grid=%i110" % n_rad]}}, "Approximating ORCA Grid 2")
         elif self.name == "Grid 3":
             n_rad = 45
-            return ("Integral=(grid=%i194)" % n_rad, "Approximating ORCA Grid 3")
+            return ({Method.GAUSSIAN_ROUTE:{"Integral":["grid=%i194" % n_rad]}}, "Approximating ORCA Grid 3")
         elif self.name == "Grid 4":
             n_rad = 45
-            return ("Integral=(grid=%i302)" % n_rad, "Approximating ORCA Grid 4")
+            return ({Method.GAUSSIAN_ROUTE:{"Integral":["grid=%i302" % n_rad]}}, "Approximating ORCA Grid 4")
         elif self.name == "Grid 5":
             n_rad = 50
-            return ("Integral=(grid=%i434)" % n_rad, "Approximating ORCA Grid 5")
+            return ({Method.GAUSSIAN_ROUTE:{"Integral":["grid=%i434" % n_rad]}}, "Approximating ORCA Grid 5")
         elif self.name == "Grid 6":
             n_rad = 55
-            return ("Integral=(grid=%i590)" % n_rad, "Approximating ORCA Grid 6")
+            return ({Method.GAUSSIAN_ROUTE:{"Integral":["grid=%i590" % n_rad]}}, "Approximating ORCA Grid 6")
         elif self.name == "Grid 7":
             n_rad = 60
-            return ("Integral=(grid=%i770)" % n_rad, "Approximating ORCA Grid 7")
+            return ({Method.GAUSSIAN_ROUTE:{"Integral":["grid=%i770" % n_rad]}}, "Approximating ORCA Grid 7")
 
         else:
-            return ("Integral=(grid=%s)" % self.name, "grid may not be available in Gaussian")
+            return ({Method.GAUSSIAN_ROUTE:{"Integral":["grid=%s" % self.name]}}, "grid may not be available in Gaussian")
 
     def get_orca(self):
         """translates grid to something ORCA accepts

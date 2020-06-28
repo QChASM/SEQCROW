@@ -51,6 +51,9 @@ def seqcrow_bse(session):
             
             if ele != 'H':
                 atom.draw_mode = Atom.BALL_STYLE
+            elif len(atom.neighbors) > 1:
+                atom.radius = 1.0
+                atom.draw_mode = Atom.BALL_STYLE
             else:
                 atom.draw_mode = Atom.STICK_STYLE
 
