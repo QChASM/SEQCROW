@@ -1,6 +1,8 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 from chimerax.core.tools import ToolInstance
+from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.ui.widgets import ColorButton
 from chimerax.bild.bild import read_bild
 from chimerax.core.models import ADD_MODELS, REMOVE_MODELS
@@ -11,6 +13,7 @@ from chimerax.core.commands.cli import FloatArg, TupleOf, IntArg
 from chimerax.core.commands import run
 
 from AaronTools.atoms import Atom
+from AaronTools.const import PHYSICAL
 from AaronTools.geometry import Geometry
 from AaronTools.trajectory import Pathway
 
@@ -18,13 +21,20 @@ from io import BytesIO
 
 from os.path import basename
 
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
+from matplotlib.backend_bases import MouseEvent
+from matplotlib.figure import Figure
+from matplotlib import rc as matplotlib_rc
+
+from PyQt5.Qt import QIcon, QStyle
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QValidator
 from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, QTabWidget, QComboBox, \
                             QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, \
                             QFormLayout, QCheckBox, QHeaderView
 
-from ..managers import FILEREADER_CHANGE
+from SEQCROW.managers import FILEREADER_CHANGE
+from SEQCROW.tools.per_frame_plot import NavigationToolbar
 from SEQCROW.utils import iter2str
 
 #TODO:
@@ -33,13 +43,16 @@ from SEQCROW.utils import iter2str
 #  - vectors sometimes end up in the wrong place b/c 
 #    geom coords don't match model coords for opt + freq jobs
 
+matplotlib_rc('font',  **{'sans-serif' : 'Arial', 'family' : 'sans-serif'})
+
 class _NormalModeSettings(Settings):
     AUTO_SAVE = {
         'arrow_color': Value((0.0, 1.0, 0.0, 1.0), TupleOf(FloatArg, 4), iter2str),
-        'arrow_scale': Value(1.5, FloatArg, str),
-        'anim_scale': Value(0.2, FloatArg, str),
-        'anim_duration': Value(120, IntArg, str),
+        'arrow_scale': Value(1.5, FloatArg),
+        'anim_scale': Value(0.2, FloatArg),
+        'anim_duration': Value(120, IntArg),
         'anim_fps': Value(60, IntArg), 
+        'fwhm': Value(5, FloatArg), 
     }
 
 class FPSSpinBox(QSpinBox):
@@ -103,7 +116,6 @@ class NormalModes(ToolInstance):
     def __init__(self, session, name):
         super().__init__(session, name)
         
-        from chimerax.ui import MainToolWindow
         self.tool_window = MainToolWindow(self)        
         
         self.vec_mw_bool = False
@@ -183,6 +195,7 @@ class NormalModes(ToolInstance):
         stop_anim_button.clicked.connect(self.stop_anim)
         vector_opts.addRow(stop_anim_button)
         
+        
         animate_tab = QWidget()
         anim_opts = QFormLayout(animate_tab)
         
@@ -217,8 +230,33 @@ class NormalModes(ToolInstance):
         stop_anim_button.clicked.connect(self.stop_anim)
         anim_opts.addRow(stop_anim_button)
 
+        
+        ir_tab = QWidget()
+        ir_layout = QFormLayout(ir_tab)
+        
+        self.plot_type = QComboBox()
+        self.plot_type.addItems(['Absorbance', 'Transmittance'])
+        ir_layout.addRow("plot type:", self.plot_type)
+        
+        self.peak_type = QComboBox()
+        self.peak_type.addItems(['Gaussian', 'Lorentzian'])
+        ir_layout.addRow("peak type:", self.peak_type)
+        
+        self.fwhm = QDoubleSpinBox()
+        self.fwhm.setSingleStep(5)
+        self.fwhm.setRange(0.01, 200.0)
+        self.fwhm.setValue(self.settings.fwhm)
+        self.fwhm.setToolTip("width of peaks at half of their maximum value")
+        ir_layout.addRow("FWHM:", self.fwhm)
+        
+        show_plot = QPushButton("show plot")
+        show_plot.clicked.connect(lambda *args: self.tool_window.create_child_window("IR Plot", window_class=IRPlot))
+        ir_layout.addRow(show_plot)
+        
+        
         self.display_tabs.addTab(vector_tab, "vectors")
         self.display_tabs.addTab(animate_tab, "animate")
+        self.display_tabs.addTab(ir_tab, "plot")
 
         layout.addWidget(self.display_tabs)
 
@@ -456,3 +494,110 @@ class NormalModes(ToolInstance):
         self.session.triggers.remove_handler(self._refresh_handler)
         self.session.filereader_manager.triggers.remove_handler(self._fr_update_handler)
         super().delete()
+
+
+class IRPlot(ChildToolWindow):
+    def __init__(self, tool_instance, title, **kwargs):
+        super().__init__(tool_instance, title, statusbar=False, **kwargs)
+        
+        self._build_ui()
+
+        self.refresh_plot()
+
+    def _build_ui(self):
+        
+        layout = QGridLayout()
+        
+        self.figure = Figure(figsize=(2,2))
+        self.canvas = Canvas(self.figure)
+        
+        ax = self.figure.add_axes((0.15, 0.20, 0.80, 0.70))
+
+        self.canvas.setMinimumWidth(500)
+        self.canvas.setMinimumHeight(300)
+
+        layout.addWidget(self.canvas, 0, 0, 1, 2)
+
+        toolbar_widget = QWidget()
+        toolbar = NavigationToolbar(self.canvas, toolbar_widget)
+        toolbar.setMaximumHeight(24)
+        layout.addWidget(toolbar, 1, 1, 1, 1)
+        
+        refresh_button = QPushButton()
+        refresh_button.setIcon(QIcon(refresh_button.style().standardIcon(QStyle.SP_BrowserReload)))
+        refresh_button.clicked.connect(self.refresh_plot)
+        layout.addWidget(refresh_button, 1, 0, 1, 1, Qt.AlignTop)
+        
+        self.ui_area.setLayout(layout)
+        self.manage(None)
+
+    def refresh_plot(self):
+        fr = self.tool_instance.model_selector.currentData()
+        if fr is None:
+            return 
+
+        fwhm = self.tool_instance.fwhm.value()
+        self.tool_instance.settings.fwhm = fwhm
+        frequencies = [freq.frequency for freq in fr.other['frequency'].data if freq.frequency > 0]
+        intensities = [freq.intensity for freq in fr.other['frequency'].data if freq.frequency > 0]
+
+        #I was going to do rovib spectra at some point
+        #probably more work than it's worth
+        #if 'rotational_temperature' in fr.other:
+        #    rot_const = np.array(fr.other['rotational_temperature'])
+        #    rot_const *= PHYSICAL.KB / (PHYSICAL.SPEED_OF_LIGHT * PHYSICAL.PLANK)
+        #else:
+        #    rot_const = [0, 0, 0]
+        
+        #print(rot_const)
+        
+        if 'temperature' in fr.other:
+            temp = fr.other['temperature']
+        else:
+            temp = 298.15
+        
+        temp = 10
+        beta = -1 / (PHYSICAL.KB * temp)
+
+        functions = []
+        x_values = np.linspace(0, max(frequencies) - 10 * fwhm, num=200).tolist()
+        for freq, intensity in zip(frequencies, intensities):
+            if intensity is not None:
+                #make sure to get x values near the peak
+                #this makes the peaks look hi res, but we can cheap out
+                #on areas where there's no peak
+                x_values.extend(np.linspace(max(freq - (5 * fwhm), 0), 
+                                            freq + (5 * fwhm), 
+                                            num=100).tolist()
+                                )
+                x_values.append(freq)
+                if self.tool_instance.peak_type.currentText() == "Gaussian":
+                    functions.append(lambda x, x0=freq, inten=intensity, w=fwhm: \
+                                    inten * np.exp(-4*np.log(2) * (x - x0)**2 / w**2))
+
+                elif self.tool_instance.peak_type.currentText() == "Lorentzian":
+                    functions.append(lambda x, x0=freq, inten=intensity, w=fwhm, : \
+                                    inten * 0.5 * (0.5 * w / ((x - x0)**2 + (0.5 * w)**2)))
+
+        x_values = list(set(x_values))
+        #print(len(x_values), len(functions))
+        x_values.sort()
+        y_values = np.array([sum(f(x) for f in functions) for x in x_values])
+        y_values /= np.amax(y_values)
+
+        ax = self.figure.gca()
+        ax.clear()
+
+        if self.tool_instance.plot_type.currentText() == "Transmittance":
+            y_values = np.array([10 ** (2 - 0.9*y) for y in y_values])
+            ax.set_ylabel('transmittance (%)')
+        else:
+            ax.set_ylabel('absorbance (a.u.)')
+       
+        ax.set_xlabel(r'wavenumber (cm$^{-1}$)')
+        ax.plot(x_values, y_values, color='k', linewidth=0.5)
+        ax.set_xlim(4000, 0)
+        ax.autoscale()
+        
+        self.canvas.draw()
+

@@ -5007,7 +5007,7 @@ class PrepLocalJob(ChildToolWindow):
     def run_job(self):
         job_name = self.job_name.text().strip()
         
-        if not job_name.isalnum():
+        if not job_name.replace(' ', '').replace('-', '').replace('_','').isalnum():
             self.session.logger.error("invalid job name: '%s'\nmust be alphanumeric" % job_name)
             return
 
