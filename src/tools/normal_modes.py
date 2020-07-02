@@ -200,7 +200,7 @@ class NormalModes(ToolInstance):
         anim_opts = QFormLayout(animate_tab)
         
         self.anim_scale = QDoubleSpinBox()
-        self.anim_scale.setSingleStep(0.1)
+        self.anim_scale.setSingleStep(0.05)
         self.anim_scale.setRange(0.01, 100.0)
         self.anim_scale.setValue(self.settings.anim_scale)
         self.anim_scale.setSuffix(" \u212B")
@@ -256,7 +256,7 @@ class NormalModes(ToolInstance):
         
         self.display_tabs.addTab(vector_tab, "vectors")
         self.display_tabs.addTab(animate_tab, "animate")
-        self.display_tabs.addTab(ir_tab, "plot")
+        self.display_tabs.addTab(ir_tab, "IR spectrum")
 
         layout.addWidget(self.display_tabs)
 
