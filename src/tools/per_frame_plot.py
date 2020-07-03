@@ -76,6 +76,9 @@ class EnergyPlot(ToolInstance):
         ax = self.figure.add_axes((0.15, 0.20, 0.80, 0.70))
 
         fr = self.filereader
+        if fr.all_geom is None:
+            self.opened = False
+            return
 
         data = []
         for step in fr.all_geom:

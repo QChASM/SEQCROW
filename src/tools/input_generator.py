@@ -1,4 +1,4 @@
-from chimerax.atomic import AtomicStructure, selected_atoms, selected_bonds, get_triggers
+from chimerax.atomic import AtomicStructure, selected_atoms, selected_bonds, selected_pseudobonds, get_triggers
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.core.settings import Settings
@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter
                             QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, \
                             QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, \
                             QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView, QTextBrowser, \
-                            QStatusBar, QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem 
+                            QStatusBar, QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem, QSizePolicy
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.theory import *
@@ -62,12 +62,11 @@ class _InputGeneratorSettings(Settings):
         'previous_gaussian_solvent_model': Value("None", StringArg),
         'previous_gaussian_solvent_name': Value("", StringArg),
         #shh these are just jsons
-        'previous_gaussian_options': Value(dumps({Method.GAUSSIAN_ROUTE: {'opt': \
-                                                                                ['NoEigenTest', 'Tight', 'VeryTight'], \
-                                                                        'DensityFit': \
-                                                                                [], \
-                                                                        'pop': \
-                                                                                ['NBO', 'NBOREAD', 'NBO7'] \
+        'previous_gaussian_options': Value(dumps({Method.GAUSSIAN_ROUTE: {'opt': ['NoEigenTest', 'Tight', 'VeryTight'], \
+                                                                          'DensityFit': [], \
+                                                                          'pop': ['NBO', 'NBOREAD', 'NBO7'], \
+                                                                          'scrf': ['COSMORS'], \
+                                                                          'Integral':['grid=99302'], \
                                                                         }, \
                                                   Method.GAUSSIAN_COMMENT:[], \
                                                   Method.GAUSSIAN_PRE_ROUTE: {'LindaWorkers':
@@ -80,9 +79,12 @@ class _InputGeneratorSettings(Settings):
         'last_gaussian_options': Value(dumps({Method.GAUSSIAN_ROUTE:{}}), StringArg),
         'previous_orca_solvent_model': Value("None", StringArg),
         'previous_orca_solvent_name': Value("", StringArg),
-        #shh these are just jsons
         'previous_orca_options': Value(dumps({Method.ORCA_ROUTE:['TightSCF'], \
-                                              Method.ORCA_BLOCKS:{'basis':['decontract true'], 'elprop':[], 'freq':[], 'geom':[]}}), StringArg),
+                                              Method.ORCA_BLOCKS:{'basis':['decontract true'], \
+                                                                  'elprop':['Quadrupole True'], \
+                                                                  'freq':['Increment 0.001'], \
+                                                                  'geom':['Calc_Hess true']}, \
+                                                                 }), StringArg),
         #just the blocks that are used by the tool
         'last_orca_options': Value(dumps({}), StringArg),
         'previous_psi4_options': Value(dumps({Method.PSI4_SETTINGS:{'reference': \
@@ -99,6 +101,12 @@ class _InputGeneratorSettings(Settings):
                                                                    Method.PSI4_BEFORE_GEOM: [], \
                                                                    Method.PSI4_AFTER_GEOM: ["nrg, wfn = energy('$FUNCTIONAL', return_wfn=True)"], \
                                                                    Method.PSI4_COMMENT: [], \
+                                                                   Method.PSI4_COORDINATES: {'units':['angstrom', 'bohr'], 
+                                                                                             'pubchem':['benzene'], 
+                                                                                             'symmetry':['c1', 'c2', 'ci', 'cs', 'd2', 'c2h', 'c2v', 'd2h'], 
+                                                                                             'no_reorient':[], 
+                                                                                             'no_com':[], 
+                                                                                            }, \
                                              }), StringArg),
         'last_psi4_options': Value(dumps({}), StringArg),
         'last_program': Value("Gaussian", StringArg),
@@ -592,11 +600,9 @@ class BuildQM(ToolInstance):
 
         func = self.functional_widget.getFunctional(update_settings)        
         basis = self.get_basis_set(update_settings)
-        
-        if self.file_type.currentText() != "Psi4":
-            dispersion = self.functional_widget.getDispersion(update_settings)
-        else:
-            dispersion = None
+
+        dispersion = self.functional_widget.getDispersion(update_settings)
+
         
         grid = self.functional_widget.getGrid(update_settings)      
         charge = self.job_widget.getCharge(update_settings)
@@ -936,64 +942,50 @@ class JobTypeOption(QWidget):
         bond_constraints_layout = QGridLayout(bond_constraints)
         bond_constraints_layout.setContentsMargins(0, 0, 0, 0)
 
-        freeze_bonds = QPushButton("constrain selected bonds")
+        freeze_bonds = QPushButton("constrain selected bonds or atom pair")
         freeze_bonds.clicked.connect(self.constrain_bonds)
         freeze_bonds.clicked.connect(self.something_changed)
         bond_constraints_layout.addWidget(freeze_bonds, 0, 0)
-
-        freeze_atom_pair = QPushButton("constrain selected atom pair")
-        freeze_atom_pair.clicked.connect(self.constrain_atom_pair)
-        freeze_atom_pair.clicked.connect(self.something_changed)
-        bond_constraints_layout.addWidget(freeze_atom_pair, 0, 1)
 
         self.constrained_bond_table = QTableWidget()
         self.constrained_bond_table.setColumnCount(3)
         self.constrained_bond_table.cellClicked.connect(self.clicked_bond_table)
         self.constrained_bond_table.setHorizontalHeaderLabels(["atom 1", "atom 2", "unfreeze"])
         self.constrained_bond_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        bond_constraints_layout.addWidget(self.constrained_bond_table, 1, 0, 1, 2)
+        bond_constraints_layout.addWidget(self.constrained_bond_table, 1, 0)
         
         angle_constraints = QWidget()
         angle_constraints_layout = QGridLayout(angle_constraints)
         angle_constraints_layout.setContentsMargins(0, 0, 0, 0)
 
-        freeze_bond_pair = QPushButton("constrain selected bond pair")
-        freeze_bond_pair.clicked.connect(self.constrain_bond_pair)
+        freeze_bond_pair = QPushButton("constrain selected bond pair or atom trio")
+        freeze_bond_pair.clicked.connect(self.constrain_angles)
         freeze_bond_pair.clicked.connect(self.something_changed)
         angle_constraints_layout.addWidget(freeze_bond_pair, 0, 0)
-        
-        freeze_atom_trio = QPushButton("constrain selected atom trio")
-        freeze_atom_trio.clicked.connect(self.constrain_atom_trio)
-        freeze_atom_trio.clicked.connect(self.something_changed)
-        angle_constraints_layout.addWidget(freeze_atom_trio, 0, 1)
 
         self.constrained_angle_table = QTableWidget()
         self.constrained_angle_table.setColumnCount(4)
         self.constrained_angle_table.cellClicked.connect(self.clicked_angle_table)
         self.constrained_angle_table.setHorizontalHeaderLabels(["atom 1", "atom 2", "atom 3", "unfreeze"])
         self.constrained_angle_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        angle_constraints_layout.addWidget(self.constrained_angle_table, 1, 0, 1, 2)
+        angle_constraints_layout.addWidget(self.constrained_angle_table, 1, 0)
 
         torsion_constrains = QWidget()
         torsion_constrains_layout = QGridLayout(torsion_constrains)
         torsion_constrains_layout.setContentsMargins(0, 0, 0, 0)
 
-        freeze_bond_trio = QPushButton("constrain selected bond trio")
-        freeze_bond_trio.clicked.connect(self.constrain_bond_trio)
+        freeze_bond_trio = QPushButton("constrain selected bond trio or atom quartet")
+        freeze_bond_trio.clicked.connect(self.constrain_torsions)
         freeze_bond_trio.clicked.connect(self.something_changed)
         torsion_constrains_layout.addWidget(freeze_bond_trio, 0, 0)
-        
-        freeze_atom_quartet = QPushButton("constrain selected atom quartet")
-        freeze_atom_quartet.clicked.connect(self.constrain_atom_quartet)
-        freeze_atom_quartet.clicked.connect(self.something_changed)
-        torsion_constrains_layout.addWidget(freeze_atom_quartet, 0, 1)
+
 
         self.constrained_torsion_table = QTableWidget()
         self.constrained_torsion_table.setColumnCount(5)
         self.constrained_torsion_table.cellClicked.connect(self.clicked_torsion_table)
         self.constrained_torsion_table.setHorizontalHeaderLabels(["atom 1", "atom 2", "atom 3", "atom 4", "unfreeze"])
         self.constrained_torsion_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        torsion_constrains_layout.addWidget(self.constrained_torsion_table, 1, 0, 1, 2)
+        torsion_constrains_layout.addWidget(self.constrained_torsion_table, 1, 0)
 
         constraints_viewer = QTabWidget()
 
@@ -1070,6 +1062,7 @@ class JobTypeOption(QWidget):
         self.solvent_names = QListWidget()
         self.solvent_names.setSelectionMode(self.solvent_names.SingleSelection)
         self.solvent_names.itemSelectionChanged.connect(self.change_selected_solvent)
+        self.solvent_names.itemDoubleClicked.connect(self.change_selected_solvent)
         
         solvent_layout.addWidget(self.solvent_names)
         
@@ -1402,56 +1395,14 @@ class JobTypeOption(QWidget):
 
         self.jobTypeChanged.emit()
 
-    def constrain_atom_pair(self):
-        """adds selected atoms to list of constrained bonds"""
-        current_atoms = [atom for atom in selected_atoms(self.session) if atom.structure is self.structure]
-        if len(current_atoms) != 2:
-            session.logger.error("can only select two atoms on %s" % self.structure.atomspec)
-            return
-
-        atom1, atom2 = sorted(current_atoms)
-        for bond in self.constrained_bonds:
-            if atom1 in bond and atom2 in bond:
-                return
-
-        self.constrained_bonds.append((atom1, atom2))
-
-        row = self.constrained_bond_table.rowCount()
-        self.constrained_bond_table.insertRow(row)
-        
-        item1 = QTableWidgetItem()
-        item1.setData(Qt.DisplayRole, atom1.atomspec)
-        item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        self.constrained_bond_table.setItem(row, 0, item1)
-                
-        item2 = QTableWidgetItem()
-        item2.setData(Qt.DisplayRole, atom2.atomspec)
-        item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        self.constrained_bond_table.setItem(row, 1, item2)
-        
-        widget_that_lets_me_horizontally_align_an_icon = QWidget()
-        widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
-        trash_button = QLabel()
-        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-        trash_button.setToolTip("click to unfreeze")
-        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
-        widget_layout.setContentsMargins(2, 2, 2, 2)
-        self.constrained_bond_table.setCellWidget(row, 2, widget_that_lets_me_horizontally_align_an_icon)
-
-        self.constrained_bond_table.resizeRowToContents(row)
-
-        self.jobTypeChanged.emit()
-
     def constrain_bonds(self):
         """adds selected bonds to list of constrained bonds"""
         current_bonds = [bond for bond in selected_bonds(self.session) if bond.structure is self.structure]
+        current_bonds.extend([bond for bond in selected_pseudobonds(self.session) if bond.group.structure is self.structure])
         for bond in current_bonds:
-
             atom1, atom2 = bond.atoms
-            for bond in self.constrained_bonds:
-                if atom1 in bond and atom2 in bond:
-                    continue
+            if any(atom1 in constrained_bond and atom2 in constrained_bond for constrained_bond in self.constrained_bonds):
+                continue
 
             self.constrained_bonds.append((atom1, atom2))
             
@@ -1480,263 +1431,306 @@ class JobTypeOption(QWidget):
 
             self.constrained_bond_table.resizeRowToContents(row)
 
-        self.jobTypeChanged.emit()
-
-    def constrain_atom_trio(self):
-        """adds selected atoms to constrained angles"""
-        #try to use ordered selection so that if the user selected 1 -> 2 -> 3, they appear in that order
-        current_atoms = [atom for atom in self.session.seqcrow_ordered_selection_manager.selection if atom.structure is self.structure]
-        #if the user didn't pick the atoms one by one, fall back on selected_atoms
-        if len(current_atoms) != 3:
-            current_atoms = [atom for atom in selected_atoms(self.session) if atom.structure is self.structure]
-        
-        if len(current_atoms) != 3:
-            self.session.logger.error("can only select three atoms on %s" % self.structure.atomspec)
+        current_atoms = [atom for atom in selected_atoms(self.session) if atom.structure is self.structure]
+        if len(current_atoms) > 2 or len(current_atoms) == 1:
+            self.session.logger.error("can only select two atoms on %s" % self.structure.atomspec)
             return
-
-        atom1, atom2, atom3 = current_atoms
-        for angle in self.constrained_angles:
-            if atom1 is angle[0] and atom2 is angle[1] and atom3 is angle[2]:
-                return
+        elif len(current_atoms) == 2:
+            atom1, atom2 = sorted(current_atoms)
+            for bond in self.constrained_bonds:
+                if atom1 in bond and atom2 in bond:
+                    return
+    
+            self.constrained_bonds.append((atom1, atom2))
+    
+            row = self.constrained_bond_table.rowCount()
+            self.constrained_bond_table.insertRow(row)
             
-            if atom1 is angle[2] and atom2 is angle[1] and atom3 is angle[0]:
-                return
-
-        self.constrained_angles.append((atom1, atom2, atom3))
-
-        row = self.constrained_angle_table.rowCount()
-        self.constrained_angle_table.insertRow(row)
-        
-        item1 = QTableWidgetItem()
-        item1.setData(Qt.DisplayRole, atom1.atomspec)
-        item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        self.constrained_angle_table.setItem(row, 0, item1)
-
-        item2 = QTableWidgetItem()
-        item2.setData(Qt.DisplayRole, atom2.atomspec)
-        item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        self.constrained_angle_table.setItem(row, 1, item2)
-
-        item3 = QTableWidgetItem()
-        item3.setData(Qt.DisplayRole, atom3.atomspec)
-        item3.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        self.constrained_angle_table.setItem(row, 2, item3)
-        
-        widget_that_lets_me_horizontally_align_an_icon = QWidget()
-        widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
-        trash_button = QLabel()
-        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-        trash_button.setToolTip("click to unfreeze")
-        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
-        widget_layout.setContentsMargins(2, 2, 2, 2)
-        self.constrained_angle_table.setCellWidget(row, 3, widget_that_lets_me_horizontally_align_an_icon)
-
-        self.constrained_angle_table.resizeRowToContents(row)
+            item1 = QTableWidgetItem()
+            item1.setData(Qt.DisplayRole, atom1.atomspec)
+            item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+            self.constrained_bond_table.setItem(row, 0, item1)
+    
+            item2 = QTableWidgetItem()
+            item2.setData(Qt.DisplayRole, atom2.atomspec)
+            item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+            self.constrained_bond_table.setItem(row, 1, item2)
+            
+            widget_that_lets_me_horizontally_align_an_icon = QWidget()
+            widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
+            trash_button = QLabel()
+            dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
+            trash_button.setToolTip("click to unfreeze")
+            widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+            widget_layout.setContentsMargins(2, 2, 2, 2)
+            self.constrained_bond_table.setCellWidget(row, 2, widget_that_lets_me_horizontally_align_an_icon)
+    
+            self.constrained_bond_table.resizeRowToContents(row)
 
         self.jobTypeChanged.emit()
-    
-    def constrain_bond_pair(self):
+   
+    def constrain_angles(self):
         """adds selected bonds to list of contrained angles"""
         #try to use ordered selection so that if the user selected 1 -> 2 -> 3, they appear in that order
         current_bonds = [bond for bond in selected_bonds(self.session) if bond.structure is self.structure]
+        current_bonds.extend([bond for bond in selected_pseudobonds(self.session) if bond.group.structure is self.structure])
         #if the user didn't pick the atoms one by one, fall back on selected_atoms
-        if len(current_bonds) != 2:
+        if len(current_bonds) != 2 and len(current_bonds) != 0:
             self.session.logger.error("can only select two bonds on %s" % self.structure.atomspec)
             return
-
-        current_atoms = []
-        atom2 = None
-        for bond in current_bonds:
-            for atom in bond.atoms:
-                if atom not in current_atoms:
-                    current_atoms.append(atom)
-                    
-                else:
-                    atom2 = atom
-                    
-        if atom2 is None:
-            self.session.logger.error("bonds must have one atom in common")
-            return
-        
-        current_atoms.remove(atom2)
-
-        atom1, atom3 = sorted(current_atoms)
-        for angle in self.constrained_angles:
-            if atom1 is angle[0] and atom2 is angle[1] and atom3 is angle[2]:
+        elif len(current_bonds) == 2:
+            current_atoms = []
+            atom2 = None
+            for bond in current_bonds:
+                for atom in bond.atoms:
+                    if atom not in current_atoms:
+                        current_atoms.append(atom)
+                        
+                    else:
+                        atom2 = atom
+                        
+            if atom2 is None:
+                self.session.logger.error("bonds must have one atom in common")
                 return
             
-            if atom1 is angle[2] and atom2 is angle[1] and atom3 is angle[0]:
-                return
-
-        self.constrained_angles.append((atom1, atom2, atom3))
-
-        row = self.constrained_angle_table.rowCount()
-        self.constrained_angle_table.insertRow(row)
+            current_atoms.remove(atom2)
+    
+            atom1, atom3 = sorted(current_atoms)
+            for angle in self.constrained_angles:
+                if atom1 is angle[0] and atom2 is angle[1] and atom3 is angle[2]:
+                    return
+                
+                if atom1 is angle[2] and atom2 is angle[1] and atom3 is angle[0]:
+                    return
+    
+            self.constrained_angles.append((atom1, atom2, atom3))
+    
+            row = self.constrained_angle_table.rowCount()
+            self.constrained_angle_table.insertRow(row)
+            
+            item1 = QTableWidgetItem()
+            item1.setData(Qt.DisplayRole, atom1.atomspec)
+            item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+            self.constrained_angle_table.setItem(row, 0, item1)
+    
+            item2 = QTableWidgetItem()
+            item2.setData(Qt.DisplayRole, atom2.atomspec)
+            item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+            self.constrained_angle_table.setItem(row, 1, item2)
+    
+            item3 = QTableWidgetItem()
+            item3.setData(Qt.DisplayRole, atom3.atomspec)
+            item3.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+            self.constrained_angle_table.setItem(row, 2, item3)
+            
+            widget_that_lets_me_horizontally_align_an_icon = QWidget()
+            widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
+            trash_button = QLabel()
+            dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
+            trash_button.setToolTip("click to unfreeze")
+            widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+            widget_layout.setContentsMargins(2, 2, 2, 2)
+            self.constrained_angle_table.setCellWidget(row, 3, widget_that_lets_me_horizontally_align_an_icon)
+    
+            self.constrained_angle_table.resizeRowToContents(row)
         
-        item1 = QTableWidgetItem()
-        item1.setData(Qt.DisplayRole, atom1.atomspec)
-        item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        self.constrained_angle_table.setItem(row, 0, item1)
-
-        item2 = QTableWidgetItem()
-        item2.setData(Qt.DisplayRole, atom2.atomspec)
-        item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        self.constrained_angle_table.setItem(row, 1, item2)
-
-        item3 = QTableWidgetItem()
-        item3.setData(Qt.DisplayRole, atom3.atomspec)
-        item3.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        self.constrained_angle_table.setItem(row, 2, item3)
+        #try to use ordered selection so that if the user selected 1 -> 2 -> 3, they appear in that order
+        current_atoms = [atom for atom in self.session.seqcrow_ordered_selection_manager.selection if atom.structure is self.structure]
+        #if the user didn't pick the atoms one by one, fall back on selected_atoms
+        if len(current_atoms) != 3:
+            current_atoms = [atom for atom in selected_atoms(self.session) if atom.structure is self.structure]
         
-        widget_that_lets_me_horizontally_align_an_icon = QWidget()
-        widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
-        trash_button = QLabel()
-        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-        trash_button.setToolTip("click to unfreeze")
-        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
-        widget_layout.setContentsMargins(2, 2, 2, 2)
-        self.constrained_angle_table.setCellWidget(row, 3, widget_that_lets_me_horizontally_align_an_icon)
-
-        self.constrained_angle_table.resizeRowToContents(row)
+        if len(current_atoms) != 3 and len(current_atoms) != 0:
+            self.session.logger.error("can only select three atoms on %s" % self.structure.atomspec)
+            return
+        elif len(current_atoms) == 3:
+            atom1, atom2, atom3 = current_atoms
+            for angle in self.constrained_angles:
+                if atom1 is angle[0] and atom2 is angle[1] and atom3 is angle[2]:
+                    return
+                
+                if atom1 is angle[2] and atom2 is angle[1] and atom3 is angle[0]:
+                    return
+    
+            self.constrained_angles.append((atom1, atom2, atom3))
+    
+            row = self.constrained_angle_table.rowCount()
+            self.constrained_angle_table.insertRow(row)
+            
+            item1 = QTableWidgetItem()
+            item1.setData(Qt.DisplayRole, atom1.atomspec)
+            item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+            self.constrained_angle_table.setItem(row, 0, item1)
+    
+            item2 = QTableWidgetItem()
+            item2.setData(Qt.DisplayRole, atom2.atomspec)
+            item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+            self.constrained_angle_table.setItem(row, 1, item2)
+    
+            item3 = QTableWidgetItem()
+            item3.setData(Qt.DisplayRole, atom3.atomspec)
+            item3.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+            self.constrained_angle_table.setItem(row, 2, item3)
+            
+            widget_that_lets_me_horizontally_align_an_icon = QWidget()
+            widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
+            trash_button = QLabel()
+            dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
+            trash_button.setToolTip("click to unfreeze")
+            widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+            widget_layout.setContentsMargins(2, 2, 2, 2)
+            self.constrained_angle_table.setCellWidget(row, 3, widget_that_lets_me_horizontally_align_an_icon)
+    
+            self.constrained_angle_table.resizeRowToContents(row)
 
         self.jobTypeChanged.emit()
     
-    def constrain_atom_quartet(self):
-        """adds selected atoms to list of contrained torsions"""
-        #try to use ordered selection so that if the user selected 1 -> 2 -> 3, they appear in that order
+    def constrain_torsions(self):
+        """adds selected bonds/atoms to list of constrained torsions"""
+        current_bonds = [bond for bond in selected_bonds(self.session) if bond.structure is self.structure]
+        current_bonds.extend([bond for bond in selected_pseudobonds(self.session) if bond.group.structure is self.structure])
+        #if the user didn't pick the atoms one by one, fall back on selected_atoms
+        if len(current_bonds) != 3 and len(current_bonds) != 0:
+            self.session.logger.error("can only select three bonds on %s" % self.structure.atomspec)
+            return
+        elif len(current_bonds) == 3:
+            current_atoms = []
+            atom2 = None
+            atom3 = None
+            for bond in current_bonds:
+                for atom in bond.atoms:
+                    if atom not in current_atoms:
+                        current_atoms.append(atom)
+                    else:
+                        if atom2 is None:
+                            atom2 = atom
+                        elif atom3 is None:
+                            atom3 = atom
+                            
+            if atom3 is None or atom3 == atom2:
+                #improper torsion
+                atom1, atom2, atom3, atom4 = current_atoms
+            
+            else:
+                current_atoms.remove(atom2)
+                current_atoms.remove(atom3)
+                
+                atom1 = [atom for atom in current_atoms if atom2 in atom.neighbors]
+                if len(atom1) < 1:
+                    for pbond in selected_pseudobonds(self.session):
+                        if atom2 in pbond.atoms and any(atom in pbond.atoms for atom in current_atoms):
+                            atom1 = pbond.other_atom(atom2)
+                else:
+                    atom1 = atom1[0]
+                
+                atom4 = [atom for atom in current_atoms if atom3 in atom.neighbors]
+                if len(atom4) < 1:
+                    for pbond in selected_pseudobonds(self.session):
+                        if atom3 in pbond.atoms and any(atom in pbond.atoms for atom in current_atoms):
+                            atom4 = pbond.other_atom(atom3)
+                else:
+                    atom4 = atom4[0]
+
+            for torsion in self.constrained_torsions:
+                if atom1 is torsion[0] and atom2 is torsion[1] and atom3 is torsion[2] and atom4 is torsion[3]:
+                    return
+                
+                if atom1 is torsion[3] and atom2 is torsion[2] and atom3 is torsion[1] and atom4 is torsion[0]:
+                    return
+    
+            self.constrained_torsions.append((atom1, atom2, atom3, atom4))
+    
+            row = self.constrained_torsion_table.rowCount()
+            self.constrained_torsion_table.insertRow(row)
+            
+            item1 = QTableWidgetItem()
+            item1.setData(Qt.DisplayRole, atom1.atomspec)
+            item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+            self.constrained_torsion_table.setItem(row, 0, item1)
+    
+            item2 = QTableWidgetItem()
+            item2.setData(Qt.DisplayRole, atom2.atomspec)
+            item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+            self.constrained_torsion_table.setItem(row, 1, item2)
+    
+            item3 = QTableWidgetItem()
+            item3.setData(Qt.DisplayRole, atom3.atomspec)
+            item3.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+            self.constrained_torsion_table.setItem(row, 2, item3)
+            
+            item4 = QTableWidgetItem()
+            item4.setData(Qt.DisplayRole, atom4.atomspec)
+            item4.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+            self.constrained_torsion_table.setItem(row, 3, item4)
+            
+            widget_that_lets_me_horizontally_align_an_icon = QWidget()
+            widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
+            trash_button = QLabel()
+            dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
+            trash_button.setToolTip("click to unfreeze")
+            widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+            widget_layout.setContentsMargins(2, 2, 2, 2)
+            self.constrained_torsion_table.setCellWidget(row, 4, widget_that_lets_me_horizontally_align_an_icon)
+            
+            self.constrained_torsion_table.resizeRowToContents(row)
+
         current_atoms = [atom for atom in self.session.seqcrow_ordered_selection_manager.selection if atom.structure is self.structure]
         #if the user didn't pick the atoms one by one, fall back on selected_atoms
         if len(current_atoms) != 4:
             current_atoms = [atom for atom in selected_atoms(self.session) if atom.structure is self.structure]
         
-        if len(current_atoms) != 4:
+        if len(current_atoms) != 4 and len(current_atoms) != 0:
             self.session.logger.error("can only select four atoms on %s" % self.structure.atomspec)
             return
-
-        atom1, atom2, atom3, atom4 = current_atoms
-        for torsion in self.constrained_torsions:
-            if atom1 is torsion[0] and atom2 is torsion[1] and atom3 is torsion[2] and atom4 is torsion[3]:
-                return
-            
-            if atom1 is torsion[3] and atom2 is torsion[2] and atom3 is torsion[1] and atom4 is torsion[0]:
-                return
-
-        self.constrained_torsions.append((atom1, atom2, atom3, atom4))
-
-        row = self.constrained_torsion_table.rowCount()
-        self.constrained_torsion_table.insertRow(row)
-        
-        item1 = QTableWidgetItem()
-        item1.setData(Qt.DisplayRole, atom1.atomspec)
-        item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        self.constrained_torsion_table.setItem(row, 0, item1)
-
-        item2 = QTableWidgetItem()
-        item2.setData(Qt.DisplayRole, atom2.atomspec)
-        item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        self.constrained_torsion_table.setItem(row, 1, item2)
-
-        item3 = QTableWidgetItem()
-        item3.setData(Qt.DisplayRole, atom3.atomspec)
-        item3.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        self.constrained_torsion_table.setItem(row, 2, item3)
-        
-        item4 = QTableWidgetItem()
-        item4.setData(Qt.DisplayRole, atom4.atomspec)
-        item4.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        self.constrained_torsion_table.setItem(row, 3, item4)
-        
-        widget_that_lets_me_horizontally_align_an_icon = QWidget()
-        widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
-        trash_button = QLabel()
-        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-        trash_button.setToolTip("click to unfreeze")
-        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
-        widget_layout.setContentsMargins(2, 2, 2, 2)
-        self.constrained_torsion_table.setCellWidget(row, 4, widget_that_lets_me_horizontally_align_an_icon)
-
-        self.constrained_torsion_table.resizeRowToContents(row)
-
-        self.jobTypeChanged.emit()
-    
-    def constrain_bond_trio(self):
-        """adds selected bonds to list of constrained torsions"""
-        current_bonds = [bond for bond in selected_bonds(self.session) if bond.structure is self.structure]
-        #if the user didn't pick the atoms one by one, fall back on selected_atoms
-        if len(current_bonds) != 3:
-            self.session.logger.error("can only select three bonds on %s" % self.structure.atomspec)
-            return
-
-        current_atoms = []
-        atom2 = None
-        atom3 = None
-        for bond in current_bonds:
-            for atom in bond.atoms:
-                if atom not in current_atoms:
-                    current_atoms.append(atom)
-                else:
-                    if atom2 is None:
-                        atom2 = atom
-                    elif atom3 is None:
-                        atom3 = atom
-                        
-        if atom3 is None or atom3 == atom2:
-            #improper torsion
+        elif len(current_atoms) == 4:
             atom1, atom2, atom3, atom4 = current_atoms
-        
-        else:
-            current_atoms.remove(atom2)
-            current_atoms.remove(atom3)
+            for torsion in self.constrained_torsions:
+                if atom1 is torsion[0] and atom2 is torsion[1] and atom3 is torsion[2] and atom4 is torsion[3]:
+                    return
+                
+                if atom1 is torsion[3] and atom2 is torsion[2] and atom3 is torsion[1] and atom4 is torsion[0]:
+                    return
+    
+            self.constrained_torsions.append((atom1, atom2, atom3, atom4))
+    
+            row = self.constrained_torsion_table.rowCount()
+            self.constrained_torsion_table.insertRow(row)
             
-            atom1 = [atom for atom in current_atoms if atom2 in atom.neighbors][0]
-            atom4 = [atom for atom in current_atoms if atom3 in atom.neighbors][0]
+            item1 = QTableWidgetItem()
+            item1.setData(Qt.DisplayRole, atom1.atomspec)
+            item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+            self.constrained_torsion_table.setItem(row, 0, item1)
+    
+            item2 = QTableWidgetItem()
+            item2.setData(Qt.DisplayRole, atom2.atomspec)
+            item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+            self.constrained_torsion_table.setItem(row, 1, item2)
+    
+            item3 = QTableWidgetItem()
+            item3.setData(Qt.DisplayRole, atom3.atomspec)
+            item3.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+            self.constrained_torsion_table.setItem(row, 2, item3)
             
-        for torsion in self.constrained_torsions:
-            if atom1 is torsion[0] and atom2 is torsion[1] and atom3 is torsion[2] and atom4 is torsion[3]:
-                return
+            item4 = QTableWidgetItem()
+            item4.setData(Qt.DisplayRole, atom4.atomspec)
+            item4.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+            self.constrained_torsion_table.setItem(row, 3, item4)
             
-            if atom1 is torsion[3] and atom2 is torsion[2] and atom3 is torsion[1] and atom4 is torsion[0]:
-                return
-
-        self.constrained_torsions.append((atom1, atom2, atom3, atom4))
-
-        row = self.constrained_torsion_table.rowCount()
-        self.constrained_torsion_table.insertRow(row)
-        
-        item1 = QTableWidgetItem()
-        item1.setData(Qt.DisplayRole, atom1.atomspec)
-        item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        self.constrained_torsion_table.setItem(row, 0, item1)
-
-        item2 = QTableWidgetItem()
-        item2.setData(Qt.DisplayRole, atom2.atomspec)
-        item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        self.constrained_torsion_table.setItem(row, 1, item2)
-
-        item3 = QTableWidgetItem()
-        item3.setData(Qt.DisplayRole, atom3.atomspec)
-        item3.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        self.constrained_torsion_table.setItem(row, 2, item3)
-        
-        item4 = QTableWidgetItem()
-        item4.setData(Qt.DisplayRole, atom4.atomspec)
-        item4.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        self.constrained_torsion_table.setItem(row, 3, item4)
-        
-        widget_that_lets_me_horizontally_align_an_icon = QWidget()
-        widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
-        trash_button = QLabel()
-        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
-        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-        trash_button.setToolTip("click to unfreeze")
-        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
-        widget_layout.setContentsMargins(2, 2, 2, 2)
-        self.constrained_torsion_table.setCellWidget(row, 4, widget_that_lets_me_horizontally_align_an_icon)
-        
-        self.constrained_torsion_table.resizeRowToContents(row)
+            widget_that_lets_me_horizontally_align_an_icon = QWidget()
+            widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
+            trash_button = QLabel()
+            dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
+            trash_button.setToolTip("click to unfreeze")
+            widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+            widget_layout.setContentsMargins(2, 2, 2, 2)
+            self.constrained_torsion_table.setCellWidget(row, 4, widget_that_lets_me_horizontally_align_an_icon)
+    
+            self.constrained_torsion_table.resizeRowToContents(row)
 
         self.jobTypeChanged.emit()
 
@@ -1990,15 +1984,20 @@ class JobTypeOption(QWidget):
 
 class FunctionalOption(QWidget):
     #TODO: make checking the "is_semiempirical" box disable the basis functions tab of the parent tab widget
+    #      dispersion names can be moved to EmpiricalDispersion
     GAUSSIAN_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D", "B3PW91", "B97-D", "BP86", "PBE0", "PM6", "AM1"]
-    GAUSSIAN_DISPERSION = ["Grimme D2", "Grimme D3", "Becke-Johnson damped Grimme D3", "Petersson-Frisch"]
+    GAUSSIAN_DISPERSION = ["Grimme D2", "Zero-damped Grimme D3", "Becke-Johnson damped Grimme D3", "Petersson-Frisch"]
     GAUSSIAN_GRIDS = ["Default", "SuperFineGrid", "UltraFine", "FineGrid"]
     
     ORCA_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D3", "B3PW91", "B97-D", "BP86", "PBE0", "HF-3c", "AM1"]
-    ORCA_DISPERSION = ["Grimme D2", "Undamped Grimme D3", "Becke-Johnson damped Grimme D3", "Grimme D4"]
+    ORCA_DISPERSION = ["Grimme D2", "Zero-damped Grimme D3", "Becke-Johnson damped Grimme D3", "Grimme D4"]
     ORCA_GRIDS = ["Default", "Grid7", "Grid6", "Grid5", "Grid4"]
 
     PSI4_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D", "B3PW91", "B97-D", "BP86", "PBE0", "CCSD", "CCSD(T)"]
+    PSI4_DISPERSION = ["Grimme D1", "Grimme D2", "Zero-damped Grimme D3", "Becke-Johnson damped Grimme D3", \
+                       "Becke-Johnson damped modified Grimme D3", "Chai & Head-Gordon", "Nonlocal Approximation", \
+                       "Pernal, Podeszwa, Patkowski, & Szalewicz", "Podeszwa, Katarzyna, Patkowski, & Szalewicz", \
+                       "Řezác, Greenwell, & Beran"]
     PSI4_GRIDS = ["Default", "(175, 974)", "(60, 770)", "(99, 590)", "(55, 590)", "(50, 434)", "(75, 302)"]
 
     functionalChanged = pyqtSignal()
@@ -2201,7 +2200,6 @@ class FunctionalOption(QWidget):
             self.functional_option.addItems(self.GAUSSIAN_FUNCTIONALS)
             self.functional_option.addItem("other")
             
-            self.dispersion.setEnabled(True)
             self.dispersion.addItem("None")
             self.dispersion.addItems(self.GAUSSIAN_DISPERSION)
             
@@ -2211,7 +2209,6 @@ class FunctionalOption(QWidget):
             self.functional_option.addItems(self.ORCA_FUNCTIONALS)
             self.functional_option.addItem("other")
             
-            self.dispersion.setEnabled(True)
             self.dispersion.addItem("None")
             self.dispersion.addItems(self.ORCA_DISPERSION)
             
@@ -2220,8 +2217,9 @@ class FunctionalOption(QWidget):
         elif program == "Psi4":
             self.functional_option.addItems(self.PSI4_FUNCTIONALS)
             self.functional_option.addItem("other")
-            #Psi4 doesn't seem to have an 'empirical dispersion' keyword like Gaussian or ORCA
-            self.dispersion.setEnabled(False)
+            
+            self.dispersion.addItem("None")
+            self.dispersion.addItems(self.PSI4_DISPERSION)
             
             self.grid.addItems(self.PSI4_GRIDS)
             
@@ -3679,10 +3677,14 @@ class TwoLayerKeyWordOption(QWidget):
         
         super().__init__(parent)
 
-        layout = QGridLayout(self)        
+        layout = QGridLayout(self)
         
         self.keyword_groupbox = QGroupBox(self.name)
-        self.keyword_layout = QGridLayout(self.keyword_groupbox)
+        self.keyword_groupbox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        keyword_layout = QGridLayout(self.keyword_groupbox)
+        keyword_layout.setContentsMargins(0, 0, 0, 0)
+        keyword_layout.setRowStretch(0, 1)
+        keyword_layout.setRowStretch(1, 0)
         
         self.previous_kw_table = QTableWidget()
         self.previous_kw_table.setColumnCount(2)
@@ -3691,7 +3693,8 @@ class TwoLayerKeyWordOption(QWidget):
         self.previous_kw_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.previous_kw_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.previous_kw_table.verticalHeader().setVisible(False)
-        self.keyword_layout.addWidget(self.previous_kw_table, 0, 0)
+        self.previous_kw_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        keyword_layout.addWidget(self.previous_kw_table, 0, 0)
         
         self.current_kw_table = QTableWidget()
         self.current_kw_table.setColumnCount(2)
@@ -3701,10 +3704,12 @@ class TwoLayerKeyWordOption(QWidget):
         self.current_kw_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.current_kw_table.verticalHeader().setVisible(False)
         self.current_kw_table.cellClicked.connect(self.clicked_current_route_keyword)
-        self.keyword_layout.addWidget(self.current_kw_table, 0, 1)
+        self.current_kw_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        keyword_layout.addWidget(self.current_kw_table, 0, 1)
 
         new_kw_widget = QWidget()
         new_kw_widgets_layout = QGridLayout(new_kw_widget)
+        new_kw_widgets_layout.setContentsMargins(4, 2, 4, 2)
         self.new_kw = QLineEdit()
         self.new_kw.setPlaceholderText("filter %s" % self.name)
         self.new_kw.textChanged.connect(self.apply_kw_filter)
@@ -3712,14 +3717,24 @@ class TwoLayerKeyWordOption(QWidget):
         self.new_kw.setClearButtonEnabled(True)
         add_kw_button = QPushButton("add")
         add_kw_button.clicked.connect(self.add_kw)
-        new_kw_widgets_layout.addWidget(QLabel("%s:" % self.name[:-1]), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
+        if self.name.endswith('s'):
+            new_kw_widgets_layout.addWidget(QLabel("%s:" % self.name[:-1]), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
+        else:
+            new_kw_widgets_layout.addWidget(QLabel("%s:" % self.name), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
         new_kw_widgets_layout.addWidget(self.new_kw, 0, 1)
         new_kw_widgets_layout.addWidget(add_kw_button, 0, 2)
-        self.keyword_layout.addWidget(new_kw_widget, 1, 0, 1, 2)
+        new_kw_widgets_layout.setColumnStretch(0, 0)
+        new_kw_widgets_layout.setColumnStretch(1, 1)
+        new_kw_widgets_layout.setColumnStretch(2, 0)
+        keyword_layout.addWidget(new_kw_widget, 1, 0, 1, 2)
         
 
         self.option_groupbox = QGroupBox("options")
+        self.option_groupbox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         option_layout = QGridLayout(self.option_groupbox)
+        option_layout.setContentsMargins(0, 0, 0, 0)
+        option_layout.setRowStretch(0, 1)
+        option_layout.setRowStretch(1, 0)
         
         self.previous_opt_table = QTableWidget()
         self.previous_opt_table.setColumnCount(2)
@@ -3728,6 +3743,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.previous_opt_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.previous_opt_table.verticalHeader().setVisible(False)
         self.previous_opt_table.cellActivated.connect(self.clicked_keyword_option)
+        self.previous_opt_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         option_layout.addWidget(self.previous_opt_table, 0, 0)
         
         self.current_opt_table = QTableWidget()
@@ -3738,10 +3754,12 @@ class TwoLayerKeyWordOption(QWidget):
         self.current_opt_table.cellClicked.connect(self.clicked_current_keyword_option)
         self.current_opt_table.cellChanged.connect(self.edit_current_opt)
         self.current_opt_table.verticalHeader().setVisible(False)
+        self.current_opt_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         option_layout.addWidget(self.current_opt_table, 0, 1)
 
         new_opt_widget = QWidget()
         new_opt_widgets_layout = QGridLayout(new_opt_widget)
+        new_opt_widgets_layout.setContentsMargins(4, 2, 4, 2)
         self.new_opt = QLineEdit()
         self.new_opt.setPlaceholderText("filter options")
         self.new_opt.textChanged.connect(self.apply_opt_filter)
@@ -3752,6 +3770,9 @@ class TwoLayerKeyWordOption(QWidget):
         new_opt_widgets_layout.addWidget(QLabel("option:"), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
         new_opt_widgets_layout.addWidget(self.new_opt, 0, 1)
         new_opt_widgets_layout.addWidget(add_opt_button, 0, 2)
+        new_opt_widgets_layout.setColumnStretch(0, 0)
+        new_opt_widgets_layout.setColumnStretch(1, 1)
+        new_opt_widgets_layout.setColumnStretch(2, 0)
         option_layout.addWidget(new_opt_widget, 1, 0, 1, 2)
 
         self.current_kw_table.itemSelectionChanged.connect(self.update_route_opts)
@@ -3787,7 +3808,8 @@ class TwoLayerKeyWordOption(QWidget):
         splitter.setChildrenCollapsible(True)
         splitter.addWidget(self.keyword_groupbox)
         splitter.addWidget(self.option_groupbox)
-        layout.addWidget(splitter, 0, 0, 1, 1, Qt.AlignTop)
+        splitter.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        layout.addWidget(splitter, 0, 0)
         layout.setContentsMargins(0, 0, 0, 0)
 
     def add_item_to_previous_kw_table(self, kw):
@@ -4169,7 +4191,7 @@ class KeywordOptions(QWidget):
             self.widgets[item] = self.get_options_for(item, last, previous)
             self.widgets[item].optionChanged.connect(self.something_changed)
             self.widgets[item].settingsChanged.connect(self.settings_changed)
-            self.layout.addWidget(self.widgets[item], 1, 0, Qt.AlignTop)
+            self.layout.addWidget(self.widgets[item], 1, 0)
 
         position_selector.currentTextChanged.connect(self.change_widget)            
         self.change_widget(position_selector.currentText())
@@ -4177,6 +4199,7 @@ class KeywordOptions(QWidget):
         self.layout.setContentsMargins(0, 0, 0, 0)        
         self.layout.setRowStretch(0, 0)
         self.layout.setRowStretch(1, 1)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
     
     def setKeywords(self, current_dict):
         for item in self.widgets.keys():
@@ -4321,11 +4344,11 @@ class GaussianKeywordOptions(KeywordOptions):
             else:
                 previous_dict = previous
                 
-            return TwoLayerKeyWordOption("link 0 commands", last_dict, previous_dict, "double click to use %%%s=%s", one_opt_per_kw=False)
+            return TwoLayerKeyWordOption("link 0", last_dict, previous_dict, "double click to use %%%s=%s", one_opt_per_kw=False)
     
 
 class ORCAKeywordOptions(KeywordOptions):
-    items = {'route': Method.ORCA_ROUTE, \
+    items = {'simple keywords': Method.ORCA_ROUTE, \
              'comment': Method.ORCA_COMMENT, \
              'blocks': Method.ORCA_BLOCKS, \
             }
@@ -4335,7 +4358,7 @@ class ORCAKeywordOptions(KeywordOptions):
 
     @classmethod
     def get_options_for(cls, name, last, previous):
-        if name == "route":
+        if name == "simple keywords":
             if last is None:
                 last_list = []
             else:
@@ -4377,7 +4400,8 @@ class ORCAKeywordOptions(KeywordOptions):
 
 class Psi4KeywordOptions(KeywordOptions):
     items = {'settings': Method.PSI4_SETTINGS, \
-             'before geometry': Method.PSI4_BEFORE_GEOM, \
+             'before molecule': Method.PSI4_BEFORE_GEOM, \
+             'molecule': Method.PSI4_COORDINATES, \
              'after job': Method.PSI4_AFTER_GEOM, \
              'comment': Method.PSI4_COMMENT, \
             }
@@ -4400,7 +4424,7 @@ class Psi4KeywordOptions(KeywordOptions):
                 
             return OneLayerKeyWordOption("after job", last_list, previous_list, multiline=True)
             
-        elif name == "before geometry":
+        elif name == "before molecule":
             if last is None:
                 last_list = []
             else:
@@ -4411,7 +4435,7 @@ class Psi4KeywordOptions(KeywordOptions):
             else:
                 previous_list = previous
                 
-            return OneLayerKeyWordOption("before geometry", last_list, previous_list, multiline=True)
+            return OneLayerKeyWordOption("before molecule", last_list, previous_list, multiline=True)
             
         elif name == "comment":
             if last is None:
@@ -4439,6 +4463,19 @@ class Psi4KeywordOptions(KeywordOptions):
                 
             return TwoLayerKeyWordOption("settings", last_dict, previous_dict, "double click to use \"set { %s %s }\"", one_opt_per_kw=True)
 
+        elif name == "molecule":
+            if last is None:
+                last_dict = {}
+            else:
+                last_dict = last
+            
+            if previous is None:
+                previous_dict = {}
+            else:
+                previous_dict = previous
+            
+            return TwoLayerKeyWordOption("molecule options", last_dict, previous_dict, "double click to use \"%s %s\"", one_opt_per_kw=True)
+
 
 class KeywordWidget(QWidget):
     additionalOptionsChanged = pyqtSignal()
@@ -4451,18 +4488,22 @@ class KeywordWidget(QWidget):
         self.layout = QGridLayout(self)
         
         self.gaussian_widget = GaussianKeywordOptions(self.settings)
+        self.gaussian_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.gaussian_widget.optionsChanged.connect(self.options_changed)
         self.layout.addWidget(self.gaussian_widget, 0, 0)
         
         self.orca_widget = ORCAKeywordOptions(self.settings)
+        self.orca_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.orca_widget.optionsChanged.connect(self.options_changed)
         self.layout.addWidget(self.orca_widget, 0, 0)
 
         self.psi4_widget = Psi4KeywordOptions(self.settings)
+        self.psi4_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.psi4_widget.optionsChanged.connect(self.options_changed)
         self.layout.addWidget(self.psi4_widget, 0, 0)
 
         self.setOptions(init_form)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
     
     def setOptions(self, program):
         self.form = program
@@ -4798,15 +4839,16 @@ class SavePreset(ChildToolWindow):
             
             basis_set = self.tool_instance.basis_widget.getBasis(update_settings=False)
             preset['basis'] = {'name':[], 'file':[], 'auxiliary':[], 'elements':[]}
-            for basis, elements in zip(basis_set.basis, basis_elements):
-                preset['basis']['name'].append(basis.name)
-                preset['basis']['file'].append(basis.user_defined)
-                preset['basis']['auxiliary'].append(basis.aux_type)
-                if elements == "current":
-                    preset['basis']['elements'].append(basis.elements)
-                else:
-                    preset['basis']['elements'].append([elements])
-                        
+            if basis_set.basis is not None:
+                for basis, elements in zip(basis_set.basis, basis_elements):
+                    preset['basis']['name'].append(basis.name)
+                    preset['basis']['file'].append(basis.user_defined)
+                    preset['basis']['auxiliary'].append(basis.aux_type)
+                    if elements == "current":
+                        preset['basis']['elements'].append(basis.elements)
+                    else:
+                        preset['basis']['elements'].append([elements])
+
             preset['ecp'] = {'name':[], 'file':[], 'elements':[]}
             if basis_set.ecp is not None:
                 for basis, elements in zip(basis_set.ecp, ecp_elements):
@@ -4965,8 +5007,8 @@ class PrepLocalJob(ChildToolWindow):
     def run_job(self):
         job_name = self.job_name.text().strip()
         
-        if len(job_name.strip()) == 0 or any(x in job_name for x in "\\/;'\"?<>,`~!@#$%^&*"):
-            self.session.logger.error("invalid job name: '%s'" % job_name)
+        if not job_name.replace(' ', '').replace('-', '').replace('_','').isalnum():
+            self.session.logger.error("invalid job name: '%s'\nmust be alphanumeric" % job_name)
             return
 
         auto_update = self.auto_update.currentText() == 'change model'

@@ -1,6 +1,8 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 from chimerax.core.tools import ToolInstance
+from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.ui.widgets import ColorButton
 from chimerax.bild.bild import read_bild
 from chimerax.core.models import ADD_MODELS, REMOVE_MODELS
@@ -11,6 +13,7 @@ from chimerax.core.commands.cli import FloatArg, TupleOf, IntArg
 from chimerax.core.commands import run
 
 from AaronTools.atoms import Atom
+from AaronTools.const import PHYSICAL
 from AaronTools.geometry import Geometry
 from AaronTools.trajectory import Pathway
 
@@ -18,13 +21,20 @@ from io import BytesIO
 
 from os.path import basename
 
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
+from matplotlib.backend_bases import MouseEvent
+from matplotlib.figure import Figure
+from matplotlib import rc as matplotlib_rc
+
+from PyQt5.Qt import QIcon, QStyle
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QValidator
 from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, QTabWidget, QComboBox, \
                             QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, \
-                            QFormLayout, QCheckBox, QHeaderView
+                            QFormLayout, QCheckBox, QHeaderView, QMenuBar, QAction, QFileDialog
 
-from ..managers import FILEREADER_CHANGE
+from SEQCROW.managers import FILEREADER_CHANGE
+from SEQCROW.tools.per_frame_plot import NavigationToolbar
 from SEQCROW.utils import iter2str
 
 #TODO:
@@ -33,13 +43,16 @@ from SEQCROW.utils import iter2str
 #  - vectors sometimes end up in the wrong place b/c 
 #    geom coords don't match model coords for opt + freq jobs
 
+matplotlib_rc('font',  **{'sans-serif' : 'Arial', 'family' : 'sans-serif'})
+
 class _NormalModeSettings(Settings):
     AUTO_SAVE = {
         'arrow_color': Value((0.0, 1.0, 0.0, 1.0), TupleOf(FloatArg, 4), iter2str),
-        'arrow_scale': Value(1.5, FloatArg, str),
-        'anim_scale': Value(0.2, FloatArg, str),
-        'anim_duration': Value(120, IntArg, str),
+        'arrow_scale': Value(1.5, FloatArg),
+        'anim_scale': Value(0.2, FloatArg),
+        'anim_duration': Value(120, IntArg),
         'anim_fps': Value(60, IntArg), 
+        'fwhm': Value(5, FloatArg), 
     }
 
 class FPSSpinBox(QSpinBox):
@@ -103,10 +116,10 @@ class NormalModes(ToolInstance):
     def __init__(self, session, name):
         super().__init__(session, name)
         
-        from chimerax.ui import MainToolWindow
         self.tool_window = MainToolWindow(self)        
         
         self.vec_mw_bool = False
+        self.ir_plot = None
         
         self.settings = _NormalModeSettings(session, name)
         
@@ -145,6 +158,8 @@ class NormalModes(ToolInstance):
         
         layout.addWidget(table)
         self.table = table
+        self.table.itemDoubleClicked.connect(self.highlight_ir_plot)
+        self.table.itemSelectionChanged.connect(self.highlight_ir_plot)
         
         #tab thing to select animation or vectors
         self.display_tabs = QTabWidget()
@@ -183,11 +198,12 @@ class NormalModes(ToolInstance):
         stop_anim_button.clicked.connect(self.stop_anim)
         vector_opts.addRow(stop_anim_button)
         
+        
         animate_tab = QWidget()
         anim_opts = QFormLayout(animate_tab)
         
         self.anim_scale = QDoubleSpinBox()
-        self.anim_scale.setSingleStep(0.1)
+        self.anim_scale.setSingleStep(0.05)
         self.anim_scale.setRange(0.01, 100.0)
         self.anim_scale.setValue(self.settings.anim_scale)
         self.anim_scale.setSuffix(" \u212B")
@@ -217,8 +233,33 @@ class NormalModes(ToolInstance):
         stop_anim_button.clicked.connect(self.stop_anim)
         anim_opts.addRow(stop_anim_button)
 
+        
+        ir_tab = QWidget()
+        ir_layout = QFormLayout(ir_tab)
+        
+        self.plot_type = QComboBox()
+        self.plot_type.addItems(['Absorbance', 'Transmittance'])
+        ir_layout.addRow("plot type:", self.plot_type)
+        
+        self.peak_type = QComboBox()
+        self.peak_type.addItems(['Gaussian', 'Lorentzian', 'Delta'])
+        ir_layout.addRow("peak type:", self.peak_type)
+        
+        self.fwhm = QDoubleSpinBox()
+        self.fwhm.setSingleStep(5)
+        self.fwhm.setRange(0.01, 200.0)
+        self.fwhm.setValue(self.settings.fwhm)
+        self.fwhm.setToolTip("width of peaks at half of their maximum value")
+        ir_layout.addRow("FWHM:", self.fwhm)
+        
+        show_plot = QPushButton("show plot")
+        show_plot.clicked.connect(self.show_ir_plot)
+        ir_layout.addRow(show_plot)
+        
+        
         self.display_tabs.addTab(vector_tab, "vectors")
         self.display_tabs.addTab(animate_tab, "animate")
+        self.display_tabs.addTab(ir_tab, "IR spectrum")
 
         layout.addWidget(self.display_tabs)
 
@@ -250,7 +291,6 @@ class NormalModes(ToolInstance):
         model = self.session.filereader_manager.get_model(fr)
         
         freq_data = fr.other['frequency'].data
-        self.rows = []
         
         for i, mode in enumerate(freq_data):
             row = self.table.rowCount()
@@ -258,8 +298,8 @@ class NormalModes(ToolInstance):
             
             freq = QTableWidgetItem()
             freq.setData(Qt.DisplayRole, round(mode.frequency, 2))
+            freq.setData(Qt.UserRole, i)
             self.table.setItem(row, 0, freq)
-            self.rows.append(freq)
             
             intensity = QTableWidgetItem()
             if mode.intensity is not None:
@@ -333,8 +373,9 @@ class NormalModes(ToolInstance):
         if len([mode for mode in modes if mode.column() == 0]) != 1:
             raise RuntimeError("one mode must be selected")
         else:
-            mode = modes[::2][0]
-            mode = self.rows.index(mode)
+            for m in modes:
+                if m.column() == 0:
+                    mode = m.data(Qt.UserRole)
 
         scale = self.vec_scale.value()
 
@@ -379,8 +420,9 @@ class NormalModes(ToolInstance):
         if len([mode for mode in modes if mode.column() == 0]) != 1:
             raise RuntimeError("one mode must be selected")
         else:
-            mode = modes[::2][0]
-            mode = self.rows.index(mode)
+            for m in modes:
+                if m.column() == 0:
+                    mode = m.data(Qt.UserRole)
 
         scale = self.anim_scale.value()
         frames = self.anim_duration.value()
@@ -450,9 +492,276 @@ class NormalModes(ToolInstance):
         run(self.session,
             'open %s' % self.help if self.help is not None else "")
     
+    def show_ir_plot(self):
+        if self.ir_plot is None:
+            self.ir_plot = self.tool_window.create_child_window("IR Plot", window_class=IRPlot)
+    
+    def highlight_ir_plot(self, *args):
+        if self.ir_plot is not None:
+            self.ir_plot.highlight(self.table.selectedItems())
+    
     def delete(self):
         """overload delete"""
         self.session.triggers.remove_handler(self._add_handler)
         self.session.triggers.remove_handler(self._refresh_handler)
         self.session.filereader_manager.triggers.remove_handler(self._fr_update_handler)
         super().delete()
+
+
+class IRPlot(ChildToolWindow):
+    def __init__(self, tool_instance, title, **kwargs):
+        super().__init__(tool_instance, title, statusbar=False, **kwargs)
+        
+        self.highlighted_mode = None
+        self._last_mouse_xy = None
+        self._dragged = False
+        self._min_drag = 10	
+        self._drag_mode = None
+        self.press = None
+        self.drag_prev = None
+        self.dragging = False
+        
+        self._build_ui()
+        self.refresh_plot()
+
+    def _build_ui(self):
+        
+        layout = QGridLayout()
+        
+        self.figure = Figure(figsize=(2,2))
+        self.canvas = Canvas(self.figure)
+        
+        ax = self.figure.add_axes((0.15, 0.20, 0.80, 0.70))
+        
+        self.canvas.mpl_connect('button_release_event', self.unclick)
+        self.canvas.mpl_connect('button_press_event', self.onclick)
+        self.canvas.mpl_connect('motion_notify_event', self.drag)
+        self.canvas.mpl_connect('scroll_event', self.zoom)
+        
+        self.canvas.setMinimumWidth(500)
+        self.canvas.setMinimumHeight(300)
+
+        layout.addWidget(self.canvas, 0, 0, 1, 2)
+
+        toolbar_widget = QWidget()
+        self.toolbar = NavigationToolbar(self.canvas, toolbar_widget)
+        self.toolbar.setMaximumHeight(24)
+        layout.addWidget(self.toolbar, 1, 1, 1, 1)
+        
+        refresh_button = QPushButton()
+        refresh_button.setIcon(QIcon(refresh_button.style().standardIcon(QStyle.SP_BrowserReload)))
+        refresh_button.clicked.connect(self.refresh_plot)
+        layout.addWidget(refresh_button, 1, 0, 1, 1, Qt.AlignTop)
+        
+        #menu bar for saving stuff
+        menu = QMenuBar()
+        file = menu.addMenu("&Export")
+        file.addAction("&Save CSV...")
+        
+        file.triggered.connect(self.save)
+        
+        menu.setNativeMenuBar(False)
+        
+        layout.setMenuBar(menu)        
+        self.ui_area.setLayout(layout)
+        self.manage(None)
+    
+    def save(self):
+        filename, _ = QFileDialog.getSaveFileName(filter="CSV Files (*.csv)")
+        if filename:
+            s = "frequency (cm^-1),IR intensity\n"
+            ax = self.figure.gca()
+            if len(ax.lines) > 0:
+                line = ax.lines[0]
+                for x, y in zip(line.get_xdata(), line.get_ydata()):
+                    s += "%f,%f\n" % (x, y)
+            
+            else:
+                fr = self.tool_instance.model_selector.currentData()
+                if fr is None:
+                    self.tool_instance.session.logger.error("no model selected")
+                    return 
+                
+                frequencies = [freq.frequency for freq in fr.other['frequency'].data]
+                intensities = [freq.intensity for freq in fr.other['frequency'].data]
+                for x, y in zip(frequencies, intensities):
+                    s += "%f,%f\n" % (x, y if y is not None else 0)
+
+            with open(filename, 'w') as f:
+                f.write(s.strip())
+                
+            self.tool_instance.session.logger.info("saved to %s" % filename)
+
+    def zoom(self, event):
+        if event.xdata is None:
+            return
+        a = self.figure.gca()
+        x0, x1 = a.get_xlim()
+        x_range = x1 - x0
+        xdiff = -0.05 * event.step * x_range
+        xshift = 0.2 * (event.xdata - (x0 + x1)/2)
+        nx0 = x0 - xdiff + xshift
+        nx1 = x1 + xdiff + xshift
+
+        a.set_xlim(nx0, nx1)
+        self.canvas.draw()
+
+    def drag(self, event):
+        if self.toolbar.mode != "":
+            return
+
+        if event.button is not None and self.press is not None:
+            x, y, xpress, ypress = self.press
+            dx = event.x - x
+            dy = event.y - y
+            drag_dist = np.linalg.norm([dx, dy])
+            if self.dragging or drag_dist >= self._min_drag or event.button == 2:
+                self.dragging = True
+                if self.drag_prev is not None:
+                    x, y, xpress, ypress = self.drag_prev
+                    dx = event.x - x
+                    dy = event.y - y
+                
+                self.drag_prev = event.x, event.y, event.xdata, event.ydata
+                self.move(dx, dy)
+
+    def move(self, dx, dy):
+        a = self.figure.gca()
+        w = self.figure.get_figwidth() * self.figure.get_dpi()
+        x0, x1 = a.get_xlim()
+        xs = dx/w * (x1-x0)
+        nx0, nx1 = x0-xs, x1-xs
+        #y0, y1 = a.get_ylim()
+        #ys = dy/h * (y1-y0)
+        #ny0, ny1 = y0-ys, y1-ys
+        a.set_xlim(nx0, nx1)
+        #a.set_ylim(ny0, ny1)
+        self.canvas.draw()
+
+    def onclick(self, event):
+        if self.toolbar.mode != "":
+            return
+
+        self.press = event.x, event.y, event.xdata, event.ydata
+
+    def unclick(self, event):
+        if self.toolbar.mode != "":
+            return
+
+        self.press = None
+        self.drag_prev = None
+        self.dragging = False
+
+    def refresh_plot(self):
+        fr = self.tool_instance.model_selector.currentData()
+        if fr is None:
+            return 
+
+        fwhm = self.tool_instance.fwhm.value()
+        self.tool_instance.settings.fwhm = fwhm
+        frequencies = [freq.frequency for freq in fr.other['frequency'].data if freq.frequency > 0]
+        intensities = [freq.intensity for freq in fr.other['frequency'].data if freq.frequency > 0]
+        
+        if self.tool_instance.peak_type.currentText() != "Delta":
+            functions = []
+            x_values = np.linspace(0, max(frequencies) - 10 * fwhm, num=200).tolist()
+            for freq, intensity in zip(frequencies, intensities):
+                if intensity is not None:
+                    #make sure to get x values near the peak
+                    #this makes the peaks look hi res, but we can cheap out
+                    #on areas where there's no peak
+                    x_values.extend(np.linspace(max(freq - (5 * fwhm), 0), 
+                                                freq + (5 * fwhm), 
+                                                num=100).tolist()
+                                    )
+                    x_values.append(freq)
+                    if self.tool_instance.peak_type.currentText() == "Gaussian":
+                        functions.append(lambda x, x0=freq, inten=intensity, w=fwhm: \
+                                        inten * np.exp(-4*np.log(2) * (x - x0)**2 / w**2))
+    
+                    elif self.tool_instance.peak_type.currentText() == "Lorentzian":
+                        functions.append(lambda x, x0=freq, inten=intensity, w=fwhm, : \
+                                        inten * 0.5 * (0.5 * w / ((x - x0)**2 + (0.5 * w)**2)))
+        
+            x_values = list(set(x_values))
+            #print(len(x_values), len(functions))
+            x_values.sort()
+            y_values = np.array([sum(f(x) for f in functions) for x in x_values])
+        
+        else:
+            x_values = []
+            y_values = []
+
+            for freq, intensity in zip(frequencies, intensities):
+                if intensity is not None:
+                    y_values.append(intensity)
+                    x_values.append(freq)
+
+            y_values = np.array(y_values)
+
+        if len(y_values) == 0:
+            self.tool_instance.session.logger.error("nothing to plot")
+            return
+
+        y_values /= np.amax(y_values)
+
+        ax = self.figure.gca()
+        ax.clear()
+        self.highlighted_mode = None
+
+        if self.tool_instance.plot_type.currentText() == "Transmittance":
+            y_values = np.array([10 ** (2 - 0.9*y) for y in y_values])
+            ax.set_ylabel('transmittance (%)')
+        else:
+            ax.set_ylabel('absorbance (a.u.)')
+       
+        ax.set_xlabel(r'wavenumber (cm$^{-1}$)')
+        if self.tool_instance.peak_type.currentText() != "Delta":
+            ax.plot(x_values, y_values, color='k', linewidth=0.5)
+        else:
+            if self.tool_instance.plot_type.currentText() == "Transmittance":
+                ax.vlines(x_values, y_values, [100 for y in y_values])
+                ax.hlines(100, 0, 4000)
+            
+            else:
+                ax.vlines(x_values, [0 for y in y_values], y_values)
+                ax.hlines(0, 0, 4000)
+
+        x_lim = ax.get_xlim()
+        ax.set_xlim(max(x_lim), min(x_lim))
+        
+        self.canvas.draw()
+
+    def highlight(self, items):
+        ax = self.figure.gca()
+        if self.highlighted_mode is not None and self.highlighted_mode in ax.collections:
+            ax.collections.remove(self.highlighted_mode)
+        
+        if len(items) == 0:
+            self.highlighted_mode = None
+            return
+        
+        fr = self.tool_instance.model_selector.currentData()
+        if fr is None:
+            return 
+
+        for item in items:
+            if item.column() == 0:
+                row = item.data(Qt.UserRole)
+        
+        frequency = [freq.frequency for freq in fr.other['frequency'].data][row]
+        
+        if ax.get_ylim()[1] > 50:
+            y_vals = (10**(2-0.9), 100)
+        else:
+            y_vals = (0, 1)
+            
+        self.highlighted_mode = ax.vlines(frequency, *y_vals, color='r')
+        
+        self.canvas.draw()
+
+    def cleanup(self):
+        self.tool_instance.ir_plot = None
+        
+        super().cleanup()
+

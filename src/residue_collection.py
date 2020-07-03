@@ -132,6 +132,11 @@ class Residue(Geometry):
         if refresh_connected:
             self.refresh_chix_connected(chix_residue)
 
+        for atom in chix_residue.atoms:
+            if atom.serial_number == -1:
+                atom.serial_number = atom.structure.atoms.index(atom) + 1
+
+
     def refresh_chix_connected(self, chix_residue):
         known_bonds = []
         known_chix_bonds = []

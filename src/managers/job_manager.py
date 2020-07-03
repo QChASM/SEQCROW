@@ -68,6 +68,31 @@ class JobManager(ProviderManager):
             with open(self.jobs_list_filename, 'r') as f:
                 queue_dict = load(f)
 
+            if 'check' in queue_dict:
+                for job in queue_dict['check']:
+                    if job['server'] == 'local':
+                        if job['format'] == 'Psi4':
+                            local_job = Psi4Job(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
+
+                        elif job['format'] == 'ORCA':
+                            local_job = ORCAJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
+
+                        elif job['format'] == 'Gaussian':
+                            local_job = GaussianJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
+
+                        if 'output' in job and os.path.exists(job['output']):
+                            fr = FileReader(job['output'], just_geom=False)
+                            if 'finished' in fr.other and fr.other['finished']:
+                                local_job.isFinished = lambda *args, **kwargs: True
+                            else:
+                                local_job.isRunning = lambda *args, **kwargs: True
+                                self.unknown_status_jobs.append(local_job)
+
+                            local_job.output_name = job['output']
+                            local_job.scratch_dir = job['scratch']
+
+                        self.local_jobs.append(local_job)
+
             for job in queue_dict['queued']:
                 if job['server'] == 'local':
                     if job['format'] == 'Psi4':
@@ -116,31 +141,6 @@ class JobManager(ProviderManager):
                         local_job.error = True
                         local_job.output_name = job['output']
                         local_job.scratch_dir = job['scratch']
-                        self.local_jobs.append(local_job)
-
-            if 'check' in queue_dict:
-                for job in queue_dict['check']:
-                    if job['server'] == 'local':
-                        if job['format'] == 'Psi4':
-                            local_job = Psi4Job(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
-
-                        elif job['format'] == 'ORCA':
-                            local_job = ORCAJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
-
-                        elif job['format'] == 'Gaussian':
-                            local_job = GaussianJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
-
-                        if 'output' in job and os.path.exists(job['output']):
-                            fr = FileReader(job['output'], just_geom=False)
-                            if 'finished' in fr.other and fr.other['finished']:
-                                local_job.isFinished = lambda *args, **kwargs: True
-                            else:
-                                local_job.isRunning = lambda *args, **kwargs: True
-                                self.unknown_status_jobs.append(local_job)
-
-                            local_job.output_name = job['output']
-                            local_job.scratch_dir = job['scratch']
-
                         self.local_jobs.append(local_job)
 
             if 'killed' in queue_dict:
@@ -250,7 +250,10 @@ class JobManager(ProviderManager):
                 job.theory.structure.active_coordset_id = job.theory.structure.num_coordsets
 
         elif job.auto_open:
-            run(job.session, "open \"%s\"" % job.output_name, log=False)
+            if hasattr(job, "output_name") and os.path.exists(job.output_name):
+                run(job.session, "open \"%s\" coordsets true" % job.output_name)
+            else:
+                self.session.logger.error("could not open output of %s" % repr(job))
             
         self.triggers.activate_trigger(JOB_QUEUED, trigger_name)
         pass

@@ -264,7 +264,7 @@ class JobQueue(ToolInstance):
         for ndx in ndxs:
             job = jobs[ndx]
             if hasattr(job, "output_name"):
-                run(job.session, "open \"%s\"" % job.output_name, log=False)
+                run(job.session, "open \"%s\" coordsets true" % job.output_name, log=False)
 
     def open_log(self):
         jobs = self.session.seqcrow_job_manager.jobs
@@ -320,7 +320,7 @@ class JobQueue(ToolInstance):
                                        "Job status unknown", \
                                        "%s was running the last time ChimeraX was closed.\n" % (str(job)) + \
                                        "If the job is still running, it might compete with other jobs for you computer's resources, " + \
-                                       "which could prevent any running job to error out.\n\n" + \
+                                       "which could cause any running job to error out.\n\n" + \
                                        "Has this job finished running?", \
                                        QMessageBox.Yes | QMessageBox.No)
             
