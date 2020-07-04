@@ -628,8 +628,8 @@ class BuildQM(ToolInstance):
         
         mdl = self.model_selector.currentData()
 
-        self.check_elements()
         self.job_widget.setStructure(mdl)
+        self.check_elements()
 
         if mdl in self.session.filereader_manager.filereader_dict:
             for fr in self.session.filereader_manager.filereader_dict[mdl]:
