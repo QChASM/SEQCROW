@@ -356,8 +356,9 @@ class NormalModes(ToolInstance):
             
         fr = self.model_selector.currentData()
         model = self.session.filereader_manager.get_model(fr)
-        mode = modes[::2][0]
-        mode = self.rows.index(mode)
+        for m in modes:
+            if m.column() == 0:
+                mode = m.data(Qt.UserRole)
         
         name = "%.2f cm^-1" % fr.other['frequency'].data[mode].frequency
         
@@ -495,6 +496,8 @@ class NormalModes(ToolInstance):
     def show_ir_plot(self):
         if self.ir_plot is None:
             self.ir_plot = self.tool_window.create_child_window("IR Plot", window_class=IRPlot)
+        else:
+            self.ir_plot.refresh_plot()
     
     def highlight_ir_plot(self, *args):
         if self.ir_plot is not None:
@@ -720,11 +723,11 @@ class IRPlot(ChildToolWindow):
             ax.plot(x_values, y_values, color='k', linewidth=0.5)
         else:
             if self.tool_instance.plot_type.currentText() == "Transmittance":
-                ax.vlines(x_values, y_values, [100 for y in y_values])
+                ax.vlines(x_values, y_values, [100 for y in y_values], linewidth=0.5)
                 ax.hlines(100, 0, 4000)
             
             else:
-                ax.vlines(x_values, [0 for y in y_values], y_values)
+                ax.vlines(x_values, [0 for y in y_values], y_values, linewidth=0.5)
                 ax.hlines(0, 0, 4000)
 
         x_lim = ax.get_xlim()
@@ -739,6 +742,7 @@ class IRPlot(ChildToolWindow):
         
         if len(items) == 0:
             self.highlighted_mode = None
+            self.canvas.draw()
             return
         
         fr = self.tool_instance.model_selector.currentData()
@@ -756,7 +760,7 @@ class IRPlot(ChildToolWindow):
         else:
             y_vals = (0, 1)
             
-        self.highlighted_mode = ax.vlines(frequency, *y_vals, color='r')
+        self.highlighted_mode = ax.vlines(frequency, *y_vals, color='r', zorder=-1)
         
         self.canvas.draw()
 
