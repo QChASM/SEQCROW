@@ -356,8 +356,9 @@ class NormalModes(ToolInstance):
             
         fr = self.model_selector.currentData()
         model = self.session.filereader_manager.get_model(fr)
-        mode = modes[::2][0]
-        mode = self.rows.index(mode)
+        for m in modes:
+            if m.column() == 0:
+                mode = m.data(Qt.UserRole)
         
         name = "%.2f cm^-1" % fr.other['frequency'].data[mode].frequency
         
