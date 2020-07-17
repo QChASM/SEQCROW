@@ -3928,21 +3928,24 @@ class TwoLayerKeyWordOption(QWidget):
         kw = opt.split('=')[0].strip()
         if kw in known_kw:
             for row in range(self.current_opt_table.rowCount() - 1, -1, -1):
-                print(row, self.current_opt_table.item(row, 0))
                 if self.current_opt_table.item(row, 0).data(Qt.DisplayRole).startswith(kw):
                     self.current_opt_table.removeRow(row)
             
+            remove = 0
             for i, item in enumerate(self.last_dict[self.selected_kw]):
                 if item.startswith(kw):
-                    del self.last_dict[self.selected_kw][i]
+                    remove = i
             
-        if self.one_opt_per_kw:
-            self.last_dict[self.selected_kw] = [opt]
-            for i in range(self.current_opt_table.rowCount() - 1, -1, -1):
-                self.current_opt_table.removeRow(i)
+            del self.last_dict[self.selected_kw][remove]
         
-        else:
-            self.last_dict[self.selected_kw].append(opt)
+        if opt not in self.last_dict[self.selected_kw]:
+            if self.one_opt_per_kw:
+                self.last_dict[self.selected_kw] = [opt]
+                for i in range(self.current_opt_table.rowCount() - 1, -1, -1):
+                    self.current_opt_table.removeRow(i)
+            
+            else:
+                self.last_dict[self.selected_kw].append(opt)
         
         self.optionChanged.emit()
 
@@ -4068,7 +4071,7 @@ class TwoLayerKeyWordOption(QWidget):
             item = self.current_opt_table.item(row, 0)
             opt = item.text()
             self.last_dict[self.selected_kw].remove(opt)
-                        
+
             self.current_opt_table.removeRow(row)
             
             self.optionChanged.emit()
