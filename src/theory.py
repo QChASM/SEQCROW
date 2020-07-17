@@ -41,6 +41,7 @@ class Method:
     PSI4_AFTER_GEOM = 3
     PSI4_COMMENT = 4
     PSI4_COORDINATES = 5
+    PSI4_JOB = 6
     
     GAUSSIAN_PRE_ROUTE = 1 #can be used for things like %chk=some.chk
     GAUSSIAN_ROUTE = 2 #route specifies most options, e.g. #n B3LYP/3-21G opt 
@@ -453,7 +454,9 @@ class Method:
 
         combined_dict = combine_dicts(other_kw_dict, basis_info)
         if self.grid is not None:
-            grid_info = self.grid.get_psi4()
+            grid_info, warning = self.grid.get_psi4()
+            if warning is not None:
+                warnings.append(warning)
             combined_dict = combine_dicts(combined_dict, grid_info)
 
         s = ""
@@ -470,11 +473,11 @@ class Method:
             s += "memory %i GB\n" % self.memory
 
         if self.PSI4_BEFORE_GEOM in combined_dict:
-            for opt in combined_dict[self.PSI4_BEFORE_GEOM]:
-                s += opt
+            if len(combined_dict[self.PSI4_BEFORE_GEOM]) > 0:
+                for opt in combined_dict[self.PSI4_BEFORE_GEOM]:
+                    s += opt
+                    s += '\n'
                 s += '\n'
-
-        s += '\n'
 
         s += "molecule {\n"
         s += "%2i %i\n" % (self.charge, self.multiplicity)
@@ -560,13 +563,32 @@ class Method:
 
             s += "}\n\n"
 
+        functional = self.functional.get_psi4()[0]
+        if self.empirical_dispersion is not None:
+            functional += self.empirical_dispersion.get_psi4()[0]
+
+        if self.PSI4_JOB in combined_dict:
+            for func in combined_dict[self.PSI4_JOB]:
+                if any(['return_wfn' in kwarg and ('True' in kwarg or 'on' in kwarg) \
+                        for kwarg in combined_dict[self.PSI4_JOB][func]]):
+                    s += "nrg, wfn = %s('%s'" % (func, functional)
+                else:
+                    s += "nrg = %s('%s'" % (func, functional)
+                
+                known_kw = []
+                for kw in combined_dict[self.PSI4_JOB][func]:
+                    key = kw.split('=')[0].strip()
+                    if key not in known_kw:
+                        known_kw.append(key)
+                        s += ", "
+                        s += kw.replace("$FUNCTIONAL", "'%s'" % functional)
+                
+                s += ")\n"
+
         if self.PSI4_AFTER_GEOM in combined_dict:
-            functional = self.functional.get_psi4()[0]
-            if self.empirical_dispersion is not None:
-                functional += self.empirical_dispersion.get_psi4()[0]
             for opt in combined_dict[self.PSI4_AFTER_GEOM]:
                 if "$FUNCTIONAL" in opt:
-                    opt = opt.replace("$FUNCTIONAL", functional)
+                    opt = opt.replace("$FUNCTIONAL", "'%s'" % functional)
 
                 s += opt
                 s += '\n'
@@ -1117,7 +1139,7 @@ class Method:
                 s += opt
                 s += '\n'
 
-        s += '\n'
+            s += '\n'
 
         s += "molecule {\n"
         s += "%2s %s\n" % (json_dict['charge'], json_dict['multiplicity'])
@@ -1193,13 +1215,33 @@ class Method:
 
             s += "}\n\n"
 
+
+        functional = json_dict['functional']
+        if json_dict['empirical_dispersion'] is not None:
+            functional += json_dict['empirical_dispersion']
+
+        if str(cls.PSI4_JOB) in combined_dict:
+            for func in combined_dict[str(cls.PSI4_JOB)]:
+                if any(['return_wfn' in kwarg and ('True' in kwarg or 'on' in kwarg) \
+                        for kwarg in combined_dict[str(cls.PSI4_JOB)][func]]):
+                    s += "nrg, wfn = %s('%s'" % (func, functional)
+                else:
+                    s += "nrg = %s('%s'" % (func, functional)
+                
+                known_kw = []
+                for kw in combined_dict[str(cls.PSI4_JOB)][func]:
+                    key = kw.split('=')[0].strip()
+                    if key not in known_kw:
+                        known_kw.append(key)
+                        s += ", "
+                        s += kw.replace("$FUNCTIONAL", "'%s'" % functional)
+                
+                s += ")\n"
+
         if str(cls.PSI4_AFTER_GEOM) in combined_dict:
-            functional = json_dict['functional']
-            if json_dict['empirical_dispersion'] is not None:
-                function += json_dict['empirical_dispersion']
             for opt in combined_dict[str(cls.PSI4_AFTER_GEOM)]:
                 if "$FUNCTIONAL" in opt:
-                    opt = opt.replace("$FUNCTIONAL", json_dict['functional'])
+                    opt = opt.replace("$FUNCTIONAL", functional)
 
                 s += opt
                 s += '\n'
@@ -1617,7 +1659,10 @@ class BasisSet:
                 
                 s += "\n\n%s" % s4
         
-        info = {Method.PSI4_BEFORE_GEOM:[s]}
+        if len(s) > 0:
+            info = {Method.PSI4_BEFORE_GEOM:[s]}
+        else:
+            info = {}
 
         return info
 
@@ -2107,4 +2152,4 @@ class IntegrationGrid:
 
     def get_psi4(self):
         radial, spherical = [x.strip() for x in self.name[1:-1].split(', ')]
-        return {Method.PSI4_SETTINGS:{'dft_radial_points':[radial], 'dft_spherical_points':[spherical]}}
+        return ({Method.PSI4_SETTINGS:{'dft_radial_points':[radial], 'dft_spherical_points':[spherical]}}, None)

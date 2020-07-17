@@ -25,6 +25,7 @@ def open_aarontools(session, path, format_name=None, coordsets=False):
     geom.name = path_split(path)[-1]
 
     structure = geom.get_chimera(session, coordsets=(f.all_geom is not None and len(f.all_geom) > 1), filereader=f)
+    structure.filename = path
     #associate the AaronTools FileReader with each structure
     session.filereader_manager.triggers.activate_trigger(FILEREADER_ADDED, ([structure], [f]))
 

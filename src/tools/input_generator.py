@@ -99,7 +99,17 @@ class _InputGeneratorSettings(Settings):
                                                                                 ['true', 'false'], \
                                                                    }, \
                                                                    Method.PSI4_BEFORE_GEOM: [], \
-                                                                   Method.PSI4_AFTER_GEOM: ["nrg, wfn = energy('$FUNCTIONAL', return_wfn=True)"], \
+                                                                   Method.PSI4_JOB: {'energy': \
+                                                                                        ['return_wfn=True'], \
+                                                                                     'optimize': \
+                                                                                        ['return_wfn=True', "engine='geometric'"], \
+                                                                                     'gradient': \
+                                                                                        ['return_wfn=True'], \
+                                                                                     'frequencies': \
+                                                                                        ['return_wfn=True', \
+                                                                                         'dertype=\'gradient\'', 'dertype=\'energy\''\
+                                                                                        ], \
+                                                                                    }, \
                                                                    Method.PSI4_COMMENT: [], \
                                                                    Method.PSI4_COORDINATES: {'units':['angstrom', 'bohr'], 
                                                                                              'pubchem':['benzene'], 
@@ -1878,7 +1888,7 @@ class JobTypeOption(QWidget):
 
             return {Method.GAUSSIAN_PRE_ROUTE:link0, Method.GAUSSIAN_ROUTE:route}
 
-        if self.form == "ORCA":
+        elif self.form == "ORCA":
             route = []
             blocks = {}
             if self.do_geom_opt.checkState() == Qt.Checked:
@@ -1927,23 +1937,22 @@ class JobTypeOption(QWidget):
                 self.settings.last_raman = self.raman.checkState() == Qt.Checked
 
             return {Method.ORCA_ROUTE:route, Method.ORCA_BLOCKS:blocks}
-            
+
         elif self.form == "Psi4":
             settings = {}
-            after_geom = []
+            job = {}
             
             if self.do_geom_opt.checkState() == Qt.Checked:
-                after_geom.append("nrg, wfn = optimize('$FUNCTIONAL', return_wfn=True)")
+                job['optimize'] = []
                 
                 if self.ts_opt.checkState() == Qt.Checked:
                     settings['opt_type'] = ['ts']
                     
             
             if self.do_freq.checkState() == Qt.Checked:
+                job['frequencies'] = []
                 if self.num_freq.checkState() == Qt.Checked:
-                    after_geom.append("nrg, wfn = frequencies('$FUNCTIONAL', return_wfn=True, dertype='gradient')")
-                else:
-                    after_geom.append("nrg, wfn = frequencies('$FUNCTIONAL', return_wfn=True)")
+                    job['frequencies'].append('dertype="gradient"')
 
             if update_settings:
                 self.settings.last_nproc = self.nprocs.value()
@@ -1952,9 +1961,8 @@ class JobTypeOption(QWidget):
                 self.settings.last_ts = self.ts_opt.checkState() == Qt.Checked
                 self.settings.last_freq = self.do_freq.checkState() == Qt.Checked
                 self.settings.last_num_freq = self.num_freq.checkState() == Qt.Checked
-                self.settings.last_raman = self.raman.checkState() == Qt.Checked
                 
-            info = {Method.PSI4_AFTER_GEOM:after_geom}
+            info = {Method.PSI4_JOB:job}
             if len(settings.keys()) > 0:
                 info[Method.PSI4_SETTINGS] = settings
             
@@ -3908,16 +3916,35 @@ class TwoLayerKeyWordOption(QWidget):
         #prevent edit signal from triggering
         #it should break anything, but we don't need it
         self.current_opt_table.blockSignals(True)
-        if opt not in self.last_dict[self.selected_kw]:
-            if self.one_opt_per_kw:
-                self.last_dict[self.selected_kw] = [opt]
-                for i in range(self.current_opt_table.rowCount(), -1, -1):
-                    self.current_opt_table.removeRow(i)
-            
-            else:
-                self.last_dict[self.selected_kw].append(opt)
         
-            self.optionChanged.emit()
+        #check keywords to see if opt is already one of them
+        #this is really just for psi4, as they are basically the only one to use
+        #a '=' for the 'job' options
+        #though gaussian may also use this for some route options, but it should still
+        #be fine as you can't specify e.g. grid=99302 and grid=superfinegrid
+        #if the keyword is already on the table, remove that item
+        known_kw = [self.current_opt_table.item(row, 0).data(Qt.DisplayRole).split('=')[0] \
+                    for row in range(0, self.current_opt_table.rowCount())]
+        kw = opt.split('=')[0].strip()
+        if kw in known_kw:
+            for row in range(self.current_opt_table.rowCount() - 1, -1, -1):
+                print(row, self.current_opt_table.item(row, 0))
+                if self.current_opt_table.item(row, 0).data(Qt.DisplayRole).startswith(kw):
+                    self.current_opt_table.removeRow(row)
+            
+            for i, item in enumerate(self.last_dict[self.selected_kw]):
+                if item.startswith(kw):
+                    del self.last_dict[self.selected_kw][i]
+            
+        if self.one_opt_per_kw:
+            self.last_dict[self.selected_kw] = [opt]
+            for i in range(self.current_opt_table.rowCount() - 1, -1, -1):
+                self.current_opt_table.removeRow(i)
+        
+        else:
+            self.last_dict[self.selected_kw].append(opt)
+        
+        self.optionChanged.emit()
 
         row = self.current_opt_table.rowCount()
         self.current_opt_table.insertRow(row)
@@ -3934,7 +3961,7 @@ class TwoLayerKeyWordOption(QWidget):
         widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
         widget_layout.setContentsMargins(2, 2, 2, 2)
         self.current_opt_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
-    
+        
         self.current_opt_table.resizeRowToContents(row)
         self.current_opt_table.resizeColumnToContents(0)
         self.current_opt_table.resizeColumnToContents(1)
@@ -4404,6 +4431,7 @@ class Psi4KeywordOptions(KeywordOptions):
              'molecule': Method.PSI4_COORDINATES, \
              'after job': Method.PSI4_AFTER_GEOM, \
              'comment': Method.PSI4_COMMENT, \
+             'job': Method.PSI4_JOB, \
             }
 
     previous_option_name = "previous_psi4_options"
@@ -4411,6 +4439,19 @@ class Psi4KeywordOptions(KeywordOptions):
 
     @classmethod
     def get_options_for(cls, name, last, previous):
+        if name == "job":
+            if last is None:
+                last_dict = {}
+            else:
+                last_dict = last
+            
+            if previous is None:
+                previous_dict = {}
+            else:
+                previous_dict = previous
+                
+            return TwoLayerKeyWordOption("job", last_dict, previous_dict, "double click to use \"%s(%s)\"", one_opt_per_kw=False)
+        
         if name == "after job":
             if last is None:
                 last_list = []

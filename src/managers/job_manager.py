@@ -37,8 +37,7 @@ class JobManager(ProviderManager):
         self.triggers.add_handler(JOB_STARTED, self.job_started)
         self.triggers.add_trigger(JOB_QUEUED)
         self.triggers.add_handler(JOB_QUEUED, self.check_queue)
-        #switch write_json triggers for debugging
-        #self.triggers.add_handler(JOB_QUEUED, self.write_json)
+        self.triggers.add_handler(JOB_QUEUED, self.write_json)
         self.session.triggers.add_handler('app quit', self.write_json)
 
     def __setattr__(self, attr, val):

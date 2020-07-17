@@ -32,6 +32,7 @@ def seqcrow_bse(session):
     geoms = session.models.list(type=AtomicStructure)
     
     for geom in geoms:
+        geom.ball_scale = 0.4
         for bond in geom.bonds:
             bond.halfbond = True
             bond.radius = 0.16
@@ -47,12 +48,13 @@ def seqcrow_bse(session):
             
             if ele in RADII:
                 #AaronTools has bonding radii, maybe I should use vdw?
-                atom.radius = 1.6*RADII[ele]
+                #check to see how necessary this is
+                atom.radius = RADII[ele]
             
             if ele != 'H':
                 atom.draw_mode = Atom.BALL_STYLE
             elif len(atom.neighbors) > 1:
-                atom.radius = 1.0
+                atom.radius = 0.625
                 atom.draw_mode = Atom.BALL_STYLE
             else:
                 atom.draw_mode = Atom.STICK_STYLE
@@ -74,7 +76,7 @@ def seqcrow_s(session):
     lighting_profile.key_light_intensity = 1.
     lighting_profile.depth_cue = True
     lighting_profile.shadows = True
-    lighting_profile.multishadow = 8
+    lighting_profile.multishadow = 64
     lighting_profile.multishadow_map_size = 1024
     lighting_profile.multishadow_depth_bias = 0.01
     lighting_profile.fill_light_intensity = 0.5
@@ -90,6 +92,7 @@ def seqcrow_s(session):
     geoms = session.models.list(type=AtomicStructure)
     
     for geom in geoms:
+        geom.ball_scale = 0.625
         for bond in geom.bonds:
             bond.halfbond = True
             bond.radius = 0.25
@@ -106,7 +109,7 @@ def seqcrow_s(session):
             if len(atom.neighbors) == 0:
                 atom.draw_mode = Atom.BALL_STYLE
                 if ele in RADII:
-                    atom.radius = 2.5*RADII[ele]
+                    atom.radius = RADII[ele]
             
             else:
                 atom.draw_mode = Atom.STICK_STYLE
