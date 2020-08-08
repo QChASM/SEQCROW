@@ -62,7 +62,7 @@ class JobManager(ProviderManager):
 
     def init_queue(self):
         scr_dir = os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR)
-        self.jobs_list_filename = os.path.join(scr_dir, "job_list.json")
+        self.jobs_list_filename = os.path.join(scr_dir, "job_list-2.json")
         if os.path.exists(self.jobs_list_filename):
             with open(self.jobs_list_filename, 'r') as f:
                 queue_dict = load(f)

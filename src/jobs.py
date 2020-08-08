@@ -5,7 +5,7 @@ from PyQt5.QtCore import QThread, pyqtSignal
 
 from time import asctime, localtime
 
-from SEQCROW.theory import Method
+from SEQCROW.theory import SEQCROW_Theory
 
 from sys import platform
 
@@ -14,7 +14,7 @@ class LocalJob(QThread):
         """base class of local ORCA, Gaussian, and Psi4 jobs
         name        str - name of job
         session     chimerax session object
-        theory      SEQCROW.theory.Method or a dictionary with a saved job's settings
+        theory      SEQCROW.theory.SEQCROW_Theory or a dictionary with a saved job's settings
         kw_dict     dictionary - everything that isn't in self.theory (not used if theory is a dict)
         """
         self.name = name
@@ -74,10 +74,10 @@ class ORCAJob(LocalJob):
 
         infile = self.name + '.inp'
         infile = infile.replace(' ', '_')
-        if isinstance(self.theory, Method):
-            self.theory.write_orca_input(self.kw_dict, os.path.join(self.scratch_dir, infile))
+        if isinstance(self.theory, SEQCROW_Theory):
+            self.theory.write_orca_input(fname=os.path.join(self.scratch_dir, infile), **self.kw_dict)
         else:
-            Method.orca_input_from_dict(self.theory, os.path.join(self.scratch_dir, infile))
+            SEQCROW_Theory.orca_input_from_dict(self.theory, os.path.join(self.scratch_dir, infile))
 
         executable = os.path.abspath(self.session.seqcrow_settings.settings.ORCA_EXE)
         if not os.path.exists(executable):
@@ -110,8 +110,8 @@ class ORCAJob(LocalJob):
     def get_json(self):
         if self.start_time is None:
             #we don't need to keep the theory stuff around if the job has started
-            if isinstance(self.theory, Method):
-                d = self.theory.get_orca_json(self.kw_dict)
+            if isinstance(self.theory, SEQCROW_Theory):
+                d = self.theory.get_orca_json(**self.kw_dict)
             else:
                 d = self.theory.copy()
         else:
@@ -148,10 +148,10 @@ class GaussianJob(LocalJob):
             os.makedirs(self.scratch_dir)
 
         infile = self.name + '.gjf'
-        if isinstance(self.theory, Method):
-            self.theory.write_gaussian_input(self.kw_dict, os.path.join(self.scratch_dir, infile))
+        if isinstance(self.theory, SEQCROW_Theory):
+            self.theory.write_gaussian_input(fname=os.path.join(self.scratch_dir, infile), **self.kw_dict)
         else:
-            Method.gaussian_input_from_dict(self.theory, os.path.join(self.scratch_dir, infile))
+            SEQCROW_Theory.gaussian_input_from_dict(self.theory, os.path.join(self.scratch_dir, infile))
             
         executable = os.path.abspath(self.session.seqcrow_settings.settings.GAUSSIAN_EXE)
         if not os.path.exists(executable):
@@ -177,8 +177,8 @@ class GaussianJob(LocalJob):
     def get_json(self):
         if self.start_time is None:
             #we don't need to keep the theory stuff around if the job has started
-            if isinstance(self.theory, Method):
-                d = self.theory.get_gaussian_json(self.kw_dict)
+            if isinstance(self.theory, SEQCROW_Theory):
+                d = self.theory.get_gaussian_json(**self.kw_dict)
             else:
                 d = self.theory.copy()
 
@@ -216,10 +216,10 @@ class Psi4Job(LocalJob):
             os.makedirs(self.scratch_dir)
 
         infile = self.name + '.in'
-        if isinstance(self.theory, Method):
-            self.theory.write_psi4_input(self.kw_dict, os.path.join(self.scratch_dir, infile))
+        if isinstance(self.theory, SEQCROW_Theory):
+            self.theory.write_psi4_input(fname=os.path.join(self.scratch_dir, infile), **self.kw_dict)
         else:
-            Method.psi4_input_from_dict(self.theory, os.path.join(self.scratch_dir, infile))
+            SEQCROW_Theory.psi4_input_from_dict(self.theory, os.path.join(self.scratch_dir, infile))
 
         executable = os.path.abspath(self.session.seqcrow_settings.settings.PSI4_EXE)
         if not os.path.exists(executable):
@@ -245,8 +245,8 @@ class Psi4Job(LocalJob):
     def get_json(self):
         if self.start_time is None:
             #we don't need to keep the theory stuff around if the job has started
-            if isinstance(self.theory, Method):
-                d = self.theory.get_psi4_json(self.kw_dict)
+            if isinstance(self.theory, SEQCROW_Theory):
+                d = self.theory.get_psi4_json(**self.kw_dict)
             else:
                 d = self.theory.copy()
 
