@@ -4921,9 +4921,13 @@ class SavePreset(ChildToolWindow):
             preset['mem'] = mem
         
         if self.solvent.checkState() == Qt.Checked:
-            solvent = self.tool_instance.job_widget.getSolvent()
-            preset['solvent model'] = solvent.name
-            preset['solvent'] = solvent.solvent
+            solvent = self.tool_instance.job_widget.getSolvent(update_settings=False)
+            if solvent is not None:
+                preset['solvent model'] = solvent.name
+                preset['solvent'] = solvent.solvent
+            else:
+                preset['solvent model'] = 'None'
+                preset['solvent'] = ''
         
         if self.method.checkState() == Qt.Checked:
             method = self.tool_instance.method_widget.getMethod(update_settings=False)
