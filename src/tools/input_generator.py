@@ -56,9 +56,9 @@ class _InputGeneratorSettings(Settings):
         'last_ecp_path': Value("", StringArg),
         'last_number_ecp': Value(0, IntArg),
         'previous_method': Value("", StringArg),
-        'previous_custom_func': Value("", StringArg),
-        'previous_method_names': Value([], ListOf(StringArg), iter2str),
-        'previous_method_needs_basis': Value([], ListOf(BoolArg), iter2str),
+        'previous_custom_func': Value("", StringArg),       
+        'previous_functional_names': Value([], ListOf(StringArg), iter2str),
+        'previous_functional_needs_basis': Value([], ListOf(BoolArg), iter2str),
         'previous_dispersion': Value("None", StringArg),
         'previous_grid': Value("Default", StringArg),
         'previous_charge': Value(0, IntArg),
@@ -103,6 +103,7 @@ class _InputGeneratorSettings(Settings):
                                                                                 ['true', 'false'], \
                                                                    }, \
                                                                    PSI4_BEFORE_GEOM: [], \
+                                                                   PSI4_BEFORE_JOB: ['activate(auto_fragments())'], \
                                                                    PSI4_JOB: {'energy': \
                                                                                         ['return_wfn=True', 'dft_method=pbe0'], \
                                                                                      'optimize': \
@@ -1227,6 +1228,7 @@ class JobTypeOption(QWidget):
             ndx = self.solvent_option.findText(self.settings.previous_solvent_model)
             if ndx >= 0:
                 self.solvent_option.setCurrentIndex(ndx)
+            self.solvent_name.setText(self.settings.previous_solvent_name)
             self.job_type_opts.setTabEnabled(3, True)
             self.use_checkpoint.setEnabled(True)
             self.chk_file_path.setEnabled(True)
@@ -1238,11 +1240,14 @@ class JobTypeOption(QWidget):
             self.hpmodes.setEnabled(False)
             self.raman.setToolTip("ask ORCA to compute Raman intensities")
             self.raman.setEnabled(True)
-            self.solvent_names.addItems(ImplicitSolvent.KNOWN_ORCA_SMD_SOLVENTS)
-            ndx = self.solvent_option.findText(self.settings.previous_orca_solvent_model)
+            if self.settings.previous_solvent_model == "SMD":
+                self.solvent_names.addItems(ImplicitSolvent.KNOWN_ORCA_SMD_SOLVENTS)
+            else:
+                self.solvent_names.addItems(ImplicitSolvent.KNOWN_ORCA_CPCM_SOLVENTS)
+            ndx = self.solvent_option.findText(self.settings.previous_solvent_model)
             if ndx >= 0:
                 self.solvent_option.setCurrentIndex(ndx)
-            self.solvent_name.setText(self.settings.previous_orca_solvent_name)
+            self.solvent_name.setText(self.settings.previous_solvent_name)
             self.job_type_opts.setTabEnabled(3, True)
             self.use_checkpoint.setEnabled(False)
             self.chk_file_path.setEnabled(False)
@@ -1408,10 +1413,6 @@ class JobTypeOption(QWidget):
         if ndx >= 0:
             self.solvent_option.setCurrentIndex(ndx)
 
-    def setSolvent(self, value):
-        """sets solvent to value"""
-        self.solvent_name.setText(value)
-
     def getGeometryOptimization(self):
         """returns whether the job type is opt"""
         return self.do_geom_opt.checkState() == Qt.Checked
@@ -1448,6 +1449,8 @@ class JobTypeOption(QWidget):
         """returns ImplicitSolvent for the current solvent settings"""
         model = self.solvent_option.currentText()
         if model == "None":
+            if update_settings:
+                self.settings.previous_solvent_model = "None"
             return None
             
         solvent = self.solvent_name.text()
@@ -2079,7 +2082,8 @@ class MethodOption(QWidget):
         self.previously_used_table.setEditTriggers(self.previously_used_table.NoEditTriggers)
         self.previously_used_table.setSelectionMode(self.previously_used_table.SingleSelection)
         self.previously_used_table.setSortingEnabled(True)
-        for i, (name, basis_required) in enumerate(zip(self.settings.previous_method_names, self.settings.previous_method_needs_basis)):
+        
+        for name, basis_required in zip(self.settings.previous_functional_names, self.settings.previous_functional_needs_basis):
             row = self.previously_used_table.rowCount()
             self.add_previously_used(row, name, basis_required)
 
@@ -4478,6 +4482,7 @@ class Psi4KeywordOptions(KeywordOptions):
     items = {'settings': PSI4_SETTINGS, \
              'before molecule': PSI4_BEFORE_GEOM, \
              'molecule': PSI4_COORDINATES, \
+             'optking': PSI4_OPTKING, \
              'before job': PSI4_BEFORE_JOB, \
              'job': PSI4_JOB, \
              'after job': PSI4_AFTER_JOB, \
@@ -4574,6 +4579,19 @@ class Psi4KeywordOptions(KeywordOptions):
                 previous_dict = previous
                 
             return TwoLayerKeyWordOption("settings", last_dict, previous_dict, "double click to use \"set { %s %s }\"", one_opt_per_kw=True)
+
+        elif name == "optking":
+            if last is None:
+                last_dict = {}
+            else:
+                last_dict = last            
+                
+            if previous is None:
+                previous_dict = {}
+            else:
+                previous_dict = previous
+                
+            return TwoLayerKeyWordOption("optking settings", last_dict, previous_dict, "double click to use \"set optking { %s %s }\"", one_opt_per_kw=True)
 
         elif name == "molecule":
             if last is None:
