@@ -2181,14 +2181,14 @@ class MethodOption(QWidget):
             return
         
         #XXX: make sure to call __setattr__
-        cur_funcs = self.settings.previous_method_names
-        cur_semis = self.settings.previous_method_needs_basis
+        cur_funcs = self.settings.previous_functional_names
+        cur_semis = self.settings.previous_functional_needs_basis
     
         cur_funcs.pop(row)
         cur_semis.pop(row)
         
-        self.settings.previous_method_names = cur_funcs
-        self.settings.previous_method_needs_basis = cur_semis
+        self.settings.previous_functional_names = cur_funcs
+        self.settings.previous_functional_needs_basis = cur_semis
         
         self.settings.save()
         
@@ -2327,16 +2327,16 @@ class MethodOption(QWidget):
             
             if len(method) > 0:
                 found_func = False
-                for i in range(0, len(self.settings.previous_method_names)):
-                    if self.settings.previous_method_names[i] == method and \
-                        self.settings.previous_method_needs_basis[i] != is_semiempirical:
+                for i in range(0, len(self.settings.previous_functional_names)):
+                    if self.settings.previous_functional_names[i] == method and \
+                        self.settings.previous_functional_needs_basis[i] != is_semiempirical:
                         found_func = True
                 
                 if not found_func:
                     #append doesn't seem to call __setattr__, so the setting doesn't get updated
                     if update_settings:
-                        self.settings.previous_method_names = self.settings.previous_method_names + [method]
-                        self.settings.previous_method_needs_basis = self.settings.previous_method_needs_basis + [not is_semiempirical]
+                        self.settings.previous_functional_names = self.settings.previous_functional_names + [method]
+                        self.settings.previous_functional_needs_basis = self.settings.previous_functional_needs_basis + [not is_semiempirical]
                     
                         row = self.previously_used_table.rowCount()
                         self.add_previously_used(row, method, not is_semiempirical)
