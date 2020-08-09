@@ -4233,15 +4233,19 @@ class KeywordOptions(QWidget):
         
         self.widgets = {}
         for item in self.items.keys():
-            if self.items[item] not in self.last_dict:
-                last = None
-            else:
+            if self.items[item] in self.last_dict:
                 last = self.last_dict[self.items[item]]
-            
-            if self.items[item] not in self.previous_dict:
-                previous = None
+            elif item in self.old_items and self.old_items[item] in self.last_dict:
+                last = self.last_dict[self.old_items[item]]
             else:
+                last = None
+            
+            if self.items[item] in self.previous_dict:
                 previous = self.previous_dict[self.items[item]]
+            elif item in self.old_items and self.old_items[item] in self.previous_dict:
+                previous = self.previous_dict[self.old_items[item]]
+            else:
+                previous = None
             
             self.widgets[item] = self.get_options_for(item, last, previous)
             self.widgets[item].optionChanged.connect(self.something_changed)
