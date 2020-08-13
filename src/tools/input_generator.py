@@ -567,11 +567,11 @@ class BuildQM(ToolInstance):
 
     def update_preview(self, *args, **kw):
         """whenever a setting is changed, this should be called to update the preview"""
-        self.update_theory()
+        self.update_theory(update_settings=False)
         
         self.check_elements()
         if self.preview_window is not None:
-            self.update_theory(False)
+            self.update_theory(update_settings=False)
 
             kw_dict = self.job_widget.getKWDict(False)
             other_kw_dict = self.other_keywords_widget.getKWDict(False)
@@ -665,6 +665,23 @@ class BuildQM(ToolInstance):
         nproc = self.job_widget.getNProc(update_settings)
         mem = self.job_widget.getMem(update_settings)
         jobs = self.job_widget.getJobs() #job settings get updated during getKWDict
+        #also need to convert constrained atoms to AaronTools atoms when saving - same reason we
+        #convert to ResidueCollection
+        if update_settings:
+            for job in jobs:
+                if hasattr(job, "constraints"):
+                    new_constraints = {}
+                    if job.constraints is not None:
+                        for key in job.constraints:
+                            new_constraints[key] = []
+                            for item in job.constraints[key]:
+                                if hasattr(item, "__iter__"):
+                                    new_constraints[key].append([atom for atom in model.atoms if atom.chix_atom in item])
+                                else:
+                                    new_constraints[key].append([atom for atom in model.atoms if atom.chix_atom is item][0])
+                    
+                    job.constraints = new_constraints
+
         solvent = self.job_widget.getSolvent(update_settings)
 
         if update_settings:
