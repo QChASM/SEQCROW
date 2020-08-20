@@ -196,13 +196,15 @@ class SEQCROW_Theory(Theory):
         for atom in self.geometry.atoms:
             if isinstance(self.geometry, AtomicStructure):
                 coords = atom.coord
+                ele = atom.element.name
             elif isinstance(self.geometry, Geometry):
                 coords = atom.coords
+                ele = atom.element
             
             if use_bohr:
                 coords /= UNIT.A0_TO_BOHR
             
-            atoms.append("%-2s %13.6f %13.6f %13.6f\n" % (atom.element.name, *coords))
+            atoms.append("%-2s %13.6f %13.6f %13.6f\n" % (ele, *coords))
         
         out['geometry'] = atoms
 
