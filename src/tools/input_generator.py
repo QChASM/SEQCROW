@@ -2244,6 +2244,7 @@ class MethodOption(QWidget):
         """change options to what's available in the specified program"""
         current_func = self.method_option.currentText()
         self.method_option.clear()
+        cur_disp = self.dispersion.currentText()
         self.dispersion.clear()
         self.grid.clear()
         self.form = program
@@ -2280,6 +2281,10 @@ class MethodOption(QWidget):
             
         if ndx != -1:
             self.method_option.setCurrentIndex(ndx)
+        
+        ndx = self.dispersion.findText(cur_disp, Qt.MatchExactly)
+        if ndx != -1:
+            self.dispersion.setCurrentIndex(ndx)
         
         self.methodChanged.emit()
 
@@ -3457,6 +3462,53 @@ class BasisWidget(QWidget):
         self.basisChanged.emit()
 
 
+#these table subclasses let me overwrite the dropEvent
+#so you can drag and drop things to add options
+class CurrentKWTable(QTableWidget):
+    def __init__(self, origin, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.origin = origin
+        
+    def dropEvent(self, event):
+        other_table = event.source()
+        if not isinstance(other_table, QTableWidget):
+            return
+            
+        for item in other_table.selectedItems():
+            if item.column() != 0:
+                continue
+                
+            kw = item.text()
+            if hasattr(self.origin, "last_dict"):
+                if kw not in self.origin.last_dict:
+                    self.origin.last_dict[kw] = []
+                    self.origin.add_item_to_current_kw_table(kw)
+            
+            elif hasattr(self.origin, "last_list"):
+                if not any(kw == x for x in self.origin.last_list):
+                    self.origin.last_list.append(kw)
+                    self.origin.add_item_to_current_kw_table(kw)
+
+
+class CurrentOptTable(QTableWidget):
+    def __init__(self, origin, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.origin = origin
+        
+    def dropEvent(self, event):
+        other_table = event.source()
+        if not isinstance(other_table, QTableWidget):
+            return
+            
+        for item in other_table.selectedItems():
+            if item.column() != 0:
+                continue
+                
+            opt = item.text()
+            if hasattr(self.origin, "last_dict"):
+                self.origin.add_item_to_current_opt_table(opt)
+
+
 class OneLayerKeyWordOption(QWidget):
     #TODO:
     #* add option to not save (who wants to save a comment? some people might, but I don't)
@@ -3487,7 +3539,7 @@ class OneLayerKeyWordOption(QWidget):
         self.previous_kw_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.previous_kw_table.verticalHeader().setVisible(False)
         
-        self.current_kw_table = QTableWidget()
+        self.current_kw_table = CurrentKWTable(self)
         self.current_kw_table.setColumnCount(2)
         self.current_kw_table.setHorizontalHeaderLabels(['current', 'remove'])
         self.current_kw_table.setSelectionMode(QTableWidget.SingleSelection)
@@ -3535,7 +3587,10 @@ class OneLayerKeyWordOption(QWidget):
         self.current_kw_table.horizontalHeader().setStretchLastSection(False)            
         self.current_kw_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.current_kw_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
-    
+        
+        self.previous_kw_table.setDragDropMode(QTableWidget.DragOnly)
+        self.current_kw_table.setDragDropMode(QTableWidget.DropOnly)        
+
         layout.addWidget(self.previous_kw_table, 0, 0)
         layout.addWidget(self.current_kw_table, 0, 1)
         layout.addWidget(new_kw_widget, 1, 0, 1, 2)
@@ -3747,7 +3802,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.previous_kw_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         keyword_layout.addWidget(self.previous_kw_table, 0, 0)
         
-        self.current_kw_table = QTableWidget()
+        self.current_kw_table = CurrentKWTable(self)
         self.current_kw_table.setColumnCount(2)
         self.current_kw_table.setHorizontalHeaderLabels(['current', 'remove'])
         self.current_kw_table.setSelectionMode(QTableWidget.SingleSelection)
@@ -3797,7 +3852,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.previous_opt_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         option_layout.addWidget(self.previous_opt_table, 0, 0)
         
-        self.current_opt_table = QTableWidget()
+        self.current_opt_table = CurrentOptTable(self)
         self.current_opt_table.setColumnCount(2)
         self.current_opt_table.setHorizontalHeaderLabels(['current', 'remove'])
         self.current_opt_table.setEditTriggers(QTableWidget.DoubleClicked)
@@ -3854,6 +3909,12 @@ class TwoLayerKeyWordOption(QWidget):
         self.current_opt_table.horizontalHeader().setStretchLastSection(False)            
         self.current_opt_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.current_opt_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
+    
+        self.previous_kw_table.setDragDropMode(QTableWidget.DragOnly)
+        self.current_kw_table.setDragDropMode(QTableWidget.DropOnly)        
+        
+        self.previous_opt_table.setDragDropMode(QTableWidget.DragOnly)
+        self.current_opt_table.setDragDropMode(QTableWidget.DropOnly)
     
         splitter = QSplitter(Qt.Horizontal)
         splitter.setChildrenCollapsible(True)
@@ -4367,9 +4428,9 @@ class KeywordOptions(QWidget):
 
 
 class GaussianKeywordOptions(KeywordOptions):
-    items = {'link 0': GAUSSIAN_PRE_ROUTE, \
+    items = {'route': GAUSSIAN_ROUTE, \
+             'link 0': GAUSSIAN_PRE_ROUTE, \
              'comment': GAUSSIAN_COMMENT, \
-             'route': GAUSSIAN_ROUTE, \
              'end of file': GAUSSIAN_POST, \
             }
     
@@ -4441,8 +4502,8 @@ class GaussianKeywordOptions(KeywordOptions):
 
 class ORCAKeywordOptions(KeywordOptions):
     items = {'simple keywords': ORCA_ROUTE, \
-             'comment': ORCA_COMMENT, \
              'blocks': ORCA_BLOCKS, \
+             'comment': ORCA_COMMENT, \
             }
 
     old_items = {'simple keywords': "1", \
@@ -4497,11 +4558,11 @@ class ORCAKeywordOptions(KeywordOptions):
 
 class Psi4KeywordOptions(KeywordOptions):
     items = {'settings': PSI4_SETTINGS, \
-             'before molecule': PSI4_BEFORE_GEOM, \
              'molecule': PSI4_COORDINATES, \
-             'optking': PSI4_OPTKING, \
-             'before job': PSI4_BEFORE_JOB, \
              'job': PSI4_JOB, \
+             'optking': PSI4_OPTKING, \
+             'before molecule': PSI4_BEFORE_GEOM, \
+             'before job': PSI4_BEFORE_JOB, \
              'after job': PSI4_AFTER_JOB, \
              'comment': PSI4_COMMENT, \
             }

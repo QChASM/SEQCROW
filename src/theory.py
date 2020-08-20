@@ -4,6 +4,7 @@ from AaronTools.utils.utils import combine_dicts
 from AaronTools.atoms import Atom
 from AaronTools.geometry import Geometry
 from AaronTools.theory import *
+from AaronTools.const import UNIT
 
 from chimerax.atomic import AtomicStructure
 
@@ -83,24 +84,21 @@ class SEQCROW_Theory(Theory):
         geometry = self.geometry
         warnings = []
         
-        header, header_warnings = self.make_header(geometry, 
-                                                   style='psi4', 
-                                                   return_warnings=True, 
-                                                   **other_kw_dict)
+        header, use_bohr, header_warnings = self.make_header(geometry, 
+                                                             style='psi4', 
+                                                             return_warnings=True, 
+                                                             **other_kw_dict)
         
         warnings.extend(header_warnings)
 
         s = header
-        
-        use_bohr =  False
-        #TODO: add use_bohr to AaronTools
-        
+
         if geometry is not None:
             if isinstance(self.geometry, AtomicStructure):
                 for atom in self.geometry.atoms:
                     if use_bohr:
                         #this is the angstrom-bohr conversion that psi4 uses
-                        coords = [x / 0.52917720859 for x in atom.coord]
+                        coords = [x / UNIT.A0_TO_BOHR for x in atom.coord]
                     else:
                         coords = atom.coord
                     s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element.name, *coords)
@@ -108,7 +106,7 @@ class SEQCROW_Theory(Theory):
             elif isinstance(self.geometry, Geometry):
                 for atom in self.geometry.atoms:
                     if use_bohr:
-                        coords = [x / 0.52917720859 for x in atom.coords]
+                        coords = [x / UNIT.A0_TO_BOHR for x in atom.coords]
                     else:
                         coords = atom.coords
                     s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element, *coords)
@@ -181,10 +179,10 @@ class SEQCROW_Theory(Theory):
     def get_psi4_json(self, **other_kw_dict):
         out = {}
 
-        header = self.make_header(self.geometry,
-                                  style='psi4', 
-                                  return_warnings=False, 
-                                  **other_kw_dict)
+        header, use_bohr = self.make_header(self.geometry,
+                                            style='psi4', 
+                                            return_warnings=False, 
+                                            **other_kw_dict)
         
         footer = self.make_footer(self.geometry,
                                   style='psi4', 
@@ -197,10 +195,14 @@ class SEQCROW_Theory(Theory):
         atoms = []
         for atom in self.geometry.atoms:
             if isinstance(self.geometry, AtomicStructure):
-                atoms.append("%-2s %13.6f %13.6f %13.6f\n" % (atom.element.name, *atom.coord))
-            
+                coords = atom.coord
             elif isinstance(self.geometry, Geometry):
-                atoms.append("%-2s %13.6f %13.6f %13.6f\n" % (atom.element, *atom.coords))
+                coords = atom.coords
+            
+            if use_bohr:
+                coords /= UNIT.A0_TO_BOHR
+            
+            atoms.append("%-2s %13.6f %13.6f %13.6f\n" % (atom.element.name, *coords))
         
         out['geometry'] = atoms
 
