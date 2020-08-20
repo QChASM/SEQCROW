@@ -304,6 +304,9 @@ class SEQCROW_ECP(SEQCROW_Basis, ECP):
         super(SEQCROW_Basis, self).__init__(*args, **kwargs)
         super(ECP, self).__init__(*args, **kwargs)
         
+        if not hasattr(self.ele_selection, "__iter__"):
+            self.ele_selection = [self.ele_selection]
+        
     def refresh_elements(self, geometry):
         if isinstance(geometry, Geometry):
             super().refresh_elements(geometry)
