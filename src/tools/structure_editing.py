@@ -184,7 +184,7 @@ class EditStructure(ToolInstance):
 
         self.tool_window.ui_area.setLayout(layout)
 
-        self.tool_window.manage('side')
+        self.tool_window.manage(None)
     
     def close_previous_change(self, state):
         if state == Qt.Checked:
@@ -419,7 +419,7 @@ class RingSelection(ChildToolWindow):
             ring_names.append(row.data())
             
         self.textBox.setText(",".join(ring_names))
-        
+
 
 
 class NameCompleter(QCompleter):

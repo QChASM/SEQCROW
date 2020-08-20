@@ -301,7 +301,7 @@ class SubstituentTable(QWidget):
             
         for i in range(0, self.table.rowCount()):
             self.table.setRowHidden(i, not filter(i))
-            
+
     def add_subs(self):
         from AaronTools.substituent import Substituent
 
@@ -367,7 +367,7 @@ class RingTable(QWidget):
         layout.addWidget(self.filterEdit, 1, 3)
     
         self.change_filter_method("name")        
-        
+
     def change_filter_method(self, text):
         if text == "name":
             self.filterEdit.setToolTip("name regex")
@@ -394,7 +394,7 @@ class RingTable(QWidget):
             
         for i in range(0, self.table.rowCount()):
             self.table.setRowHidden(i, not filter(i))
-            
+
     def add_rings(self):
         from AaronTools.ring import Ring
         

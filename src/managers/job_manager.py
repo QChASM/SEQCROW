@@ -37,8 +37,7 @@ class JobManager(ProviderManager):
         self.triggers.add_handler(JOB_STARTED, self.job_started)
         self.triggers.add_trigger(JOB_QUEUED)
         self.triggers.add_handler(JOB_QUEUED, self.check_queue)
-        #switch write_json triggers for debugging
-        #self.triggers.add_handler(JOB_QUEUED, self.write_json)
+        self.triggers.add_handler(JOB_QUEUED, self.write_json)
         self.session.triggers.add_handler('app quit', self.write_json)
 
     def __setattr__(self, attr, val):
@@ -63,7 +62,7 @@ class JobManager(ProviderManager):
 
     def init_queue(self):
         scr_dir = os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR)
-        self.jobs_list_filename = os.path.join(scr_dir, "job_list.json")
+        self.jobs_list_filename = os.path.join(scr_dir, "job_list-2.json")
         if os.path.exists(self.jobs_list_filename):
             with open(self.jobs_list_filename, 'r') as f:
                 queue_dict = load(f)

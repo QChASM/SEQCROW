@@ -252,6 +252,8 @@ class NormalModes(ToolInstance):
         self.fwhm.setToolTip("width of peaks at half of their maximum value")
         ir_layout.addRow("FWHM:", self.fwhm)
         
+        self.peak_type.currentTextChanged.connect(lambda text, widget=self.fwhm: widget.setEnabled(text != "Delta"))
+        
         show_plot = QPushButton("show plot")
         show_plot.clicked.connect(self.show_ir_plot)
         ir_layout.addRow(show_plot)
@@ -724,11 +726,11 @@ class IRPlot(ChildToolWindow):
         else:
             if self.tool_instance.plot_type.currentText() == "Transmittance":
                 ax.vlines(x_values, y_values, [100 for y in y_values], linewidth=0.5)
-                ax.hlines(100, 0, 4000)
+                ax.hlines(100, 0, max(4000, *frequencies), linewidth=0.5)
             
             else:
                 ax.vlines(x_values, [0 for y in y_values], y_values, linewidth=0.5)
-                ax.hlines(0, 0, 4000)
+                ax.hlines(0, 0, max(4000, *frequencies), linewidth=0.5)
 
         x_lim = ax.get_xlim()
         ax.set_xlim(max(x_lim), min(x_lim))

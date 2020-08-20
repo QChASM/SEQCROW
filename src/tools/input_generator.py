@@ -19,11 +19,15 @@ from PyQt5.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter
                             QStatusBar, QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem, QSizePolicy
 
 from SEQCROW.residue_collection import ResidueCollection
-from SEQCROW.theory import *
-from SEQCROW.utils import iter2str, combine_dicts
+from SEQCROW.utils import iter2str
 from SEQCROW.jobs import ORCAJob, GaussianJob, Psi4Job
+from SEQCROW.theory import SEQCROW_Basis, SEQCROW_ECP, SEQCROW_Theory
 
 from AaronTools.const import TMETAL
+from AaronTools.theory import *
+from AaronTools.theory.method import KNOWN_SEMI_EMPIRICAL
+from AaronTools.utils.utils import combine_dicts
+
 
 class _InputGeneratorSettings(Settings):
     EXPLICIT_SAVE = {
@@ -51,43 +55,43 @@ class _InputGeneratorSettings(Settings):
         'last_ecp_elements': Value([], ListOf(StringArg), iter2str),
         'last_ecp_path': Value("", StringArg),
         'last_number_ecp': Value(0, IntArg),
-        'previous_functional': Value("", StringArg),
-        'previous_custom_func': Value("", StringArg),
+        'previous_method': Value("", StringArg),
+        'previous_custom_func': Value("", StringArg),       
         'previous_functional_names': Value([], ListOf(StringArg), iter2str),
         'previous_functional_needs_basis': Value([], ListOf(BoolArg), iter2str),
         'previous_dispersion': Value("None", StringArg),
         'previous_grid': Value("Default", StringArg),
         'previous_charge': Value(0, IntArg),
         'previous_mult': Value(1, IntArg),
-        'previous_gaussian_solvent_model': Value("None", StringArg),
-        'previous_gaussian_solvent_name': Value("", StringArg),
+        'previous_solvent_model': Value("None", StringArg),
+        'previous_solvent_name': Value("", StringArg),
         #shh these are just jsons
-        'previous_gaussian_options': Value(dumps({Method.GAUSSIAN_ROUTE: {'opt': ['NoEigenTest', 'Tight', 'VeryTight'], \
+        'previous_gaussian_options': Value(dumps({GAUSSIAN_ROUTE: {'opt': ['NoEigenTest', 'Tight', 'VeryTight'], \
                                                                           'DensityFit': [], \
                                                                           'pop': ['NBO', 'NBOREAD', 'NBO7'], \
                                                                           'scrf': ['COSMORS'], \
                                                                           'Integral':['grid=99302'], \
                                                                         }, \
-                                                  Method.GAUSSIAN_COMMENT:[], \
-                                                  Method.GAUSSIAN_PRE_ROUTE: {'LindaWorkers':
+                                                  GAUSSIAN_COMMENT:[], \
+                                                  GAUSSIAN_PRE_ROUTE: {'LindaWorkers':
                                                                                 #I found this example online at http://wild.life.nctu.edu.tw/~jsyu/compchem/g09/g09ur/m_linda.htm
                                                                                 #I don't know if it works (I don't use linda)
                                                                                 ["spain", "hamlet:2", "ophelia:4"], \
                                                                              }, \
-                                                  Method.GAUSSIAN_POST: ['$nbo RESONANCE NBOSUM E2PERT=0.0 NLMO BNDIDX $end'], \
+                                                  GAUSSIAN_POST: ['$nbo RESONANCE NBOSUM E2PERT=0.0 NLMO BNDIDX $end'], \
                                                  }), StringArg),
-        'last_gaussian_options': Value(dumps({Method.GAUSSIAN_ROUTE:{}}), StringArg),
+        'last_gaussian_options': Value(dumps({GAUSSIAN_ROUTE:{}}), StringArg),
         'previous_orca_solvent_model': Value("None", StringArg),
         'previous_orca_solvent_name': Value("", StringArg),
-        'previous_orca_options': Value(dumps({Method.ORCA_ROUTE:['TightSCF'], \
-                                              Method.ORCA_BLOCKS:{'basis':['decontract true'], \
+        'previous_orca_options': Value(dumps({ORCA_ROUTE:['TightSCF'], \
+                                              ORCA_BLOCKS:{'basis':['decontract true'], \
                                                                   'elprop':['Quadrupole True'], \
                                                                   'freq':['Increment 0.001'], \
                                                                   'geom':['Calc_Hess true']}, \
                                                                  }), StringArg),
         #just the blocks that are used by the tool
         'last_orca_options': Value(dumps({}), StringArg),
-        'previous_psi4_options': Value(dumps({Method.PSI4_SETTINGS:{'reference': \
+        'previous_psi4_options': Value(dumps({PSI4_SETTINGS:{'reference': \
                                                                                 ['rhf', 'rohf', 'uhf', 'cuhf', 'rks', 'uks'], \
                                                                     'diag_method': \
                                                                                 #the psi4 manual seems to imply that davidson and sem are
@@ -98,10 +102,21 @@ class _InputGeneratorSettings(Settings):
                                                                     'fci': \
                                                                                 ['true', 'false'], \
                                                                    }, \
-                                                                   Method.PSI4_BEFORE_GEOM: [], \
-                                                                   Method.PSI4_AFTER_GEOM: ["nrg, wfn = energy('$FUNCTIONAL', return_wfn=True)"], \
-                                                                   Method.PSI4_COMMENT: [], \
-                                                                   Method.PSI4_COORDINATES: {'units':['angstrom', 'bohr'], 
+                                                                   PSI4_BEFORE_GEOM: [], \
+                                                                   PSI4_BEFORE_JOB: ['activate(auto_fragments())'], \
+                                                                   PSI4_JOB: {'energy': \
+                                                                                        ['return_wfn=True', 'dft_method=pbe0'], \
+                                                                                     'optimize': \
+                                                                                        ['return_wfn=True', "engine='geometric'"], \
+                                                                                     'gradient': \
+                                                                                        ['return_wfn=True'], \
+                                                                                     'frequencies': \
+                                                                                        ['return_wfn=True', \
+                                                                                         'dertype=\'gradient\'', 'dertype=\'energy\''\
+                                                                                        ], \
+                                                                                    }, \
+                                                                   PSI4_COMMENT: [], \
+                                                                   PSI4_COORDINATES: {'units':['angstrom', 'bohr'], 
                                                                                              'pubchem':['benzene'], 
                                                                                              'symmetry':['c1', 'c2', 'ci', 'cs', 'd2', 'c2h', 'c2v', 'd2h'], 
                                                                                              'no_reorient':[], 
@@ -114,72 +129,97 @@ class _InputGeneratorSettings(Settings):
         
     AUTO_SAVE = {
         'gaussian_presets': Value(dumps({
-                                       "quick optimize":{"nproc":1, \
-                                                           "mem":0, \
-                                                           "opt":True, \
-                                                           "ts":False, \
-                                                           "freq":False, \
-                                                           "semi-empirical":False, \
-                                                           "solvent model":'None', \
-                                                           "solvent":'', \
-                                                           "functional":'PM6', \
-                                                           "grid":None, \
-                                                           "disp":None, \
-                                                           "basis": {'name':[], 'auxiliary':[], 'file':[], 'elements':[]}, \
-                                                           "ecp": {'name':[], 'file':[], 'elements':[]}, \
-                                                           "other": {}, \
-                                                         }, \
+                                       "quick optimize":{"opt":True, \
+                                                         "ts":False, \
+                                                         "freq":False, \
+                                                         "semi-empirical":False, \
+                                                         "solvent model":'None', \
+                                                         "solvent":'', \
+                                                         "method":'PM6', \
+                                                         "grid":None, \
+                                                         "disp":None, \
+                                                         "basis": {'name':[], 'auxiliary':[], 'file':[], 'elements':[]}, \
+                                                         "ecp": {'name':[], 'file':[], 'elements':[]}, \
+                                                         "other": {}, \
+                                                        }, \
                                         }), StringArg), \
         'orca_presets': Value(dumps({
-                                       "quick optimize":{"nproc":1, \
-                                                       "mem":0, \
-                                                       "opt":True, \
-                                                       "ts":False, \
-                                                       "freq":False, \
-                                                       "semi-empirical":False, \
-                                                       "solvent model":'None', \
-                                                       "solvent":'', \
-                                                       "functional":'HF-3c', \
-                                                       "grid":None, \
-                                                       "disp":None, \
-                                                       "basis": {'name':[], 'auxiliary':[], 'file':[], 'elements':[]}, \
-                                                       "ecp": {'name':[], 'file':[], 'elements':[]}, \
-                                                       "other": {}, \
+                                       "quick optimize":{"opt":True, \
+                                                         "ts":False, \
+                                                         "freq":False, \
+                                                         "semi-empirical":False, \
+                                                         "solvent model":'None', \
+                                                         "solvent":'', \
+                                                         "method":'HF-3c', \
+                                                         "grid":None, \
+                                                         "disp":None, \
+                                                         "basis": {'name':[], 'auxiliary':[], 'file':[], 'elements':[]}, \
+                                                         "ecp": {'name':[], 'file':[], 'elements':[]}, \
+                                                         "other": {}, \
                                                       }, \
-                                       "DLPNO single-point":{"nproc":2, \
-                                                   "mem":12, \
-                                                   "opt":False, \
-                                                   "ts":False, \
-                                                   "freq":False, \
-                                                   "semi-empirical":False, \
-                                                   "solvent model":'None', \
-                                                   "solvent":'', \
-                                                   "functional":'DLPNO-CCSD(T)', \
-                                                   "grid":None, \
-                                                   "disp":None, \
-                                                   "basis": {'name':["cc-pVTZ", "cc-pVTZ"], 'auxiliary':[None, "C"], 'file':[False, False], 'elements':['all', 'all']}, \
-                                                   "ecp": {'name':[], 'file':[], 'elements':['all']}, \
-                                                   "other": {Method.ORCA_ROUTE:['TightSCF']}, \
+                                       "DLPNO single-point":{"opt":False, \
+                                                             "ts":False, \
+                                                             "freq":False, \
+                                                             "semi-empirical":False, \
+                                                             "solvent model":'None', \
+                                                             "solvent":'', \
+                                                             "method":'DLPNO-CCSD(T)', \
+                                                             "grid":None, \
+                                                             "disp":None, \
+                                                             "basis": {'name':["cc-pVTZ", "cc-pVTZ"], 
+                                                                       'auxiliary':[None, "C"], 
+                                                                       'file':[False, False], 
+                                                                       'elements':['all', 'all']
+                                                                      }, \
+                                                             "ecp": {'name':[], 'file':[], 'elements':['all']}, \
+                                                             "other": {ORCA_ROUTE:['TightSCF']}, \
                                                   }, \
                                        }), StringArg), \
         'psi4_presets': Value(dumps({
-                                       "quick optimize":{"nproc":1, \
-                                                       "mem":0, \
-                                                       "opt":True, \
+                                     "quick optimize":{"opt":True, \
                                                        "ts":False, \
                                                        "freq":False, \
                                                        "semi-empirical":False, \
                                                        "solvent model":'None', \
                                                        "solvent":'', \
-                                                       "functional":'HF', \
+                                                       "method":'HF', \
                                                        "grid":None, \
                                                        "disp":None, \
                                                        "basis": {'name':['sto-3g'], 'auxiliary':[None], 'file':[False], 'elements':['all']}, \
                                                        "ecp": {'name':[], 'file':[], 'elements':[]}, \
                                                        "other": {}, \
+                                                       }, \
+                                     "custom dft":{"opt":False, \
+                                                   "ts":False, \
+                                                   "freq":False, \
+                                                   "semi-empirical":False, \
+                                                   "method":'SCF', \
+                                                   "grid":None, \
+                                                   "disp":None, \
+                                                   "basis": {'name':['def2-SVP'], 'auxiliary':[None], 'file':[False], 'elements':['all']}, \
+                                                   "ecp": {'name':[], 'file':[], 'elements':[]}, \
+                                                   "other":{
+                                                            PSI4_BEFORE_GEOM: [ \
+                                                            """lol_idk = {
+    #this is included as an example; it is not a tested DFT method
+    "name": "seqcrow_example",
+    "x_methods": {"GGA_X_B88": {"alpha": 0.580}},
+    "x_hf": {"alpha": 0.420},
+    "c_methods": {"GGA_C_LYP": {"alpha": 0.678}}, 
+    "dispersion": {"type": "d3bj", 
+                   "params": {'s6':  1.0000,  
+                              's8':  0.1337, 
+                              'a1': -0.0789, 
+                              'a2':  0.0091, 
+                    }
+                  }
+}
+"""                                                        
+                                                            ], \
+                                                            PSI4_JOB: {'energy':['dft_method=lol_idk']}, \
                                                       }, \
-                                        },\
-                                ), StringArg),
+                                        }, \
+                                    }), StringArg), \
         'on_finished': Value('do nothing', StringArg), 
     }
     
@@ -258,9 +298,9 @@ class BuildQM(ToolInstance):
         self.job_widget = JobTypeOption(self.settings, self.session, init_form=init_form)
         self.job_widget.jobTypeChanged.connect(self.update_preview)
         
-        #functional stuff
-        self.functional_widget = FunctionalOption(self.settings, init_form=init_form)
-        self.functional_widget.functionalChanged.connect(self.update_preview)
+        #method stuff
+        self.method_widget = MethodOption(self.settings, init_form=init_form)
+        self.method_widget.methodChanged.connect(self.update_preview)
 
         #basis set stuff
         self.basis_widget = BasisWidget(self.settings, init_form=init_form)
@@ -272,7 +312,7 @@ class BuildQM(ToolInstance):
         
         tabs = QTabWidget()
         tabs.addTab(self.job_widget, "job details")
-        tabs.addTab(self.functional_widget, "functional")
+        tabs.addTab(self.method_widget, "method")
         tabs.addTab(self.basis_widget, "basis functions")
         tabs.addTab(self.other_keywords_widget, "additional options")
         
@@ -388,7 +428,7 @@ class BuildQM(ToolInstance):
         self.file_type.setCurrentIndex(ndx)
         
         self.file_type.blockSignals(True)
-        self.functional_widget.blockSignals(True)
+        self.method_widget.blockSignals(True)
         self.basis_widget.blockSignals(True)
         self.job_widget.blockSignals(True)
         self.other_keywords_widget.blockSignals(True)
@@ -415,12 +455,19 @@ class BuildQM(ToolInstance):
             solvent = ImplicitSolvent(preset['solvent model'], preset['solvent'])
             self.job_widget.setSolvent(solvent)
         
-        if 'functional' in preset:
-            func = Functional(preset['functional'], preset['semi-empirical'])
-            self.functional_widget.setFunctional(func)
+        if 'method' in preset:
+            func = Method(preset['method'], preset['semi-empirical'])
+            self.method_widget.setMethod(func)
         
-            self.functional_widget.setGrid(preset['grid'])
-            self.functional_widget.setDispersion(preset['disp'])
+            self.method_widget.setGrid(preset['grid'])
+            self.method_widget.setDispersion(preset['disp'])
+        
+        if 'functional' in preset:
+            func = Method(preset['functional'], preset['semi-empirical'])
+            self.method_widget.setMethod(func)
+        
+            self.method_widget.setGrid(preset['grid'])
+            self.method_widget.setDispersion(preset['disp'])
 
         if 'basis' in preset:
             basis_list = []
@@ -429,14 +476,14 @@ class BuildQM(ToolInstance):
                 aux_type = preset['basis']['auxiliary'][i]
                 user_defined = preset['basis']['file'][i]
                 
-                basis_list.append(Basis(name, elements, aux_type=aux_type, user_defined=user_defined))
+                basis_list.append(SEQCROW_Basis(name, elements, aux_type=aux_type, user_defined=user_defined))
                 
             ecp_list = []
             for i, name in enumerate(preset['ecp']['name']):
                 elements = preset['ecp']['elements'][i]
                 user_defined = preset['ecp']['file'][i]
                 
-                ecp_list.append(ECP(name, elements, user_defined=user_defined))
+                ecp_list.append(SEQCROW_ECP(name, elements, user_defined=user_defined))
     
             basis_set = BasisSet(basis_list, ecp_list)
             
@@ -446,12 +493,12 @@ class BuildQM(ToolInstance):
             raw_kw_dict = preset['other']
             kw_dict = {}
             for kw in raw_kw_dict.keys():
-                kw_dict[int(kw)] = raw_kw_dict[kw]
+                kw_dict[kw] = raw_kw_dict[kw]
             
             self.other_keywords_widget.setKeywords(kw_dict)
         
         self.file_type.blockSignals(False)
-        self.functional_widget.blockSignals(False)
+        self.method_widget.blockSignals(False)
         self.basis_widget.blockSignals(False)
         self.job_widget.blockSignals(False)
         self.other_keywords_widget.blockSignals(False)
@@ -520,22 +567,25 @@ class BuildQM(ToolInstance):
 
     def update_preview(self, *args, **kw):
         """whenever a setting is changed, this should be called to update the preview"""
+        self.update_theory(update_settings=False)
+        
         self.check_elements()
         if self.preview_window is not None:
-            self.update_theory(False)
-        
+            self.update_theory(update_settings=False)
+
             kw_dict = self.job_widget.getKWDict(False)
             other_kw_dict = self.other_keywords_widget.getKWDict(False)
-        
-            combined_dict = combine_dicts(kw_dict, other_kw_dict)
             
-            if self.file_type.currentText() == "Gaussian":
-                output, warnings = self.theory.write_gaussian_input(combined_dict)
-            elif self.file_type.currentText() == "ORCA":
-                output, warnings = self.theory.write_orca_input(combined_dict)
-            elif self.file_type.currentText() == "Psi4":
-                output, warnings = self.theory.write_psi4_input(combined_dict)
-
+            combined_dict = combine_dicts(kw_dict, other_kw_dict)
+    
+            program = self.file_type.currentText()
+            if program == "Gaussian":
+                output, warnings = self.theory.write_gaussian_input(**combined_dict)
+            elif program == "ORCA":
+                output, warnings = self.theory.write_orca_input(**combined_dict)
+            elif program == "Psi4":
+                output, warnings = self.theory.write_psi4_input(**combined_dict)
+    
             self.preview_window.setPreview(output, warnings)
 
     def change_file_type(self, *args):
@@ -544,20 +594,20 @@ class BuildQM(ToolInstance):
         #if we don't block signals, the preview will try to update before all widgets 
         #have been updated to give the proper info
         self.file_type.blockSignals(True)
-        self.functional_widget.blockSignals(True)
+        self.method_widget.blockSignals(True)
         self.basis_widget.blockSignals(True)
         self.job_widget.blockSignals(True)
         self.other_keywords_widget.blockSignals(True)
     
         program = self.file_type.currentText()
         self.settings.last_program = program
-        self.functional_widget.setOptions(program)
+        self.method_widget.setOptions(program)
         self.basis_widget.setOptions(program)
         self.job_widget.setOptions(program)
         self.other_keywords_widget.setOptions(program)
         
         self.file_type.blockSignals(False)
-        self.functional_widget.blockSignals(False)
+        self.method_widget.blockSignals(False)
         self.basis_widget.blockSignals(False)
         self.job_widget.blockSignals(False)
         self.other_keywords_widget.blockSignals(False)
@@ -598,27 +648,49 @@ class BuildQM(ToolInstance):
         else:
             model = None
 
-        func = self.functional_widget.getFunctional(update_settings)        
+        if update_settings:
+            #if we update settings, we might be setting up a job
+            #we need to grab the AaronTools Geometry in case the
+            #structure is closed before the job starts
+            model = ResidueCollection(model)
+
+        meth = self.method_widget.getMethod(update_settings)        
         basis = self.get_basis_set(update_settings)
 
-        dispersion = self.functional_widget.getDispersion(update_settings)
+        dispersion = self.method_widget.getDispersion(update_settings)
 
-        
-        grid = self.functional_widget.getGrid(update_settings)      
+        grid = self.method_widget.getGrid(update_settings)      
         charge = self.job_widget.getCharge(update_settings)
         mult = self.job_widget.getMultiplicity(update_settings)
         nproc = self.job_widget.getNProc(update_settings)
         mem = self.job_widget.getMem(update_settings)
+        jobs = self.job_widget.getJobs() #job settings get updated during getKWDict
+        #also need to convert constrained atoms to AaronTools atoms when saving - same reason we
+        #convert to ResidueCollection
+        if update_settings:
+            for job in jobs:
+                if hasattr(job, "constraints"):
+                    new_constraints = {}
+                    if job.constraints is not None:
+                        for key in job.constraints:
+                            new_constraints[key] = []
+                            for item in job.constraints[key]:
+                                if hasattr(item, "__iter__"):
+                                    new_constraints[key].append([atom for atom in model.atoms if atom.chix_atom in item])
+                                else:
+                                    new_constraints[key].append([atom for atom in model.atoms if atom.chix_atom is item][0])
+                    
+                    job.constraints = new_constraints
+
+        solvent = self.job_widget.getSolvent(update_settings)
 
         if update_settings:
             self.settings.save()
-
-        constraints = self.job_widget.getConstraints()
         
-        self.theory = Method(structure=model, charge=charge, multiplicity=mult, \
-                             functional=func, basis=basis, empirical_dispersion=dispersion, \
-                             grid=grid, constraints=constraints, \
-                             processors=nproc, memory=mem)
+        self.theory = SEQCROW_Theory(charge=charge, multiplicity=mult, \
+                                     method=meth, basis=basis, empirical_dispersion=dispersion, \
+                                     grid=grid, processors=nproc, memory=mem, job_type=jobs, \
+                                     solvent=solvent, geometry=model)
     
     def change_model(self, index):
         """changes model to the one selected in self.model_selector (index is basically ignored"""
@@ -688,7 +760,7 @@ class BuildQM(ToolInstance):
     def copy_input(self):
         """copies input file to the clipboard"""
         self.update_theory()
-        
+
         kw_dict = self.job_widget.getKWDict()
         other_kw_dict = self.other_keywords_widget.getKWDict()
         self.settings.save()
@@ -699,11 +771,11 @@ class BuildQM(ToolInstance):
         
         program = self.file_type.currentText()
         if program == "Gaussian":
-            output, warnings = self.theory.write_gaussian_input(combined_dict)
+            output, warnings = self.theory.write_gaussian_input(**combined_dict)
         elif program == "ORCA":
-            output, warnings = self.theory.write_orca_input(combined_dict)
+            output, warnings = self.theory.write_orca_input(**combined_dict)
         elif program == "Psi4":
-            output, warnings = self.theory.write_psi4_input(combined_dict)
+            output, warnings = self.theory.write_psi4_input(**combined_dict)
 
         for warning in warnings:
             self.session.logger.warning(warning)
@@ -721,6 +793,15 @@ class BuildQM(ToolInstance):
         a file dialog will open asking for a file location"""
         self.update_theory()
         
+        if self.model_selector.currentIndex() >= 0 and \
+            self.model_selector.currentIndex() < len(self.models):
+            model = self.models[self.model_selector.currentIndex()]
+        else:
+            model = None
+
+        if update_settings:
+            model = ResidueCollection(model)
+
         kw_dict = self.job_widget.getKWDict()
         other_kw_dict = self.other_keywords_widget.getKWDict()
         self.settings.save()
@@ -735,17 +816,17 @@ class BuildQM(ToolInstance):
         if program == "Gaussian":
             filename, _ = QFileDialog.getSaveFileName(filter="Gaussian input files (*.com *.gjf)")
             if filename:
-                output, warnings = self.theory.write_gaussian_input(combined_dict, fname=filename)
+                output, warnings = self.theory.write_gaussian_input(model, fname=filename, **combined_dict)
         
         elif program == "ORCA":
             filename, _ = QFileDialog.getSaveFileName(filter="ORCA input files (*.inp)")
             if filename:
-                output, warnings = self.theory.write_orca_input(combined_dict, fname=filename)
+                output, warnings = self.theory.write_orca_input(model, fname=filename, **combined_dict)
         
         elif program == "Psi4":
             filename, _ = QFileDialog.getSaveFileName(filter="Psi4 input files (*.in)")
             if filename:
-                output, warnings = self.theory.write_psi4_input(combined_dict, fname=filename)
+                output, warnings = self.theory.write_psi4_input(model, fname=filename, **combined_dict)
 
         for warning in warnings:
             self.session.logger.warning(warning)
@@ -1035,7 +1116,7 @@ class JobTypeOption(QWidget):
         self.num_freq = QCheckBox()
         self.num_freq.setChecked(self.settings.last_num_freq)
         self.num_freq.stateChanged.connect(self.something_changed)
-        self.num_freq.setToolTip("numerical vibrational frequency algorithms are often slower than analytical algorithms,\nusually require less memory and available for functionals where analytical methods are not")
+        self.num_freq.setToolTip("numerical vibrational frequency algorithms are often slower than analytical algorithms,\nusually require less memory and available for methods where analytical methods are not")
         freq_opt_form.addRow("Numerical frequencies:", self.num_freq)
 
         self.job_type_opts.addTab(self.freq_opt, "frequency settings")
@@ -1052,7 +1133,7 @@ class JobTypeOption(QWidget):
         
         self.solvent_name_label = QLabel("solvent:")
         self.solvent_name = QLineEdit()
-        self.solvent_name.setText(self.settings.previous_gaussian_solvent_name)
+        self.solvent_name.setText(self.settings.previous_solvent_name)
         self.solvent_name.textChanged.connect(self.filter_solvents)
         self.solvent_name.setClearButtonEnabled(True)
         solvent_form_layout.addRow(self.solvent_name_label, self.solvent_name)
@@ -1161,9 +1242,10 @@ class JobTypeOption(QWidget):
             self.raman.setToolTip("ask Gaussian to compute Raman intensities")
             self.raman.setEnabled(True)
             self.solvent_names.addItems(ImplicitSolvent.KNOWN_GAUSSIAN_SOLVENTS)
-            ndx = self.solvent_option.findText(self.settings.previous_gaussian_solvent_model)
+            ndx = self.solvent_option.findText(self.settings.previous_solvent_model)
             if ndx >= 0:
                 self.solvent_option.setCurrentIndex(ndx)
+            self.solvent_name.setText(self.settings.previous_solvent_name)
             self.job_type_opts.setTabEnabled(3, True)
             self.use_checkpoint.setEnabled(True)
             self.chk_file_path.setEnabled(True)
@@ -1175,11 +1257,14 @@ class JobTypeOption(QWidget):
             self.hpmodes.setEnabled(False)
             self.raman.setToolTip("ask ORCA to compute Raman intensities")
             self.raman.setEnabled(True)
-            self.solvent_names.addItems(ImplicitSolvent.KNOWN_ORCA_SOLVENTS)
-            ndx = self.solvent_option.findText(self.settings.previous_orca_solvent_model)
+            if self.settings.previous_solvent_model == "SMD":
+                self.solvent_names.addItems(ImplicitSolvent.KNOWN_ORCA_SMD_SOLVENTS)
+            else:
+                self.solvent_names.addItems(ImplicitSolvent.KNOWN_ORCA_CPCM_SOLVENTS)
+            ndx = self.solvent_option.findText(self.settings.previous_solvent_model)
             if ndx >= 0:
                 self.solvent_option.setCurrentIndex(ndx)
-            self.solvent_name.setText(self.settings.previous_orca_solvent_name)
+            self.solvent_name.setText(self.settings.previous_solvent_name)
             self.job_type_opts.setTabEnabled(3, True)
             self.use_checkpoint.setEnabled(False)
             self.chk_file_path.setEnabled(False)
@@ -1237,6 +1322,18 @@ class JobTypeOption(QWidget):
             self.solvent_name_label.setVisible(False)
             self.solvent_name.setVisible(False)
             self.solvent_names.setVisible(False)
+
+        if self.form == "ORCA":
+            if self.solvent_option.currentText() == "CPCM":
+                self.solvent_names.clear()
+                self.solvent_names.addItems(ImplicitSolvent.KNOWN_ORCA_CPCM_SOLVENTS)
+                self.solvent_names.sortItems()
+                self.filter_solvents(self.solvent_name.text())
+            elif self.solvent_option.currentText() == "SMD":
+                self.solvent_names.clear()
+                self.solvent_names.addItems(ImplicitSolvent.KNOWN_ORCA_SMD_SOLVENTS)
+                self.solvent_names.sortItems()
+                self.filter_solvents(self.solvent_name.text())
 
         self.jobTypeChanged.emit()
     
@@ -1333,10 +1430,6 @@ class JobTypeOption(QWidget):
         if ndx >= 0:
             self.solvent_option.setCurrentIndex(ndx)
 
-    def setSolvent(self, value):
-        """sets solvent to value"""
-        self.solvent_name.setText(value)
-
     def getGeometryOptimization(self):
         """returns whether the job type is opt"""
         return self.do_geom_opt.checkState() == Qt.Checked
@@ -1349,10 +1442,39 @@ class JobTypeOption(QWidget):
         """returns whether the job is freq"""
         return self.do_freq.checkState() == Qt.Checked
 
-    def getSolvent(self):
+    def getJobs(self):
+        job_types = []
+        if self.do_geom_opt.checkState() == Qt.Checked:
+            if self.use_contraints.checkState() == Qt.Checked:
+                constraints = self.getConstraints()
+            else:
+                constraints = None
+            
+            job_types.append(OptimizationJob(transition_state=self.ts_opt.checkState() == Qt.Checked, 
+                                             constraints=constraints)
+                            )
+        
+        if self.do_freq.checkState() == Qt.Checked:
+            job_types.append(FrequencyJob(numerical=(self.num_freq.checkState() == Qt.Checked or 
+                                                     self.raman.checkState() == Qt.Checked),
+                                          temperature=self.temp.value())
+                            )
+
+        return job_types
+
+    def getSolvent(self, update_settings):
         """returns ImplicitSolvent for the current solvent settings"""
         model = self.solvent_option.currentText()
+        if model == "None":
+            if update_settings:
+                self.settings.previous_solvent_model = "None"
+            return None
+            
         solvent = self.solvent_name.text()
+        
+        if update_settings:
+            self.settings.previous_solvent_model = model
+            self.settings.previous_solvent_name = solvent
         
         return ImplicitSolvent(model, solvent)
 
@@ -1811,22 +1933,13 @@ class JobTypeOption(QWidget):
             route = {}
             if self.do_geom_opt.checkState() == Qt.Checked:
                 route['opt'] = []
-                if self.use_contraints.checkState() == Qt.Checked:
-                    if len(self.constrained_atoms + self.constrained_bonds) > 0:
-                        route['opt'].append("ModRedundant")
-                    
+
                 if self.ts_opt.checkState() == Qt.Checked:
-                    route['opt'].append("TS")
                     route['opt'].append("CalcFC")
                     
             if self.do_freq.checkState() == Qt.Checked:
                 route['freq'] = []
-                temp = self.temp.value()
-                route['freq'].append("temperature=%.2f" % temp)
-                
-                if self.num_freq.checkState() == Qt.Checked:
-                    route['freq'].append('Numerical')
-                
+
                 if self.raman.checkState() == Qt.Unchecked:
                     route['freq'].append("NoRaman")
                 else:
@@ -1834,26 +1947,8 @@ class JobTypeOption(QWidget):
                     
                 if self.hpmodes.checkState() == Qt.Checked:
                     route['freq'].append('HPModes')
-                    
-            if self.solvent_option.currentText() != "None":
-                solvent_scrf = self.solvent_option.currentText()
-                if update_settings:
-                    self.settings.previous_gaussian_solvent_model = solvent_scrf
-                
-                route['scrf'] = [solvent_scrf]
-                
-                solvent_name = self.solvent_name.text()
-                if update_settings:
-                    self.settings.previous_gaussian_solvent_name = solvent_name
-                
-                route['scrf'].append("solvent=%s" % solvent_name)
-                
-            else:
-                if update_settings:
-                    self.settings.previous_gaussian_solvent_model = "None"
 
             link0 = {}
-
 
             if self.use_checkpoint.checkState() == Qt.Checked:
                 for kw in route:
@@ -1876,46 +1971,15 @@ class JobTypeOption(QWidget):
                 self.settings.last_num_freq = self.num_freq.checkState() == Qt.Checked
                 self.settings.last_raman = self.raman.checkState() == Qt.Checked
 
-            return {Method.GAUSSIAN_PRE_ROUTE:link0, Method.GAUSSIAN_ROUTE:route}
+            return {GAUSSIAN_PRE_ROUTE:link0, GAUSSIAN_ROUTE:route}
 
-        if self.form == "ORCA":
+        elif self.form == "ORCA":
             route = []
             blocks = {}
-            if self.do_geom_opt.checkState() == Qt.Checked:
-                if self.ts_opt.checkState() == Qt.Checked:
-                    route.append("OptTS")
-                else:
-                    route.append("Opt")
 
             if self.do_freq.checkState() == Qt.Checked:
-                if self.raman.checkState() == Qt.Unchecked and self.num_freq.checkState() == Qt.Unchecked:
-                    route.append("Freq")
-                elif self.raman.checkState() == Qt.Checked:
-                    route.append("NumFreq")
+                if self.raman.checkState() == Qt.Checked:
                     blocks['elprop'] = ['Polar 1']
-                else:
-                    route.append("NumFreq")
-                    
-                temp = self.temp.value()
-                blocks['freq'] = ["Temp    %.2f" % temp]
- 
-            if self.solvent_option.currentText() != "None":
-                solvent_scrf = self.solvent_option.currentText()
-                if update_settings:
-                    self.settings.previous_gaussian_solvent_model = solvent_scrf
-
-                solvent_name = self.solvent_name.text()
-                if update_settings:
-                    self.settings.previous_gaussian_solvent_name = solvent_name
-                
-                if len(solvent_name) > 0:
-                    route.append("%s(%s)" % (solvent_scrf, solvent_name))
-                else:
-                    route.append("%s" % (solvent_scrf))
-
-            else:
-                if update_settings:
-                    self.settings.previous_gaussian_solvent_model = "None"
 
             if update_settings:
                 self.settings.last_nproc = self.nprocs.value()
@@ -1926,24 +1990,11 @@ class JobTypeOption(QWidget):
                 self.settings.last_num_freq = self.num_freq.checkState() == Qt.Checked
                 self.settings.last_raman = self.raman.checkState() == Qt.Checked
 
-            return {Method.ORCA_ROUTE:route, Method.ORCA_BLOCKS:blocks}
-            
+            return {ORCA_ROUTE:route, ORCA_BLOCKS:blocks}
+
         elif self.form == "Psi4":
             settings = {}
-            after_geom = []
-            
-            if self.do_geom_opt.checkState() == Qt.Checked:
-                after_geom.append("nrg, wfn = optimize('$FUNCTIONAL', return_wfn=True)")
-                
-                if self.ts_opt.checkState() == Qt.Checked:
-                    settings['opt_type'] = ['ts']
-                    
-            
-            if self.do_freq.checkState() == Qt.Checked:
-                if self.num_freq.checkState() == Qt.Checked:
-                    after_geom.append("nrg, wfn = frequencies('$FUNCTIONAL', return_wfn=True, dertype='gradient')")
-                else:
-                    after_geom.append("nrg, wfn = frequencies('$FUNCTIONAL', return_wfn=True)")
+            job = {}
 
             if update_settings:
                 self.settings.last_nproc = self.nprocs.value()
@@ -1952,11 +2003,10 @@ class JobTypeOption(QWidget):
                 self.settings.last_ts = self.ts_opt.checkState() == Qt.Checked
                 self.settings.last_freq = self.do_freq.checkState() == Qt.Checked
                 self.settings.last_num_freq = self.num_freq.checkState() == Qt.Checked
-                self.settings.last_raman = self.raman.checkState() == Qt.Checked
                 
-            info = {Method.PSI4_AFTER_GEOM:after_geom}
+            info = {PSI4_JOB:job}
             if len(settings.keys()) > 0:
-                info[Method.PSI4_SETTINGS] = settings
+                info[PSI4_SETTINGS] = settings
             
             return info
 
@@ -1982,7 +2032,7 @@ class JobTypeOption(QWidget):
                 self.constrained_torsions.remove(torsion)
 
 
-class FunctionalOption(QWidget):
+class MethodOption(QWidget):
     #TODO: make checking the "is_semiempirical" box disable the basis functions tab of the parent tab widget
     #      dispersion names can be moved to EmpiricalDispersion
     GAUSSIAN_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D", "B3PW91", "B97-D", "BP86", "PBE0", "PM6", "AM1"]
@@ -1998,9 +2048,9 @@ class FunctionalOption(QWidget):
                        "Becke-Johnson damped modified Grimme D3", "Chai & Head-Gordon", "Nonlocal Approximation", \
                        "Pernal, Podeszwa, Patkowski, & Szalewicz", "Podeszwa, Katarzyna, Patkowski, & Szalewicz", \
                        "Řezác, Greenwell, & Beran"]
-    PSI4_GRIDS = ["Default", "(175, 974)", "(60, 770)", "(99, 590)", "(55, 590)", "(50, 434)", "(75, 302)"]
+    PSI4_GRIDS = ["Default", "(250, 974)", "(175, 974)", "(60, 770)", "(99, 590)", "(55, 590)", "(50, 434)", "(75, 302)"]
 
-    functionalChanged = pyqtSignal()
+    methodChanged = pyqtSignal()
     
     def __init__(self, settings, init_form, parent=None):
         super().__init__(parent)
@@ -2013,34 +2063,34 @@ class FunctionalOption(QWidget):
         new_margins = (margins.left(), 0, margins.right(), 0)
         layout.setContentsMargins(*new_margins)
 
-        functional_form = QWidget()
-        func_form_layout = QFormLayout(functional_form)
+        method_form = QWidget()
+        func_form_layout = QFormLayout(method_form)
         margins = func_form_layout.contentsMargins()
         new_margins = (margins.left(), margins.top(), margins.right(), 0)
         func_form_layout.setContentsMargins(*new_margins)
         
-        self.functional_option = QComboBox()
-        func_form_layout.addRow(self.functional_option)
+        self.method_option = QComboBox()
+        func_form_layout.addRow(self.method_option)
         
         keyword_label = QLabel("keyword:")
         
-        self.functional_kw = QLineEdit()
-        self.functional_kw.setPlaceholderText("filter functionals")
-        self.functional_kw.setText(self.settings.previous_custom_func)
-        self.functional_kw.setClearButtonEnabled(True)
+        self.method_kw = QLineEdit()
+        self.method_kw.setPlaceholderText("filter methods")
+        self.method_kw.setText(self.settings.previous_custom_func)
+        self.method_kw.setClearButtonEnabled(True)
         
-        func_form_layout.addRow(keyword_label, self.functional_kw)
+        func_form_layout.addRow(keyword_label, self.method_kw)
         
         semi_empirical_label = QLabel("basis set is integral:")
-        semi_empirical_label.setToolTip("check if basis set is integral to the functional (e.g. semi-empirical methods)")
+        semi_empirical_label.setToolTip("check if basis set is integral to the method (e.g. semi-empirical methods)")
         
         self.is_semiempirical = QCheckBox()
         self.is_semiempirical.stateChanged.connect(self.something_changed) 
-        self.is_semiempirical.setToolTip("check if basis set is integral to the functional (e.g. semi-empirical methods)")
+        self.is_semiempirical.setToolTip("check if basis set is integral to the method (e.g. semi-empirical methods)")
 
         func_form_layout.addRow(semi_empirical_label, self.is_semiempirical)
 
-        layout.addWidget(functional_form, 0, 0, Qt.AlignTop)
+        layout.addWidget(method_form, 0, 0, Qt.AlignTop)
 
         self.previously_used_table = QTableWidget()
         self.previously_used_table.setColumnCount(3)
@@ -2049,11 +2099,12 @@ class FunctionalOption(QWidget):
         self.previously_used_table.setEditTriggers(self.previously_used_table.NoEditTriggers)
         self.previously_used_table.setSelectionMode(self.previously_used_table.SingleSelection)
         self.previously_used_table.setSortingEnabled(True)
-        for i, (name, basis_required) in enumerate(zip(self.settings.previous_functional_names, self.settings.previous_functional_needs_basis)):
+        
+        for name, basis_required in zip(self.settings.previous_functional_names, self.settings.previous_functional_needs_basis):
             row = self.previously_used_table.rowCount()
             self.add_previously_used(row, name, basis_required)
 
-        self.previously_used_table.cellActivated.connect(lambda *args, s=self: FunctionalOption.remove_saved_func(s, *args))
+        self.previously_used_table.cellActivated.connect(lambda *args, s=self: MethodOption.remove_saved_func(s, *args))
         
         self.previously_used_table.verticalHeader().setVisible(False)
         self.previously_used_table.resizeColumnToContents(0)
@@ -2073,7 +2124,7 @@ class FunctionalOption(QWidget):
         disp_form_layout.setContentsMargins(*new_margins)
         
         self.dispersion = QComboBox()
-        self.dispersion.setToolTip("Dispersion correction for DFT functionals without built-in dispersion\n" + \
+        self.dispersion.setToolTip("Dispersion correction for DFT methods without built-in dispersion\n" + \
                                    "Important for long- or medium-range noncovalent interactions")
         self.dispersion.currentIndexChanged.connect(self.something_changed)
 
@@ -2090,21 +2141,21 @@ class FunctionalOption(QWidget):
         
         layout.addWidget(dft_form, 2, 0, Qt.AlignTop)
         
-        self.other_options = [keyword_label, self.functional_kw, semi_empirical_label, self.is_semiempirical, self.previously_used_table]
+        self.other_options = [keyword_label, self.method_kw, semi_empirical_label, self.is_semiempirical, self.previously_used_table]
         
         layout.setRowStretch(0, 0)
         layout.setRowStretch(1, 0)
         layout.setRowStretch(2, 1)
         layout.setContentsMargins(0, 0, 0, 0)
         
-        self.functional_option.currentTextChanged.connect(self.functional_changed)
+        self.method_option.currentTextChanged.connect(self.method_changed)
         self.setOptions(self.form)
         self.setPreviousStuff()
-        self.functional_kw.textChanged.connect(self.apply_filter)
+        self.method_kw.textChanged.connect(self.apply_filter)
 
     def something_changed(self, *args, **kw):
-        """called whenever something changes - emits functionalChanged"""
-        self.functionalChanged.emit()
+        """called whenever something changes - emits methodChanged"""
+        self.methodChanged.emit()
 
     def add_previously_used(self, row, name, basis_required):
         """add a basis set to the table of previously used options
@@ -2132,7 +2183,7 @@ class FunctionalOption(QWidget):
         trash_button = QLabel()
         dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
         trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(dim, dim))
-        trash_button.setToolTip("double click to remove from stored functionals")
+        trash_button.setToolTip("double click to remove from stored methods")
         widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
         widget_layout.setContentsMargins(2, 2, 2, 2)
         self.previously_used_table.setCellWidget(row, 2, widget_that_lets_me_horizontally_align_an_icon)
@@ -2160,16 +2211,16 @@ class FunctionalOption(QWidget):
         
         self.previously_used_table.removeRow(row)
 
-    def functional_changed(self, text):
-        """called whenever the functional kw changes - emits functionalChanged"""
+    def method_changed(self, text):
+        """called whenever the method kw changes - emits methodChanged"""
         for option in self.other_options:
             option.setVisible(text == "other")
         
-        self.functionalChanged.emit()
+        self.methodChanged.emit()
 
     def apply_filter(self, text):
-        """filter previous functional table when the user types in the custom kw box"""
-        #text = self.functional_kw.text()
+        """filter previous method table when the user types in the custom kw box"""
+        #text = self.method_kw.text()
         if text:
             #the user doesn't need capturing groups
             text = text.replace('(', '\(')
@@ -2191,14 +2242,15 @@ class FunctionalOption(QWidget):
 
     def setOptions(self, program):
         """change options to what's available in the specified program"""
-        current_func = self.functional_option.currentText()
-        self.functional_option.clear()
+        current_func = self.method_option.currentText()
+        self.method_option.clear()
+        cur_disp = self.dispersion.currentText()
         self.dispersion.clear()
         self.grid.clear()
         self.form = program
         if program == "Gaussian":
-            self.functional_option.addItems(self.GAUSSIAN_FUNCTIONALS)
-            self.functional_option.addItem("other")
+            self.method_option.addItems(self.GAUSSIAN_FUNCTIONALS)
+            self.method_option.addItem("other")
             
             self.dispersion.addItem("None")
             self.dispersion.addItems(self.GAUSSIAN_DISPERSION)
@@ -2206,8 +2258,8 @@ class FunctionalOption(QWidget):
             self.grid.addItems(self.GAUSSIAN_GRIDS)
             
         elif program == "ORCA":
-            self.functional_option.addItems(self.ORCA_FUNCTIONALS)
-            self.functional_option.addItem("other")
+            self.method_option.addItems(self.ORCA_FUNCTIONALS)
+            self.method_option.addItem("other")
             
             self.dispersion.addItem("None")
             self.dispersion.addItems(self.ORCA_DISPERSION)
@@ -2215,41 +2267,45 @@ class FunctionalOption(QWidget):
             self.grid.addItems(self.ORCA_GRIDS)
             
         elif program == "Psi4":
-            self.functional_option.addItems(self.PSI4_FUNCTIONALS)
-            self.functional_option.addItem("other")
+            self.method_option.addItems(self.PSI4_FUNCTIONALS)
+            self.method_option.addItem("other")
             
             self.dispersion.addItem("None")
             self.dispersion.addItems(self.PSI4_DISPERSION)
             
             self.grid.addItems(self.PSI4_GRIDS)
             
-        ndx = self.functional_option.findText(current_func, Qt.MatchExactly)
+        ndx = self.method_option.findText(current_func, Qt.MatchExactly)
         if ndx == -1:
-            ndx = self.functional_option.findText(self.settings.previous_functional, Qt.MatchExactly)
+            ndx = self.method_option.findText(self.settings.previous_method, Qt.MatchExactly)
             
         if ndx != -1:
-            self.functional_option.setCurrentIndex(ndx)
+            self.method_option.setCurrentIndex(ndx)
         
-        self.functionalChanged.emit()
+        ndx = self.dispersion.findText(cur_disp, Qt.MatchExactly)
+        if ndx != -1:
+            self.dispersion.setCurrentIndex(ndx)
+        
+        self.methodChanged.emit()
 
     def setPreviousStuff(self):
-        """grabs the functional options from the last time this tool was used and set
+        """grabs the method options from the last time this tool was used and set
         the current options ot that"""
-        func = self.settings.previous_functional
+        func = self.settings.previous_method
         disp = self.settings.previous_dispersion
         grid = self.settings.previous_grid
-        self.setFunctional(func)
+        self.setMethod(func)
         self.setGrid(grid)
         self.setDispersion(disp)
         
-        self.functionalChanged.emit()
+        self.methodChanged.emit()
 
     def use_previous_from_table(self, row):
-        """grabs the functional info from the table of previously used options and 
-        sets the current functional name to that"""
+        """grabs the method info from the table of previously used options and 
+        sets the current method name to that"""
         if row >= 0:
             name = self.previously_used_table.item(row, 0).text()
-            self.functional_kw.setText(name)
+            self.method_kw.setText(name)
             
             needs_basis = self.previously_used_table.item(row, 1).text()
             if needs_basis == "yes":
@@ -2257,57 +2313,57 @@ class FunctionalOption(QWidget):
             else:
                 self.is_semiempirical.setCheckState(Qt.Checked)            
 
-        self.functionalChanged.emit()
+        self.methodChanged.emit()
 
-    def getFunctional(self, update_settings=True):
-        """returns Functional corresponding to current settings"""
+    def getMethod(self, update_settings=True):
+        """returns Method corresponding to current settings"""
         if self.form == "Gaussian":
-            if self.functional_option.currentText() == "B3LYP":
+            if self.method_option.currentText() == "B3LYP":
                 if update_settings:
-                    self.settings.previous_functional = "Gaussian's B3LYP"
+                    self.settings.previous_method = "Gaussian's B3LYP"
                 
-                return Functional("Gaussian's B3LYP", False)
+                return Method("Gaussian's B3LYP", False)
             
-        if self.functional_option.currentText() != "other":
-            functional = self.functional_option.currentText()
+        if self.method_option.currentText() != "other":
+            method = self.method_option.currentText()
             #omega doesn't get decoded right
             if update_settings:
-                self.settings.previous_functional = functional.replace('ω', 'w')
+                self.settings.previous_method = method.replace('ω', 'w')
             
-            if functional in KNOWN_SEMI_EMPIRICAL:
+            if method in KNOWN_SEMI_EMPIRICAL:
                 is_semiempirical = True
             else:
                 is_semiempirical = False
                 
-            return Functional(functional, is_semiempirical)
+            return Method(method, is_semiempirical)
             
         else:
             if update_settings:
-                self.settings.previous_functional = "other"
+                self.settings.previous_method = "other"
             
-            functional = self.functional_kw.text()
+            method = self.method_kw.text()
             if update_settings:
-                self.settings.previous_custom_func = functional
+                self.settings.previous_custom_func = method
             
             is_semiempirical = self.is_semiempirical.checkState() == Qt.Checked
             
-            if len(functional) > 0:
+            if len(method) > 0:
                 found_func = False
                 for i in range(0, len(self.settings.previous_functional_names)):
-                    if self.settings.previous_functional_names[i] == functional and \
+                    if self.settings.previous_functional_names[i] == method and \
                         self.settings.previous_functional_needs_basis[i] != is_semiempirical:
                         found_func = True
                 
                 if not found_func:
                     #append doesn't seem to call __setattr__, so the setting doesn't get updated
                     if update_settings:
-                        self.settings.previous_functional_names = self.settings.previous_functional_names + [functional]
+                        self.settings.previous_functional_names = self.settings.previous_functional_names + [method]
                         self.settings.previous_functional_needs_basis = self.settings.previous_functional_needs_basis + [not is_semiempirical]
                     
                         row = self.previously_used_table.rowCount()
-                        self.add_previously_used(row, functional, not is_semiempirical)
+                        self.add_previously_used(row, method, not is_semiempirical)
 
-            return Functional(functional, is_semiempirical)
+            return Method(method, is_semiempirical)
 
     def getDispersion(self, update_settings=True):
         """returns EmpiricalDispersion corresponding to current settings"""
@@ -2351,9 +2407,9 @@ class FunctionalOption(QWidget):
 
         self.dispersion.setCurrentIndex(ndx)
 
-    def setFunctional(self, func):
-        """sets functional option to match the given Functional"""
-        if isinstance(func, Functional):
+    def setMethod(self, func):
+        """sets method option to match the given Method"""
+        if isinstance(func, Method):
             test_value = func.name
         else:
             test_value = func
@@ -2364,17 +2420,17 @@ class FunctionalOption(QWidget):
         if self.form == "Gaussian" and test_value == "Gaussian's B3LYP":
             test_value = "B3LYP"
         
-        ndx = self.functional_option.findText(test_value, Qt.MatchExactly)
+        ndx = self.method_option.findText(test_value, Qt.MatchExactly)
         if ndx < 0:
-            ndx = self.functional_option.findText("other", Qt.MatchExactly)
-            if isinstance(func, Functional):
-                self.functional_kw.setText(func.name)
+            ndx = self.method_option.findText("other", Qt.MatchExactly)
+            if isinstance(func, Method):
+                self.method_kw.setText(func.name)
                 self.is_semiempirical.setChecked(func.is_semiempirical)
             else:
-                self.functional_kw.setText(func)
-                self.is_semiempirical.setChecked(func in KNOWN_SEMI_EMPIRICAL)
+                self.method_kw.setText(func)
+                self.is_semiempirical.setChecked(any(func == semi_func.upper() for semi_func in KNOWN_SEMI_EMPIRICAL))
 
-        self.functional_option.setCurrentIndex(ndx)
+        self.method_option.setCurrentIndex(ndx)
 
 
 class BasisOption(QWidget):
@@ -2417,7 +2473,7 @@ class BasisOption(QWidget):
     
     aux_available = True
     
-    basis_class = Basis
+    basis_class = SEQCROW_Basis
 
     def __init__(self, parent, settings, form):
         self.parent = parent
@@ -2965,7 +3021,7 @@ class ECPOption(BasisOption):
 
     aux_available = False
 
-    basis_class = ECP
+    basis_class = SEQCROW_ECP
 
     def update_tooltab(self):
         """renames the tab for this ecp"""
@@ -3228,7 +3284,7 @@ class BasisWidget(QWidget):
             basis.show_elements(not (len(self.basis_options) == 1 and len(self.ecp_options) == 0))
 
     def get_basis(self, update_settings=True):
-        """returns ([Basis], [ECP]) corresponding to the current settings"""
+        """returns ([SEQCROW_Basis], [SEQCROW_ECP]) corresponding to the current settings"""
         basis_set = []
         ecp = []
         for i, basis in enumerate(self.basis_options):
@@ -3406,6 +3462,53 @@ class BasisWidget(QWidget):
         self.basisChanged.emit()
 
 
+#these table subclasses let me overwrite the dropEvent
+#so you can drag and drop things to add options
+class CurrentKWTable(QTableWidget):
+    def __init__(self, origin, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.origin = origin
+        
+    def dropEvent(self, event):
+        other_table = event.source()
+        if not isinstance(other_table, QTableWidget):
+            return
+            
+        for item in other_table.selectedItems():
+            if item.column() != 0:
+                continue
+                
+            kw = item.text()
+            if hasattr(self.origin, "last_dict"):
+                if kw not in self.origin.last_dict:
+                    self.origin.last_dict[kw] = []
+                    self.origin.add_item_to_current_kw_table(kw)
+            
+            elif hasattr(self.origin, "last_list"):
+                if not any(kw == x for x in self.origin.last_list):
+                    self.origin.last_list.append(kw)
+                    self.origin.add_item_to_current_kw_table(kw)
+
+
+class CurrentOptTable(QTableWidget):
+    def __init__(self, origin, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.origin = origin
+        
+    def dropEvent(self, event):
+        other_table = event.source()
+        if not isinstance(other_table, QTableWidget):
+            return
+            
+        for item in other_table.selectedItems():
+            if item.column() != 0:
+                continue
+                
+            opt = item.text()
+            if hasattr(self.origin, "last_dict"):
+                self.origin.add_item_to_current_opt_table(opt)
+
+
 class OneLayerKeyWordOption(QWidget):
     #TODO:
     #* add option to not save (who wants to save a comment? some people might, but I don't)
@@ -3436,7 +3539,7 @@ class OneLayerKeyWordOption(QWidget):
         self.previous_kw_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.previous_kw_table.verticalHeader().setVisible(False)
         
-        self.current_kw_table = QTableWidget()
+        self.current_kw_table = CurrentKWTable(self)
         self.current_kw_table.setColumnCount(2)
         self.current_kw_table.setHorizontalHeaderLabels(['current', 'remove'])
         self.current_kw_table.setSelectionMode(QTableWidget.SingleSelection)
@@ -3484,7 +3587,10 @@ class OneLayerKeyWordOption(QWidget):
         self.current_kw_table.horizontalHeader().setStretchLastSection(False)            
         self.current_kw_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.current_kw_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
-    
+        
+        self.previous_kw_table.setDragDropMode(QTableWidget.DragOnly)
+        self.current_kw_table.setDragDropMode(QTableWidget.DropOnly)        
+
         layout.addWidget(self.previous_kw_table, 0, 0)
         layout.addWidget(self.current_kw_table, 0, 1)
         layout.addWidget(new_kw_widget, 1, 0, 1, 2)
@@ -3696,7 +3802,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.previous_kw_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         keyword_layout.addWidget(self.previous_kw_table, 0, 0)
         
-        self.current_kw_table = QTableWidget()
+        self.current_kw_table = CurrentKWTable(self)
         self.current_kw_table.setColumnCount(2)
         self.current_kw_table.setHorizontalHeaderLabels(['current', 'remove'])
         self.current_kw_table.setSelectionMode(QTableWidget.SingleSelection)
@@ -3746,7 +3852,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.previous_opt_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         option_layout.addWidget(self.previous_opt_table, 0, 0)
         
-        self.current_opt_table = QTableWidget()
+        self.current_opt_table = CurrentOptTable(self)
         self.current_opt_table.setColumnCount(2)
         self.current_opt_table.setHorizontalHeaderLabels(['current', 'remove'])
         self.current_opt_table.setEditTriggers(QTableWidget.DoubleClicked)
@@ -3804,6 +3910,12 @@ class TwoLayerKeyWordOption(QWidget):
         self.current_opt_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.current_opt_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
     
+        self.previous_kw_table.setDragDropMode(QTableWidget.DragOnly)
+        self.current_kw_table.setDragDropMode(QTableWidget.DropOnly)        
+        
+        self.previous_opt_table.setDragDropMode(QTableWidget.DragOnly)
+        self.current_opt_table.setDragDropMode(QTableWidget.DropOnly)
+    
         splitter = QSplitter(Qt.Horizontal)
         splitter.setChildrenCollapsible(True)
         splitter.addWidget(self.keyword_groupbox)
@@ -3857,7 +3969,10 @@ class TwoLayerKeyWordOption(QWidget):
         trash_button = QLabel()
         dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
         trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-        trash_button.setToolTip("click to not use this %s" % self.name[:-1])
+        if self.name.endswith('s'):
+            trash_button.setToolTip("click to not use this %s" % self.name[:-1])
+        else:
+            trash_button.setToolTip("click to not use this %s" % self.name)
         widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
         widget_layout.setContentsMargins(2, 2, 2, 2)
         self.current_kw_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
@@ -3908,16 +4023,38 @@ class TwoLayerKeyWordOption(QWidget):
         #prevent edit signal from triggering
         #it should break anything, but we don't need it
         self.current_opt_table.blockSignals(True)
+        
+        #check keywords to see if opt is already one of them
+        #this is really just for psi4, as they are basically the only one to use
+        #a '=' for the 'job' options
+        #though gaussian may also use this for some route options, but it should still
+        #be fine as you can't specify e.g. grid=99302 and grid=superfinegrid
+        #if the keyword is already on the table, remove that item
+        known_kw = [self.current_opt_table.item(row, 0).data(Qt.DisplayRole).split('=')[0] \
+                    for row in range(0, self.current_opt_table.rowCount())]
+        kw = opt.split('=')[0].strip()
+        if kw in known_kw:
+            for row in range(self.current_opt_table.rowCount() - 1, -1, -1):
+                if self.current_opt_table.item(row, 0).data(Qt.DisplayRole).startswith(kw):
+                    self.current_opt_table.removeRow(row)
+            
+            remove = 0
+            for i, item in enumerate(self.last_dict[self.selected_kw]):
+                if item.startswith(kw):
+                    remove = i
+            
+            del self.last_dict[self.selected_kw][remove]
+        
         if opt not in self.last_dict[self.selected_kw]:
             if self.one_opt_per_kw:
                 self.last_dict[self.selected_kw] = [opt]
-                for i in range(self.current_opt_table.rowCount(), -1, -1):
+                for i in range(self.current_opt_table.rowCount() - 1, -1, -1):
                     self.current_opt_table.removeRow(i)
             
             else:
                 self.last_dict[self.selected_kw].append(opt)
         
-            self.optionChanged.emit()
+        self.optionChanged.emit()
 
         row = self.current_opt_table.rowCount()
         self.current_opt_table.insertRow(row)
@@ -3934,7 +4071,7 @@ class TwoLayerKeyWordOption(QWidget):
         widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
         widget_layout.setContentsMargins(2, 2, 2, 2)
         self.current_opt_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
-    
+        
         self.current_opt_table.resizeRowToContents(row)
         self.current_opt_table.resizeColumnToContents(0)
         self.current_opt_table.resizeColumnToContents(1)
@@ -4041,7 +4178,7 @@ class TwoLayerKeyWordOption(QWidget):
             item = self.current_opt_table.item(row, 0)
             opt = item.text()
             self.last_dict[self.selected_kw].remove(opt)
-                        
+
             self.current_opt_table.removeRow(row)
             
             self.optionChanged.emit()
@@ -4126,7 +4263,7 @@ class TwoLayerKeyWordOption(QWidget):
 class KeywordOptions(QWidget):
     """
     items is a dict that can include
-        route       - enables widget to display route options a la Gaussian or ORCA 
+        route       - enables widget to display route options 
         comment     - comment 
         link 0      - enables Gaussian's Link 0 commands
         settings    - enables setting specifications a la Psi4
@@ -4159,12 +4296,12 @@ class KeywordOptions(QWidget):
         self.previous_dict = {}
         previous_dict = loads(self.settings.__getattr__(self.previous_option_name))
         for key in previous_dict.keys():
-            self.previous_dict[int(key)] = previous_dict[key]
+            self.previous_dict[key] = previous_dict[key]
         
         self.last_dict = {}
         last_dict = loads(self.settings.__getattr__(self.last_option_name))
         for key in last_dict.keys():
-            self.last_dict[int(key)] = last_dict[key]
+            self.last_dict[key] = last_dict[key]
                     
         self.layout = QGridLayout(self)
         
@@ -4178,15 +4315,19 @@ class KeywordOptions(QWidget):
         
         self.widgets = {}
         for item in self.items.keys():
-            if self.items[item] not in self.last_dict:
-                last = None
-            else:
+            if self.items[item] in self.last_dict:
                 last = self.last_dict[self.items[item]]
-            
-            if self.items[item] not in self.previous_dict:
-                previous = None
+            elif item in self.old_items and self.old_items[item] in self.last_dict:
+                last = self.last_dict[self.old_items[item]]
             else:
+                last = None
+            
+            if self.items[item] in self.previous_dict:
                 previous = self.previous_dict[self.items[item]]
+            elif item in self.old_items and self.old_items[item] in self.previous_dict:
+                previous = self.previous_dict[self.old_items[item]]
+            else:
+                previous = None
             
             self.widgets[item] = self.get_options_for(item, last, previous)
             self.widgets[item].optionChanged.connect(self.something_changed)
@@ -4205,7 +4346,10 @@ class KeywordOptions(QWidget):
         for item in self.widgets.keys():
             if self.items[item] in current_dict:
                 self.widgets[item].setCurrentSettings(current_dict[self.items[item]])
-                
+            
+            elif hasattr(self, "old_items") and item in self.old_items and self.old_items[item] in current_dict:
+                self.widgets[item].setCurrentSettings(current_dict[self.old_items[item]])
+            
             else:
                 self.widgets[item].clearCurrentSettings()
     
@@ -4284,11 +4428,20 @@ class KeywordOptions(QWidget):
 
 
 class GaussianKeywordOptions(KeywordOptions):
-    items = {'link 0': Method.GAUSSIAN_PRE_ROUTE, \
-             'comment': Method.GAUSSIAN_COMMENT, \
-             'route': Method.GAUSSIAN_ROUTE, \
-             'end of file': Method.GAUSSIAN_POST, \
+    items = {'route': GAUSSIAN_ROUTE, \
+             'link 0': GAUSSIAN_PRE_ROUTE, \
+             'comment': GAUSSIAN_COMMENT, \
+             'end of file': GAUSSIAN_POST, \
             }
+    
+    #the keys used to be an int map before this stuff got moved to AaronTools
+    #old_items allows users to keep old settings
+    old_items = {'link 0': "1", \
+                 'comment': "8", \
+                 'route': "2", \
+                 'end of file': "7", \
+                }
+    
     previous_option_name = "previous_gaussian_options"
     last_option_name = "last_gaussian_options"
 
@@ -4348,10 +4501,15 @@ class GaussianKeywordOptions(KeywordOptions):
     
 
 class ORCAKeywordOptions(KeywordOptions):
-    items = {'simple keywords': Method.ORCA_ROUTE, \
-             'comment': Method.ORCA_COMMENT, \
-             'blocks': Method.ORCA_BLOCKS, \
+    items = {'simple keywords': ORCA_ROUTE, \
+             'blocks': ORCA_BLOCKS, \
+             'comment': ORCA_COMMENT, \
             }
+
+    old_items = {'simple keywords': "1", \
+                 'comment': "4", \
+                 'blocks': "2", \
+                }
 
     previous_option_name = "previous_orca_options"
     last_option_name = "last_orca_options"
@@ -4399,19 +4557,56 @@ class ORCAKeywordOptions(KeywordOptions):
 
 
 class Psi4KeywordOptions(KeywordOptions):
-    items = {'settings': Method.PSI4_SETTINGS, \
-             'before molecule': Method.PSI4_BEFORE_GEOM, \
-             'molecule': Method.PSI4_COORDINATES, \
-             'after job': Method.PSI4_AFTER_GEOM, \
-             'comment': Method.PSI4_COMMENT, \
+    items = {'settings': PSI4_SETTINGS, \
+             'molecule': PSI4_COORDINATES, \
+             'job': PSI4_JOB, \
+             'optking': PSI4_OPTKING, \
+             'before molecule': PSI4_BEFORE_GEOM, \
+             'before job': PSI4_BEFORE_JOB, \
+             'after job': PSI4_AFTER_JOB, \
+             'comment': PSI4_COMMENT, \
             }
+
+    old_items = {'settings': "1", \
+                 'before molecule': "2", \
+                 'molecule': "5", \
+                 'before job': "3", \
+                 'comment': "4", \
+                 'job': "6", \
+                }
 
     previous_option_name = "previous_psi4_options"
     last_option_name = "last_psi4_options"
 
     @classmethod
     def get_options_for(cls, name, last, previous):
+        if name == "job":
+            if last is None:
+                last_dict = {}
+            else:
+                last_dict = last
+            
+            if previous is None:
+                previous_dict = {}
+            else:
+                previous_dict = previous
+                
+            return TwoLayerKeyWordOption("job", last_dict, previous_dict, "double click to use \"%s(%s)\"", one_opt_per_kw=False)
+        
         if name == "after job":
+            if last is None:
+                last_list = []
+            else:
+                last_list = last            
+                
+            if previous is None:
+                previous_list = []
+            else:
+                previous_list = previous
+                
+            return OneLayerKeyWordOption("after job", last_list, previous_list, multiline=True)
+
+        if name == "before job":
             if last is None:
                 last_list = []
             else:
@@ -4462,6 +4657,19 @@ class Psi4KeywordOptions(KeywordOptions):
                 previous_dict = previous
                 
             return TwoLayerKeyWordOption("settings", last_dict, previous_dict, "double click to use \"set { %s %s }\"", one_opt_per_kw=True)
+
+        elif name == "optking":
+            if last is None:
+                last_dict = {}
+            else:
+                last_dict = last            
+                
+            if previous is None:
+                previous_dict = {}
+            else:
+                previous_dict = previous
+                
+            return TwoLayerKeyWordOption("optking settings", last_dict, previous_dict, "double click to use \"set optking { %s %s }\"", one_opt_per_kw=True)
 
         elif name == "molecule":
             if last is None:
@@ -4725,10 +4933,10 @@ class SavePreset(ChildToolWindow):
         self.solvent.setToolTip("implicit solvent")
         layout.addRow("solvent:", self.solvent)
         
-        self.functional = QCheckBox()
-        self.functional.setChecked(True)
-        self.functional.setToolTip("functional")
-        layout.addRow("functional:", self.functional)
+        self.method = QCheckBox()
+        self.method.setChecked(True)
+        self.method.setToolTip("method")
+        layout.addRow("method:", self.method)
         
         
         self.basis = QCheckBox()
@@ -4813,22 +5021,26 @@ class SavePreset(ChildToolWindow):
             preset['mem'] = mem
         
         if self.solvent.checkState() == Qt.Checked:
-            solvent = self.tool_instance.job_widget.getSolvent()
-            preset['solvent model'] = solvent.name
-            preset['solvent'] = solvent.solvent
+            solvent = self.tool_instance.job_widget.getSolvent(update_settings=False)
+            if solvent is not None:
+                preset['solvent model'] = solvent.name
+                preset['solvent'] = solvent.solvent
+            else:
+                preset['solvent model'] = 'None'
+                preset['solvent'] = ''
         
-        if self.functional.checkState() == Qt.Checked:
-            functional = self.tool_instance.functional_widget.getFunctional(update_settings=False)
-            preset['functional'] = functional.name
-            preset['semi-empirical'] = functional.is_semiempirical
+        if self.method.checkState() == Qt.Checked:
+            method = self.tool_instance.method_widget.getMethod(update_settings=False)
+            preset['method'] = method.name
+            preset['semi-empirical'] = method.is_semiempirical
             
-            dispersion = self.tool_instance.functional_widget.getDispersion(update_settings=False)
+            dispersion = self.tool_instance.method_widget.getDispersion(update_settings=False)
             if dispersion is not None:
                 preset['disp'] = dispersion.name
             else:
                 preset['disp'] = dispersion
             
-            grid = self.tool_instance.functional_widget.getGrid(update_settings=False)
+            grid = self.tool_instance.method_widget.getGrid(update_settings=False)
             if grid is not None:
                 preset['grid'] = grid.name
             else:
@@ -4874,7 +5086,7 @@ class SavePreset(ChildToolWindow):
         
         self.status.showMessage("saved \"%s\"" % name)
         
-        #sometimes this causes an error
+        #sometimes destroy causes an error
         #I haven't seen any pattern
         #self.destroy()
 
