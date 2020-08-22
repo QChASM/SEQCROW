@@ -792,15 +792,6 @@ class BuildQM(ToolInstance):
         """save input to a file
         a file dialog will open asking for a file location"""
         self.update_theory()
-        
-        if self.model_selector.currentIndex() >= 0 and \
-            self.model_selector.currentIndex() < len(self.models):
-            model = self.models[self.model_selector.currentIndex()]
-        else:
-            model = None
-
-        if update_settings:
-            model = ResidueCollection(model)
 
         kw_dict = self.job_widget.getKWDict()
         other_kw_dict = self.other_keywords_widget.getKWDict()
@@ -816,17 +807,18 @@ class BuildQM(ToolInstance):
         if program == "Gaussian":
             filename, _ = QFileDialog.getSaveFileName(filter="Gaussian input files (*.com *.gjf)")
             if filename:
-                output, warnings = self.theory.write_gaussian_input(model, fname=filename, **combined_dict)
+                print(filename)
+                output, warnings = self.theory.write_gaussian_input(fname=filename, **combined_dict)
         
         elif program == "ORCA":
             filename, _ = QFileDialog.getSaveFileName(filter="ORCA input files (*.inp)")
             if filename:
-                output, warnings = self.theory.write_orca_input(model, fname=filename, **combined_dict)
+                output, warnings = self.theory.write_orca_input(fname=filename, **combined_dict)
         
         elif program == "Psi4":
             filename, _ = QFileDialog.getSaveFileName(filter="Psi4 input files (*.in)")
             if filename:
-                output, warnings = self.theory.write_psi4_input(model, fname=filename, **combined_dict)
+                output, warnings = self.theory.write_psi4_input(fname=filename, **combined_dict)
 
         for warning in warnings:
             self.session.logger.warning(warning)
