@@ -4,6 +4,8 @@ from chimerax.core.toolshed import BundleAPI
 from chimerax.core.toolshed.info import SelectorInfo
 from chimerax.core.commands import BoolArg, ModelsArg, StringArg, register
 
+from AaronTools.const import ELEMENTS
+
 
 class _SEQCROW_API(BundleAPI):
 
@@ -34,12 +36,16 @@ class _SEQCROW_API(BundleAPI):
         #initialize is called after init_manager 
         session.seqcrow_job_manager.init_queue()
 
-        ##register selectors from the user's personal library
-        #from AaronTools.substituent import Substituent
-        #for sub in Substituent.list():  
-        #    if not any([selector.name == sub for selector in bundle_info.selectors]):
-        #        si = SelectorInfo(sub, atomic=True, synopsis="%s substituent" % sub)
-        #        bundle_info.selectors.append(si)
+        #register selectors from the user's personal library
+        from AaronTools.substituent import Substituent
+        for sub in Substituent.list():
+            if sub not in ELEMENTS and sub.isalpha():
+                if not any([selector.name == sub for selector in bundle_info.selectors]):
+                    si = SelectorInfo(sub, atomic=True, synopsis="%s substituent" % sub)
+                    bundle_info.selectors.append(si)
+        
+        #need to reregister selectors b/c ^ that bypassed the bundle_info.xml or something
+        bundle_info._register_selectors(session.logger)
 
     @staticmethod
     def open_file(session, path, format_name, coordsets=False):
@@ -64,10 +70,8 @@ class _SEQCROW_API(BundleAPI):
         
     @staticmethod
     def register_selector(bundle_info, selector_info, logger):
-        """select all transition metals with one easy `select` command!"""
-
         from .selectors import register_selectors
-        register_selectors(logger)
+        register_selectors(logger, selector_info.name)
 
     @staticmethod
     def init_manager(session, bundle_info, name, **kw):
