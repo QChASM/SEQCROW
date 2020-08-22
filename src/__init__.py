@@ -5,6 +5,7 @@ from chimerax.core.toolshed.info import SelectorInfo
 from chimerax.core.commands import BoolArg, ModelsArg, StringArg, register
 
 from AaronTools.const import ELEMENTS
+from AaronTools.substituent import Substituent
 
 
 class _SEQCROW_API(BundleAPI):
@@ -25,6 +26,9 @@ class _SEQCROW_API(BundleAPI):
 
             session.ui.triggers.add_handler('ready',
                 lambda *args, ses=session: settings.register_settings_options(ses))
+                    
+            session.ui.triggers.add_handler('ready',
+                lambda *args, ses=session: _SEQCROW_API.register_selector_menus(ses))
         
         #apply AARONLIB setting
         if seqcrow_settings.settings.AARONLIB is not None:
@@ -37,13 +41,12 @@ class _SEQCROW_API(BundleAPI):
         session.seqcrow_job_manager.init_queue()
 
         #register selectors from the user's personal library
-        from AaronTools.substituent import Substituent
         for sub in Substituent.list():
-            if sub not in ELEMENTS and sub.isalpha():
+            if sub not in ELEMENTS and sub.isalnum():
                 if not any([selector.name == sub for selector in bundle_info.selectors]):
                     si = SelectorInfo(sub, atomic=True, synopsis="%s substituent" % sub)
                     bundle_info.selectors.append(si)
-        
+
         #need to reregister selectors b/c ^ that bypassed the bundle_info.xml or something
         bundle_info._register_selectors(session.logger)
 
@@ -221,6 +224,15 @@ class _SEQCROW_API(BundleAPI):
         elif command_info.name == "closeRing":
             from .commands.closeRing import closeRing, closeRing_description
             register("closeRing", closeRing_description, closeRing)
+
+    @staticmethod
+    def register_selector_menus(session):
+        add_submenu = session.ui.main_window.add_select_submenu
+        add_selector = session.ui.main_window.add_menu_selector
+        substituent_menu = add_submenu(['Che&mistry'], 'Substituents')
+        for sub in Substituent.list():
+            if sub not in ELEMENTS and sub.isalnum():
+                add_selector(substituent_menu, sub, sub)
 
 
 bundle_api = _SEQCROW_API()

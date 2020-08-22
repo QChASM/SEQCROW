@@ -13,6 +13,8 @@ from SEQCROW.residue_collection import ResidueCollection
 
 from collections import deque
 
+from time import perf_counter
+
 Primes()
 BondOrder()
 
@@ -61,6 +63,9 @@ def substituent_selection(session, sub_name, models, results):
     
     found = False
     
+    #rank_time = 0
+    #frag_time = 0
+    
     for model in models:
         if isinstance(model, AtomicStructure):
             for atom in model.atoms:
@@ -69,7 +74,14 @@ def substituent_selection(session, sub_name, models, results):
                     if bonded_atom.element.name != sub.atoms[0].element:
                         continue
                     #session.logger.info("fragment for %s" % bonded_atom.atomspec)
-                    frag = get_fragment(model, bonded_atom, atom, length)
+                    #frag_start = perf_counter()
+                    frag = get_fragment(bonded_atom, atom, length)
+                    #frag_stop = perf_counter()
+                    #frag_time += frag_stop - frag_start
+                    
+                    if frag.intersects(atoms):
+                        continue
+                    
                     frag = frag.subtract(Atoms([atom]))
 
                     if len(frag) != length:
@@ -80,7 +92,10 @@ def substituent_selection(session, sub_name, models, results):
                     if sub_elements != elements:
                         continue
 
+                    #rank_start = perf_counter()
                     frag_ranks = canonical_rank(frag)
+                    #rank_stop = perf_counter()
+                    #rank_time += rank_stop - rank_start
                     
                     #session.logger.warning(", ".join(sub_elements))
                     #session.logger.warning("%s;\n%s" % (", ".join(str(x) for x in sorted(frag_ranks)), ", ".join(str(x) for x in sorted(sub_ranks))))
@@ -108,15 +123,12 @@ def substituent_selection(session, sub_name, models, results):
                             
                         failed = False
                         for i, j, k in zip(
-                            sorted([aa.element.name for aa in a.neighbors]), 
+                            sorted([aa.element.name for aa in a.neighbors if ((aa is not atom and a is bonded_atom) or a is not bonded_atom)]), 
                             sorted([bb.element.name for bb in b.neighbors]), 
-                            [x for _, x in sorted(zip([aa.element.name for aa in a.neighbors], [aa for aa in a.neighbors]), key=lambda pair: pair[0])], 
+                            sorted([aa for aa in a.neighbors if ((aa is not atom and a is bonded_atom) or a is not bonded_atom)]), 
                         ):
-                            if a is bonded_atom and k is atom:
-                                continue
-                            
                             if i != j:
-                                #session.logger.info("failed %s %s %s" % i, j, k.atomspec)
+                                #session.logger.info("failed %s %s, %s" % (i, j, k.atomspec))
                                 failed = True
                                 break
                             
@@ -126,23 +138,25 @@ def substituent_selection(session, sub_name, models, results):
                     else:
                         atoms = atoms.merge(frag)
     
+    #session.logger.info("spent %f time fragmenting" % frag_time)
+    #session.logger.info("spent %f time ranking atoms" % rank_time)
     results.add_atoms(atoms)
 
-def get_fragment(atoms, start, stop, max_len):
+def get_fragment(start, stop, max_len):
     """
     see AaronTools.geometry.Geometry.get_fragment
     """
 
     stack = deque([start])
-    frag = Atoms([start])
+    frag = [start]
+    stop = set([stop])
     while len(stack) > 0 and len(frag) <= max_len:
         connected = stack.popleft()
-        connected = Atoms(connected.neighbors).subtract(Atoms([stop]))
-        connected = connected.subtract(frag)
-        stack.extend(connected.instances())
-        frag = frag.merge(connected)
+        connected = set(connected.neighbors) - stop - set(frag)
+        stack.extend(connected)
+        frag.extend(connected)
 
-    return frag
+    return Atoms(frag)
 
 def get_invariant(atom, atoms):
     """gets initial invariant
@@ -299,7 +313,7 @@ def canonical_rank(structure, heavy_only=False, break_ties=True):
         return update_ranks(ranks, new_partitions)
 
     # rank all atoms the same initially
-    for a in structure.instances():
+    for a in structure:
         if heavy_only and a.element.name == "H":
             continue
         atoms += [a]
