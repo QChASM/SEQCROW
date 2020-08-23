@@ -11,6 +11,10 @@ class JobFinishedNotification(EnumOption):
     values = ['log notification', 'log and popup notifications']
     labels = ['log notification', 'log and popup notifications']
 
+class IOPresets(EnumOption):
+    values = ['None', 'Ball-Stick-Endcap', 'Sticks', 'Index Labels', 'Ball-Stick-Endcap + Index Labels', 'Sticks + Index Labels']
+    labels = ['None', 'Ball-Stick-Endcap', 'Sticks', 'Index Labels', 'Ball-Stick-Endcap + Index Labels', 'Sticks + Index Labels']
+
 # 'settings' module attribute will be set by manager initialization
 class _SEQCROWSettings(Settings):
     EXPLICIT_SAVE = {
@@ -20,8 +24,11 @@ class _SEQCROWSettings(Settings):
         'PSI4_EXE': Value("psi4", StringArg),
         'SCRATCH_DIR': Value(path.join(path.expanduser('~'), "SEQCROW_SCRATCH"), StringArg), 
         'JOB_FINISHED_NOTIFICATION': Value('log notification', 
-                                           EnumOf(JobFinishedNotification.values)
+                                           EnumOf(JobFinishedNotification.values),
                                           ), 
+        'SEQCROW_IO_PRESET': Value('None', 
+                                   EnumOf(IOPresets.values),
+                                  ),
     }
 
 
@@ -61,6 +68,11 @@ def register_settings_options(session):
             "Personal AaronTools library folder",
             InputFolderOption,
             "Directory containing your substituents (/Subs), ligands (/Ligands), rings (/Rings), and AARON templates (/TS_geoms)\nYou will need to restart ChimeraX for changes to take effect"),
+            
+        "SEQCROW_IO_PRESET" : (
+            "Preset for molecules opened with SEQCROW", 
+            IOPresets, 
+            "Molecules opened through SEQCROW (xyz, log, etc.) will use this graphical preset"),
     }
     
     job_settings_info = {
@@ -119,7 +131,5 @@ def register_settings_options(session):
         
         opt = opt_class(opt_name, getattr(settings, setting), _opt_cb,
             attr_name=setting, settings=settings, balloon=balloon, auto_set_attr=False)
-
-        
         
         session.ui.main_window.add_settings_option("SEQCROW Jobs", opt)

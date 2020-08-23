@@ -1,5 +1,5 @@
 from chimerax.core.toolshed import ProviderManager
-from chimerax.core.models import REMOVE_MODELS
+from chimerax.core.models import REMOVE_MODELS, ADD_MODELS
 from chimerax.core.triggerset import TriggerSet
         
 FILEREADER_CHANGE = "AaronTools file opened or closed"
@@ -14,15 +14,33 @@ class FileReaderManager(ProviderManager):
         self.triggers.add_trigger(FILEREADER_CHANGE)
         self.triggers.add_trigger(FILEREADER_ADDED)
         self.triggers.add_trigger(FILEREADER_REMOVED)
-                
+
         session.triggers.add_handler(REMOVE_MODELS, self.remove_models)
+        session.triggers.add_handler(ADD_MODELS, self.apply_preset)
         self.triggers.add_handler(FILEREADER_REMOVED, self.remove_filereader)
         self.triggers.add_handler(FILEREADER_ADDED, self.add_filereader)
 
         #list of models with an associated FileReader object
         self.models = []
         self.filereaders = []
-        
+
+    def apply_preset(self, trigger_name, models):
+        """if a graphical preset is set in SEQCROW settings, apply that preset to models"""
+        for model in models:
+            if model in self.models:
+                if model.session.ui.is_gui:
+                    preset = model.session.seqcrow_settings.settings.SEQCROW_IO_PRESET
+                    model.session.logger.info(preset)
+                    if "Ball-Stick-Endcap" in preset:
+                        from SEQCROW.presets import seqcrow_bse
+                        seqcrow_bse(model.session, models=model)
+                    if "Sticks" in preset:
+                        from SEQCROW.presets import seqcrow_s
+                        seqcrow_s(model.session, models=model)
+                    if "Index Labels" in preset:
+                        from SEQCROW.presets import indexLabel
+                        indexLabel(model.session, models=model)
+
     def add_filereader(self, trigger_name, models_and_filereaders):
         """add models with filereader data to our list"""
         models, filereaders = models_and_filereaders
