@@ -53,6 +53,8 @@ class _NormalModeSettings(Settings):
         'anim_duration': Value(120, IntArg),
         'anim_fps': Value(60, IntArg), 
         'fwhm': Value(5, FloatArg), 
+        'peak_type': 'Gaussian', 
+        'plot_type': 'Absorbance', 
     }
 
 class FPSSpinBox(QSpinBox):
@@ -239,10 +241,14 @@ class NormalModes(ToolInstance):
         
         self.plot_type = QComboBox()
         self.plot_type.addItems(['Absorbance', 'Transmittance'])
+        ndx = self.plot_type.findText(self.settings.plot_type, Qt.MatchExactly)
+        self.plot_type.setCurrentIndex(ndx)
         ir_layout.addRow("plot type:", self.plot_type)
         
         self.peak_type = QComboBox()
         self.peak_type.addItems(['Gaussian', 'Lorentzian', 'Delta'])
+        ndx = self.peak_type.findText(self.settings.peak_type, Qt.MatchExactly)
+        self.peak_type.setCurrentIndex(ndx)
         ir_layout.addRow("peak type:", self.peak_type)
         
         self.fwhm = QDoubleSpinBox()
@@ -664,6 +670,8 @@ class IRPlot(ChildToolWindow):
 
         fwhm = self.tool_instance.fwhm.value()
         self.tool_instance.settings.fwhm = fwhm
+        self.tool_instance.settings.peak_type = self.tool_instance.peak_type.currentText()
+        self.tool_instance.settings.plot_type = self.tool_instance.plot_type.currentText()
         frequencies = [freq.frequency for freq in fr.other['frequency'].data if freq.frequency > 0]
         intensities = [freq.intensity for freq in fr.other['frequency'].data if freq.frequency > 0]
         

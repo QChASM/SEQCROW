@@ -132,7 +132,10 @@ presets:
                 ChimeraX's devel build
                 ChimeraXClassifier>ChimeraX :: Bundle :: General,Input/Output,Structure Editing,External Program :: 1,1 :: SEQCROW :: ChimAARON,SEQCRO,SEQCROW :: true</ChimeraXClassifier-->
                 <ChimeraXClassifier>ChimeraX :: Tool :: Build QM Input :: SEQCROW :: Create Gaussian, ORCA, or Psi4 input file</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Structure Modification :: AaronTools :: Modify substituents, swap ligands, and close rings</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Structure Modification :: AaronTools :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Change Substituents :: Structure Editing :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Swap Transition Metal Ligands :: Structure Editing :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Fuse Ring :: Structure Editing :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Browse AaronTools Libraries :: AaronTools :: Browse the AaronTools ligand, substituent, and ring libraries"</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Process QM Thermochemistry :: AaronTools :: Compute the free energy of a molecule with frequency data</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Managed Models :: SEQCROW :: see models managed by SEQCROW</ChimeraXClassifier>
@@ -184,10 +187,10 @@ presets:
                 <ChimeraXClassifier>ChimeraX :: DataFormat :: OUT :: OUT :: Molecular structure :: .out :: :: :: :: :: ORCA output file :: utf-8</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Open :: OUT :: OUT :: false :: coordsets:Bool</ChimeraXClassifier>
     
-                <!--NOTE: this synopsis will not appear when `help rmsdAlign` is used-->
+                <!--NOTE: this synopsis will not appear when `help <command>` is used-->
                 <ChimeraXClassifier>ChimeraX :: Command :: rmsdAlign :: Structure Analysis :: Calculate RMSD between structures</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: substitute :: Structure Editing :: change substiuents</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Command :: closeRing :: Structure Editing :: close or fuse a ring</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: fuseRing :: Structure Editing :: fuse a ring</ChimeraXClassifier>
        </Classifiers>
             
 </BundleInfo>

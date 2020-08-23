@@ -103,33 +103,63 @@ class _SEQCROW_API(BundleAPI):
             from .tools import AaronTools_Library
             tool = AaronTools_Library(session, ti.name)
             return tool        
+        
         elif ti.name == "Visualize Normal Modes":
             from .tools import NormalModes
             tool = NormalModes(session, ti.name)
             return tool        
-        elif ti.name == "Structure Modification":
+        
+        if any(ti.name == name for name in ["Structure Modification", \
+                                            "Change Substituents", \
+                                            "Swap Transition Metal Ligands", \
+                                            "Fuse Ring"]):
             from .tools import EditStructure
-            tool = EditStructure(session, ti.name)
-            return tool        
+            for tool in session.tools.list():
+                if isinstance(tool, EditStructure):
+                    tool.display(True)
+                    if ti.name == "Change Substituents":
+                        tool.alchemy_tabs.setCurrentIndex(0)                    
+                    elif ti.name == "Swap Transition Metal Ligands":
+                        tool.alchemy_tabs.setCurrentIndex(1)
+                    elif ti.name == "Fuse Ring":
+                        tool.alchemy_tabs.setCurrentIndex(2)
+                    break
+            else:
+                tool = EditStructure(session, ti.name)
+
+                if ti.name == "Change Substituents":
+                    tool.alchemy_tabs.setCurrentIndex(0)
+                elif ti.name == "Swap Transition Metal Ligands":
+                    tool.alchemy_tabs.setCurrentIndex(1)
+                elif ti.name == "Fuse Ring":
+                    tool.alchemy_tabs.setCurrentIndex(2)
+
+                return tool        
+        
         elif ti.name == "Add to Personal Library":
             from .tools import LibAdd
             tool = LibAdd(session, ti.name)
             return tool
+        
         elif ti.name == "Managed Models":
             from .tools import FileReaderPanel
             tool = FileReaderPanel(session, ti.name)
             return tool        
+        
         elif ti.name == "Process QM Thermochemistry":
             from .tools import Thermochem
             tool = Thermochem(session, ti.name)
             return tool
+        
         elif ti.name == "Build QM Input":
             from .tools import BuildQM
             tool = BuildQM(session, ti.name)
             return tool
+        
         elif ti.name == "Job Queue":
             from .tools import JobQueue
             return JobQueue(session, ti.name)
+        
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)
 
@@ -221,9 +251,9 @@ class _SEQCROW_API(BundleAPI):
             from .commands.substitute import substitute, substitute_description
             register("substitute", substitute_description, substitute)
 
-        elif command_info.name == "closeRing":
-            from .commands.closeRing import closeRing, closeRing_description
-            register("closeRing", closeRing_description, closeRing)
+        elif command_info.name == "fuseRing":
+            from .commands.fuseRing import fuseRing, fuseRing_description
+            register("fuseRing", fuseRing_description, fuseRing)
 
     @staticmethod
     def register_selector_menus(session):
