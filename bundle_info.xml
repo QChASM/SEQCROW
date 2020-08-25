@@ -142,6 +142,7 @@ presets:
                 <ChimeraXClassifier>ChimeraX :: Tool :: Add to Personal Library :: AaronTools :: Add to your personal ligand, substituent, and ring libraries</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Visualize Normal Modes :: AaronTools :: Visualize normal modes from a Gaussian output file as displacement vectors or as an animation</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Job Queue :: SEQCROW :: View status of jobs</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: AARON Input Builder :: AARON :: Build AARON input file</ChimeraXClassifier>
                 
                 <ChimeraXClassifier>ChimeraX :: Selector :: tm :: Transition metals</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: Ad :: Adamantyl substituent</ChimeraXClassifier>

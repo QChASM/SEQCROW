@@ -70,7 +70,7 @@ class _SEQCROW_API(BundleAPI):
             
         elif format_name == "XYZ":
             return save_aarontools(session, path, format_name, **kw)
-        
+
     @staticmethod
     def register_selector(bundle_info, selector_info, logger):
         from .selectors import register_selectors
@@ -159,6 +159,10 @@ class _SEQCROW_API(BundleAPI):
         elif ti.name == "Job Queue":
             from .tools import JobQueue
             return JobQueue(session, ti.name)
+        
+        elif ti.name == "AARON Input Builder":
+            from .tools import AARONInputBuilder
+            return AARONInputBuilder(session, ti.name)
         
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)

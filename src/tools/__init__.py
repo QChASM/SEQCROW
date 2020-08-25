@@ -7,3 +7,4 @@ from .filereader_panel import FileReaderPanel
 from .compute_thermo import Thermochem
 from .input_generator import BuildQM
 from .job_manager_tool import JobQueue
+from .aaron_input_builder import AARONInputBuilder
