@@ -342,26 +342,32 @@ class Thermochem(ToolInstance):
         
         relative_layout.addWidget(QLabel("ΔE"), 4, 0, Qt.AlignTop | Qt.AlignVCenter)
         self.relative_dE = QLineEdit()
+        self.relative_dE.setReadOnly(True)
         relative_layout.addWidget(self.relative_dE, 5, 0, Qt.AlignTop | Qt.AlignVCenter)
         
         relative_layout.addWidget(QLabel("ΔZPVE"), 4, 1, Qt.AlignTop | Qt.AlignVCenter)
-        self.relative_dZPVE = QLineEdit()  
+        self.relative_dZPVE = QLineEdit() 
+        self.relative_dZPVE.setReadOnly(True)        
         relative_layout.addWidget(self.relative_dZPVE, 5, 1, Qt.AlignTop | Qt.AlignVCenter)
 
         relative_layout.addWidget(QLabel("ΔH<sub>RRHO</sub>"), 4, 2, Qt.AlignTop | Qt.AlignVCenter)
         self.relative_dH = QLineEdit()
+        self.relative_dH.setReadOnly(True)
         relative_layout.addWidget(self.relative_dH, 5, 2, Qt.AlignTop | Qt.AlignVCenter)
 
         relative_layout.addWidget(QLabel("ΔG<sub>RRHO</sub>"), 4, 3, Qt.AlignTop | Qt.AlignVCenter)
         self.relative_dG = QLineEdit()
+        self.relative_dG.setReadOnly(True)
         relative_layout.addWidget(self.relative_dG, 5, 3, Qt.AlignTop | Qt.AlignVCenter)
 
         relative_layout.addWidget(QLabel("ΔG<sub>Quasi-RRHO</sub>"), 4, 4, Qt.AlignTop | Qt.AlignVCenter)
         self.relative_dQRRHOG = QLineEdit()
+        self.relative_dQRRHOG.setReadOnly(True)
         relative_layout.addWidget(self.relative_dQRRHOG, 5, 4, Qt.AlignTop | Qt.AlignVCenter)
 
         relative_layout.addWidget(QLabel("ΔG<sub>Quasi-Harmonic</sub>"), 4, 5, Qt.AlignTop | Qt.AlignVCenter)
         self.relative_dQHARMG = QLineEdit()
+        self.relative_dQHARMG.setReadOnly(True)
         relative_layout.addWidget(self.relative_dQHARMG, 5, 5, Qt.AlignTop | Qt.AlignVCenter)
 
         
@@ -491,7 +497,7 @@ class Thermochem(ToolInstance):
         other_Es = self.other_group.energies()
         other_cos = self.other_group.compOutputs()
         
-        if any(len(x) == 0 for x in [ref_Es, other_Es]):
+        if any(len(x) == 0 for x in [ref_Es, other_Es, ref_cos, other_cos]):
             self.relative_dE.setText("")
             self.relative_dZPVE.setText("")
             self.relative_dH.setText("")
