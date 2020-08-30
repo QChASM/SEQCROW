@@ -174,7 +174,7 @@ presets:
                 <ChimeraXClassifier>ChimeraX :: Selector :: OMe      :: Methoxy substituent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: Ph       :: Phenyl substituent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: SCH3     :: Methylthio substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: SCH3     :: Thio substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: SH       :: Thio substituent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: SiF3     :: Trifluorosilyl substituent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: SiH3     :: Silyl substituent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: SuperMes :: Super Mesityl substituent</ChimeraXClassifier>
