@@ -2,7 +2,7 @@ def open_aarontools(session, path, format_name=None, coordsets=False):
     from AaronTools.fileIO import FileReader
     from AaronTools.geometry import Geometry
     from SEQCROW.residue_collection import ResidueCollection
-    from SEQCROW.managers import FILEREADER_ADDED
+    from SEQCROW.managers import ADD_FILEREADER
     from os.path import split as path_split
     from warnings import warn
 
@@ -27,7 +27,7 @@ def open_aarontools(session, path, format_name=None, coordsets=False):
     structure = geom.get_chimera(session, coordsets=(f.all_geom is not None and len(f.all_geom) > 1), filereader=f)
     structure.filename = path
     #associate the AaronTools FileReader with each structure
-    session.filereader_manager.triggers.activate_trigger(FILEREADER_ADDED, ([structure], [f]))
+    session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([structure], [f]))
 
     if coordsets:
         from chimerax.std_commands.coordset_gui import CoordinateSetSlider

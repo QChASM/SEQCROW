@@ -5,7 +5,6 @@ from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
 from chimerax.core.commands.cli import StringArg, BoolArg, ListOf, IntArg
 from chimerax.core.commands import run
-from chimerax.core.models import ADD_MODELS, REMOVE_MODELS
 
 from json import dumps, loads, dump, load
 
@@ -23,7 +22,7 @@ from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.utils import iter2str
 from SEQCROW.jobs import ORCAJob, GaussianJob, Psi4Job
 from SEQCROW.theory import SEQCROW_Basis, SEQCROW_ECP, SEQCROW_Theory
-from SEQCROW.widgets import PeriodicTable
+from SEQCROW.widgets import PeriodicTable, ModelComboBox
 
 from AaronTools.const import TMETAL
 from AaronTools.theory import *
@@ -251,21 +250,16 @@ class BuildQM(ToolInstance):
         self.export_preset_window = None
 
         self._build_ui()
-
-        self.models = []
         
         self.presets = {}
         self.presets['Gaussian'] = loads(self.settings.gaussian_presets)
         self.presets['ORCA'] = loads(self.settings.orca_presets)
         self.presets['Psi4'] = loads(self.settings.psi4_presets)
         
-        self.refresh_models()
         self.refresh_presets()
 
         global_triggers = get_triggers()
 
-        self._add_handler = self.session.triggers.add_handler(ADD_MODELS, self.refresh_models)
-        self._remove_handler = self.session.triggers.add_handler(REMOVE_MODELS, self.refresh_models)
         #TODO: 
         #find a better trigger - only need changes to coordinates and elements
         #'changes done' fires when other things happen like selecting atoms
@@ -291,7 +285,7 @@ class BuildQM(ToolInstance):
 
         form_layout.addRow("file type:", self.file_type)
         
-        self.model_selector = QComboBox()
+        self.model_selector = ModelComboBox(self.session)
         form_layout.addRow("structure:", self.model_selector)
         
         layout.addWidget(basics_form, 0, 0)
@@ -618,47 +612,12 @@ class BuildQM(ToolInstance):
         
         self.update_preview()
     
-    def refresh_models(self, *args, **kwargs):
-        """refresh the list of models on the model selector"""
-        models = [mdl for mdl in self.session.models if isinstance(mdl, AtomicStructure)]
-        
-        #purge old models
-        models_to_del = [mdl for mdl in self.models if mdl not in models]
-    
-        for mdl in models_to_del:
-            if mdl in self.models:
-                self.models.remove(mdl)
-        
-        #figure out new models
-        new_models = [model for model in models if model not in self.models]
-        self.models.extend(new_models)
-        
-        #remove models in reverse order b/c  0 -> count() can cause some to not get removed
-        #if multiple models are closed at once
-        for i in range(self.model_selector.count(), -1, -1):
-            if self.model_selector.itemData(i) not in self.models:
-                self.model_selector.removeItem(i)
-                
-        for model in self.models:
-            if self.model_selector.findData(model) == -1:
-                self.model_selector.addItem("%s (%s)" % (model.name, model.atomspec), model)
-
     def update_theory(self, update_settings=True):
         """grabs the current settings and updates self.theory
         always called before creating an input file"""
-        if self.model_selector.currentIndex() >= 0 and \
-            self.model_selector.currentIndex() < len(self.models):
-            model = self.models[self.model_selector.currentIndex()]
-        else:
-            model = None
+        model = self.model_selector.currentData()
 
-        if update_settings:
-            #if we update settings, we might be setting up a job
-            #we need to grab the AaronTools Geometry in case the
-            #structure is closed before the job starts
-            model = ResidueCollection(model)
-
-        meth = self.method_widget.getMethod(update_settings)        
+        meth = self.method_widget.getMethod(update_settings)
         basis = self.get_basis_set(update_settings)
 
         dispersion = self.method_widget.getDispersion(update_settings)
@@ -738,7 +697,10 @@ class BuildQM(ToolInstance):
 
     def run_local_job(self, *args, name="local_job", auto_update=False, auto_open=False):
         self.update_theory()
-        
+
+        model = self.model_selector.currentData()
+        self.theory.geometry = ResidueCollection(model)
+
         kw_dict = self.job_widget.getKWDict()
         other_kw_dict = self.other_keywords_widget.getKWDict()
         self.settings.save()
@@ -834,13 +796,12 @@ class BuildQM(ToolInstance):
     def delete(self):
         """deregister trigger handlers"""
         #overload delete to de-register handler
-        self.session.triggers.remove_handler(self._add_handler)
-        self.session.triggers.remove_handler(self._remove_handler)
-        
         global_triggers = get_triggers()
         global_triggers.remove_handler(self._changes)
         
-        super().delete()  
+        self.model_selector.deleteLater()
+        
+        return super().delete()
 
     def display_help(self):
         """Show the help for this tool in the help viewer."""

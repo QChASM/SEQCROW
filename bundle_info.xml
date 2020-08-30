@@ -34,6 +34,7 @@ tools:
 
 selectors:
     tm  - select all transition metals
+    several substituent selectors, including Me, Ph, and iPr
 
 presets:
     ball-stick-endcap       - all non-H atoms are represented as balls and sticks; H atoms are represented as sticks/endcaps
@@ -144,40 +145,40 @@ presets:
                 <ChimeraXClassifier>ChimeraX :: Tool :: Job Queue :: SEQCROW :: View status of jobs</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: AARON Input Builder :: AARON :: Build AARON input file</ChimeraXClassifier>
                 
-                <ChimeraXClassifier>ChimeraX :: Selector :: tm :: Transition metals</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: Ad :: Adamantyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: BF2 :: Difluoroboro substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CCH :: Alkynyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CF3 :: Trifluoromethyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CH2Cl :: Chloromethyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CH2F :: Fluoromethyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CH2OH :: Hydroxymethyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CHCH2 :: Vinyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CHCl2 :: Dichloromethyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CHF2 :: Difluoromethyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CHO :: Formyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CN :: Cyano substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: COCH3 :: Acetyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: COOCH3 :: Methylcarboxyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: Cy :: Cyclohexyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: Et :: Ethyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: iPr :: iso-Propyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: Me :: Methyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: Mes :: Mesityl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: NH2 :: Amino substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: NHOH :: Hydroxylamino substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: NO :: Nitroso substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: NO2 :: Nitro substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: OCF3 :: Trifluoromethoxy substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: OH :: Hydroxyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: OMe :: Methoxy substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: Ph :: Phenyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: SCH3 :: Methylthio substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: SCH3 :: Thio substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: SiF3 :: Trifluorosilyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: SiH3 :: Silyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: tm       :: Transition metals</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: Ad       :: Adamantyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: BF2      :: Difluoroboro substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CCH      :: Alkynyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CF3      :: Trifluoromethyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CH2Cl    :: Chloromethyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CH2F     :: Fluoromethyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CH2OH    :: Hydroxymethyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CHCH2    :: Vinyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CHCl2    :: Dichloromethyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CHF2     :: Difluoromethyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CHO      :: Formyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CN       :: Cyano substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: COCH3    :: Acetyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: COOCH3   :: Methylcarboxyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: Cy       :: Cyclohexyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: Et       :: Ethyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: iPr      :: iso-Propyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: Me       :: Methyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: Mes      :: Mesityl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: NH2      :: Amino substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: NHOH     :: Hydroxylamino substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: NO       :: Nitroso substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: NO2      :: Nitro substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: OCF3     :: Trifluoromethoxy substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: OH       :: Hydroxyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: OMe      :: Methoxy substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: Ph       :: Phenyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: SCH3     :: Methylthio substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: SCH3     :: Thio substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: SiF3     :: Trifluorosilyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: SiH3     :: Silyl substituent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: SuperMes :: Super Mesityl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: tBu :: tert-Butyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: tBu      :: tert-Butyl substituent</ChimeraXClassifier>
                 
                 <ChimeraXClassifier>ChimeraX :: DataFormat :: XYZ :: XYZ :: Molecular structure :: .xyz :: :: :: :: :: XYZ Format :: utf-8</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Open :: XYZ :: AaronTools :: false :: coordsets:Bool</ChimeraXClassifier>

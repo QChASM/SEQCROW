@@ -2,7 +2,7 @@ from chimerax.atomic.colors import element_color
 
 from PyQt5.Qt import QStyle
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtWidgets import QPushButton, QCheckBox, QGridLayout, QWidget
+from PyQt5.QtWidgets import QPushButton, QGridLayout, QWidget
 
 from AaronTools.const import ELEMENTS, TMETAL
 
@@ -145,7 +145,25 @@ class PeriodicTable(QWidget):
         elements_layout.addWidget(self._elements['Po'], 5, 15, Qt.AlignLeft | Qt.AlignTop)
         elements_layout.addWidget(self._elements['At'], 5, 16, Qt.AlignLeft | Qt.AlignTop)
         elements_layout.addWidget(self._elements['Rn'], 5, 17, Qt.AlignLeft | Qt.AlignTop)
-
+        if 'Fr' in ELEMENTS:
+            elements_layout.addWidget(self._elements['Fr'], 6,  0, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Ra'], 6,  1, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Rf'], 6,  3, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Db'], 6,  4, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Sg'], 6,  5, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Bh'], 6,  6, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Hs'], 6,  7, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Mt'], 6,  8, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Ds'], 6,  9, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Rg'], 6, 10, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Cn'], 6, 11, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Nh'], 6, 12, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Fl'], 6, 13, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Mc'], 6, 14, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Lv'], 6, 15, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Ts'], 6, 16, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Og'], 6, 17, Qt.AlignLeft | Qt.AlignTop)
+        
         elements_layout.addWidget(self._elements['La'], 7,  2, Qt.AlignLeft | Qt.AlignTop)
         elements_layout.addWidget(self._elements['Ce'], 7,  3, Qt.AlignLeft | Qt.AlignTop)
         elements_layout.addWidget(self._elements['Pr'], 7,  4, Qt.AlignLeft | Qt.AlignTop)
@@ -161,15 +179,27 @@ class PeriodicTable(QWidget):
         elements_layout.addWidget(self._elements['Tm'], 7, 14, Qt.AlignLeft | Qt.AlignTop)
         elements_layout.addWidget(self._elements['Yb'], 7, 15, Qt.AlignLeft | Qt.AlignTop)
         elements_layout.addWidget(self._elements['Lu'], 7, 16, Qt.AlignLeft | Qt.AlignTop)
+        if 'Ac' in ELEMENTS:
+            elements_layout.addWidget(self._elements['Ac'], 8,  2, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Th'], 8,  3, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Pa'], 8,  4, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['U'],  8,  5, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Np'], 8,  6, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Pu'], 8,  7, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Am'], 8,  8, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Cm'], 8,  9, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Bk'], 8, 10, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Cf'], 8, 11, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Es'], 8, 12, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Fm'], 8, 13, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Md'], 8, 14, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['No'], 8, 15, Qt.AlignLeft | Qt.AlignTop)
+            elements_layout.addWidget(self._elements['Lr'], 8, 16, Qt.AlignLeft | Qt.AlignTop)
         
         organic_button = QPushButton("organic chemists'")
         organic_button.setCheckable(True)
         organic_button.clicked.connect(self._select_ochem)
-        #layout.addWidget(organic_button, 9, col, Qt.AlignTop)
-
-        all_button = QPushButton("all")
-        all_button.clicked.connect(self._select_all)
-        layout.addWidget(all_button, 10, 0, Qt.AlignTop)        
+        #layout.addWidget(organic_button, 9, col, Qt.AlignTop)        
 
         z_lt_37_button = QPushButton("H-Kr")
         z_lt_37_button.setCheckable(True)
@@ -191,6 +221,16 @@ class PeriodicTable(QWidget):
         tm_button.clicked.connect(self._select_tm)
         layout.addWidget(tm_button, 9, 3, Qt.AlignTop)       
 
+        all_button = QPushButton("all")
+        all_button.clicked.connect(self._select_all)
+        all.clicked.connect(lambda *args: organic_button.setChecked(False))
+        all.clicked.connect(lambda *args: tm_button.setChecked(False))        
+        all.clicked.connect(lambda *args: organic_button.setChecked(False))
+        all.clicked.connect(lambda *args: z_lt_37_button.setChecked(False))
+        all.clicked.connect(lambda *args: z_ge_37_button.setChecked(False))
+        all.clicked.connect(lambda *args: z_le_86_button.setChecked(False))
+        layout.addWidget(all_button, 10, 0, Qt.AlignTop)
+        
         invert = QPushButton("invert")
         invert.clicked.connect(self._invert)
         invert.clicked.connect(lambda *args: organic_button.setChecked(False))
