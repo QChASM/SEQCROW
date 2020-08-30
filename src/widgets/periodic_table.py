@@ -223,12 +223,12 @@ class PeriodicTable(QWidget):
 
         all_button = QPushButton("all")
         all_button.clicked.connect(self._select_all)
-        all.clicked.connect(lambda *args: organic_button.setChecked(False))
-        all.clicked.connect(lambda *args: tm_button.setChecked(False))        
-        all.clicked.connect(lambda *args: organic_button.setChecked(False))
-        all.clicked.connect(lambda *args: z_lt_37_button.setChecked(False))
-        all.clicked.connect(lambda *args: z_ge_37_button.setChecked(False))
-        all.clicked.connect(lambda *args: z_le_86_button.setChecked(False))
+        all_button.clicked.connect(lambda *args: organic_button.setChecked(False))
+        all_button.clicked.connect(lambda *args: tm_button.setChecked(False))        
+        all_button.clicked.connect(lambda *args: organic_button.setChecked(False))
+        all_button.clicked.connect(lambda *args: z_lt_37_button.setChecked(False))
+        all_button.clicked.connect(lambda *args: z_ge_37_button.setChecked(False))
+        all_button.clicked.connect(lambda *args: z_le_86_button.setChecked(False))
         layout.addWidget(all_button, 10, 0, Qt.AlignTop)
         
         invert = QPushButton("invert")
