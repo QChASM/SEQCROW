@@ -251,6 +251,10 @@ class BuildQM(ToolInstance):
 
         self._build_ui()
         
+        ndx = self.model_selector.currentIndex()
+        if ndx != -1:
+            self.change_model(ndx)
+        
         self.presets = {}
         self.presets['Gaussian'] = loads(self.settings.gaussian_presets)
         self.presets['ORCA'] = loads(self.settings.orca_presets)
