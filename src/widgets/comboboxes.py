@@ -45,14 +45,19 @@ class ModelComboBox(QComboBox):
         return super().close(*args, **kwargs)
 
     def _refresh_models(self):
+        valid_mdls = []
+        for x in self._mdl_types:
+            valid_mdls.extend(self._session.models.list(type=x))
+
         for i in range(self.count(), -1, -1):
-            if self.itemData(i) not in self._session.models.list(type=self._mdl_types):
+            if self.itemData(i) not in valid_mdls:
                 self.removeItem(i)
         
-        for mdl in self._session.models.list(type=self._mdl_types):
-            ndx = self.findData(mdl)
-            if ndx == -1:
-                self.addItem("%s (%s)" % (mdl.name, mdl.atomspec), mdl)
+        for x in self._mdl_types:
+            for mdl in self._session.models.list(type=x):
+                ndx = self.findData(mdl)
+                if ndx == -1:
+                    self.addItem("%s (%s)" % (mdl.name, mdl.atomspec), mdl)
     
     def _add_models(self, trigger_name, models):
         for mdl in models:
