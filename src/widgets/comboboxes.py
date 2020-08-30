@@ -22,6 +22,8 @@ class ModelComboBox(QComboBox):
         self._add_handler = session.triggers.add_handler(ADD_MODELS, self._add_models)
         self._del_handler = session.triggers.add_handler(REMOVE_MODELS, self._del_models)
     
+        self.setSizeAdjustPolicy(self.AdjustToMinimumContentsLengthWithIcon)
+    
         self._refresh_models()
 
     def deleteLater(self, *args, **kwargs):
@@ -79,6 +81,8 @@ class FilereaderComboBox(QComboBox):
         
         self._add_handler = session.filereader_manager.triggers.add_handler(FILEREADER_ADDED, self._add_filereaders)
         self._del_handler = session.filereader_manager.triggers.add_handler(FILEREADER_REMOVED, self._del_filereaders)
+        
+        self.setSizeAdjustPolicy(self.AdjustToMinimumContentsLengthWithIcon)
         
         self._refresh_models()
 

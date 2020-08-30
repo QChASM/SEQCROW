@@ -14,7 +14,8 @@ from PyQt5.QtCore import Qt, QSize, pyqtSignal
 from PyQt5.QtGui import QKeySequence
 from PyQt5.QtWidgets import QLabel, QGridLayout, QComboBox, QSplitter, QLineEdit, QDoubleSpinBox, \
                             QMenuBar, QFileDialog, QAction, QApplication, QWidget, QGroupBox, QStatusBar, \
-                            QTabWidget, QTableWidget, QSizePolicy, QPushButton, QHeaderView, QHBoxLayout
+                            QTabWidget, QTableWidget, QSizePolicy, QPushButton, QHeaderView, QHBoxLayout, \
+                            QTableWidgetItem
 
 from os.path import basename
 
@@ -320,7 +321,7 @@ class Thermochem(ToolInstance):
         self.relative_temperature.setMinimum(0)
         self.relative_temperature.valueChanged.connect(self.calc_relative_thermo)
         relative_layout.addWidget(QLabel("T ="), 1, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
-        relative_layout.addWidget(self.relative_temperature, 1, 1, Qt.AlignLeft | Qt.AlignVCenter)
+        relative_layout.addWidget(self.relative_temperature, 1, 1, 1, 5, Qt.AlignLeft | Qt.AlignVCenter)
 
         self.relative_v0 = QDoubleSpinBox()
         self.relative_v0.setMaximum(2**31 - 1)
@@ -331,7 +332,7 @@ class Thermochem(ToolInstance):
         self.relative_v0.setToolTip("frequency parameter for quasi treatments of entropy")
         self.relative_v0.valueChanged.connect(self.calc_relative_thermo)
         relative_layout.addWidget(QLabel("𝜔<sub>0</sub> ="), 2, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
-        relative_layout.addWidget(self.relative_v0, 2, 1, Qt.AlignLeft | Qt.AlignVCenter)
+        relative_layout.addWidget(self.relative_v0, 2, 1, 1, 5, Qt.AlignLeft | Qt.AlignVCenter)
         
         relative_layout.addWidget(QLabel("relative energies in kcal/mol:"), 3, 0, 1, 6, Qt.AlignTop)
         
@@ -465,9 +466,9 @@ class Thermochem(ToolInstance):
         
         def boltzmann_weight(energies1, energies2, T):
             rezero = energies1[0]
-            nrgs1 = [UNIT.HART_TO_KCAL*(x - rezero) for x in energies1]
-            nrgs2 = [UNIT.HART_TO_KCAL*(x - rezero) for x in energies2]
-            beta = 1/(PHYSICAL.BOLTZMANN * T)
+            nrgs1 = [(x - rezero) for x in energies1]
+            nrgs2 = [(x - rezero) for x in energies2]
+            beta = UNIT.HART_TO_JOULE/(PHYSICAL.KB * T)
             total1 = 0
             total2 = 0
             for nrg in nrgs1:
@@ -476,7 +477,7 @@ class Thermochem(ToolInstance):
             for nrg in nrgs2:
                 total2 += np.exp(-beta*nrg)
             
-            rel_nrg = -np.log(total2 / total1) / beta
+            rel_nrg = -PHYSICAL.BOLTZMANN * T * np.log(total2 / total1)
             
             return rel_nrg
 
@@ -790,15 +791,12 @@ class ThermoGroup(QWidget):
         row = self.table.rowCount()
         self.table.insertRow(row)
 
-        add_button = QPushButton()
-        add_button.setFlat(True)
-        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
-        size = QSize(dim, dim)
-        add_button.setIcon(QIcon(self.style().standardIcon(QStyle.SP_ArrowDown)))
-        add_button.setIconSize(size)
-        add_button.clicked.connect(self.add_row)
-        self.table.setCellWidget(row, 1, add_button)
-        
+        plus = QTableWidgetItem("add row")
+        plus.setToolTip("add another energy/frequency pair")
+        plus.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        self.table.setItem(row, 1, plus)
+        self.table.resizeRowToContents(row)
+
         if row > 0:
             row -= 1
             nrg_combobox = FilereaderComboBox(self.session, otherItems=['energy'])
@@ -811,6 +809,7 @@ class ThermoGroup(QWidget):
             widget_that_lets_me_horizontally_align_an_icon = QWidget()
             widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
             trash_button = QLabel()
+            dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
             trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
             widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
             widget_layout.setContentsMargins(2, 2, 2, 2)
@@ -845,13 +844,15 @@ class ThermoGroup(QWidget):
             out.append(fr.other['energy'])
         
         return out
-        
+
     def remove_row(self, row, col):
         if col == 2 and row != self.table.rowCount()-1:
             self.table.cellWidget(row, 0).deleteLater()
             self.table.cellWidget(row, 1).deleteLater()
             self.table.removeRow(row)
             self.changes.emit()
+        elif row == self.table.rowCount()-1:
+            self.add_row()
     
     def deleteLater(self):
         for row in range(0, self.table.rowCount()-1):
