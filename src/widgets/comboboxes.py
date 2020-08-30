@@ -99,8 +99,9 @@ class FilereaderComboBox(QComboBox):
 
     def _add_filereaders(self, trigger_name, filereaders):
         for fr in filereaders:
-            mdl = self._session.filereader_manager.get_model(fr)
-            self.addItem("%s (%s)" % (basename(fr.name), mdl.atomspec), fr)
+            if self._other is None or all(x in fr.other for x in self._other):
+                mdl = self._session.filereader_manager.get_model(fr)
+                self.addItem("%s (%s)" % (basename(fr.name), mdl.atomspec), fr)
             
     def _del_filereaders(self, trigger_name, filereaders):
         for fr in filereaders:

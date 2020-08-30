@@ -56,6 +56,10 @@ class Thermochem(ToolInstance):
         self.thermo_co = {}
 
         self._build_ui()
+        
+        self.set_sp()
+        
+        self.set_thermo_mdl()
 
     def _build_ui(self):
         #each group has an empty widget at the bottom so they resize the way I want while also having the
