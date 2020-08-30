@@ -25,6 +25,7 @@ from SEQCROW.libraries import SubstituentTable, LigandTable, RingTable
 class _EditStructureSettings(Settings):
     AUTO_SAVE = {'modify': Value(True, BoolArg), 
                  'guess': Value(True, BoolArg),
+                 'minimize': Value(False, BoolArg), 
                 }
 
 
@@ -74,30 +75,38 @@ class EditStructure(ToolInstance):
         self.close_previous_sub.stateChanged.connect(self.close_previous_change)
         self.substitute_layout.addWidget(self.close_previous_sub, 1, 1, 1, 2, Qt.AlignTop)    
         
-        self.substitute_layout.addWidget(QLabel("guess previous substituent:"), 2, 0, 1, 1, Qt.AlignVCenter)
+        self.substitute_layout.addWidget(QLabel("relax substituent:"), 2, 0, 1, 1, Qt.AlignVCenter)
+        
+        self.minimize = QCheckBox()
+        self.minimize.setToolTip("spin the added substituents to try to minimize the LJ potential energy")
+        self.minimize.setChecked(self.settings.minimize)
+        self.substitute_layout.addWidget(self.minimize, 2, 1, 1, 1, Qt.AlignTop)
+        
+        self.substitute_layout.addWidget(QLabel("guess previous substituent:"), 3, 0, 1, 1, Qt.AlignVCenter)
         
         self.guess_old = QCheckBox()
         self.guess_old.setToolTip("checked: AaronTools will use the shortest connected fragment in the residue\nunchecked: previous substituent must be selected")
         self.guess_old.setChecked(self.settings.guess)
         self.guess_old.stateChanged.connect(lambda state, settings=self.settings: settings.__setattr__("guess", True if state == Qt.Checked else False))
-        self.substitute_layout.addWidget(self.guess_old, 2, 1, 1, 2, Qt.AlignTop)
+        self.substitute_layout.addWidget(self.guess_old, 3, 1, 1, 2, Qt.AlignTop)
         
-        self.substitute_layout.addWidget(QLabel("new residue name:"), 3, 0, 1, 1, Qt.AlignVCenter)
+        self.substitute_layout.addWidget(QLabel("new residue name:"), 4, 0, 1, 1, Qt.AlignVCenter)
         
         self.new_sub_name = QLineEdit()
         self.new_sub_name.setToolTip("change name of modified residues")
         self.new_sub_name.setPlaceholderText("leave blank to keep current")
-        self.substitute_layout.addWidget(self.new_sub_name, 3, 1, 1, 2, Qt.AlignTop)
+        self.substitute_layout.addWidget(self.new_sub_name, 4, 1, 1, 2, Qt.AlignTop)
         
         substitute_button = QPushButton("substitute current selection")
         substitute_button.clicked.connect(self.do_substitute)
-        self.substitute_layout.addWidget(substitute_button, 4, 0, 1, 3, Qt.AlignTop)
+        self.substitute_layout.addWidget(substitute_button, 5, 0, 1, 3, Qt.AlignTop)
         
         self.substitute_layout.setRowStretch(0, 0)
         self.substitute_layout.setRowStretch(1, 0)
         self.substitute_layout.setRowStretch(2, 0)
         self.substitute_layout.setRowStretch(3, 0)
-        self.substitute_layout.setRowStretch(4, 1)
+        self.substitute_layout.setRowStretch(4, 0)
+        self.substitute_layout.setRowStretch(5, 1)
         
         
         #map ligand
@@ -167,7 +176,7 @@ class EditStructure(ToolInstance):
         self.closering_layout.addWidget(self.new_ring_name, 2, 1, 1, 2, Qt.AlignTop)
 
         closering_button = QPushButton("put a ring on current selection")
-        closering_button.clicked.connect(self.do_closering)
+        closering_button.clicked.connect(self.do_fusering)
         self.closering_layout.addWidget(closering_button, 3, 0, 1, 3, Qt.AlignTop)
 
         self.closering_layout.setRowStretch(0, 0)
@@ -178,7 +187,7 @@ class EditStructure(ToolInstance):
 
         self.alchemy_tabs.addTab(self.substitute_tab, "substitute")
         self.alchemy_tabs.addTab(self.maplig_tab, "swap ligand")
-        self.alchemy_tabs.addTab(self.closering_tab, "close ring")
+        self.alchemy_tabs.addTab(self.closering_tab, "fuse ring")
 
         layout.addWidget(self.alchemy_tabs)
 
@@ -204,20 +213,26 @@ class EditStructure(ToolInstance):
         new_name = self.new_sub_name.text()
 
         use_attached = not self.guess_old.isChecked()
+        
+        minimize = self.minimize.isChecked()
+        
+        self.settings.minimize = minimize
 
         if len(new_name.strip()) > 0:
-            run(self.session, "substitute sel substituents %s newName %s guessAvoid %s modify %s" %
+            run(self.session, "substitute sel substituents %s newName %s guessAvoid %s modify %s minimize %s" %
                               (subnames, \
                                new_name, \
                                not use_attached, \
-                               self.close_previous_bool)
+                               self.close_previous_bool, \
+                               minimize)
                 )
 
         else:
-            run(self.session, "substitute sel substituents %s guessAvoid %s modify %s" %
+            run(self.session, "substitute sel substituents %s guessAvoid %s modify %s minimize %s" %
                               (subnames, \
                                not use_attached, \
-                               self.close_previous_bool)
+                               self.close_previous_bool, \
+                               minimize)
                 )
 
     def open_sub_selector(self):
@@ -303,20 +318,20 @@ class EditStructure(ToolInstance):
     def open_lig_selector(self):
         self.tool_window.create_child_window("select ligands", window_class=LigandSelection, textBox=self.ligname)
     
-    def do_closering(self):
+    def do_fusering(self):
         ring_names = self.ringname.text()
         
         new_name = self.new_ring_name.text()
 
         if len(new_name.strip()) > 0:
-            run(self.session, "closeRing sel rings %s newName %s modify %s" %
+            run(self.session, "fuseRing sel rings %s newName %s modify %s" %
                               (ring_names, \
                                new_name, \
                                self.close_previous_bool)
                 )
 
         else:
-            run(self.session, "closeRing sel rings %s modify %s" %
+            run(self.session, "fuseRing sel rings %s modify %s" %
                               (ring_names, \
                                self.close_previous_bool)
                 )
@@ -338,7 +353,7 @@ class SubstituentSelection(ChildToolWindow):
         self.textBox = textBox
         
         self._build_ui()
-        
+
     def _build_ui(self):
         layout = QGridLayout()
         
@@ -349,7 +364,7 @@ class SubstituentSelection(ChildToolWindow):
         self.ui_area.setLayout(layout)
         
         self.manage(None)
-        
+
     def refresh_selection(self):
         sub_names = []
         for row in self.sub_table.table.selectionModel().selectedRows():
@@ -368,7 +383,7 @@ class LigandSelection(ChildToolWindow):
         self.textBox = textBox
         
         self._build_ui()
-        
+
     def _build_ui(self):
         layout = QGridLayout()
         
@@ -379,7 +394,7 @@ class LigandSelection(ChildToolWindow):
         self.ui_area.setLayout(layout)
         
         self.manage(None)
-        
+
     def refresh_selection(self):
         lig_names = []
         for row in self.lig_table.table.selectionModel().selectedRows():
@@ -398,7 +413,7 @@ class RingSelection(ChildToolWindow):
         self.textBox = textBox
         
         self._build_ui()
-        
+
     def _build_ui(self):
         layout = QGridLayout()
         
@@ -409,7 +424,7 @@ class RingSelection(ChildToolWindow):
         self.ui_area.setLayout(layout)
         
         self.manage(None)
-        
+
     def refresh_selection(self):
         ring_names = []
         for row in self.ring_table.table.selectionModel().selectedRows():
@@ -430,7 +445,7 @@ class NameCompleter(QCompleter):
         self.setCompletionMode(self.PopupCompletion)
         self.setFilterMode(Qt.MatchContains)
         self.setWrapAround(False)
-        
+
     def pathFromIndex(self, ndx):
         name = super().pathFromIndex(ndx)
         
@@ -440,7 +455,7 @@ class NameCompleter(QCompleter):
             name = "%s, %s" % (", ".join(names[:-1]), name)
             
         return name
-        
+
     def splitPath(self, path):
         path = path.split(',')[-1].strip()
         return [path]

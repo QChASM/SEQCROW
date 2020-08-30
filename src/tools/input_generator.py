@@ -5,7 +5,6 @@ from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
 from chimerax.core.commands.cli import StringArg, BoolArg, ListOf, IntArg
 from chimerax.core.commands import run
-from chimerax.core.models import ADD_MODELS, REMOVE_MODELS
 
 from json import dumps, loads, dump, load
 
@@ -16,12 +15,14 @@ from PyQt5.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter
                             QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, \
                             QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, \
                             QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView, QTextBrowser, \
-                            QStatusBar, QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem, QSizePolicy
+                            QStatusBar, QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem, QSizePolicy, \
+                            QToolBox
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.utils import iter2str
 from SEQCROW.jobs import ORCAJob, GaussianJob, Psi4Job
 from SEQCROW.theory import SEQCROW_Basis, SEQCROW_ECP, SEQCROW_Theory
+from SEQCROW.widgets import PeriodicTable, ModelComboBox
 
 from AaronTools.const import TMETAL
 from AaronTools.theory import *
@@ -249,21 +250,16 @@ class BuildQM(ToolInstance):
         self.export_preset_window = None
 
         self._build_ui()
-
-        self.models = []
         
         self.presets = {}
         self.presets['Gaussian'] = loads(self.settings.gaussian_presets)
         self.presets['ORCA'] = loads(self.settings.orca_presets)
         self.presets['Psi4'] = loads(self.settings.psi4_presets)
         
-        self.refresh_models()
         self.refresh_presets()
 
         global_triggers = get_triggers()
 
-        self._add_handler = self.session.triggers.add_handler(ADD_MODELS, self.refresh_models)
-        self._remove_handler = self.session.triggers.add_handler(REMOVE_MODELS, self.refresh_models)
         #TODO: 
         #find a better trigger - only need changes to coordinates and elements
         #'changes done' fires when other things happen like selecting atoms
@@ -289,7 +285,7 @@ class BuildQM(ToolInstance):
 
         form_layout.addRow("file type:", self.file_type)
         
-        self.model_selector = QComboBox()
+        self.model_selector = ModelComboBox(self.session)
         form_layout.addRow("structure:", self.model_selector)
         
         layout.addWidget(basics_form, 0, 0)
@@ -419,6 +415,8 @@ class BuildQM(ToolInstance):
         """open 'save preset' child tool"""
         if self.preset_window is None:
             self.preset_window = self.tool_window.create_child_window("New Preset", window_class=SavePreset)
+        else:
+            self.preset_window.display(True)
 
     def apply_preset(self, program, preset_name):
         """apply preset named 'preset_name' for 'program'"""
@@ -614,47 +612,12 @@ class BuildQM(ToolInstance):
         
         self.update_preview()
     
-    def refresh_models(self, *args, **kwargs):
-        """refresh the list of models on the model selector"""
-        models = [mdl for mdl in self.session.models if isinstance(mdl, AtomicStructure)]
-        
-        #purge old models
-        models_to_del = [mdl for mdl in self.models if mdl not in models]
-    
-        for mdl in models_to_del:
-            if mdl in self.models:
-                self.models.remove(mdl)
-        
-        #figure out new models
-        new_models = [model for model in models if model not in self.models]
-        self.models.extend(new_models)
-        
-        #remove models in reverse order b/c  0 -> count() can cause some to not get removed
-        #if multiple models are closed at once
-        for i in range(self.model_selector.count(), -1, -1):
-            if self.model_selector.itemData(i) not in self.models:
-                self.model_selector.removeItem(i)
-                
-        for model in self.models:
-            if self.model_selector.findData(model) == -1:
-                self.model_selector.addItem("%s (%s)" % (model.name, model.atomspec), model)
-
     def update_theory(self, update_settings=True):
         """grabs the current settings and updates self.theory
         always called before creating an input file"""
-        if self.model_selector.currentIndex() >= 0 and \
-            self.model_selector.currentIndex() < len(self.models):
-            model = self.models[self.model_selector.currentIndex()]
-        else:
-            model = None
+        model = self.model_selector.currentData()
 
-        if update_settings:
-            #if we update settings, we might be setting up a job
-            #we need to grab the AaronTools Geometry in case the
-            #structure is closed before the job starts
-            model = ResidueCollection(model)
-
-        meth = self.method_widget.getMethod(update_settings)        
+        meth = self.method_widget.getMethod(update_settings)
         basis = self.get_basis_set(update_settings)
 
         dispersion = self.method_widget.getDispersion(update_settings)
@@ -734,7 +697,10 @@ class BuildQM(ToolInstance):
 
     def run_local_job(self, *args, name="local_job", auto_update=False, auto_open=False):
         self.update_theory()
-        
+
+        model = self.model_selector.currentData()
+        self.theory.geometry = ResidueCollection(model)
+
         kw_dict = self.job_widget.getKWDict()
         other_kw_dict = self.other_keywords_widget.getKWDict()
         self.settings.save()
@@ -830,13 +796,12 @@ class BuildQM(ToolInstance):
     def delete(self):
         """deregister trigger handlers"""
         #overload delete to de-register handler
-        self.session.triggers.remove_handler(self._add_handler)
-        self.session.triggers.remove_handler(self._remove_handler)
-        
         global_triggers = get_triggers()
         global_triggers.remove_handler(self._changes)
         
-        super().delete()  
+        self.model_selector.deleteLater()
+        
+        return super().delete()
 
     def display_help(self):
         """Show the help for this tool in the help viewer."""
@@ -898,7 +863,7 @@ class JobTypeOption(QWidget):
         self.charge.valueChanged.connect(self.something_changed)
         
         job_type_layout.addRow("charge:", self.charge)
-                
+
         self.multiplicity = QSpinBox()
         self.multiplicity.setRange(1, 3)
         self.multiplicity.setSingleStep(1)
@@ -4817,86 +4782,61 @@ class SavePreset(ChildToolWindow):
             super().__init__(parent)
             self.tool_instance = tool_instance
 
-            self.basis_form = QFormLayout(self)
+            layout = QGridLayout(self)
+            #self.basis_box = QToolBox()
+            self.basis_box = QTabWidget()
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.addWidget(self.basis_box)
             
-            self.basis_elements = []
-            self.ecp_elements = []
+            self.basis_ptables = []
+            self.ecp_ptables = []
             
-            self.basis_form.setContentsMargins(0, 0, 0, 0)
-
         def refresh_basis(self):
             basis_set = self.tool_instance.basis_widget.getBasis(update_settings=False)
             self.setBasis(basis_set)
             
         def setBasis(self, basis_set):
             """display current basis sets and element selectors"""
-            self.basis_elements = []
-            self.ecp_elements = []
-            for i in range(self.basis_form.rowCount()-1, -1, -1):
-                self.basis_form.removeRow(i)
-            
+            self.basis_ptables = []
+            self.ecp_ptables = []
+
+            for i in range(self.basis_box.count()-1, -1, -1):
+                #self.basis_box.removeItem(i)
+                self.basis_box.removeTab(i)
+
             if basis_set.basis is not None:
                 for basis in basis_set.basis:
-                    element_selector = QComboBox()
-                    self.basis_elements.append(element_selector)
-                    element_selector.addItems(["current elements", "all elements", "transition metals", "non-transition metals"])
+                    element_selector = PeriodicTable(initial_elements=basis.elements)
+                    self.basis_ptables.append(element_selector)
                     basis_name = basis.name
                     aux = basis.aux_type
                     if aux is not None:
-                        label = "    %s/%s" % (basis_name, aux)
+                        label = "%s/%s" % (basis_name, aux)
                     else:
-                        label = "    %s" % basis_name
+                        label = "%s" % basis_name
 
-                    #if there's only one basis, it should only be used for all elements
-                    if len(basis_set.basis) == 1 and (basis_set.ecp is None or len(basis_set.ecp) == 0):
-                        element_selector.setCurrentIndex(1)
-                        element_selector.setEnabled(False)
-
-                    self.basis_form.addRow(label, element_selector)
+                    #self.basis_box.addItem(element_selector, label)
+                    self.basis_box.addTab(element_selector, label)
 
             if basis_set.ecp is not None:
                 for ecp in basis_set.ecp:
-                    element_selector = QComboBox()
-                    self.ecp_elements.append(element_selector)
-                    element_selector.addItems(["current elements", "all elements", "transition metals", "non-transition metals"])
-                    basis_name = ecp.name
-                    aux = basis.aux_type
-                    label = "    %s" % basis_name
+                    element_selector = PeriodicTable(initial_elements=ecp.elements)
+                    self.ecp_ptables.append(element_selector)
+                    label = "ECP: %s" % ecp.name
 
-                    self.basis_form.addRow(label, element_selector)
+                    #self.basis_box.addItem(element_selector, label)
+                    self.basis_box.addTab(element_selector, label)
 
         def getElements(self):
-            basis = []
-            ecp = []
-            for selector in self.basis_elements:
-                elements = selector.currentText()
-                if elements == "current elements":
-                    basis.append("current")
-                
-                elif elements == "all elements":
-                    basis.append("all")
-                
-                elif elements == "transition metals":
-                    basis.append("tm")
-                    
-                elif elements == "non-transition metals":
-                    basis.append("!tm")
-            
-            for selector in self.ecp_elements:
-                elements = selector.currentText()
-                if elements == "current elements":
-                    ecp.append("current")
-                
-                elif elements == "all elements":
-                    ecp.append("all")
-                
-                elif elements == "transition metals":
-                    ecp.append("tm")
-                    
-                elif elements == "non-transition metals":
-                    ecp.append("!tm")
-                    
-            return basis, ecp
+            basis_elements = []
+            ecp_elements = []
+            for selector in self.basis_ptables:
+                basis_elements.append(selector.selectedElements(abbreviate=True))
+
+            for ecp in self.ecp_ptables:
+                ecp_elements.append(selector.selectedElements(abbreviate=True))
+
+            return basis_elements, ecp_elements
 
 
     def __init__(self, tool_instance, title, **kwargs):
@@ -5013,7 +4953,7 @@ class SavePreset(ChildToolWindow):
             preset['mem'] = mem
         
         if self.solvent.checkState() == Qt.Checked:
-            solvent = self.tool_instance.job_widget.getSolvent(update_settings=False)
+            solvent = self.tool_instance.job_widget.getSolvent(update_settings=True)
             if solvent is not None:
                 preset['solvent model'] = solvent.name
                 preset['solvent'] = solvent.solvent
@@ -5022,17 +4962,17 @@ class SavePreset(ChildToolWindow):
                 preset['solvent'] = ''
         
         if self.method.checkState() == Qt.Checked:
-            method = self.tool_instance.method_widget.getMethod(update_settings=False)
+            method = self.tool_instance.method_widget.getMethod(update_settings=True)
             preset['method'] = method.name
             preset['semi-empirical'] = method.is_semiempirical
             
-            dispersion = self.tool_instance.method_widget.getDispersion(update_settings=False)
+            dispersion = self.tool_instance.method_widget.getDispersion(update_settings=True)
             if dispersion is not None:
                 preset['disp'] = dispersion.name
             else:
                 preset['disp'] = dispersion
             
-            grid = self.tool_instance.method_widget.getGrid(update_settings=False)
+            grid = self.tool_instance.method_widget.getGrid(update_settings=True)
             if grid is not None:
                 preset['grid'] = grid.name
             else:
@@ -5041,30 +4981,22 @@ class SavePreset(ChildToolWindow):
         if self.basis.checkState() == Qt.Checked:
             basis_elements, ecp_elements = self.basis_elements.getElements()
             
-            basis_set = self.tool_instance.basis_widget.getBasis(update_settings=False)
-            preset['basis'] = {'name':[], 'file':[], 'auxiliary':[], 'elements':[]}
+            basis_set = self.tool_instance.basis_widget.getBasis(update_settings=True)
+            preset['basis'] = {'name':[], 'file':[], 'auxiliary':[], 'elements':basis_elements}
             if basis_set.basis is not None:
                 for basis, elements in zip(basis_set.basis, basis_elements):
                     preset['basis']['name'].append(basis.name)
                     preset['basis']['file'].append(basis.user_defined)
                     preset['basis']['auxiliary'].append(basis.aux_type)
-                    if elements == "current":
-                        preset['basis']['elements'].append(basis.elements)
-                    else:
-                        preset['basis']['elements'].append([elements])
 
-            preset['ecp'] = {'name':[], 'file':[], 'elements':[]}
+            preset['ecp'] = {'name':[], 'file':[], 'elements':ecp_elements}
             if basis_set.ecp is not None:
                 for basis, elements in zip(basis_set.ecp, ecp_elements):
                     preset['ecp']['name'].append(basis.name)
                     preset['ecp']['file'].append(basis.user_defined)
-                    if elements == "current":
-                        preset['ecp']['elements'].append(basis.elements)
-                    else:
-                        preset['ecp']['elements'].append([elements])
         
         if self.additional.checkState() == Qt.Checked:
-            preset["other"] = self.tool_instance.other_keywords_widget.getKWDict(update_settings=False)
+            preset["other"] = self.tool_instance.other_keywords_widget.getKWDict(update_settings=True)
         
         self.tool_instance.presets[program][name] = preset
 

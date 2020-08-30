@@ -7,7 +7,7 @@ from chimerax.core.commands import BoolArg, CmdDesc, StringArg, DynamicEnum, Lis
 
 from SEQCROW.residue_collection import ResidueCollection, Residue
 
-closeRing_description = CmdDesc(required=[("selection", AtomsArg)], \
+fuseRing_description = CmdDesc(required=[("selection", AtomsArg)], \
                                 keyword=[("rings", ListOf(DynamicEnum(Ring.list, \
                                                           name="ring", \
                                                           case_sensitive=True, \
@@ -18,7 +18,7 @@ closeRing_description = CmdDesc(required=[("selection", AtomsArg)], \
                                          ("newName", ListOf(StringArg)), 
                                          ("modify", BoolArg)], \
                                 required_arguments=["rings"], \
-                                synopsis="close or fuse a ring")
+                                synopsis="fuse a ring")
 
 def minimal_ring_convert(atomic_structure, atom1, atom2, avoid=None):
     tm_bonds = atomic_structure.pseudobond_group(atomic_structure.PBG_METAL_COORDINATION, create_type=None)
@@ -78,7 +78,7 @@ def minimal_ring_convert(atomic_structure, atom1, atom2, avoid=None):
 
     return residues
 
-def closeRing(session, selection, rings, newName=None, modify=True):
+def fuseRing(session, selection, rings, newName=None, modify=True):
     ordered_selection = session.seqcrow_ordered_selection_manager.selection
     if len(ordered_selection) == len(selection):
         selection = ordered_selection

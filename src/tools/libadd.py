@@ -14,6 +14,7 @@ from AaronTools.const import AARONLIB
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.tools import key_atom_highlight, ghost_connection_highlight, show_walk_highlight
+from SEQCROW.selectors import register_selectors
 
 from warnings import warn
 
@@ -123,7 +124,7 @@ class LibAdd(ToolInstance):
             self.key_atomspec = selection
         
         self.tool_window.status("key atoms set to %s" % " ".join(atom.atomspec for atom in selection))
-        
+
     def libadd_ligand(self):
         """add ligand to library or open it in a new model"""
         selection = selected_atoms(self.session)
@@ -179,7 +180,7 @@ class LibAdd(ToolInstance):
             else:
                 ligand.write(outfile=filename)
                 self.tool_window.status("%s added to ligand library" % lig_name)        
-        
+
     def libadd_ring(self):
         """add ring to library or open it in a new model"""
         selection = self.session.seqcrow_ordered_selection_manager.selection
@@ -231,8 +232,13 @@ class LibAdd(ToolInstance):
         
         if not selection.single_structure:
             raise RuntimeError("selected atoms must be on the same model")
-          
-        rescol = ResidueCollection(selection[0].structure)
+        
+        residues = []
+        for atom in selection:
+            if atom.residue not in residues:
+                residues.append(atom.residue)
+            
+        rescol = ResidueCollection(selection[0].structure, convert_residues=residues)
             
         substituent_atoms = [atom for atom in rescol.atoms if atom.chix_atom in selection]
         
@@ -275,6 +281,7 @@ class LibAdd(ToolInstance):
         vx = np.cross(vb, x_axis)
         sub.rotate(vx, theta)
         
+        add = False
         if len(sub_name) == 0:
             chimerax_sub = ResidueCollection(sub).get_chimera(self.session)
             chimerax_sub.name = "substituent preview"
@@ -293,15 +300,24 @@ class LibAdd(ToolInstance):
                 
                 rv = exists_warning.exec_()
                 if rv == QMessageBox.Yes:
-                    sub.write(outfile=filename)
-                    self.tool_window.status("%s added to substituent library" % sub_name)
+                    add = True
                 
                 else:
                     self.tool_window.status("%s has not been added to substituent library" % sub_name)
 
             else:
-                sub.write(outfile=filename)
-                self.tool_window.status("%s added to substituent library" % sub_name)
+                add = True
+
+        if add:
+            sub.write(outfile=filename)
+            self.tool_window.status("%s added to substituent library" % sub_name)
+            register_selectors(self.session.logger, sub_name)
+            if self.session.ui.is_gui:
+                if sub_name.isalnum():
+                    add_submenu = self.session.ui.main_window.add_select_submenu
+                    add_selector = self.session.ui.main_window.add_menu_selector
+                    substituent_menu = add_submenu(['Che&mistry'], 'Substituents')
+                    add_selector(substituent_menu, sub_name, sub_name)
     
     def display_help(self):
         """Show the help for this tool in the help viewer."""

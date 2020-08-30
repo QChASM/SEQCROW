@@ -136,7 +136,6 @@ class Residue(Geometry):
             if atom.serial_number == -1:
                 atom.serial_number = atom.structure.atoms.index(atom) + 1
 
-
     def refresh_chix_connected(self, chix_residue):
         known_bonds = []
         known_chix_bonds = []
@@ -223,9 +222,7 @@ class ResidueCollection(Geometry):
             all_atoms = []
             if convert_residues is None:
                 convert_residues = molecule.residues
-            for i, residue in enumerate(convert_residues):
-                aaron_atoms = []
-    
+            for i, residue in enumerate(convert_residues):  
                 new_res = Residue(residue, \
                                   comment=molecule.comment if hasattr(molecule, "comment") else None, \
                                   refresh_connected=False)
@@ -237,17 +234,25 @@ class ResidueCollection(Geometry):
             super().__init__(all_atoms, name=molecule.name, refresh_connected=refresh_connected, comment=molecule.comment if hasattr(molecule, "comment") else "", **kwargs)
         
             #update bonding to match that of the chimerax molecule
-            for bond in molecule.bonds:
-                atom1 = bond.atoms[0]
-                atom2 = bond.atoms[1]
-                if self.convert_residues is not None and (atom1.residue not in self.convert_residues or atom2.residue not in self.convert_residues):
-                    continue
-                
-                aaron_atom1 = [atom for atom in all_atoms if atom.chix_atom is atom1][0]
-                aaron_atom2 = [atom for atom in all_atoms if atom.chix_atom is atom2][0]
-
-                aaron_atom1.connected.add(aaron_atom2)
-                aaron_atom2.connected.add(aaron_atom1)
+            for atom in all_atoms:
+                for atom2 in all_atoms:
+                    if atom2.chix_atom not in atom.chix_atom.neighbors:
+                        continue
+                    
+                    atom.connected.add(atom2)
+                            
+                    
+            #for bond in molecule.bonds:
+            #    atom1 = bond.atoms[0]
+            #    atom2 = bond.atoms[1]
+            #    if self.convert_residues is not None and (atom1.residue not in self.convert_residues or atom2.residue not in self.convert_residues):
+            #        continue
+            #    
+            #    aaron_atom1 = [atom for atom in all_atoms if atom.chix_atom is atom1][0]
+            #    aaron_atom2 = [atom for atom in all_atoms if atom.chix_atom is atom2][0]
+            #
+            #    aaron_atom1.connected.add(aaron_atom2)
+            #    aaron_atom2.connected.add(aaron_atom1)
             
             #add bonds to metals
             tm_bonds = molecule.pseudobond_group(molecule.PBG_METAL_COORDINATION, create_type=None)
@@ -324,7 +329,7 @@ class ResidueCollection(Geometry):
                 
             for atom in deleted_atoms:
                 res.atoms.remove(atom)
-        
+
     def find_residue(self, target):
         """returns a list of residues containing the specified target"""
         atom = self.find(target)
@@ -421,10 +426,6 @@ class ResidueCollection(Geometry):
                     #we cannot draw a bond to an atom that is not in the residue
                     #this could happen when previewing a substituent or w/e with the libadd tool
                     continue
-
-                ##this doesn't work for some reason?
-                #if any([atom2 in bond.atoms for bond in atom1.bonds]):
-                #    continue
                 
                 if atom2 not in atom1.neighbors:
                     new_bond = atomic_structure.new_bond(atom1, atom2)

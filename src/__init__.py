@@ -4,6 +4,9 @@ from chimerax.core.toolshed import BundleAPI
 from chimerax.core.toolshed.info import SelectorInfo
 from chimerax.core.commands import BoolArg, ModelsArg, StringArg, register
 
+from AaronTools.const import ELEMENTS
+from AaronTools.substituent import Substituent
+
 
 class _SEQCROW_API(BundleAPI):
 
@@ -23,6 +26,9 @@ class _SEQCROW_API(BundleAPI):
 
             session.ui.triggers.add_handler('ready',
                 lambda *args, ses=session: settings.register_settings_options(ses))
+                    
+            session.ui.triggers.add_handler('ready',
+                lambda *args, ses=session: _SEQCROW_API.register_selector_menus(ses))
         
         #apply AARONLIB setting
         if seqcrow_settings.settings.AARONLIB is not None:
@@ -34,12 +40,15 @@ class _SEQCROW_API(BundleAPI):
         #initialize is called after init_manager 
         session.seqcrow_job_manager.init_queue()
 
-        ##register selectors from the user's personal library
-        #from AaronTools.substituent import Substituent
-        #for sub in Substituent.list():  
-        #    if not any([selector.name == sub for selector in bundle_info.selectors]):
-        #        si = SelectorInfo(sub, atomic=True, synopsis="%s substituent" % sub)
-        #        bundle_info.selectors.append(si)
+        #register selectors from the user's personal library
+        for sub in Substituent.list():
+            if sub not in ELEMENTS and sub.isalnum():
+                if not any([selector.name == sub for selector in bundle_info.selectors]):
+                    si = SelectorInfo(sub, atomic=True, synopsis="%s substituent" % sub)
+                    bundle_info.selectors.append(si)
+
+        #need to reregister selectors b/c ^ that bypassed the bundle_info.xml or something
+        bundle_info._register_selectors(session.logger)
 
     @staticmethod
     def open_file(session, path, format_name, coordsets=False):
@@ -61,13 +70,11 @@ class _SEQCROW_API(BundleAPI):
             
         elif format_name == "XYZ":
             return save_aarontools(session, path, format_name, **kw)
-        
+
     @staticmethod
     def register_selector(bundle_info, selector_info, logger):
-        """select all transition metals with one easy `select` command!"""
-
         from .selectors import register_selectors
-        register_selectors(logger)
+        register_selectors(logger, selector_info.name)
 
     @staticmethod
     def init_manager(session, bundle_info, name, **kw):
@@ -96,33 +103,67 @@ class _SEQCROW_API(BundleAPI):
             from .tools import AaronTools_Library
             tool = AaronTools_Library(session, ti.name)
             return tool        
+        
         elif ti.name == "Visualize Normal Modes":
             from .tools import NormalModes
             tool = NormalModes(session, ti.name)
             return tool        
-        elif ti.name == "Structure Modification":
+        
+        if any(ti.name == name for name in ["Structure Modification", \
+                                            "Change Substituents", \
+                                            "Swap Transition Metal Ligands", \
+                                            "Fuse Ring"]):
             from .tools import EditStructure
-            tool = EditStructure(session, ti.name)
-            return tool        
+            for tool in session.tools.list():
+                if isinstance(tool, EditStructure):
+                    tool.display(True)
+                    if ti.name == "Change Substituents":
+                        tool.alchemy_tabs.setCurrentIndex(0)                    
+                    elif ti.name == "Swap Transition Metal Ligands":
+                        tool.alchemy_tabs.setCurrentIndex(1)
+                    elif ti.name == "Fuse Ring":
+                        tool.alchemy_tabs.setCurrentIndex(2)
+                    break
+            else:
+                tool = EditStructure(session, ti.name)
+
+                if ti.name == "Change Substituents":
+                    tool.alchemy_tabs.setCurrentIndex(0)
+                elif ti.name == "Swap Transition Metal Ligands":
+                    tool.alchemy_tabs.setCurrentIndex(1)
+                elif ti.name == "Fuse Ring":
+                    tool.alchemy_tabs.setCurrentIndex(2)
+
+                return tool        
+        
         elif ti.name == "Add to Personal Library":
             from .tools import LibAdd
             tool = LibAdd(session, ti.name)
             return tool
+        
         elif ti.name == "Managed Models":
             from .tools import FileReaderPanel
             tool = FileReaderPanel(session, ti.name)
             return tool        
+        
         elif ti.name == "Process QM Thermochemistry":
             from .tools import Thermochem
             tool = Thermochem(session, ti.name)
             return tool
+        
         elif ti.name == "Build QM Input":
             from .tools import BuildQM
             tool = BuildQM(session, ti.name)
             return tool
+        
         elif ti.name == "Job Queue":
             from .tools import JobQueue
             return JobQueue(session, ti.name)
+        
+        elif ti.name == "AARON Input Builder":
+            from .tools import AARONInputBuilder
+            return AARONInputBuilder(session, ti.name)
+        
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)
 
@@ -214,9 +255,18 @@ class _SEQCROW_API(BundleAPI):
             from .commands.substitute import substitute, substitute_description
             register("substitute", substitute_description, substitute)
 
-        elif command_info.name == "closeRing":
-            from .commands.closeRing import closeRing, closeRing_description
-            register("closeRing", closeRing_description, closeRing)
+        elif command_info.name == "fuseRing":
+            from .commands.fuseRing import fuseRing, fuseRing_description
+            register("fuseRing", fuseRing_description, fuseRing)
+
+    @staticmethod
+    def register_selector_menus(session):
+        add_submenu = session.ui.main_window.add_select_submenu
+        add_selector = session.ui.main_window.add_menu_selector
+        substituent_menu = add_submenu(['Che&mistry'], 'Substituents')
+        for sub in Substituent.list():
+            if sub not in ELEMENTS and sub.isalnum():
+                add_selector(substituent_menu, sub, sub)
 
 
 bundle_api = _SEQCROW_API()

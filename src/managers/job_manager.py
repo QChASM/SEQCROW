@@ -11,7 +11,7 @@ from json import load, dump
 from PyQt5.QtWidgets import QMessageBox, QApplication
 
 from SEQCROW.jobs import LocalJob, GaussianJob, ORCAJob, Psi4Job
-from SEQCROW.managers import FILEREADER_ADDED
+from SEQCROW.managers import ADD_FILEREADER
 from SEQCROW.residue_collection import ResidueCollection
 
 JOB_FINISHED = "job finished"
@@ -229,7 +229,7 @@ class JobManager(ProviderManager):
 
                 fr = FileReader(finfo, get_all=True, just_geom=False)
                 if len(fr.atoms) > 0:
-                    job.session.filereader_manager.triggers.activate_trigger(FILEREADER_ADDED, ([job.theory.structure], [fr]))
+                    job.session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([job.theory.structure], [fr]))
     
                     rescol = ResidueCollection(fr, refresh_connected=True)
                     rescol.update_chix(job.theory.structure)

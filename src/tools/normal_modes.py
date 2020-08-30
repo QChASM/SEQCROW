@@ -5,7 +5,6 @@ from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.ui.widgets import ColorButton
 from chimerax.bild.bild import read_bild
-from chimerax.core.models import ADD_MODELS, REMOVE_MODELS
 from chimerax.std_commands.coordset_gui import CoordinateSetSlider
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
@@ -33,9 +32,9 @@ from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, 
                             QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, \
                             QFormLayout, QCheckBox, QHeaderView, QMenuBar, QAction, QFileDialog
 
-from SEQCROW.managers import FILEREADER_CHANGE
 from SEQCROW.tools.per_frame_plot import NavigationToolbar
 from SEQCROW.utils import iter2str
+from SEQCROW.widgets import FilereaderComboBox
 
 #TODO:
 #make double clicking something in the table visualize it
@@ -53,6 +52,8 @@ class _NormalModeSettings(Settings):
         'anim_duration': Value(120, IntArg),
         'anim_fps': Value(60, IntArg), 
         'fwhm': Value(5, FloatArg), 
+        'peak_type': 'Gaussian', 
+        'plot_type': 'Absorbance', 
     }
 
 class FPSSpinBox(QSpinBox):
@@ -108,6 +109,11 @@ class FPSSpinBox(QSpinBox):
         self.setValue(val)
 
 
+class FreqTableWidgetItem(QTableWidgetItem):
+    def __lt__(self, other):
+        return self.data(Qt.UserRole) < other.data(Qt.UserRole)
+
+
 class NormalModes(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False         
@@ -125,17 +131,11 @@ class NormalModes(ToolInstance):
         
         self._build_ui()
 
-        self.refresh_models()
-
-        self._add_handler = session.triggers.add_handler(ADD_MODELS, self.refresh_models)
-        self._refresh_handler = session.triggers.add_handler(REMOVE_MODELS, self.refresh_models)
-        self._fr_update_handler = session.filereader_manager.triggers.add_handler(FILEREADER_CHANGE, self.refresh_models)
-
     def _build_ui(self):
         layout = QGridLayout()
         
         #select which molecule's frequencies to visualize
-        model_selector = QComboBox()
+        model_selector = FilereaderComboBox(self.session, otherItems=['frequency'])
                 
         model_selector.currentIndexChanged.connect(self.create_freq_table)
         self.model_selector = model_selector
@@ -239,10 +239,14 @@ class NormalModes(ToolInstance):
         
         self.plot_type = QComboBox()
         self.plot_type.addItems(['Absorbance', 'Transmittance'])
+        ndx = self.plot_type.findText(self.settings.plot_type, Qt.MatchExactly)
+        self.plot_type.setCurrentIndex(ndx)
         ir_layout.addRow("plot type:", self.plot_type)
         
         self.peak_type = QComboBox()
         self.peak_type.addItems(['Gaussian', 'Lorentzian', 'Delta'])
+        ndx = self.peak_type.findText(self.settings.peak_type, Qt.MatchExactly)
+        self.peak_type.setCurrentIndex(ndx)
         ir_layout.addRow("peak type:", self.peak_type)
         
         self.fwhm = QDoubleSpinBox()
@@ -298,8 +302,8 @@ class NormalModes(ToolInstance):
             row = self.table.rowCount()
             self.table.insertRow(row)
             
-            freq = QTableWidgetItem()
-            freq.setData(Qt.DisplayRole, round(mode.frequency, 2))
+            freq = FreqTableWidgetItem()
+            freq.setData(Qt.DisplayRole, "%.2f%s" % (abs(mode.frequency), "i" if mode.frequency < 0 else ""))
             freq.setData(Qt.UserRole, i)
             self.table.setItem(row, 0, freq)
             
@@ -308,23 +312,6 @@ class NormalModes(ToolInstance):
                 intensity.setData(Qt.DisplayRole, round(mode.intensity, 2))
             self.table.setItem(row, 1, intensity)
     
-    def refresh_models(self, *args, **kwargs):
-        """refresh the list of models with frequency data and add or remove items from the combobox"""        
-        #remove in reverse order b/c sometimes they don't get removed in forwards order
-        #TODO: we use FileReaders now, not models - look for those
-        for i in range(self.model_selector.count(), -1, -1):
-            if self.model_selector.itemData(i) not in self.session.filereader_manager.frequency_filereaders:
-                self.model_selector.removeItem(i)
-                
-        for model in self.session.filereader_manager.frequency_models:
-            if len(model.atomspec) > 1:
-                for fr in self.session.filereader_manager.filereader_dict[model]:
-                    if 'frequency' not in fr.other:
-                        continue
-                        
-                    if self.model_selector.findData(fr) == -1:
-                        self.model_selector.addItem("%s (%s)" % (basename(fr.name), model.atomspec), fr)
-
     def change_mw_option(self, state):
         """toggle bool associated with mass-weighting option"""
         if state == Qt.Checked:
@@ -504,14 +491,12 @@ class NormalModes(ToolInstance):
     def highlight_ir_plot(self, *args):
         if self.ir_plot is not None:
             self.ir_plot.highlight(self.table.selectedItems())
-    
-    def delete(self):
-        """overload delete"""
-        self.session.triggers.remove_handler(self._add_handler)
-        self.session.triggers.remove_handler(self._refresh_handler)
-        self.session.filereader_manager.triggers.remove_handler(self._fr_update_handler)
-        super().delete()
 
+    def delete(self):
+        self.model_selector.deleteLater()
+
+        return super().delete()
+    
 
 class IRPlot(ChildToolWindow):
     def __init__(self, tool_instance, title, **kwargs):
@@ -664,6 +649,8 @@ class IRPlot(ChildToolWindow):
 
         fwhm = self.tool_instance.fwhm.value()
         self.tool_instance.settings.fwhm = fwhm
+        self.tool_instance.settings.peak_type = self.tool_instance.peak_type.currentText()
+        self.tool_instance.settings.plot_type = self.tool_instance.plot_type.currentText()
         frequencies = [freq.frequency for freq in fr.other['frequency'].data if freq.frequency > 0]
         intensities = [freq.intensity for freq in fr.other['frequency'].data if freq.frequency > 0]
         
