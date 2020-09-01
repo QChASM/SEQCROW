@@ -569,6 +569,10 @@ class BuildQM(ToolInstance):
 
     def update_preview(self, *args, **kw):
         """whenever a setting is changed, this should be called to update the preview"""
+        model = self.model_selector.currentData()
+        if model is None:
+            return
+
         self.update_theory(update_settings=False)
         
         self.check_elements()
@@ -632,22 +636,6 @@ class BuildQM(ToolInstance):
         nproc = self.job_widget.getNProc(update_settings)
         mem = self.job_widget.getMem(update_settings)
         jobs = self.job_widget.getJobs() #job settings get updated during getKWDict
-        #also need to convert constrained atoms to AaronTools atoms when saving - same reason we
-        #convert to ResidueCollection
-        if update_settings:
-            for job in jobs:
-                if hasattr(job, "constraints"):
-                    new_constraints = {}
-                    if job.constraints is not None:
-                        for key in job.constraints:
-                            new_constraints[key] = []
-                            for item in job.constraints[key]:
-                                if hasattr(item, "__iter__"):
-                                    new_constraints[key].append([atom for atom in model.atoms if atom.chix_atom in item])
-                                else:
-                                    new_constraints[key].append([atom for atom in model.atoms if atom.chix_atom is item][0])
-                    
-                    job.constraints = new_constraints
 
         solvent = self.job_widget.getSolvent(update_settings)
 
@@ -704,6 +692,19 @@ class BuildQM(ToolInstance):
 
         model = self.model_selector.currentData()
         self.theory.geometry = ResidueCollection(model)
+        for job in self.theory.job_type:
+            if hasattr(job, "constraints"):
+                new_constraints = {}
+                if job.constraints is not None:
+                    for key in job.constraints:
+                        new_constraints[key] = []
+                        for item in job.constraints[key]:
+                            if hasattr(item, "__iter__"):
+                                new_constraints[key].append([atom for atom in self.theory.geometry.atoms if atom.chix_atom in item])
+                            else:
+                                new_constraints[key].append([atom for atom in self.theory.geometry.atoms if atom.chix_atom is item][0])        
+                    
+                    job.constraints = new_constraints
 
         kw_dict = self.job_widget.getKWDict()
         other_kw_dict = self.other_keywords_widget.getKWDict()
