@@ -217,7 +217,7 @@ class JobManager(ProviderManager):
                 if 'finished' not in fr.other or not fr.other['finished']:
                     job.error = True
 
-        if job.auto_update and not job.theory.structure.deleted:
+        if job.auto_update and (job.theory.geometry.chix_atomicstructure is not None and not job.theory.geometry.chix_atomicstructure.deleted):
             if os.path.exists(job.output_name):
                 finfo = job.output_name
                 if isinstance(job, GaussianJob):
@@ -229,26 +229,26 @@ class JobManager(ProviderManager):
 
                 fr = FileReader(finfo, get_all=True, just_geom=False)
                 if len(fr.atoms) > 0:
-                    job.session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([job.theory.structure], [fr]))
+                    job.session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([job.theory.geometry.chix_atomicstructure], [fr]))
     
                     rescol = ResidueCollection(fr, refresh_connected=True)
-                    rescol.update_chix(job.theory.structure)
+                    rescol.update_chix(job.theory.geometry.chix_atomicstructure)
 
             if fr.all_geom is not None and len(fr.all_geom) > 1:
                 coordsets = rescol.all_geom_coordsets(fr)
 
-                job.theory.structure.remove_coordsets()
-                job.theory.structure.add_coordsets(coordsets)
+                job.theory.geometry.chix_atomicstructure.remove_coordsets()
+                job.theory.geometry.chix_atomicstructure.add_coordsets(coordsets)
 
                 for i, coordset in enumerate(coordsets):
-                    job.theory.structure.active_coordset_id = i + 1
+                    job.theory.geometry.chix_atomicstructure.active_coordset_id = i + 1
                     
-                    for atom, coord in zip(job.theory.structure.atoms, coordset):
+                    for atom, coord in zip(job.theory.geometry.chix_atomicstructure.atoms, coordset):
                         atom.coord = coord
                 
-                job.theory.structure.active_coordset_id = job.theory.structure.num_coordsets
+                job.theory.geometry.chix_atomicstructure.active_coordset_id = job.theory.geometry.chix_atomicstructure.num_coordsets
 
-        elif job.auto_open:
+        elif job.auto_open or job.auto_update:
             if hasattr(job, "output_name") and os.path.exists(job.output_name):
                 run(job.session, "open \"%s\" coordsets true" % job.output_name)
             else:

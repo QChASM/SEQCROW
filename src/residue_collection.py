@@ -196,7 +196,8 @@ class ResidueCollection(Geometry):
         
         if isinstance(molecule, Catalyst):
             super().__init__(molecule, refresh_connected=refresh_connected, comment=molecule.comment, **kwargs)
-            
+
+            self.chix_atomicstructure = None            
             self.atomspec = None
             self.residues = []
             i = 1
@@ -215,6 +216,7 @@ class ResidueCollection(Geometry):
             return
         
         elif isinstance(molecule, AtomicStructure):
+            self.chix_atomicstructure = molecule
             self.residues = []
             self.atomspec = molecule.atomspec
             
@@ -270,6 +272,7 @@ class ResidueCollection(Geometry):
         else:
             #assume whatever we got is something AaronTools can turn into a Geometry
             super().__init__(molecule, refresh_connected=refresh_connected, **kwargs)
+            self.chix_atomicstructure = None
             self.atomspec = None
             if "comment" in kwargs:
                 self.residues = [Residue(molecule, resnum=1, name="UNK", refresh_connected=refresh_connected, comment=kwargs['comment'])]
