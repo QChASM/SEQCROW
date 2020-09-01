@@ -125,7 +125,7 @@ class ORCAJob(LocalJob):
         d['format'] = "ORCA"
         d['depend'] = None
         d['auto_update'] = False
-        d['auto_open'] = self.auto_open
+        d['auto_open'] = self.auto_open or self.auto_update
 
         return d
 
@@ -193,7 +193,7 @@ class GaussianJob(LocalJob):
         d['format'] = "Gaussian"
         d['depend'] = None
         d['auto_update'] = False
-        d['auto_open'] = self.auto_open
+        d['auto_open'] = self.auto_open or self.auto_update
 
         return d
 
@@ -261,6 +261,6 @@ class Psi4Job(LocalJob):
         d['format'] = "Psi4"
         d['depend'] = None
         d['auto_update'] = False
-        d['auto_open'] = self.auto_open
+        d['auto_open'] = self.auto_open or self.auto_update
 
         return d
