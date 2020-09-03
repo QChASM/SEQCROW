@@ -193,6 +193,8 @@ presets:
                 <ChimeraXClassifier>ChimeraX :: Command :: rmsdAlign :: Structure Analysis :: Calculate RMSD between structures</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: substitute :: Structure Editing :: change substiuents</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: fuseRing :: Structure Editing :: fuse a ring</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: angle :: Structure Analysis :: angle defined by three atoms</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: dihedral :: Structure Analysis :: dihedral angle defined by four atoms</ChimeraXClassifier>
        </Classifiers>
             
 </BundleInfo>

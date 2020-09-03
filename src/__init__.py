@@ -258,6 +258,14 @@ class _SEQCROW_API(BundleAPI):
         elif command_info.name == "fuseRing":
             from .commands.fuseRing import fuseRing, fuseRing_description
             register("fuseRing", fuseRing_description, fuseRing)
+        
+        elif command_info.name == "angle":
+            from .commands.angle import angle, angle_description
+            register("angle", angle_description, angle)
+        
+        elif command_info.name == "dihedral":
+            from .commands.dihedral import dihedral, dihedral_description
+            register("dihedral", dihedral_description, dihedral)
 
     @staticmethod
     def register_selector_menus(session):
