@@ -37,7 +37,7 @@ class EditStructure(ToolInstance):
     def __init__(self, session, name):       
         super().__init__(session, name)
         
-        self.settings = _EditStructureSettings(session, name)
+        self.settings = _EditStructureSettings(session, "Structure Modification")
         
         self.tool_window = MainToolWindow(self)        
 

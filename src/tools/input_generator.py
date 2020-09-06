@@ -230,6 +230,17 @@ class _InputGeneratorSettings(Settings):
 
 
 class BuildQM(ToolInstance):
+    """tool for building input files for QM software (Gaussian, ORCA, Psi4)
+    
+    there are comboboxes for the file format (program) and the molecule
+    
+    then, THERE ARE FOUR LIGHTS:
+    job details        - charge & multiplicity, job type, job-specific options, and solvent
+    method             - dft functional or other method
+    basis functions    - choose basis sets on a per-element basis 
+    additional options - generic (and uncurated) options 
+    """
+    
     SESSION_ENDURING = False
     SESSION_SAVE = False         
 
@@ -513,14 +524,17 @@ class BuildQM(ToolInstance):
             self.preset_window.basis_elements.refresh_basis()
 
     def show_remove_preset(self):
+        """shows the child window to remove a preset"""
         if self.remove_preset_window is None:
             self.remove_preset_window = self.tool_window.create_child_window("Remove Presets", window_class=RemovePreset)
 
     def show_export_preset(self):
+        """shows child window to export preset json"""
         if self.export_preset_window is None:
             self.export_preset_window = self.tool_window.create_child_window("Export Presets", window_class=ExportPreset)
 
     def import_preset_file(self):
+        """open file browser, select file, and import presets"""
         filename, _ = QFileDialog.getOpenFileName(filter="JSON files (*.json)")
 
         if not filename:
@@ -559,6 +573,7 @@ class BuildQM(ToolInstance):
         self.refresh_presets()
 
     def show_queue(self):
+        """show queue tool"""
         run(self.session, "ui tool show \"Job Queue\"")
 
     def show_preview(self):
@@ -684,12 +699,19 @@ class BuildQM(ToolInstance):
         return BasisSet(basis, ecp)
 
     def show_local_job_prep(self):
+        """open run local job child window"""
         if self.job_local_prep is None:
             self.job_local_prep = self.tool_window.create_child_window("Launch Job", window_class=PrepLocalJob)
 
     def run_local_job(self, *args, name="local_job", auto_update=False, auto_open=False):
+        """run job"""
         self.update_theory()
 
+        #for local jobs, AtomicStructure is converted to ResidueCollection
+        #if the AtomicStructure is closed and there are constraints, the
+        #job would error out when writing the input file b/c the atoms are
+        #deleted
+        #but ResidueCollection atoms are still there
         model = self.model_selector.currentData()
         self.theory.geometry = ResidueCollection(model)
         for job in self.theory.job_type:
@@ -1078,7 +1100,7 @@ class JobTypeOption(QWidget):
         self.num_freq = QCheckBox()
         self.num_freq.setChecked(self.settings.last_num_freq)
         self.num_freq.stateChanged.connect(self.something_changed)
-        self.num_freq.setToolTip("numerical vibrational frequency algorithms are often slower than analytical algorithms,\nusually require less memory and available for methods where analytical methods are not")
+        self.num_freq.setToolTip("numerical vibrational frequency algorithms are often slower and less reliable than analytical algorithms\nusually requires less memory than analytical, but are available for methods where analytical frequencies are not")
         freq_opt_form.addRow("Numerical frequencies:", self.num_freq)
 
         self.job_type_opts.addTab(self.freq_opt, "frequency settings")
@@ -1405,6 +1427,7 @@ class JobTypeOption(QWidget):
         return self.do_freq.checkState() == Qt.Checked
 
     def getJobs(self):
+        """returns list(JobType) for the current jobs"""
         job_types = []
         if self.do_geom_opt.checkState() == Qt.Checked:
             if self.use_contraints.checkState() == Qt.Checked:
@@ -1973,23 +1996,24 @@ class JobTypeOption(QWidget):
             return info
 
     def check_deleted_atoms(self):
+        """purge deleted atoms from constraints table and lists"""
         for atom in self.constrained_atoms[::-1]:
             if atom.deleted:
                 self.constrained_atom_table.removeRow(self.constrained_atoms.index(atom))
                 self.constrained_atoms.remove(atom)
 
         for bond in self.constrained_bonds:
-            if any (atom.deleted for atom in bond):
+            if any(atom.deleted for atom in bond):
                 self.constrained_bond_table.removeRow(self.constrained_bonds.index(bond))
                 self.constrained_bonds.remove(bond)
 
         for angle in self.constrained_angles:
-            if any (atom.deleted for atom in angle):
+            if any(atom.deleted for atom in angle):
                 self.constrained_angle_table.removeRow(self.constrained_angles.index(angle))
                 self.constrained_angles.remove(angle)
 
         for torsion in self.constrained_torsions:
-            if any (atom.deleted for atom in torsion):
+            if any(atom.deleted for atom in torsion):
                 self.constrained_torsion_table.removeRow(self.constrained_torsions.index(torsion))
                 self.constrained_torsions.remove(torsion)
 
@@ -3561,6 +3585,7 @@ class OneLayerKeyWordOption(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
     def add_item_to_previous_kw_table(self, kw):
+        """adds kw to the table 'previous keyword' table"""
         row = self.previous_kw_table.rowCount()
         self.previous_kw_table.insertRow(row)
     
@@ -3581,6 +3606,7 @@ class OneLayerKeyWordOption(QWidget):
         self.previous_kw_table.resizeRowToContents(row)
 
     def remove_previous_kw_row(self, row):
+        """removes row from 'previous keyword' table and items from the settings"""
         item = self.previous_kw_table.item(row, 0)
         kw = item.text()
         self.previous_list.remove(kw)
@@ -3596,6 +3622,7 @@ class OneLayerKeyWordOption(QWidget):
         self.previous_kw_table.removeRow(row)
     
     def add_item_to_current_kw_table(self, kw):
+        """adds kw to the 'current keyword' table"""
         self.current_kw_table.blockSignals(True)
         
         row = self.current_kw_table.rowCount()
@@ -3626,6 +3653,8 @@ class OneLayerKeyWordOption(QWidget):
         self.current_kw_table.blockSignals(False)
 
     def add_kw(self):
+        """'add' button was clicked
+        grab the text and add it to the table"""
         if self.multiline:
             kw = self.new_kw.toPlainText()
         else:
@@ -3640,6 +3669,8 @@ class OneLayerKeyWordOption(QWidget):
             self.add_item_to_current_kw_table(kw)
 
     def clicked_route_keyword(self, row, column):
+        """row was clicked in the 'previous' table
+        remove row or add the item to 'current' table as appropriate"""
         if column == 1:
             self.remove_previous_kw_row(row)
         elif column == 0:
@@ -3654,6 +3685,8 @@ class OneLayerKeyWordOption(QWidget):
             self.add_item_to_current_kw_table(keyword)
 
     def clicked_current_route_keyword(self, row, column):
+        """row in 'current' table was clicked - remove row if it was
+        the 'remove' column"""
         if column == 1:
             item = self.current_kw_table.item(row, 0)
             kw = item.text()
@@ -3664,6 +3697,9 @@ class OneLayerKeyWordOption(QWidget):
             self.optionChanged.emit()
  
     def edit_current_kw(self, row, column):
+        """item in 'current' table was clicked
+        allow editing if column is a keyword
+        newlines are also replaced with newlines"""
         if column == 0:
             if self.multiline:
                 self.last_list[row] = self.current_kw_table.item(row, column).text().replace('\\n', '\n')
@@ -3677,11 +3713,13 @@ class OneLayerKeyWordOption(QWidget):
             self.optionChanged.emit()
 
     def refresh_previous(self):
+        """refresh self.previous_list"""
         for item in self.last_list:
             if item not in self.previous_list:
                 self.previous_list.append(item)
     
     def apply_kw_filter(self, text=None):
+        """filter keywords based on what's typed in to the 'add' text box"""
         if text is None:
             #QTextEdit's textChanged doesn't give you the text
             text = self.new_kw.toPlainText()
@@ -3708,6 +3746,7 @@ class OneLayerKeyWordOption(QWidget):
         self.previous_kw_table.resizeColumnToContents(0)    
     
     def setCurrentSettings(self, kw_list):
+        """changes settings to match kw_list"""
         self.clearCurrentSettings()
 
         self.last_list = kw_list.copy()        
@@ -3716,6 +3755,7 @@ class OneLayerKeyWordOption(QWidget):
             self.add_item_to_current_kw_table(kw)
 
     def clearCurrentSettings(self):
+        """remove all 'current' items"""
         self.last_list = []
 
         for i in range(self.current_kw_table.rowCount(), -1, -1):
@@ -3723,6 +3763,8 @@ class OneLayerKeyWordOption(QWidget):
 
 
 class TwoLayerKeyWordOption(QWidget):
+    """widget for 'two-layer' options
+    like opt(noeigentest)"""
     optionChanged = pyqtSignal()
     settingsChanged = pyqtSignal()
     
@@ -3887,6 +3929,7 @@ class TwoLayerKeyWordOption(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
     def add_item_to_previous_kw_table(self, kw):
+        """adds kw to 'previous keyword' table"""
         row = self.previous_kw_table.rowCount()
         self.previous_kw_table.insertRow(row)
         item = QTableWidgetItem(kw)
@@ -3906,6 +3949,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.previous_kw_table.resizeRowToContents(row)
 
     def remove_previous_kw_row(self, row):
+        """remove row from 'previous keyword' table"""
         item = self.previous_kw_table.item(row, 0)
         kw = item.text()
         del self.previous_dict[kw]
@@ -3921,6 +3965,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.previous_kw_table.removeRow(row)
     
     def add_item_to_current_kw_table(self, kw):
+        """add kw to 'current keyword' table"""
         row = self.current_kw_table.rowCount()
         self.current_kw_table.insertRow(row)
         item = QTableWidgetItem(kw)
@@ -3948,6 +3993,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.optionChanged.emit()
 
     def add_item_to_previous_opt_table(self, opt):
+        """add opt to 'previous option' table"""
         row = self.previous_opt_table.rowCount()
         self.previous_opt_table.insertRow(row)
         item = QTableWidgetItem(opt)
@@ -3967,6 +4013,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.previous_opt_table.resizeRowToContents(row)
     
     def remove_previous_opt_row(self, row):
+        """remove row from 'previous option' table"""
         item = self.previous_opt_table.item(row, 0)
         opt = item.text()
         self.previous_dict[self.selected_kw].remove(opt)
@@ -3982,8 +4029,9 @@ class TwoLayerKeyWordOption(QWidget):
         self.previous_opt_table.removeRow(row)
 
     def add_item_to_current_opt_table(self, opt):
+        """add opt to 'current option' table"""
         #prevent edit signal from triggering
-        #it should break anything, but we don't need it
+        #it shouldn't break anything, but we don't need it
         self.current_opt_table.blockSignals(True)
         
         #check keywords to see if opt is already one of them
@@ -4041,6 +4089,8 @@ class TwoLayerKeyWordOption(QWidget):
         self.current_opt_table.blockSignals(False)
 
     def add_kw(self):
+        """add button was clicked for keyword
+        add the text to the table"""
         kw = self.new_kw.text()
         if len(kw.strip()) == 0:
             return
@@ -4051,6 +4101,8 @@ class TwoLayerKeyWordOption(QWidget):
             self.add_item_to_current_kw_table(kw)
 
     def add_opt(self):
+        """add button was clicked for options
+        add text to 'current options' table"""
         opt = self.new_opt.text()
         if len(opt.strip()) == 0:
             return
@@ -4064,6 +4116,10 @@ class TwoLayerKeyWordOption(QWidget):
             self.add_item_to_current_opt_table(opt)
 
     def update_route_opts(self):
+        """keyword was clicked - update the 'options' to show what's
+        available/used for that keyword
+        e.g. if freq was selected, but the selection changed to opt
+        stop showing freq options and bring up opt options"""
         for i in range(self.previous_opt_table.rowCount(), -1, -1):
             self.previous_opt_table.removeRow(i)    
             
@@ -4095,6 +4151,8 @@ class TwoLayerKeyWordOption(QWidget):
         self.current_opt_table.resizeColumnToContents(1)
 
     def clicked_route_keyword(self, row, column):
+        """item in previous keyword table was clicked - remove if 
+        column was the delete column, otherwise add it to current keywords"""
         if column == 1:
             self.remove_previous_kw_row(row)
         elif column == 0:
@@ -4109,6 +4167,8 @@ class TwoLayerKeyWordOption(QWidget):
                 self.add_item_to_current_kw_table(keyword)
 
     def clicked_current_route_keyword(self, row, column):
+        """item in current keyword table was clicked
+        remove that item if column if the delete column"""
         if column == 1:
             item = self.current_kw_table.item(row, 0)
             kw = item.text()
@@ -4122,6 +4182,9 @@ class TwoLayerKeyWordOption(QWidget):
             self.optionChanged.emit()
 
     def clicked_keyword_option(self, row, column):
+        """item was clicked in previous option table
+        remove the option of column was delete column
+        otherwise add it to the current option table"""
         if column == 1:
             self.remove_previous_opt_row(row)
         elif column == 0:
@@ -4136,6 +4199,8 @@ class TwoLayerKeyWordOption(QWidget):
             self.add_item_to_current_opt_table(option)
   
     def clicked_current_keyword_option(self, row, column):
+        """current option table item was clicked
+        remove the item if column was delete column"""
         if column == 1:
             item = self.current_opt_table.item(row, 0)
             opt = item.text()
@@ -4146,11 +4211,13 @@ class TwoLayerKeyWordOption(QWidget):
             self.optionChanged.emit()
     
     def edit_current_opt(self, row, column):
+        """option was edited - update dict"""
         if column == 0:
             self.last_dict[self.selected_kw][row] = self.current_opt_table.item(row, column).text()
             self.optionChanged.emit()
 
     def refresh_previous(self):
+        """add items in current settings to previous settings"""
         for item in self.last_dict.keys():
             if item not in self.previous_dict:
                 self.previous_dict[item] = []
@@ -4160,6 +4227,7 @@ class TwoLayerKeyWordOption(QWidget):
                     self.previous_dict[item].append(opt)
     
     def apply_kw_filter(self, text):
+        """filter keywords based on what's in the keyword text box"""
         #text = self.custom_basis_kw.text()
         if text:
             #the user doesn't need capturing groups
@@ -4183,6 +4251,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.previous_kw_table.resizeColumnToContents(0)    
     
     def apply_opt_filter(self, text):
+        """filter options based on what's in the option text box"""
         #text = self.custom_basis_kw.text()
         if text:
             #the user doesn't need capturing groups
@@ -4206,6 +4275,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.previous_opt_table.resizeColumnToContents(0)
     
     def setCurrentSettings(self, kw_dict):
+        """change current keywords and options to match kw_dict"""
         self.clearCurrentSettings()
 
         self.last_dict = kw_dict.copy()
@@ -4214,6 +4284,7 @@ class TwoLayerKeyWordOption(QWidget):
             self.add_item_to_current_kw_table(kw)
 
     def clearCurrentSettings(self):
+        """remove all options and keywords from the 'current' tables"""
         self.last_dict = {}
         for i in range(self.current_opt_table.rowCount(), -1, -1):
             self.current_opt_table.removeRow(i)
@@ -4224,15 +4295,12 @@ class TwoLayerKeyWordOption(QWidget):
 
 class KeywordOptions(QWidget):
     """
-    items is a dict that can include
-        route       - enables widget to display route options 
-        comment     - comment 
-        link 0      - enables Gaussian's Link 0 commands
-        settings    - enables setting specifications a la Psi4
-        blocks      - enables settings like ORCA's namespace-style options
-        end of file - some programs throw stuff at the end of the file
-        
-        the values should be the int map to specify the location in the input file
+    should be subclassed for program-specific options
+    subclass should set the following attributes:
+    items                       dict  - keys are the name of the settings section
+                                        the keys are used to get the widgets during KeywordOptions.get_options_for
+                                        the values should be the map to specify the 
+                                        location in the input file (e.g. AaronTools.theory.GAUSSIAN_ROUTE for route)
         
     previous_option_name        name of the'previous' setting
     last_option_name            name of the 'last' setting
@@ -4305,6 +4373,7 @@ class KeywordOptions(QWidget):
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
     
     def setKeywords(self, current_dict):
+        """sets all option widgets to match current_dict"""
         for item in self.widgets.keys():
             if self.items[item] in current_dict:
                 self.widgets[item].setCurrentSettings(current_dict[self.items[item]])
@@ -4338,6 +4407,7 @@ class KeywordOptions(QWidget):
         self.settings.save()
 
     def change_widget(self, name):
+        """show only the widget for 'name' settings"""
         for widget_name in self.widgets.keys():
             if name != widget_name:
                 self.widgets[widget_name].setVisible(False)
@@ -4346,6 +4416,8 @@ class KeywordOptions(QWidget):
                 self.widgets[widget_name].setVisible(True)
 
     def getKWDict(self, update_settings=True):
+        """returns a dict for things that are currently in option widgets
+        keys are defined by the values in KeywordOptions.items"""
         last_dict = {}
         for item in self.widgets.keys():
             if isinstance(self.widgets[item], TwoLayerKeyWordOption):
@@ -4648,6 +4720,7 @@ class Psi4KeywordOptions(KeywordOptions):
 
 
 class KeywordWidget(QWidget):
+    """widget shown on 'additional options' tab"""
     additionalOptionsChanged = pyqtSignal()
 
     def __init__(self, settings, init_form, parent=None):
@@ -4732,6 +4805,7 @@ class KeywordWidget(QWidget):
 
  
 class InputPreview(ChildToolWindow):
+    """window showing input file"""
     def __init__(self, tool_instance, title, **kwargs):
         super().__init__(tool_instance, title, statusbar=False, **kwargs)
         
@@ -4767,6 +4841,7 @@ class InputPreview(ChildToolWindow):
         self.manage(None)
 
     def setPreview(self, text, warnings_list):
+        """sets preview to 'text' and shows warnings in the status bar"""
         self.preview.setText(text)
         if len(warnings_list) > 0:
             self.status.setVisible(True)
@@ -4781,6 +4856,7 @@ class InputPreview(ChildToolWindow):
 
 
 class SavePreset(ChildToolWindow):
+    """window for selecting what to save in a preset"""
     class BasisElements(QWidget):
         """widget to select what elements belong in which basis"""
         def __init__(self, parent=None, tool_instance=None):
@@ -5026,6 +5102,7 @@ class SavePreset(ChildToolWindow):
 
 
 class RemovePreset(ChildToolWindow):
+    """window for deleting saved presets"""
     def __init__(self, tool_instance, title, **kwargs):
         super().__init__(tool_instance, title, statusbar=False, **kwargs)
         
@@ -5113,6 +5190,7 @@ class RemovePreset(ChildToolWindow):
 
 
 class PrepLocalJob(ChildToolWindow):
+    """window for running a local job"""
     def __init__(self, tool_instance, title, **kwargs):
         super().__init__(tool_instance, title, statusbar=False, **kwargs)
         
@@ -5167,6 +5245,7 @@ class PrepLocalJob(ChildToolWindow):
 
 
 class ExportPreset(ChildToolWindow):
+    """window for saving presets to a file"""
     def __init__(self, tool_instance, title, **kwargs):
         super().__init__(tool_instance, title, statusbar=False, **kwargs)
         

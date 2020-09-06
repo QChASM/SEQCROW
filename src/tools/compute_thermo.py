@@ -34,14 +34,27 @@ class _ComputeThermoSettings(Settings):
         'rel_temp': Value(298.15, FloatArg, str), 
         'ref_col_1': Value(150, IntArg), 
         'ref_col_2': Value(150, IntArg), 
-        'ref_col_3': Value(50, IntArg),         
         'other_col_1': Value(150, IntArg), 
         'other_col_2': Value(150, IntArg), 
-        'other_col_3': Value(50, IntArg), 
     }
 
 
 class Thermochem(ToolInstance):
+    """tool for calculating free energy corrections based on frequencies and energies 
+    associated with FileReaders
+    there are two tabs: absolute and relative
+    
+    the absolute tab can be used to combine the thermo corrections from one
+    FileReader with the energy of another
+    
+    the relative tab can do the same, but it prints the energies relative to
+    those of another FileReader
+    multiple molecule groups can be added (i.e. for reactions with multiple
+    reactants and products)
+    each molecule group can have multiple conformers
+    the energies of these conformers are boltzmann weighted, and the boltzmann-weighted
+    energy is used to calculate the energy of either the reference group or the 'other' group"""
+    
     SESSION_ENDURING = False
     SESSION_SAVE = False         
     help = "https://github.com/QChASM/SEQCROW/wiki/Process-Thermochemistry-Tool"
@@ -317,12 +330,12 @@ class Thermochem(ToolInstance):
         relative_widget = QWidget()
         relative_layout = QGridLayout(relative_widget)
 
-        size = [self.settings.ref_col_1, self.settings.ref_col_2, self.settings.ref_col_3]
+        size = [self.settings.ref_col_1, self.settings.ref_col_2]
         self.ref_group = ThermoGroup("reference group", self.session, self.nrg_fr, self.thermo_co, size)
         self.ref_group.changes.connect(self.calc_relative_thermo)
         relative_layout.addWidget(self.ref_group, 0, 0, 1, 3, Qt.AlignTop)
         
-        size = [self.settings.other_col_1, self.settings.other_col_2, self.settings.other_col_3]
+        size = [self.settings.other_col_1, self.settings.other_col_2]
         self.other_group = ThermoGroup("other group", self.session, self.nrg_fr, self.thermo_co, size)
         self.other_group.changes.connect(self.calc_relative_thermo)
         relative_layout.addWidget(self.other_group, 0, 3, 1, 3, Qt.AlignTop)
@@ -461,7 +474,12 @@ class Thermochem(ToolInstance):
         self.tool_window.manage(None)
 
     def calc_relative_thermo(self, *args):
+        """changes the values on the 'relative' tab
+        called when the tool is opened and whenever something changes on the relative tab"""
         def calc_free_energies(nrg_list, co_list, T, w0):
+            """returns lists for ZPVE, H, RRHO G, QRRHO G, and QHARM G
+            for the items in nrg_list and co_list at temperature T
+            and frequency parameter w0"""
             ZPVEs = []
             Hs = []
             Gs = []
@@ -492,7 +510,13 @@ class Thermochem(ToolInstance):
             return ZPVEs, Hs, Gs, RRHOG, QHARMG
         
         def boltzmann_weight(energies1, energies2, T):
-            
+            """
+            energies - list of lists
+                       list axis 0 - molecule groups
+                            axis 1 - energies of conformers
+            boltzmann weight energies for conformers 
+            combine energies for molecule groups 
+            return the difference"""
             totals1 = []
             totals2 = []
 
@@ -578,10 +602,12 @@ class Thermochem(ToolInstance):
         self.relative_dQHARMG.setText("%.1f" % rel_QHARMG)
 
     def open_link(self, theory):
+        """open the oft-cited QRRHO or QHARM reference"""
         link = self.theory_helper[theory]
         run(self.session, "open %s" % link)
 
     def save_csv(self):
+        """save data on current tab to CSV file"""
         filename, _ = QFileDialog.getSaveFileName(filter="CSV Files (*.csv)")
         if filename:
             s = self.get_csv()
@@ -592,6 +618,7 @@ class Thermochem(ToolInstance):
             self.session.logger.status("saved to %s" % filename)
 
     def copy_csv(self):
+        """put CSV data for current tab on the clipboard"""
         app = QApplication.instance()
         clipboard = app.clipboard()
         csv = self.get_csv()
@@ -599,6 +626,7 @@ class Thermochem(ToolInstance):
         self.session.logger.status("copied to clipboard")
 
     def get_csv(self):
+        """get CSV data for the current tab"""
         if self.settings.delimiter == "comma":
             delim = ","
         elif self.settings.delimiter == "space":
@@ -668,6 +696,7 @@ class Thermochem(ToolInstance):
         return s
     
     def header_check(self, state):
+        """user has [un]checked the 'include header' option on the menu"""
         if state:
             self.settings.include_header = True
         else:
@@ -687,6 +716,8 @@ class Thermochem(ToolInstance):
         self.update_sum()
 
     def set_thermo_mdl(self):
+        """frequencies filereader has changed on the absolute tab
+        also changes the temperature option (on the absolute tab only)"""
         if self.thermo_selector.currentIndex() >= 0:
             fr = self.thermo_selector.currentData()
             
@@ -698,6 +729,9 @@ class Thermochem(ToolInstance):
         self.set_thermo()
 
     def check_geometry_rmsd(self, *args):
+        """check RMSD between energy and frequency filereader on the absolute tab
+        if the RMSD is > 10^-5 or the number of atoms is different, put a warning in the
+        status bar"""
         if self.thermo_selector.currentIndex() >= 0 and self.sp_selector.currentIndex() >= 0:
             fr = self.sp_selector.currentData()
             fr2 = self.thermo_selector.currentData()
@@ -718,7 +752,7 @@ class Thermochem(ToolInstance):
                 self.status.showMessage("")
 
     def set_thermo(self):
-        """sets thermo entries for when thermo model changes"""
+        """computes thermo corrections and sets thermo entries for when thermo model changes"""
         #index of combobox is -1 when combobox has no entries
         if self.thermo_selector.currentIndex() >= 0:
             fr = self.thermo_selector.currentData()
@@ -806,11 +840,9 @@ class Thermochem(ToolInstance):
         #overload because closing a tool window doesn't destroy any widgets on it
         self.settings.ref_col_1 = self.ref_group.tree.columnWidth(0)
         self.settings.ref_col_2 = self.ref_group.tree.columnWidth(1)
-        self.settings.ref_col_3 = self.ref_group.tree.columnWidth(2)        
         
         self.settings.other_col_1 = self.other_group.tree.columnWidth(0)
         self.settings.other_col_2 = self.other_group.tree.columnWidth(1)
-        self.settings.other_col_3 = self.other_group.tree.columnWidth(2)
         
         self.sp_selector.deleteLater()
         self.thermo_selector.deleteLater()
@@ -821,6 +853,7 @@ class Thermochem(ToolInstance):
 
 
 class ThermoGroup(QWidget):
+    """widget used for the 'other' and 'reference' frames on the relative tab"""
     changes = pyqtSignal()
     
     def __init__(self, name, session, nrg_fr, thermo_co, size, *args, **kwargs):
@@ -848,7 +881,7 @@ class ThermoGroup(QWidget):
         self.tree.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.tree.setColumnWidth(0, size[0])
         self.tree.setColumnWidth(1, size[1])
-        self.tree.setColumnWidth(2, size[2])
+        self.tree.resizeColumnToContents(2)
         
         root_item = self.tree.invisibleRootItem()
         plus = QTreeWidgetItem(root_item)
