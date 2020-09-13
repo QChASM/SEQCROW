@@ -361,7 +361,7 @@ class Thermochem(ToolInstance):
         relative_layout.addWidget(QLabel("𝜔<sub>0</sub> ="), 2, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
         relative_layout.addWidget(self.relative_v0, 2, 1, 1, 5, Qt.AlignLeft | Qt.AlignVCenter)
 
-        relative_layout.addWidget(QLabel("relative energies in kcal/mol:"), 3, 0, 1, 6, Qt.AlignVCenter | Qt.AlignLeft)
+        relative_layout.addWidget(QLabel("Boltzmann-weighted relative energies in kcal/mol:"), 3, 0, 1, 6, Qt.AlignVCenter | Qt.AlignLeft)
         
         relative_layout.addWidget(QLabel("ΔE"), 4, 0, Qt.AlignTop | Qt.AlignVCenter)
         self.relative_dE = QLineEdit()

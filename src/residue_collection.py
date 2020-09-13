@@ -3,7 +3,6 @@ import numpy as np
 import re
 
 from AaronTools.atoms import Atom
-from AaronTools.catalyst import Catalyst
 from AaronTools.const import TMETAL
 from AaronTools.geometry import Geometry
 from AaronTools.ring import Ring
@@ -89,10 +88,16 @@ class Residue(Geometry):
         """changes chimerax residue to match self"""
         elements = {}
         known_atoms = []
-                
+
+        #print("updating residue", self.name, chix_residue.name)
+
         chix_residue.name = self.name
+
+        #print("updating residue:")
+        #print(self.write(outfile=False))
         
         for atom in self.atoms:
+            #print(atom, hasattr(atom, "chix_atom"))
             if not hasattr(atom, "chix_atom") or \
                atom.chix_atom is None or \
                atom.chix_atom.deleted or atom.chix_atom not in chix_residue.atoms:
@@ -110,6 +115,8 @@ class Residue(Geometry):
                 while any([chix_atom.name == atom_name for chix_atom in chix_residue.atoms]):
                     k += 1
                     atom_name = "%s%i" % (atom.element, k)
+                
+                #print("new chix atom for", atom)
                 
                 new_atom = chix_residue.structure.new_atom(atom_name, atom.element)
                 new_atom.draw_mode = ChixAtom.BALL_STYLE
@@ -187,35 +194,13 @@ class Residue(Geometry):
 
 class ResidueCollection(Geometry):
     """geometry object used for SEQCROW to easily convert to AaronTools but keep residue info"""
-    def __init__(self, molecule, refresh_connected=False, convert_residues=None, **kwargs):
+    def __init__(self, molecule, convert_residues=None, **kwargs):
         """molecule       - chimerax AtomicStructure or [AtomicStructure] or AaronTools Geometry (for easy compatibility stuff)
-        refresh_connected - let AaronTools determine bonding
         convert_residues  - None to convert everything or [chimerax.atomic.Residue] to convert only specific residues
                             this only applies to chimerax AtomicStructures"""
         self.convert_residues = convert_residues
         
-        if isinstance(molecule, Catalyst):
-            super().__init__(molecule, refresh_connected=refresh_connected, comment=molecule.comment, **kwargs)
-
-            self.chix_atomicstructure = None            
-            self.atomspec = None
-            self.residues = []
-            i = 1
-            for comp in molecule.components['substrate']:                    
-                self.residues.append(Residue(comp, refresh_connected=refresh_connected, resnum=i, name="SUB"))
-                i += 1
-
-            self.residues.append(Residue(molecule.center, refresh_connected=refresh_connected, resnum=i, name="CENT"))
-            i += 1
-            
-            for comp in molecule.components['ligand']:                    
-                self.residues.append(Residue(comp, refresh_connected=refresh_connected, resnum=i, name="LIG"))
-                i += 1
-                
-            self.session = None
-            return
-        
-        elif isinstance(molecule, AtomicStructure):
+        if isinstance(molecule, AtomicStructure):
             self.chix_atomicstructure = molecule
             self.residues = []
             self.atomspec = molecule.atomspec
@@ -227,13 +212,13 @@ class ResidueCollection(Geometry):
             for i, residue in enumerate(convert_residues):  
                 new_res = Residue(residue, \
                                   comment=molecule.comment if hasattr(molecule, "comment") else None, \
-                                  refresh_connected=False)
+                          )
                 
                 self.residues.append(new_res)
                 
                 all_atoms.extend(new_res.atoms)
             
-            super().__init__(all_atoms, name=molecule.name, refresh_connected=refresh_connected, comment=molecule.comment if hasattr(molecule, "comment") else "", **kwargs)
+            super().__init__(all_atoms, name=molecule.name, comment=molecule.comment if hasattr(molecule, "comment") else "", **kwargs)
         
             #update bonding to match that of the chimerax molecule
             for atom in all_atoms:
@@ -271,15 +256,15 @@ class ResidueCollection(Geometry):
                     
         else:
             #assume whatever we got is something AaronTools can turn into a Geometry
-            super().__init__(molecule, refresh_connected=refresh_connected, **kwargs)
+            super().__init__(molecule, **kwargs)
             self.chix_atomicstructure = None
             self.atomspec = None
             if "comment" in kwargs:
-                self.residues = [Residue(molecule, resnum=1, name="UNK", refresh_connected=refresh_connected, comment=kwargs['comment'])]
+                self.residues = [Residue(molecule, resnum=1, name="UNK", comment=kwargs['comment'])]
             elif hasattr(molecule, "comment"):
-                self.residues = [Residue(molecule, resnum=1, name="UNK", refresh_connected=refresh_connected, comment=molecule.comment)]
+                self.residues = [Residue(molecule, resnum=1, name="UNK", comment=molecule.comment)]
             else:
-                self.residues = [Residue(molecule, resnum=1, name="UNK", refresh_connected=refresh_connected)]
+                self.residues = [Residue(molecule, resnum=1, name="UNK")]
 
             return
   
@@ -288,7 +273,28 @@ class ResidueCollection(Geometry):
         self.atoms = []
         for res in self.residues:
             self.atoms.extend([a for a in res.atoms if a in old_atoms])
-  
+
+    def map_ligand(self, *args, **kwargs):
+        """map_ligand, then put new atoms in the residue they are closest to"""
+        super().map_ligand(*args, **kwargs)
+        
+        atoms_not_in_residue = []
+        for atom in self.atoms:
+            if not any(atom in residue for residue in self.residues):
+                atoms_not_in_residue.append(atom)
+        
+        new_lig = Residue(atoms_not_in_residue, name="LIG", resnum=len(self.residues))
+        self.residues.append(new_lig)
+
+        for residue in self.residues:
+            remove_atoms = []
+            for atom in residue.atoms:
+                if atom not in self.atoms:
+                    remove_atoms.append(atom)
+            
+            for atom in remove_atoms:
+                residue.atoms.remove(atom)
+
     def substitute(self, sub, target, *args, **kwargs):
         """find the residue that target is on and substitute it for sub"""
         target = self.find(target)
@@ -411,7 +417,7 @@ class ResidueCollection(Geometry):
         for bond in atomic_structure.bonds:
             if self.convert_residues is None or all(atom.residue in self.convert_residues for atom in bond.atoms):
                 bond.delete()
-            
+
         known_bonds = []
         for i, aaron_atom1 in enumerate(self.atoms):
             atom1 = [atom for atom in atomic_structure.atoms if aaron_atom1.chix_atom is atom][0]
@@ -419,6 +425,9 @@ class ResidueCollection(Geometry):
             for aaron_atom2 in aaron_atom1.connected:
                 if sorted((aaron_atom1, aaron_atom2,)) in known_bonds:
                     continue
+                
+                if not hasattr(aaron_atom2, "chix_atom"):
+                    print(aaron_atom2, "has no chix_atom")
                 
                 known_bonds.append(sorted((aaron_atom1, aaron_atom2,)))
 

@@ -16,7 +16,6 @@ from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.managers.filereader_manager import FILEREADER_CHANGE 
 from SEQCROW.tools import EnergyPlot
 
-from AaronTools.catalyst import Catalyst
 
 class FileReaderPanel(ToolInstance):
     SESSION_ENDURING = False
@@ -61,7 +60,7 @@ class FileReaderPanel(ToolInstance):
         self.tree.setUniformRowHeights(True)
         
         self.tree.setColumnWidth(self.NAME_COL, 200)
-        layout.addWidget(self.tree, 0, 0, 4, 1)
+        layout.addWidget(self.tree, 0, 0, 3, 1)
 
         restore_button = QPushButton("restore")
         restore_button.clicked.connect(self.restore_selected)
@@ -74,10 +73,6 @@ class FileReaderPanel(ToolInstance):
         coordset_slider_button = QPushButton("movie slider")
         coordset_slider_button.clicked.connect(self.open_movie_slider)
         layout.addWidget(coordset_slider_button, 2, 1)
-        
-        cat_res_button = QPushButton("catalyst residues")
-        cat_res_button.clicked.connect(self.use_cat_residues)
-        layout.addWidget(cat_res_button, 3, 1)
 
         self.tool_window.ui_area.setLayout(layout)
 
@@ -145,18 +140,6 @@ class FileReaderPanel(ToolInstance):
     
         for i in [self.ID_COL, self.COORDSETS_COL, self.NRG_COL, self.FREQ_COL]:
             self.tree.resizeColumnToContents(i)
-   
-    def use_cat_residues(self):
-        items = [item for item in self.tree.selectedItems()]
-        model_dict = self.session.filereader_manager.filereader_dict
-        models = list(model_dict.keys())
-        for item in items:
-            parent = item.parent()
-            mdl = models[self.tree.indexOfTopLevelItem(parent)]
-            rescol = ResidueCollection(mdl)
-            cat = Catalyst(rescol)
-            rescat = ResidueCollection(cat)
-            rescat.update_chix(mdl)
    
     def restore_selected(self):
         items = [item for item in self.tree.selectedItems()]
