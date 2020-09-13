@@ -283,7 +283,7 @@ class ResidueCollection(Geometry):
             if not any(atom in residue for residue in self.residues):
                 atoms_not_in_residue.append(atom)
         
-        new_lig = Residue(atoms_not_in_residue, name="LIG", resnum=len(self.residues))
+        new_lig = Residue(atoms_not_in_residue, name="LIG", resnum=len(self.residues)+1)
         self.residues.append(new_lig)
 
         for residue in self.residues:
@@ -381,14 +381,23 @@ class ResidueCollection(Geometry):
         atomic_structure.comment = self.comment
 
         for residue in self.residues:
-            if residue.chix_residue is None or residue.chix_residue not in atomic_structure.residues:
+            if residue.chix_residue is None or \
+               residue.chix_residue.deleted or \
+               residue.chix_residue not in atomic_structure.residues:
                 res = atomic_structure.new_residue(residue.name, residue.chain_id, residue.resnum)
                 residue.chix_residue = res
             else:
                 res = residue.chix_residue
-
-            residue.update_chix(res, refresh_connected=False)
-        
+            
+            try:
+                residue.update_chix(res, refresh_connected=False)
+            except RuntimeError:
+                # somtimes I get an error saying the residue has already
+                # been deleted even though I checked if chix_residue.deleted...
+                # maybe all the atoms got deleted?
+                res = atomic_structure.new_residue(residue.name, residue.chain_id, residue.resnum)
+                residue.chix_residue = res
+                
         if self.convert_residues is None:
             for residue in atomic_structure.residues:
                 if not any(residue is res.chix_residue for res in self.residues):
