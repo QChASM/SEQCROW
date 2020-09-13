@@ -1,6 +1,5 @@
 from AaronTools.substituent import Substituent
 from AaronTools.component import Component
-from AaronTools.catalyst import Catalyst
 from AaronTools.ring import Ring
 
 from chimerax.atomic import selected_atoms, selected_residues
@@ -37,7 +36,7 @@ class EditStructure(ToolInstance):
     def __init__(self, session, name):       
         super().__init__(session, name)
         
-        self.settings = _EditStructureSettings(session, name)
+        self.settings = _EditStructureSettings(session, "Structure Modification")
         
         self.tool_window = MainToolWindow(self)        
 
@@ -269,15 +268,8 @@ class EditStructure(ToolInstance):
                         rescol.atoms[i].atomspec = atom.atomspec
                         rescol.atoms[i].add_tag(atom.atomspec)
                         rescol.atoms[i].chix_atom = atom
-                        
-                try:
-                    cat = Catalyst(structure=rescol)
-                except IOError:
-                    cat = Catalyst(structure=rescol, comment=model.comment)
-                except KeyError:
-                    cat = Catalyst(structure=rescol, comment=model.comment)
 
-                target = cat.find(models[model])
+                target = rescol.find(models[model])
                 if len(target) % len(lig.key_atoms) == 0:
                     k = 0
                     ligands = []
@@ -290,24 +282,20 @@ class EditStructure(ToolInstance):
                 else:
                     raise RuntimeError("number of key atoms no not match: %i now, new ligand has %i" % (len(target), len(lig.key_atoms)))
                 
-                cat.map_ligand(ligands, target)
-                cat.fix_comment()
+                rescol.map_ligand(ligands, target)
 
-                for center_atom in cat.center:
+                for center_atom in rescol.center:
                     center_atom.connected = set([])
-                    for atom in cat.atoms:
-                        if atom not in cat.center:
+                    for atom in rescol.atoms:
+                        if atom not in rescol.center:
                             if center_atom.is_connected(atom):
                                 atom.connected.add(center_atom)
                                 center_atom.connected.add(atom)
                 
                 if self.close_previous_bool:    
-                    new_rescol = ResidueCollection(cat)
-                    new_rescol.update_chix(model)
+                    rescol.update_chix(model)
                 else:
-                    new_rescol = ResidueCollection(cat)
-                                
-                    struc = new_rescol.get_chimera(self.session)
+                    struc = rescol.get_chimera(self.session)
                     new_structures.append(struc)
             
             first_pass = False

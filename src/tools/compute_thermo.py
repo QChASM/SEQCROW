@@ -5,7 +5,7 @@ from chimerax.ui.gui import MainToolWindow
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
 from chimerax.core.commands import run
-from chimerax.core.commands.cli import FloatArg, BoolArg, StringArg
+from chimerax.core.commands.cli import FloatArg, BoolArg, StringArg, IntArg
 
 from numpy import isclose
 
@@ -14,8 +14,8 @@ from PyQt5.QtCore import Qt, QSize, pyqtSignal
 from PyQt5.QtGui import QKeySequence
 from PyQt5.QtWidgets import QLabel, QGridLayout, QComboBox, QSplitter, QLineEdit, QDoubleSpinBox, \
                             QMenuBar, QFileDialog, QAction, QApplication, QWidget, QGroupBox, QStatusBar, \
-                            QTabWidget, QTableWidget, QSizePolicy, QPushButton, QHeaderView, QHBoxLayout, \
-                            QTableWidgetItem
+                            QTabWidget, QTreeWidget, QSizePolicy, QPushButton, QHeaderView, QHBoxLayout, \
+                            QTreeWidgetItem
 
 from os.path import basename
 
@@ -31,10 +31,30 @@ class _ComputeThermoSettings(Settings):
         'w0': Value(100.0, FloatArg, str),
         'include_header': Value(True, BoolArg, str),
         'delimiter': Value('comma', StringArg), 
+        'rel_temp': Value(298.15, FloatArg, str), 
+        'ref_col_1': Value(150, IntArg), 
+        'ref_col_2': Value(150, IntArg), 
+        'other_col_1': Value(150, IntArg), 
+        'other_col_2': Value(150, IntArg), 
     }
 
 
 class Thermochem(ToolInstance):
+    """tool for calculating free energy corrections based on frequencies and energies 
+    associated with FileReaders
+    there are two tabs: absolute and relative
+    
+    the absolute tab can be used to combine the thermo corrections from one
+    FileReader with the energy of another
+    
+    the relative tab can do the same, but it prints the energies relative to
+    those of another FileReader
+    multiple molecule groups can be added (i.e. for reactions with multiple
+    reactants and products)
+    each molecule group can have multiple conformers
+    the energies of these conformers are boltzmann weighted, and the boltzmann-weighted
+    energy is used to calculate the energy of either the reference group or the 'other' group"""
+    
     SESSION_ENDURING = False
     SESSION_SAVE = False         
     help = "https://github.com/QChASM/SEQCROW/wiki/Process-Thermochemistry-Tool"
@@ -58,8 +78,9 @@ class Thermochem(ToolInstance):
         self._build_ui()
         
         self.set_sp()
-        
         self.set_thermo_mdl()
+        
+        self.calc_relative_thermo()
 
     def _build_ui(self):
         #each group has an empty widget at the bottom so they resize the way I want while also having the
@@ -309,17 +330,19 @@ class Thermochem(ToolInstance):
         relative_widget = QWidget()
         relative_layout = QGridLayout(relative_widget)
 
-        self.ref_group = ThermoGroup("reference group", self.session, self.nrg_fr, self.thermo_co)
+        size = [self.settings.ref_col_1, self.settings.ref_col_2]
+        self.ref_group = ThermoGroup("reference group", self.session, self.nrg_fr, self.thermo_co, size)
         self.ref_group.changes.connect(self.calc_relative_thermo)
         relative_layout.addWidget(self.ref_group, 0, 0, 1, 3, Qt.AlignTop)
         
-        self.other_group = ThermoGroup("other group", self.session, self.nrg_fr, self.thermo_co)
+        size = [self.settings.other_col_1, self.settings.other_col_2]
+        self.other_group = ThermoGroup("other group", self.session, self.nrg_fr, self.thermo_co, size)
         self.other_group.changes.connect(self.calc_relative_thermo)
         relative_layout.addWidget(self.other_group, 0, 3, 1, 3, Qt.AlignTop)
         
         self.relative_temperature = QDoubleSpinBox()
         self.relative_temperature.setMaximum(2**31 - 1)
-        self.relative_temperature.setValue(298.15)
+        self.relative_temperature.setValue(self.settings.rel_temp)
         self.relative_temperature.setSingleStep(10)
         self.relative_temperature.setSuffix(" K")
         self.relative_temperature.setMinimum(0)
@@ -337,15 +360,15 @@ class Thermochem(ToolInstance):
         self.relative_v0.valueChanged.connect(self.calc_relative_thermo)
         relative_layout.addWidget(QLabel("𝜔<sub>0</sub> ="), 2, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
         relative_layout.addWidget(self.relative_v0, 2, 1, 1, 5, Qt.AlignLeft | Qt.AlignVCenter)
-        
-        relative_layout.addWidget(QLabel("Boltzmann-weighted relative energies in kcal/mol:"), 3, 0, 1, 6, Qt.AlignTop)
+
+        relative_layout.addWidget(QLabel("Boltzmann-weighted relative energies in kcal/mol:"), 3, 0, 1, 6, Qt.AlignVCenter | Qt.AlignLeft)
         
         relative_layout.addWidget(QLabel("ΔE"), 4, 0, Qt.AlignTop | Qt.AlignVCenter)
         self.relative_dE = QLineEdit()
         self.relative_dE.setReadOnly(True)
         relative_layout.addWidget(self.relative_dE, 5, 0, Qt.AlignTop | Qt.AlignVCenter)
         
-        relative_layout.addWidget(QLabel("ΔZPVE"), 4, 1, Qt.AlignTop | Qt.AlignVCenter)
+        relative_layout.addWidget(QLabel("ΔZPE"), 4, 1, Qt.AlignTop | Qt.AlignVCenter)
         self.relative_dZPVE = QLineEdit() 
         self.relative_dZPVE.setReadOnly(True)        
         relative_layout.addWidget(self.relative_dZPVE, 5, 1, Qt.AlignTop | Qt.AlignVCenter)
@@ -375,6 +398,8 @@ class Thermochem(ToolInstance):
         relative_layout.setRowStretch(1, 0)
         relative_layout.setRowStretch(2, 0)
         relative_layout.setRowStretch(3, 0)
+        relative_layout.setRowStretch(4, 0)
+        relative_layout.setRowStretch(5, 0)
         
         self.tab_widget.addTab(relative_widget, "relative")
         
@@ -387,7 +412,6 @@ class Thermochem(ToolInstance):
         shortcut = QKeySequence(Qt.CTRL + Qt.Key_C)
         copy.setShortcut(shortcut)
         export.addAction(copy)
-        
         
         save = QAction("&Save CSV...", self.tool_window.ui_area)
         save.triggered.connect(self.save_csv)
@@ -449,55 +473,102 @@ class Thermochem(ToolInstance):
 
         self.tool_window.manage(None)
 
-    def calc_relative_thermo(self):
+    def calc_relative_thermo(self, *args):
+        """changes the values on the 'relative' tab
+        called when the tool is opened and whenever something changes on the relative tab"""
         def calc_free_energies(nrg_list, co_list, T, w0):
+            """returns lists for ZPVE, H, RRHO G, QRRHO G, and QHARM G
+            for the items in nrg_list and co_list at temperature T
+            and frequency parameter w0"""
             ZPVEs = []
             Hs = []
             Gs = []
             RRHOG = []
             QHARMG = []
-            for nrg, co in zip(nrg_list, co_list):
-                ZPVE = co.ZPVE
-                ZPVEs.append(nrg + ZPVE)
-                
-                dH = co.therm_corr(T, w0, CompOutput.RRHO)[1]
-                Hs.append(nrg + dH)
-                
-                dG = co.calc_G_corr(temperature=T, v0=w0, method=CompOutput.RRHO)
-                Gs.append(nrg + dG)            
-                
-                dQRRHOG = co.calc_G_corr(temperature=T, v0=w0, method=CompOutput.QUASI_RRHO)
-                RRHOG.append(nrg + dQRRHOG)
-                
-                dQHARMG = co.calc_G_corr(temperature=T, v0=w0, method=CompOutput.QUASI_HARMONIC)
-                QHARMG.append(nrg + dQHARMG)
+            for i in range(0, len(nrg_list)):
+                ZPVEs.append([])
+                Hs.append([])
+                Gs.append([])
+                RRHOG.append([])
+                QHARMG.append([])
+                for nrg, co in zip(nrg_list[i], co_list[i]):
+                    ZPVE = co.ZPVE
+                    ZPVEs[-1].append(nrg + ZPVE)
+                    
+                    dH = co.therm_corr(T, w0, CompOutput.RRHO)[1]
+                    Hs[-1].append(nrg + dH)
+                    
+                    dG = co.calc_G_corr(temperature=T, v0=w0, method=CompOutput.RRHO)
+                    Gs[-1].append(nrg + dG)            
+                    
+                    dQRRHOG = co.calc_G_corr(temperature=T, v0=w0, method=CompOutput.QUASI_RRHO)
+                    RRHOG[-1].append(nrg + dQRRHOG)
+                    
+                    dQHARMG = co.calc_G_corr(temperature=T, v0=w0, method=CompOutput.QUASI_HARMONIC)
+                    QHARMG[-1].append(nrg + dQHARMG)
             
             return ZPVEs, Hs, Gs, RRHOG, QHARMG
         
         def boltzmann_weight(energies1, energies2, T):
-            rezero = energies1[0]
-            nrgs1 = [(x - rezero) for x in energies1]
-            nrgs2 = [(x - rezero) for x in energies2]
+            """
+            energies - list of lists
+                       list axis 0 - molecule groups
+                            axis 1 - energies of conformers
+            boltzmann weight energies for conformers 
+            combine energies for molecule groups 
+            return the difference"""
+            totals1 = []
+            totals2 = []
+
             beta = UNIT.HART_TO_JOULE/(PHYSICAL.KB * T)
-            total1 = 0
-            total2 = 0
-            for nrg in nrgs1:
-                total1 += np.exp(-beta*nrg)
             
-            for nrg in nrgs2:
-                total2 += np.exp(-beta*nrg)
-            
-            rel_nrg = -PHYSICAL.BOLTZMANN * T * np.log(total2 / total1)
-            
-            return rel_nrg
+            for energy_group in energies1:
+                if len(energy_group) == 0:
+                    continue
+                    
+                rezero = min(energy_group)
+                rel_nrgs = [(x - rezero) for x in energy_group]
+                weights = [np.exp(-beta*nrg) for nrg in rel_nrgs]
+
+                totals1.append(-PHYSICAL.BOLTZMANN * T * np.log(sum(weights)) + rezero * UNIT.HART_TO_KCAL)
+
+            for energy_group in energies2:
+                if len(energy_group) == 0:
+                    continue
+                    
+                rezero = min(energy_group)
+                rel_nrgs = [(x - rezero) for x in energy_group]
+                weights = [np.exp(-beta*nrg) for nrg in rel_nrgs]
+
+                totals2.append(-PHYSICAL.BOLTZMANN * T * np.log(sum(weights)) + rezero * UNIT.HART_TO_KCAL)
+
+            return sum(totals2) - sum(totals1)
 
         ref_Es = self.ref_group.energies()
         ref_cos = self.ref_group.compOutputs()
         
+        empty_groups = []
+        for i, group in enumerate(ref_cos):
+            if len(group) == 0:
+                empty_groups.append(i)
+        
+        for ndx in empty_groups[::-1]:
+            ref_Es.pop(ndx)
+            ref_cos.pop(ndx)
+        
         other_Es = self.other_group.energies()
         other_cos = self.other_group.compOutputs()
         
-        if any(len(x) == 0 for x in [ref_Es, other_Es, ref_cos, other_cos]):
+        empty_groups = []
+        for i, group in enumerate(other_cos):
+            if len(group) == 0:
+                empty_groups.append(i)
+        
+        for ndx in empty_groups[::-1]:
+            other_Es.pop(ndx)
+            other_cos.pop(ndx)
+
+        if any(len(x) == 0  or all(len(x) == 0 for y in x) for x in [ref_Es, other_Es, ref_cos, other_cos]):
             self.relative_dE.setText("")
             self.relative_dZPVE.setText("")
             self.relative_dH.setText("")
@@ -507,6 +578,7 @@ class Thermochem(ToolInstance):
             return
         
         T = self.relative_temperature.value()
+        self.settings.rel_temp = T
         w0 = self.relative_v0.value()
 
         if w0 != self.settings.w0:
@@ -530,10 +602,12 @@ class Thermochem(ToolInstance):
         self.relative_dQHARMG.setText("%.1f" % rel_QHARMG)
 
     def open_link(self, theory):
+        """open the oft-cited QRRHO or QHARM reference"""
         link = self.theory_helper[theory]
         run(self.session, "open %s" % link)
 
     def save_csv(self):
+        """save data on current tab to CSV file"""
         filename, _ = QFileDialog.getSaveFileName(filter="CSV Files (*.csv)")
         if filename:
             s = self.get_csv()
@@ -544,6 +618,7 @@ class Thermochem(ToolInstance):
             self.session.logger.status("saved to %s" % filename)
 
     def copy_csv(self):
+        """put CSV data for current tab on the clipboard"""
         app = QApplication.instance()
         clipboard = app.clipboard()
         csv = self.get_csv()
@@ -551,6 +626,7 @@ class Thermochem(ToolInstance):
         self.session.logger.status("copied to clipboard")
 
     def get_csv(self):
+        """get CSV data for the current tab"""
         if self.settings.delimiter == "comma":
             delim = ","
         elif self.settings.delimiter == "space":
@@ -599,7 +675,7 @@ class Thermochem(ToolInstance):
         
         elif self.tab_widget.currentIndex() == 1:
             if self.settings.include_header:
-                s = delim.join(["ΔE", "ΔZPVE", "ΔH(RRHO)", "ΔG(RRHO)", "ΔG(Quasi-RRHO)", "ΔG(Quasi-Harmonic)"])
+                s = delim.join(["ΔE", "ΔZPE", "ΔH(RRHO)", "ΔG(RRHO)", "ΔG(Quasi-RRHO)", "ΔG(Quasi-Harmonic)"])
                 s+= "\n"
             else:
                 s = ""
@@ -620,6 +696,7 @@ class Thermochem(ToolInstance):
         return s
     
     def header_check(self, state):
+        """user has [un]checked the 'include header' option on the menu"""
         if state:
             self.settings.include_header = True
         else:
@@ -639,6 +716,8 @@ class Thermochem(ToolInstance):
         self.update_sum()
 
     def set_thermo_mdl(self):
+        """frequencies filereader has changed on the absolute tab
+        also changes the temperature option (on the absolute tab only)"""
         if self.thermo_selector.currentIndex() >= 0:
             fr = self.thermo_selector.currentData()
             
@@ -650,10 +729,16 @@ class Thermochem(ToolInstance):
         self.set_thermo()
 
     def check_geometry_rmsd(self, *args):
-        #print(args)
+        """check RMSD between energy and frequency filereader on the absolute tab
+        if the RMSD is > 10^-5 or the number of atoms is different, put a warning in the
+        status bar"""
         if self.thermo_selector.currentIndex() >= 0 and self.sp_selector.currentIndex() >= 0:
             fr = self.sp_selector.currentData()
             fr2 = self.thermo_selector.currentData()
+
+            if len(fr.atoms) != len(fr2.atoms):
+                self.status.showMessage("structures are not the same: different number of atoms")
+                return
 
             geom = Geometry(fr)
             geom2 = Geometry(fr2)
@@ -667,7 +752,7 @@ class Thermochem(ToolInstance):
                 self.status.showMessage("")
 
     def set_thermo(self):
-        """sets thermo entries for when thermo model changes"""
+        """computes thermo corrections and sets thermo entries for when thermo model changes"""
         #index of combobox is -1 when combobox has no entries
         if self.thermo_selector.currentIndex() >= 0:
             fr = self.thermo_selector.currentData()
@@ -753,6 +838,12 @@ class Thermochem(ToolInstance):
 
     def delete(self):
         #overload because closing a tool window doesn't destroy any widgets on it
+        self.settings.ref_col_1 = self.ref_group.tree.columnWidth(0)
+        self.settings.ref_col_2 = self.ref_group.tree.columnWidth(1)
+        
+        self.settings.other_col_1 = self.other_group.tree.columnWidth(0)
+        self.settings.other_col_2 = self.other_group.tree.columnWidth(1)
+        
         self.sp_selector.deleteLater()
         self.thermo_selector.deleteLater()
         self.ref_group.deleteLater()
@@ -762,10 +853,13 @@ class Thermochem(ToolInstance):
 
 
 class ThermoGroup(QWidget):
+    """widget used for the 'other' and 'reference' frames on the relative tab"""
     changes = pyqtSignal()
     
-    def __init__(self, name, session, nrg_fr, thermo_co, *args, **kwargs):
+    def __init__(self, name, session, nrg_fr, thermo_co, size, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         
         self.session = session
         self.nrg_fr = nrg_fr
@@ -773,102 +867,150 @@ class ThermoGroup(QWidget):
         
         layout = QGridLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setRowStretch(0, 1)
         
         frame = QGroupBox(name)
+        frame.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         frame_layout = QGridLayout(frame)
         frame_layout.setContentsMargins(0, 0, 0, 0)
+        frame_layout.setRowStretch(0, 1)
         
-        self.table = QTableWidget()
-        self.table.setColumnCount(3)
-        self.table.setHorizontalHeaderLabels(["energy", "frequencies", "remove"])
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.table.verticalHeader().setVisible(False)
-        self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.table.horizontalHeader().setStretchLastSection(False)            
-        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
-        self.table.cellClicked.connect(self.remove_row)
-        self.table.resizeColumnToContents(2)
+        self.tree = QTreeWidget()
+        self.tree.setColumnCount(3)
+        self.tree.setHeaderLabels(["energy", "frequencies", "remove"])
+        self.tree.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.tree.setColumnWidth(0, size[0])
+        self.tree.setColumnWidth(1, size[1])
+        self.tree.resizeColumnToContents(2)
         
-        self.add_row()
+        root_item = self.tree.invisibleRootItem()
+        plus = QTreeWidgetItem(root_item)
+        plus_button = QPushButton("add molecule group")
+        plus_button.setFlat(True)
+        plus_button.clicked.connect(self.add_mol_group)        
+        plus_button2 = QPushButton("")
+        plus_button2.setFlat(True)
+        plus_button2.clicked.connect(self.add_mol_group)
+        self.tree.setItemWidget(plus, 0, plus_button)
+        self.tree.setItemWidget(plus, 1, plus_button2)
+        self.tree.insertTopLevelItem(1, plus)
         
-        frame_layout.addWidget(self.table)
+        self.add_mol_group()
+        
+        frame_layout.addWidget(self.tree)
 
         layout.addWidget(frame)
     
-    def add_row(self, *args):
-        row = self.table.rowCount()
-        self.table.insertRow(row)
-
-        plus = QTableWidgetItem("add row")
-        plus.setToolTip("add another energy/frequency pair")
-        plus.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        self.table.setItem(row, 1, plus)
-        self.table.resizeRowToContents(row)
-
-        if row > 0:
-            row -= 1
-            nrg_combobox = FilereaderComboBox(self.session, otherItems=['energy'])
-            freq_combobox = FilereaderComboBox(self.session, otherItems=['frequency'])
-            nrg_combobox.currentIndexChanged.connect(self.changes.emit)
-            freq_combobox.currentIndexChanged.connect(self.changes.emit)
-            self.table.setCellWidget(row, 0, nrg_combobox)
-            self.table.setCellWidget(row, 1, freq_combobox)
-            
-            widget_that_lets_me_horizontally_align_an_icon = QWidget()
-            widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
-            trash_button = QLabel()
-            dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
-            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-            widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
-            widget_layout.setContentsMargins(2, 2, 2, 2)
-            self.table.setCellWidget(row, 2, widget_that_lets_me_horizontally_align_an_icon)
+    def add_mol_group(self, *args):
+        row = self.tree.topLevelItemCount()
         
-            self.table.resizeRowToContents(row)
-            self.table.resizeColumnToContents(0)
-            self.table.resizeColumnToContents(1)
-            
+        root_item = self.tree.invisibleRootItem()
+        
+        mol_group = QTreeWidgetItem(root_item)
+        self.tree.insertTopLevelItem(row, mol_group)
+        trash_button = QPushButton()
+        trash_button.setFlat(True)
+        
+        trash_button.clicked.connect(lambda *args, parent=mol_group: self.remove_mol_group(parent))
+        trash_button.setIcon(QIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton)))
+        
+        add_conf_button = QPushButton("add conformer")
+        add_conf_button.setFlat(True)
+        add_conf_button.clicked.connect(lambda *args, conf_group_widget=mol_group: self.add_conf_group(conf_group_widget))
+        
+        add_conf_button2 = QPushButton("")
+        add_conf_button2.setFlat(True)
+        add_conf_button2.clicked.connect(lambda *args, conf_group_widget=mol_group: self.add_conf_group(conf_group_widget))
+        
+        add_conf_child = QTreeWidgetItem(mol_group)
+        self.tree.setItemWidget(add_conf_child, 0, add_conf_button)
+        self.tree.setItemWidget(add_conf_child, 1, add_conf_button2)
+        self.tree.setItemWidget(mol_group, 2, trash_button)
+        
+        mol_group.setText(0, "group %i" % row)
+        
+        mol_group.addChild(add_conf_child)
+        self.add_conf_group(mol_group)
+
+        self.tree.expandItem(mol_group)
+
         self.changes.emit()
-    
+
+    def add_conf_group(self, conf_group_widget):
+        row = conf_group_widget.childCount()
+        
+        conformer_item = QTreeWidgetItem(conf_group_widget)
+        conf_group_widget.insertChild(row, conformer_item)
+        
+        nrg_combobox = FilereaderComboBox(self.session, otherItems=['energy'])
+        nrg_combobox.currentIndexChanged.connect(lambda *args: self.changes.emit())
+        freq_combobox = FilereaderComboBox(self.session, otherItems=['frequency'])
+        freq_combobox.currentIndexChanged.connect(lambda *args: self.changes.emit())
+        
+        trash_button = QPushButton()
+        trash_button.setFlat(True)
+        trash_button.clicked.connect(lambda *args, combobox=nrg_combobox: combobox.deleteLater())
+        trash_button.clicked.connect(lambda *args, combobox=freq_combobox: combobox.deleteLater())
+        trash_button.clicked.connect(lambda *args, child=conformer_item: conf_group_widget.removeChild(child))
+        trash_button.clicked.connect(lambda *args: self.changes.emit())
+        trash_button.setIcon(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)))
+        
+        self.tree.setItemWidget(conformer_item, 0, nrg_combobox)
+        self.tree.setItemWidget(conformer_item, 1, freq_combobox)
+        self.tree.setItemWidget(conformer_item, 2, trash_button)
+        
+        self.changes.emit()
+
     def compOutputs(self):
         out = []
-        for row in range(0, self.table.rowCount()-1):
-            fr = self.table.cellWidget(row, 1).currentData()
-            if fr is None:
-                continue
-
-            if fr not in self.thermo_co:
-                self.thermo_co[fr] = CompOutput(fr)
-            out.append(self.thermo_co[fr])
+        for mol_index in range(1, self.tree.topLevelItemCount()):
+            out.append([])
+            mol = self.tree.topLevelItem(mol_index)
+            for conf_ndx in range(1, mol.childCount()):
+                conf = mol.child(conf_ndx)
+                fr = self.tree.itemWidget(conf, 1).currentData()
+                if fr is None:
+                    continue
+                
+                if fr not in self.thermo_co:
+                    self.thermo_co[fr] = CompOutput(fr)
+                out[-1].append(self.thermo_co[fr])
         
         return out
     
     def energies(self):
         out = []
-        for row in range(0, self.table.rowCount()-1):
-            fr = self.table.cellWidget(row, 0).currentData()
-            if fr is None:
-                continue
+        for mol_index in range(1, self.tree.topLevelItemCount()):
+            out.append([])
+            mol = self.tree.topLevelItem(mol_index)
+            for conf_ndx in range(1, mol.childCount()):
+                conf = mol.child(conf_ndx)
+                fr = self.tree.itemWidget(conf, 0).currentData()
+                if fr is None:
+                    continue
 
-            out.append(fr.other['energy'])
+                out[-1].append(fr.other['energy'])
         
         return out
-
-    def remove_row(self, row, col):
-        if col == 2 and row != self.table.rowCount()-1:
-            self.table.cellWidget(row, 0).deleteLater()
-            self.table.cellWidget(row, 1).deleteLater()
-            self.table.removeRow(row)
-            self.changes.emit()
-        elif row == self.table.rowCount()-1:
-            self.add_row()
     
-    def deleteLater(self):
-        for row in range(0, self.table.rowCount()-1):
-            cell = self.table.cellWidget(row, 0)
-            cell.deleteLater()
-            cell = self.table.cellWidget(row, 1)
-            cell.deleteLater()
+    def remove_mol_group(self, parent):
+        for conf_ndx in range(1, parent.childCount()):
+            conf = parent.child(conf_ndx)
+            self.tree.itemWidget(conf, 0).destroy()
+            self.tree.itemWidget(conf, 1).destroy()
         
-    
+        ndx = self.tree.indexOfTopLevelItem(parent)
+        self.tree.takeTopLevelItem(ndx)
+        
+        self.changes.emit()
+
+    def deleteLater(self):
+        for mol_index in range(1, self.tree.topLevelItemCount()):
+            mol = self.tree.topLevelItem(mol_index)
+            for conf_ndx in range(1, mol.childCount()):
+                conf = mol.child(conf_ndx)
+                self.tree.itemWidget(conf, 0).deleteLater()
+                self.tree.itemWidget(conf, 1).deleteLater()
+        
+        super().deleteLater()
+

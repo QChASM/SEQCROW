@@ -113,7 +113,7 @@ class LibAdd(ToolInstance):
         layout.addWidget(library_tabs)
         self.tool_window.ui_area.setLayout(layout)
 
-        self.tool_window.manage('side')
+        self.tool_window.manage(None)
 
     def update_key_atoms(self):
         selection = selected_atoms(self.session)
