@@ -231,7 +231,7 @@ class JobManager(ProviderManager):
                 if len(fr.atoms) > 0:
                     job.session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([job.theory.geometry.chix_atomicstructure], [fr]))
     
-                    rescol = ResidueCollection(fr, refresh_connected=True)
+                    rescol = ResidueCollection(fr)
                     rescol.update_chix(job.theory.geometry.chix_atomicstructure)
 
             if fr.all_geom is not None and len(fr.all_geom) > 1:

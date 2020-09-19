@@ -103,7 +103,7 @@ def substitute(session, selection, substituents, newName=None, guessAvoid=True, 
                         else:
                             end = None 
 
-                        residue.substitute(sub.copy(), target.atomspec, attached_to=end)
+                        residue.substitute(sub.copy(), target.atomspec, attached_to=end, minimize=minimize)
 
                     if minimize:
                         residue.minimize_sub_torsion()
@@ -124,7 +124,7 @@ def substitute(session, selection, substituents, newName=None, guessAvoid=True, 
                         
                         added_res = False
                         for atom in chix_res.atoms:
-                            for target in models[model][res]:
+                            for target in models[model][model.residues[model_copy.residues.index(chix_res)]]:
                                 d = np.linalg.norm(atom.coord - target.coord)
                                 if d < 15:
                                     conv_res.append(chix_res)
@@ -146,10 +146,10 @@ def substitute(session, selection, substituents, newName=None, guessAvoid=True, 
                         else:
                             end = None
 
-                        residue.substitute(sub.copy(), model_copy.atoms[model.atoms.index(target)].atomspec, attached_to=end)
+                        residue.substitute(sub.copy(), model_copy.atoms[model.atoms.index(target)].atomspec, attached_to=end, minimize=minimize)
 
-                    if minimize:
-                        residue.minimize_sub_torsion()
+                    #if minimize:
+                    #    residue.minimize_sub_torsion()
 
                     residue.update_chix(res_copy)
 
