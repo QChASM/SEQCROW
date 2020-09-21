@@ -197,5 +197,21 @@ presets:
                 <ChimeraXClassifier>ChimeraX :: Command :: dihedral :: Structure Analysis :: dihedral angle defined by four atoms</ChimeraXClassifier>
        </Classifiers>
             
+    <AdditionalPackages>
+        <Package name="AaronTools" folder="C:\Users\Tony Schaefer\Documents\GitHub\AaronTools">
+        </Package>
+    </AdditionalPackages>
+
+    <DataFiles package="AaronTools">
+        <DataDir>Ligands</DataDir>
+        <DataDir>Substituents</DataDir>
+        <DataDir>Rings</DataDir>
+        <DataDir>utils</DataDir>
+        <DataFile>bond_data.json</DataFile>
+        <DataFile>calculated_bond_lengths.json</DataFile>
+        <DataFile>config.ini</DataFile>
+        <DataFile>README.md</DataFile>
+        <DataFile>LICENSE</DataFile>
+    </DataFiles>
+
 </BundleInfo>
-            
