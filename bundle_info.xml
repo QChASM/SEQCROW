@@ -114,15 +114,9 @@ presets:
             <Classifiers>
                 <PythonClassifier>Development Status :: 2 - Pre-Alpha</PythonClassifier>
                 <PythonClassifier>License :: OSI Approved :: GNU General Public License v3 (GPLv3)</PythonClassifier>
-                <PythonClassifier>Environment :: Win32 (MS Windows)</PythonClassifier>
-                <PythonClassifier>Environment :: MacOS X</PythonClassifier>
-                <PythonClassifier>Environment :: X11 Applications :: Qt</PythonClassifier>
                 <PythonClassifier>Framework :: ChimeraX</PythonClassifier>
                 <PythonClassifier>Intended Audience :: Science/Research</PythonClassifier>
                 <PythonClassifier>Natural Language :: English</PythonClassifier>
-                <PythonClassifier>Operating System :: MacOS</PythonClassifier>
-                <PythonClassifier>Operating System :: Microsoft :: Windows</PythonClassifier>
-                <PythonClassifier>Operating System :: POSIX :: Linux</PythonClassifier>
                 <PythonClassifier>Programming Language :: Python :: 3</PythonClassifier>
                 <PythonClassifier>Topic :: Scientific/Engineering :: Chemistry</PythonClassifier>
                 <PythonClassifier>Topic :: Scientific/Engineering :: Visualization</PythonClassifier>
@@ -198,7 +192,7 @@ presets:
        </Classifiers>
             
     <AdditionalPackages>
-        <Package name="AaronTools" folder="C:\Users\Tony Schaefer\Documents\GitHub\AaronTools">
+        <Package name="AaronTools" folder="../AaronTools">
         </Package>
     </AdditionalPackages>
 
