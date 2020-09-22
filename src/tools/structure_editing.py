@@ -84,7 +84,7 @@ class EditStructure(ToolInstance):
         self.substitute_layout.addWidget(QLabel("guess previous substituent:"), 3, 0, 1, 1, Qt.AlignVCenter)
         
         self.guess_old = QCheckBox()
-        self.guess_old.setToolTip("checked: AaronTools will use the shortest connected fragment in the residue\nunchecked: previous substituent must be selected")
+        self.guess_old.setToolTip("checked: leave the longest connected fragment in the residue\nunchecked: previous substituent must be selected")
         self.guess_old.setChecked(self.settings.guess)
         self.guess_old.stateChanged.connect(lambda state, settings=self.settings: settings.__setattr__("guess", True if state == Qt.Checked else False))
         self.substitute_layout.addWidget(self.guess_old, 3, 1, 1, 2, Qt.AlignTop)
