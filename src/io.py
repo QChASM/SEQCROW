@@ -1,4 +1,4 @@
-def open_aarontools(session, path, format_name=None, coordsets=False):
+def open_aarontools(session, stream, file_name, format_name=None, coordsets=False):
     from AaronTools.fileIO import FileReader
     from AaronTools.geometry import Geometry
     from SEQCROW.residue_collection import ResidueCollection
@@ -16,16 +16,12 @@ def open_aarontools(session, path, format_name=None, coordsets=False):
         fmt = "dat"
     elif format_name == "XYZ file":
         fmt = "xyz"
-    else:
-        fmt = path.split('.')[-1]
-            
-    f = FileReader((path, fmt, None), just_geom=False, get_all=True)
+
+    f = FileReader((file_name, fmt, stream), just_geom=False, get_all=True)
 
     geom = ResidueCollection(Geometry(f))
-    geom.name = path_split(path)[-1]
 
     structure = geom.get_chimera(session, coordsets=(f.all_geom is not None and len(f.all_geom) > 1), filereader=f)
-    structure.filename = path
     #associate the AaronTools FileReader with each structure
     session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([structure], [f]))
 
@@ -46,7 +42,7 @@ def open_aarontools(session, path, format_name=None, coordsets=False):
         if coordsets:
             slider.set_slider(len(f.all_geom))
 
-    status = "Opened %s as a %s %s" % (path, format_name, "movie" if coordsets else "")
+    status = "Opened %s as a %s %s" % (file_name, format_name, "movie" if coordsets else "")
 
     return [structure], status
 
@@ -56,8 +52,6 @@ def save_aarontools(session, path, format_name, **kwargs):
     kwargs may be:
         comment - str
     """
-    #XML: ChimeraX :: Save -> extra_keywords=models:Models
-    #^ this doesn't do anything b/c save doesn't expect a 'comment' keyword
     from SEQCROW.residue_collection import ResidueCollection
     from AaronTools.geometry import Geometry
     from chimerax.atomic import AtomicStructure

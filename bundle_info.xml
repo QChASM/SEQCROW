@@ -43,7 +43,7 @@ presets:
             </Description>
             
             <Dependencies>
-                <Dependency name="ChimeraX-Core" version=">=1.0"/>
+                <Dependency name="ChimeraX-Core" version=">=1.1"/>
                 <Dependency name="scipy"/>
                 <Dependency name="numpy"/>
                 <Dependency name="Send2Trash"/>
@@ -56,7 +56,7 @@ presets:
             </Categories>
             
             <Managers>
-                <Manager name="filereader_manager" uiOnly="true"/>
+                <Manager name="filereader_manager" uiOnly="false"/>
                 <Manager name="seqcrow_ordered_selection_manager" uiOnly="true"/>
                 <Manager name="seqcrow_job_manager" uiOnly="false"/>
             </Managers>
@@ -67,6 +67,7 @@ presets:
                           suffixes=".com,.gjf" 
                           encoding="utf-8" 
                           nicknames="com" 
+                          reference_url="http://gaussian.com/input/"
                           synopsis="Gaussian input file"/>
                           
                 <Provider name="Gaussian output file" 
@@ -95,15 +96,16 @@ presets:
                           suffixes=".xyz" 
                           encoding="utf-8" 
                           nicknames="xyz" 
+                          reference_url="https://en.wikipedia.org/wiki/XYZ_file_format" 
                           synopsis="XYZ coordinate file"/>
             </Providers>
             
             <Providers manager="open command">
-                <Provider name="Gaussian input file" want_path="true"/>
-                <Provider name="Gaussian output file" want_path="true"/>
-                <Provider name="ORCA output file" want_path="true"/>
-                <Provider name="Psi4 output file" want_path="true"/>
-                <Provider name="XYZ file" want_path="true"/>
+                <Provider name="Gaussian input file" want_path="false"/>
+                <Provider name="Gaussian output file" want_path="false"/>
+                <Provider name="ORCA output file" want_path="false"/>
+                <Provider name="Psi4 output file" want_path="false"/>
+                <Provider name="XYZ file" want_path="false"/>
             </Providers>
             
             <!--we can save Gaussian input files, but not with the save command-->
@@ -114,15 +116,9 @@ presets:
             <Classifiers>
                 <PythonClassifier>Development Status :: 2 - Pre-Alpha</PythonClassifier>
                 <PythonClassifier>License :: OSI Approved :: GNU General Public License v3 (GPLv3)</PythonClassifier>
-                <PythonClassifier>Environment :: Win32 (MS Windows)</PythonClassifier>
-                <PythonClassifier>Environment :: MacOS X</PythonClassifier>
-                <PythonClassifier>Environment :: X11 Applications :: Qt</PythonClassifier>
                 <PythonClassifier>Framework :: ChimeraX</PythonClassifier>
                 <PythonClassifier>Intended Audience :: Science/Research</PythonClassifier>
                 <PythonClassifier>Natural Language :: English</PythonClassifier>
-                <PythonClassifier>Operating System :: MacOS</PythonClassifier>
-                <PythonClassifier>Operating System :: Microsoft :: Windows</PythonClassifier>
-                <PythonClassifier>Operating System :: POSIX :: Linux</PythonClassifier>
                 <PythonClassifier>Programming Language :: Python :: 3</PythonClassifier>
                 <PythonClassifier>Topic :: Scientific/Engineering :: Chemistry</PythonClassifier>
                 <PythonClassifier>Topic :: Scientific/Engineering :: Visualization</PythonClassifier>
@@ -197,5 +193,21 @@ presets:
                 <ChimeraXClassifier>ChimeraX :: Command :: dihedral :: Structure Analysis :: dihedral angle defined by four atoms</ChimeraXClassifier>
        </Classifiers>
             
+    <AdditionalPackages>
+        <Package name="AaronTools" folder="../AaronTools-distro">
+        </Package>
+    </AdditionalPackages>
+
+    <DataFiles package="AaronTools">
+        <DataDir>Ligands</DataDir>
+        <DataDir>Substituents</DataDir>
+        <DataDir>Rings</DataDir>
+        <DataDir>utils</DataDir>
+        <DataFile>bond_data.json</DataFile>
+        <DataFile>calculated_bond_lengths.json</DataFile>
+        <DataFile>config.ini</DataFile>
+        <DataFile>README.md</DataFile>
+        <DataFile>LICENSE</DataFile>
+    </DataFiles>
+
 </BundleInfo>
-            
