@@ -34,7 +34,7 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
             nrg_plot = EnergyPlot(session, structure, f)
             if not nrg_plot.opened:
                 warn("energy plot could not be opened\n" + \
-                     "there might be a mismatch between energy entries and structure entries in %s" % path)
+                     "there might be a mismatch between energy entries and structure entries in %s" % file_name)
                 nrg_plot.delete()                    
 
     if f.all_geom is not None and len(f.all_geom) > 1:

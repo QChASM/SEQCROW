@@ -194,7 +194,7 @@ presets:
        </Classifiers>
             
     <AdditionalPackages>
-        <Package name="AaronTools" folder="../AaronTools-distro">
+        <Package name="AaronTools" folder="../AaronTools">
         </Package>
     </AdditionalPackages>
 
