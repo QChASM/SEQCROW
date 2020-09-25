@@ -2,10 +2,15 @@ from chimerax.core.toolshed import ProviderManager
 from chimerax.core.selection import SELECTION_CHANGED
 from chimerax.atomic import selected_atoms, Atoms
 
+from inspect import signature
 
 class OrderedSelectionManager(ProviderManager):
     """keeps track of the order atoms were selected"""
-    def __init__(self, session):
+    def __init__(self, session, *args, **kwargs):
+        params = signature(super().__init__).parameters
+        if any("name" in param for param in params):
+            super().__init__(*args, **kwargs)
+
         session.triggers.add_handler(SELECTION_CHANGED, self.selection_changed)
         
         self.session = session

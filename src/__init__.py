@@ -82,17 +82,17 @@ class _SEQCROW_API(BundleAPI):
         """Initialize filereader and ordered atom selection managers"""
         if name == "filereader_manager":
             from .managers import FileReaderManager
-            session.filereader_manager = FileReaderManager(session)
+            session.filereader_manager = FileReaderManager(session, name)
             return session.filereader_manager
             
         elif name == "seqcrow_ordered_selection_manager":
             from SEQCROW.managers import OrderedSelectionManager
-            session.seqcrow_ordered_selection_manager = OrderedSelectionManager(session)
+            session.seqcrow_ordered_selection_manager = OrderedSelectionManager(session, name)
             return session.seqcrow_ordered_selection_manager
             
         elif name == "seqcrow_job_manager":
             from SEQCROW.managers import JobManager
-            session.seqcrow_job_manager = JobManager(session)
+            session.seqcrow_job_manager = JobManager(session, name)
             return session.seqcrow_job_manager
             
         else:

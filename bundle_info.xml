@@ -128,7 +128,7 @@ presets:
                 including my own Bundle line will prevent anything after it from being loaded
                 ChimeraX's devel build
                 ChimeraXClassifier>ChimeraX :: Bundle :: General,Input/Output,Structure Editing,External Program :: 1,1 :: SEQCROW :: ChimAARON,SEQCRO,SEQCROW :: true</ChimeraXClassifier-->
-                <ChimeraXClassifier>ChimeraX :: Tool :: Build QM Input                 :: SEQCROW           :: Create Gaussian, ORCA, or Psi4 input file</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Build QM Input                 :: AaronTools        :: Create Gaussian, ORCA, or Psi4 input file</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Structure Modification         :: AaronTools        :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Change Substituents            :: Structure Editing :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Swap Transition Metal Ligands  :: Structure Editing :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
@@ -175,16 +175,7 @@ presets:
                 <ChimeraXClassifier>ChimeraX :: Selector :: SiH3     :: Silyl substituent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: SuperMes :: Super Mesityl substituent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: tBu      :: tert-Butyl substituent</ChimeraXClassifier>
-                
-                <ChimeraXClassifier>ChimeraX :: DataFormat :: XYZ :: XYZ :: Molecular structure :: .xyz :: :: :: :: :: XYZ Format :: utf-8</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Open :: XYZ :: AaronTools :: false :: coordsets:Bool</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: DataFormat :: COM :: COM :: Molecular structure :: .com,.gjf :: :: :: :: :: Gaussian input file :: utf-8</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Open :: COM :: COM ::</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: DataFormat :: LOG :: LOG :: Molecular structure :: .log :: :: :: :: :: Gaussian output file :: utf-8</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Open :: LOG :: LOG :: false :: coordsets:Bool</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: DataFormat :: OUT :: OUT :: Molecular structure :: .out :: :: :: :: :: ORCA output file :: utf-8</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Open :: OUT :: OUT :: false :: coordsets:Bool</ChimeraXClassifier>
-    
+
                 <!--NOTE: this synopsis will not appear when `help <command>` is used-->
                 <ChimeraXClassifier>ChimeraX :: Command :: rmsdAlign :: Structure Analysis :: Calculate RMSD between structures</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: substitute :: Structure Editing :: change substiuents</ChimeraXClassifier>
@@ -194,7 +185,7 @@ presets:
        </Classifiers>
             
     <AdditionalPackages>
-        <Package name="AaronTools" folder="../AaronTools">
+        <Package name="AaronTools" folder="C:\Users\Tony Schaefer\Documents\GitHub\AaronTools">
         </Package>
     </AdditionalPackages>
 

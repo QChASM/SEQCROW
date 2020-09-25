@@ -1,7 +1,9 @@
 from chimerax.core.toolshed import ProviderManager
 from chimerax.core.models import REMOVE_MODELS, ADD_MODELS
 from chimerax.core.triggerset import TriggerSet
-        
+
+from inspect import signature
+
 FILEREADER_CHANGE = "AaronTools file opened or closed"
 FILEREADER_REMOVED = "AaronTools file closed"
 FILEREADER_ADDED = "AaronTools file opened"
@@ -10,7 +12,10 @@ ADD_FILEREADER = "adding AaronTools FileReader"
 class FileReaderManager(ProviderManager):
     """keeps track of frequency files that have been opened"""
     # XML_TAG ChimeraX :: Manager :: filereader_manager
-    def __init__(self, session):
+    def __init__(self, session, *args, **kwargs):
+        params = signature(super().__init__).parameters
+        if any("name" in param for param in params):
+            super().__init__(*args, **kwargs)
         self.triggers = TriggerSet()
         self.triggers.add_trigger(FILEREADER_CHANGE)
         self.triggers.add_trigger(FILEREADER_ADDED)

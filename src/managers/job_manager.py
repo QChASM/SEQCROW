@@ -14,14 +14,20 @@ from SEQCROW.jobs import LocalJob, GaussianJob, ORCAJob, Psi4Job
 from SEQCROW.managers import ADD_FILEREADER
 from SEQCROW.residue_collection import ResidueCollection
 
+from inspect import signature
+
 JOB_FINISHED = "job finished"
 JOB_STARTED = "job started"
 JOB_QUEUED = "job changed"
 
 class JobManager(ProviderManager):
     def __init__(self, session, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        
+        # 1.2 adds an __init__ to ProviderManager that uses the manager name for things
+        # this is not the case in 1.1
+        params = signature(super().__init__).parameters
+        if any("name" in param for param in params):
+            super().__init__(*args, **kwargs)
+            
         self.session = session
         self.local_jobs = []
         self.remote_jobs = []
