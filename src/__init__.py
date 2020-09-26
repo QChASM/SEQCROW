@@ -82,17 +82,17 @@ class _SEQCROW_API(BundleAPI):
         """Initialize filereader and ordered atom selection managers"""
         if name == "filereader_manager":
             from .managers import FileReaderManager
-            session.filereader_manager = FileReaderManager(session)
+            session.filereader_manager = FileReaderManager(session, name)
             return session.filereader_manager
             
         elif name == "seqcrow_ordered_selection_manager":
             from SEQCROW.managers import OrderedSelectionManager
-            session.seqcrow_ordered_selection_manager = OrderedSelectionManager(session)
+            session.seqcrow_ordered_selection_manager = OrderedSelectionManager(session, name)
             return session.seqcrow_ordered_selection_manager
             
         elif name == "seqcrow_job_manager":
             from SEQCROW.managers import JobManager
-            session.seqcrow_job_manager = JobManager(session)
+            session.seqcrow_job_manager = JobManager(session, name)
             return session.seqcrow_job_manager
             
         else:
@@ -110,7 +110,17 @@ class _SEQCROW_API(BundleAPI):
             tool = NormalModes(session, ti.name)
             return tool        
         
-        if any(ti.name == name for name in ["Structure Modification", \
+        elif ti.name == "Substituent Sterimol":
+            from .tools import Sterimol
+            for tool in session.tools.list():
+                if isinstance(tool, Sterimol):
+                    tool.display(True)
+                    break
+            else:
+                tool = Sterimol(session, ti.name)
+                return tool
+        
+        elif any(ti.name == name for name in ["Structure Modification", \
                                             "Change Substituents", \
                                             "Swap Transition Metal Ligands", \
                                             "Fuse Ring"]):

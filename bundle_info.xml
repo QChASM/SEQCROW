@@ -128,17 +128,18 @@ presets:
                 including my own Bundle line will prevent anything after it from being loaded
                 ChimeraX's devel build
                 ChimeraXClassifier>ChimeraX :: Bundle :: General,Input/Output,Structure Editing,External Program :: 1,1 :: SEQCROW :: ChimAARON,SEQCRO,SEQCROW :: true</ChimeraXClassifier-->
-                <ChimeraXClassifier>ChimeraX :: Tool :: Build QM Input                 :: SEQCROW           :: Create Gaussian, ORCA, or Psi4 input file</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Structure Modification         :: AaronTools        :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Change Substituents            :: Structure Editing :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Swap Transition Metal Ligands  :: Structure Editing :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Fuse Ring                      :: Structure Editing :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Browse AaronTools Libraries    :: AaronTools        :: Browse the AaronTools ligand, substituent, and ring libraries"</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Process QM Thermochemistry     :: AaronTools        :: Compute the free energy of a molecule with frequency data</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Managed Models                 :: SEQCROW           :: see models managed by SEQCROW</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Add to Personal Library        :: AaronTools        :: Add to your personal ligand, substituent, and ring libraries</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Visualize Normal Modes         :: AaronTools        :: Visualize normal modes from a Gaussian output file as displacement vectors or as an animation</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Job Queue                      :: SEQCROW           :: View status of jobs</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Build QM Input                 :: AaronTools         :: Create Gaussian, ORCA, or Psi4 input file</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Structure Modification         :: AaronTools         :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Change Substituents            :: Structure Editing  :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Swap Transition Metal Ligands  :: Structure Editing  :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Fuse Ring                      :: Structure Editing  :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Browse AaronTools Libraries    :: AaronTools         :: Browse the AaronTools ligand, substituent, and ring libraries"</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Process QM Thermochemistry     :: AaronTools         :: Compute the free energy of a molecule with frequency data</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Managed Models                 :: SEQCROW            :: see models managed by SEQCROW</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Add to Personal Library        :: AaronTools         :: Add to your personal ligand, substituent, and ring libraries</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Visualize Normal Modes         :: AaronTools         :: Visualize normal modes from a Gaussian output file as displacement vectors or as an animation</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Job Queue                      :: SEQCROW            :: View status of jobs</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Substituent Sterimol           :: Structure Analysis :: Calculate L, B1, and B5 Sterimol parameters for a substituent</ChimeraXClassifier>
                 <!--ChimeraXClassifier>ChimeraX :: Tool :: AARON Input Builder :: AARON :: Build AARON input file</ChimeraXClassifier-->
                 
                 <ChimeraXClassifier>ChimeraX :: Selector :: tm       :: Transition metals</ChimeraXClassifier>
@@ -175,16 +176,7 @@ presets:
                 <ChimeraXClassifier>ChimeraX :: Selector :: SiH3     :: Silyl substituent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: SuperMes :: Super Mesityl substituent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: tBu      :: tert-Butyl substituent</ChimeraXClassifier>
-                
-                <ChimeraXClassifier>ChimeraX :: DataFormat :: XYZ :: XYZ :: Molecular structure :: .xyz :: :: :: :: :: XYZ Format :: utf-8</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Open :: XYZ :: AaronTools :: false :: coordsets:Bool</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: DataFormat :: COM :: COM :: Molecular structure :: .com,.gjf :: :: :: :: :: Gaussian input file :: utf-8</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Open :: COM :: COM ::</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: DataFormat :: LOG :: LOG :: Molecular structure :: .log :: :: :: :: :: Gaussian output file :: utf-8</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Open :: LOG :: LOG :: false :: coordsets:Bool</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: DataFormat :: OUT :: OUT :: Molecular structure :: .out :: :: :: :: :: ORCA output file :: utf-8</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Open :: OUT :: OUT :: false :: coordsets:Bool</ChimeraXClassifier>
-    
+
                 <!--NOTE: this synopsis will not appear when `help <command>` is used-->
                 <ChimeraXClassifier>ChimeraX :: Command :: rmsdAlign :: Structure Analysis :: Calculate RMSD between structures</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: substitute :: Structure Editing :: change substiuents</ChimeraXClassifier>
@@ -194,7 +186,7 @@ presets:
        </Classifiers>
             
     <AdditionalPackages>
-        <Package name="AaronTools" folder="../AaronTools">
+        <Package name="AaronTools" folder="C:\Users\Tony Schaefer\Documents\GitHub\AaronTools">
         </Package>
     </AdditionalPackages>
 

@@ -8,6 +8,8 @@ from chimerax.core.commands import run
 
 from json import dumps, loads, dump, load
 
+from configparser import ConfigParser
+
 from PyQt5.Qt import QClipboard, QStyle, QIcon
 from PyQt5.QtCore import Qt, QRegularExpression, pyqtSignal
 from PyQt5.QtGui import QKeySequence, QFontMetrics, QFontDatabase
@@ -24,6 +26,7 @@ from SEQCROW.jobs import ORCAJob, GaussianJob, Psi4Job
 from SEQCROW.theory import SEQCROW_Basis, SEQCROW_ECP, SEQCROW_Theory
 from SEQCROW.widgets import PeriodicTable, ModelComboBox
 
+from AaronTools.config import Config, SECTIONS
 from AaronTools.const import TMETAL
 from AaronTools.theory import *
 from AaronTools.theory.method import KNOWN_SEMI_EMPIRICAL
@@ -449,6 +452,8 @@ class BuildQM(ToolInstance):
         if 'opt' in preset:
             self.job_widget.do_geom_opt.setChecked(preset['opt'])
             self.job_widget.ts_opt.setChecked(preset['ts'])
+        
+        if 'freq' in preset:
             self.job_widget.do_freq.setChecked(preset['freq'])
             
         if 'temp' in preset:
@@ -472,15 +477,15 @@ class BuildQM(ToolInstance):
             func = Method(preset['method'], preset['semi-empirical'])
             self.method_widget.setMethod(func)
         
+        if 'grid' in preset:
             self.method_widget.setGrid(preset['grid'])
+        
+        if 'disp' in preset:
             self.method_widget.setDispersion(preset['disp'])
         
         if 'functional' in preset:
             func = Method(preset['functional'], preset['semi-empirical'])
             self.method_widget.setMethod(func)
-        
-            self.method_widget.setGrid(preset['grid'])
-            self.method_widget.setDispersion(preset['disp'])
 
         if 'basis' in preset:
             basis_list = []
@@ -535,40 +540,142 @@ class BuildQM(ToolInstance):
 
     def import_preset_file(self):
         """open file browser, select file, and import presets"""
-        filename, _ = QFileDialog.getOpenFileName(filter="JSON files (*.json)")
+        filename, _ = QFileDialog.getOpenFileName(filter="JSON files (*.json);;INI files (*.ini)")
 
         if not filename:
             return
-            
-        with open(filename, 'r') as f:
-            new_presets = load(f)
-            
-        for program in ["Gaussian", "ORCA", "Psi4"]:
-            if program in new_presets:
-                for preset_name in new_presets[program]:
-                    if preset_name in self.presets[program]:
-                        yes = QMessageBox.question(self.presets_menu, \
-                                                    "%s preset named \"%s\" already exists" % (program, preset_name), \
-                                                    "would you like to overwrite \"%s\"?" % preset_name, \
-                                                    QMessageBox.Yes | QMessageBox.No)
+        
+        if filename.lower().endswith("json"):
+            with open(filename, 'r') as f:
+                new_presets = load(f)
+                
+            for program in ["Gaussian", "ORCA", "Psi4"]:
+                if program in new_presets:
+                    for preset_name in new_presets[program]:
+                        if preset_name in self.presets[program]:
+                            yes = QMessageBox.question(self.presets_menu, \
+                                                        "%s preset named \"%s\" already exists" % (program, preset_name), \
+                                                        "would you like to overwrite \"%s\"?" % preset_name, \
+                                                        QMessageBox.Yes | QMessageBox.No)
+    
+                            if yes != QMessageBox.Yes:
+                                continue
+    
+                        self.presets[program][preset_name] = new_presets[program][preset_name]
+    
+                        self.session.logger.info("imported %s preset \"%s\"" % (program, preset_name))
+    
+                        if 'basis' in self.presets[program][preset_name]:
+                            #print(any(file is not False for file in self.presets[program][preset_name]['basis']['file']))
+                            if any(file is not False for file in self.presets[program][preset_name]['basis']['file']):
+                                self.session.logger.warning("preset contains a basis set that is not built-in\n" +
+                                                            "the external basis file location may need to be updated")
+    
+                        if 'ecp' in self.presets[program][preset_name]:
+                            if any(file is not False for file in self.presets[program][preset_name]['ecp']['file']):
+                                self.session.logger.warning("preset contains an ECP that is not built-in\n" +
+                                                            "the external ECP file location may need to be updated")
+        
+        elif filename.lower().endswith("ini"):
+            config = Config(filename, quiet=True)
 
-                        if yes != QMessageBox.Yes:
-                            continue
+            for section in config.sections():
+                if any(section == x for x in SECTIONS):
+                    self.session.logger.info("skipping AaronTools standard section: %s" % section)
+                    continue
+                
+                new_preset = {}
+                
+                program = config.get(section, "exec_type", fallback=False)
+                if not program:
+                    self.session.logger.info("skipping %s; no program was specified (exec_type)" % section)
+                    continue
+                elif program.lower() == "gaussian":
+                    program = "Gaussian"
+                elif program.lower() == "orca":
+                    program = "ORCA"
+                elif program.lower() == "psi4":
+                    program = "Psi4"
+                else:
+                    self.session.logger.warning("skipping %s; exec_type was not gaussian, orca, or psi4")
+                    continue
+                
+                if section in self.presets[program]:
+                    yes = QMessageBox.question(self.presets_menu, \
+                                                "%s preset named \"%s\" already exists" % (program, section), \
+                                                "would you like to overwrite \"%s\"?" % section, \
+                                                QMessageBox.Yes | QMessageBox.No)
 
-                    self.presets[program][preset_name] = new_presets[program][preset_name]
+                    if yes != QMessageBox.Yes:
+                        continue
 
-                    self.session.logger.info("imported %s preset \"%s\"" % (program, preset_name))
-
-                    if 'basis' in self.presets[program][preset_name]:
-                        #print(any(file is not False for file in self.presets[program][preset_name]['basis']['file']))
-                        if any(file is not False for file in self.presets[program][preset_name]['basis']['file']):
+                theory = config.get_theory(None, section=section)
+                other_kw_dict = config.get_other_kwargs(section=section)
+                if len(other_kw_dict.keys()) > 0:
+                    new_preset["other"] = other_kw_dict
+                
+                if theory.basis is not None:
+                    new_preset["basis"] = {"name":[], "elements":[], "auxiliary":[], "file":[]}
+                    new_preset["ecp"] = {"name":[], "elements":[], "auxiliary":[], "file":[]}
+                    if theory.basis.basis is not None:
+                        new_preset["basis"]["name"] = [basis.name for basis in theory.basis.basis]
+                        new_preset["basis"]["elements"] = [basis.elements for basis in theory.basis.basis]
+                        new_preset["basis"]["auxiliary"] = [basis.aux_type for basis in theory.basis.basis]
+                        new_preset["basis"]["file"] = [basis.user_defined for basis in theory.basis.basis]
+                        if any(basis.user_defined for basis in theory.basis.basis):
                             self.session.logger.warning("preset contains a basis set that is not built-in\n" +
-                                                        "the external basis file location may need to be updated")
-
-                    if 'ecp' in self.presets[program][preset_name]:
-                        if any(file is not False for file in self.presets[program][preset_name]['ecp']['file']):
+                                                        "the external basis set file location may need to be updated")
+        
+                    
+                    if theory.basis.ecp is not None:
+                        new_preset["ecp"]["name"] = [basis.name for basis in theory.basis.ecp]
+                        new_preset["ecp"]["elements"] = [basis.elements for basis in theory.basis.ecp]
+                        new_preset["ecp"]["file"] = [basis.user_defined for basis in theory.basis.ecp]
+                        if any(basis.user_defined for basis in theory.basis.ecp):
                             self.session.logger.warning("preset contains an ECP that is not built-in\n" +
                                                         "the external ECP file location may need to be updated")
+                                                        
+                if theory.method is not None:
+                    new_preset["method"] = theory.method.name
+                    new_preset["semi-empirical"] = theory.method.is_semiempirical
+                
+                if theory.empirical_dispersion is not None:
+                    new_preset["disp"] = theory.empirical_dispersion.name                
+                
+                if theory.grid is not None:
+                    new_preset["grid"] = theory.grid.name
+
+                if theory.solvent is not None:
+                    if theory.solvent.solvent == "gas":
+                        new_preset["solvent"] = ""
+                    else:
+                        new_preset["solvent"] = theory.solvent.solvent
+                    
+                        new_preset["solvent model"] = theory.solvent.name
+                
+                if theory.processors is not None:
+                    new_preset["nprocs"] = theory.processors
+                
+                if theory.memory is not None:
+                    new_preset["mem"] = theory.memory
+                
+                for job in theory.job_type:
+                    if isinstance(job, OptimizationJob):
+                        new_preset["opt"] = True
+                        new_preset["ts"] = job.ts
+                    
+                    elif isinstance(job, FrequencyJob):
+                        new_preset["freq"] = True
+                        new_preset["temp"] = job.temperature
+                        new_preset["num_freq"] = job.numerical
+                    
+                    else:
+                        self.session.logger.warning("job type cannot be imported: %s" % repr(job))
+                
+                self.presets[program][section] = new_preset
+            
+        else:
+            self.session.logger.error("use JSON or INI extention")
 
         self.refresh_presets()
 
@@ -5301,42 +5408,194 @@ class ExportPreset(ChildToolWindow):
             preset_item.setCheckState(1, Qt.Unchecked)
 
     def save_presets(self):
-        filename, _ = QFileDialog.getSaveFileName(filter="JSON files (*.json)")
+        filename, _ = QFileDialog.getSaveFileName(filter="JSON files (*.json);;INI files (*.ini)")
         if not filename:
             return
 
-        out = {}
-        
-        for i in range(0, self.gaussian_preset.childCount()):
-            if self.gaussian_preset.child(i).checkState(1) == Qt.Checked:
-                if "Gaussian" not in out:
-                    out["Gaussian"] = {}
-                    
-                preset_name = self.gaussian_preset.child(i).data(0, Qt.DisplayRole)
-                out["Gaussian"][preset_name] = self.tool_instance.presets["Gaussian"][preset_name]
+        if filename.lower().endswith("json"):
+            out = {}
+            
+            for i in range(0, self.gaussian_preset.childCount()):
+                if self.gaussian_preset.child(i).checkState(1) == Qt.Checked:
+                    if "Gaussian" not in out:
+                        out["Gaussian"] = {}
+                        
+                    preset_name = self.gaussian_preset.child(i).data(0, Qt.DisplayRole)
+                    out["Gaussian"][preset_name] = self.tool_instance.presets["Gaussian"][preset_name]
+    
+            for i in range(0, self.orca_preset.childCount()):
+                if self.orca_preset.child(i).checkState(1) == Qt.Checked:
+                    if "ORCA" not in out:
+                        out["ORCA"] = {}
+                        
+                    preset_name = self.orca_preset.child(i).data(0, Qt.DisplayRole)
+                    out["ORCA"][preset_name] = self.tool_instance.presets["ORCA"][preset_name]
+    
+            for i in range(0, self.psi4_preset.childCount()):
+                if self.psi4_preset.child(i).checkState(1) == Qt.Checked:
+                    if "Psi4" not in out:
+                        out["Psi4"] = {}
+                        
+                    preset_name = self.psi4_preset.child(i).data(0, Qt.DisplayRole)
+                    out["Psi4"][preset_name] = self.tool_instance.presets["Psi4"][preset_name]
+    
+            with open(filename, "w") as f:
+                dump(out, f, indent=4)
+            
+        elif filename.lower().endswith("ini"):
+            out = ConfigParser()
 
-        for i in range(0, self.orca_preset.childCount()):
-            if self.orca_preset.child(i).checkState(1) == Qt.Checked:
-                if "ORCA" not in out:
-                    out["ORCA"] = {}
+            for i in range(0, self.gaussian_preset.childCount()):
+                if self.gaussian_preset.child(i).checkState(1) == Qt.Checked:
+                    preset_name = self.gaussian_preset.child(i).data(0, Qt.DisplayRole)
+                    preset = self.tool_instance.presets["Gaussian"][preset_name]
+                    if not out.has_section(preset_name):
+                        out.add_section(preset_name)
                     
-                preset_name = self.orca_preset.child(i).data(0, Qt.DisplayRole)
-                out["ORCA"][preset_name] = self.tool_instance.presets["ORCA"][preset_name]
-
-        for i in range(0, self.psi4_preset.childCount()):
-            if self.psi4_preset.child(i).checkState(1) == Qt.Checked:
-                if "Psi4" not in out:
-                    out["Psi4"] = {}
+                    self.fill_preset(out, preset, preset_name, "gaussian")
+    
+            for i in range(0, self.orca_preset.childCount()):
+                if self.orca_preset.child(i).checkState(1) == Qt.Checked:
+                    preset_name = self.orca_preset.child(i).data(0, Qt.DisplayRole)
+                    preset = self.tool_instance.presets["ORCA"][preset_name]
+                    if not out.has_section(preset_name):
+                        out.add_section(preset_name)
                     
-                preset_name = self.psi4_preset.child(i).data(0, Qt.DisplayRole)
-                out["Psi4"][preset_name] = self.tool_instance.presets["Psi4"][preset_name]
-
-        with open(filename, "w") as f:
-            dump(out, f, indent=4)
+                    self.fill_preset(out, preset, preset_name, "orca")
+    
+            for i in range(0, self.psi4_preset.childCount()):
+                if self.psi4_preset.child(i).checkState(1) == Qt.Checked:
+                    preset_name = self.psi4_preset.child(i).data(0, Qt.DisplayRole)
+                    preset = self.tool_instance.presets["Psi4"][preset_name]
+                    if not out.has_section(preset_name):
+                        out.add_section(preset_name)
+                    
+                    self.fill_preset(out, preset, preset_name, "psi4")
+            
+            with open(filename, "w") as f:
+                out.write(f)
+    
+        else:
+            self.tool_instance.session.logger("use json or ini extention")
+            return
             
         self.tool_instance.session.logger.status("saved presets to %s" % filename)
 
         self.destroy()
+
+    def fill_preset(self, config, preset, section, program):
+        config.set(section, "exec_type", program.lower())
+        
+        if "opt" in preset:
+            job_type = ""
+            if preset["opt"]:
+                job_type += "optimze"
+                if preset["ts"]:
+                    job_type += ".ts"
+            
+            if preset["freq"]:
+                if preset["opt"]:
+                    job_type += ", "
+                job_type += "frequencies"
+                config.set(section, "temperature", str(preset["temp"]))
+            
+            if preset["freq"] or preset["opt"]:
+                config.set(section, "type", job_type)
+        
+        if "nproc" in preset:
+            config.set(section, "processors", str(preset["nproc"]))
+            config.set(section, "memory", str(preset["mem"]))
+        
+        if "solvent" in preset and preset["solvent model"]:
+            config.set(section, "solvent", preset["solvent"] if preset["solvent"] else "gas")
+            if preset["solvent"] and not preset["solvent"] == "gas":
+                config.set(section, "solvent_model", preset["solvent model"])
+        
+        if "method" in preset:
+            config.set(section, "method", preset["method"].replace('ω', 'w'))
+            # TODO: semi-empirical
+            if "disp" in preset and preset["disp"] is not None:
+                config.set(section, "empirical_dispersion", preset["disp"])
+            
+            if "grid" in preset and preset["grid"] is not None:
+                config.set(section, "grid", preset["grid"])
+        
+        elif "functional" in preset:
+            config.set(section, "method", preset["functional"].replace('ω', 'w'))
+            # TODO: semi-empirical
+            if "disp" in preset and preset["disp"] is not None:
+                config.set(section, "empirical_dispersion", preset["disp"])
+            
+            if "grid" in preset and preset["grid"] is not None:
+                config.set(section, "grid", preset["grid"])
+        
+        if "basis" in preset and len(preset["basis"]["name"]) > 0:
+            basis_str = ""
+            for elements, aux, file, name in zip(preset["basis"]["elements"], \
+                                                 preset["basis"]["auxiliary"], \
+                                                 preset["basis"]["file"], \
+                                                 preset["basis"]["name"] \
+                                            ):
+
+                if isinstance(elements, str):
+                    basis_str += elements
+                else:
+                    basis_str += " ".join(elements)
+
+                if aux is not None:
+                    basis_str += " aux %s" % aux
+                
+                basis_str += " %s" % name
+                
+                if file:
+                    if " " in file:
+                        self.tool_instance.session.logger.warning("basis file path contains whitespace and cannot be saved to ini format: %s" % file)
+                    else:
+                        basis_str += " %s" % file
+                
+                basis_str += "\n"
+            
+            config.set(section, "basis", basis_str.strip())        
+        
+        if "ecp" in preset and len(preset["ecp"]["name"]) > 0:
+            basis_str = ""
+            for elements, file, name in zip(preset["ecp"]["elements"], \
+                                                 preset["ecp"]["file"], \
+                                                 preset["ecp"]["name"], \
+                                            ):
+                
+                if isinstance(elements, str):
+                    basis_str += elements
+                else:
+                    basis_str += " ".join(elements)
+
+                basis_str += " %s" % name
+                
+                if file:
+                    if " " in file:
+                        self.tool_instance.session.logger.warning("basis file path contains whitespace and cannot be saved to ini format: %s" % file)
+                    else:
+                        basis_str += " %s" % file
+
+                basis_str += "\n"
+            
+            config.set(section, "ecp", basis_str.strip())
+        
+        if "other" in preset:
+            for option, setting in preset["other"].items():
+                if option.isdigit():
+                    self.tool_instance.session.logger.error("preset \"%s\" uses an old format\nif you have any \"additional options\" set, re-save the preset, and try exporting again" % section)
+                    break
+                s = ""
+                if isinstance(setting, dict):
+                    for key, values in setting.items():
+                        s += "%s %s\n" % (key, ", ".join(values))
+                
+                elif isinstance(setting, list):
+                    s += "\n".join(setting)
+                
+                if len(s) > 0:
+                    config.set(section, option, s)
 
     def cleanup(self):
         self.tool_instance.export_preset_window = None
