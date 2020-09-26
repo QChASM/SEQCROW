@@ -110,7 +110,17 @@ class _SEQCROW_API(BundleAPI):
             tool = NormalModes(session, ti.name)
             return tool        
         
-        if any(ti.name == name for name in ["Structure Modification", \
+        elif ti.name == "Substituent Sterimol":
+            from .tools import Sterimol
+            for tool in session.tools.list():
+                if isinstance(tool, Sterimol):
+                    tool.display(True)
+                    break
+            else:
+                tool = Sterimol(session, ti.name)
+                return tool
+        
+        elif any(ti.name == name for name in ["Structure Modification", \
                                             "Change Substituents", \
                                             "Swap Transition Metal Ligands", \
                                             "Fuse Ring"]):
