@@ -37,7 +37,7 @@ class _SterimolSettings(Settings):
 class Sterimol(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False         
-    # help = "https://github.com/QChASM/SEQCROW/wiki/Add-to-Personal-Library-Tool"
+    help = "https://github.com/QChASM/SEQCROW/wiki/Sterimol-Tool"
     
     def __init__(self, session, name):       
         super().__init__(session, name)
