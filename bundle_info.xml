@@ -11,35 +11,45 @@
             <URL>http://catalysttrends.wheelergroupresearch.com/</URL>
             <License>license.txt</License>
             <Synopsis>Structure Editing and Quantum Chemical Representation and Organization for Workflows</Synopsis>
-            <Description>An AaronTools-based plugin for ChimeraX. 
+            <Description>SEQCROW is an AaronTools-based bundle for ChimeraX. 
 
-SEQCROW adds the following to ChimeraX:
-I/O:
-    * Read XYZ, Gaussian input and output, ORCA output, and Psi4 output files
-    * Save models to XYZ files
-    * A tool is also available to save Gaussian, ORCA, or Psi4 input files
-
-tools:
-    AaronTools
-        Add to Personal Library  - add substituents, ligands, or rings to your personal AaronTools library
-        Browse AaronTools        - browse substituents, ligands, and rings in the AaronTools library
-        Process Thermochemistry  - compute thermal corrections for models with vibrational mode information
-        Structure Modification   - modify your structure using pieces from the AaronTools library
-        Visualize Normal Modes   - display normal modes for models with vibrational mode information as vectors or an animation
-
-    SEQCROW
-        Managed Models           - restore models opened through SEQCROW to their original state
-        Build QM Input           - build Gaussian, ORCA, or Psi4 input files
-        Job Queue                - manage QM jobs that are run with SEQCROW
-
-selectors:
-    tm  - select all transition metals
-    several substituent selectors, including Me, Ph, and iPr
-
-presets:
-    ball-stick-endcap       - all non-H atoms are represented as balls and sticks; H atoms are represented as sticks/endcaps
-    index labels            - label each atom with its index (1-indexed)
-    sticks                  - all atoms are represented as sticks/endcaps
+            ## File Types
+            * Open XYZ, Gaussian input and output, ORCA output, and Psi4 output files
+            * Save atomic models to XYZ files
+            * A tool is also available to save Gaussian, ORCA, or Psi4 input files
+            
+            ## Tools
+            ### AaronTools
+            * <b>Add to Personal Library</b>     - add substituents, ligands, or rings to your personal AaronTools library
+            * <b>Browse AaronTools</b>           - browse substituents, ligands, and rings in the AaronTools library
+            * <b>Build QM Input</b>              - build Gaussian, ORCA, or Psi4 input files
+            * <b>Process QM Thermochemistry</b>  - compute thermal corrections for models with vibrational mode information
+            * <b>Structure Modification</b>      - modify your structure using components from the AaronTools libraries (substituents, ligands, ring fragments)
+            * <b>Visualize Normal Modes</b>      - display normal modes for models with vibrational mode information as vectors or an animation
+            
+            ### SEQCROW
+            * <b>Job Queue</b>                   - manage QM jobs that are run with SEQCROW
+            * <b>Managed Models</b>              - restore models opened through SEQCROW to their original state
+            
+            
+            ### Structure Analysis
+            * <b>Sterimol</b>                    - determine the L, B<sub>1</sub>, and B<sub>5</sub> Sterimol parameters for a selected substituent 
+            
+            ### Selectors
+            * <b>tm</b>                          - select all transition metals
+            * several substituent selectors, including <b>Me</b>, <b>Ph</b>, and <b>iPr</b>
+            
+            ## Graphical Presets
+            * <b>ball-stick-endcap</b>           - all non-H atoms are represented as balls and sticks; H atoms are represented as sticks/endcaps
+            * <b>index labels</b>                - label each atom with its index (1-indexed)
+            * <b>sticks</b>                      - all atoms are represented as sticks/endcaps
+            
+            ## Commands
+            * <b>rmsdAlign</b>                   - calculate RMSD and align molecular structures, similar to ChimeraX's built-in `align` command
+            * <b>substitute</b>                  - add or change substituents
+            * <b>fuseRing</b>                    - attach a ring to a structure
+            * <b>angle</b>                       - print the angle defined by three atoms to the log
+            * <b>dihedral</b>                    - print the torsional angle defined by four atoms to the log
             </Description>
             
             <Dependencies>
