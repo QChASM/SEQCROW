@@ -2598,21 +2598,20 @@ class BasisOption(QWidget):
         self.elements.itemSelectionChanged.connect(lambda *args, s=self: self.parent.something_changed())
         self.layout.addWidget(self.elements, 0, 2, 3, 1, Qt.AlignTop)
         
+        self.custom_basis_kw = QLineEdit()
+        self.custom_basis_kw.textChanged.connect(self.apply_filter)
+        self.custom_basis_kw.textChanged.connect(self.update_tooltab)
+        self.custom_basis_kw.setPlaceholderText("filter basis sets")
+        self.custom_basis_kw.setClearButtonEnabled(True)
+        keyword_label = QLabel("keyword:")
+        self.basis_name_options.addRow(keyword_label, self.custom_basis_kw)
+        
         self.aux_type = QComboBox()
         self.aux_type.currentIndexChanged.connect(lambda *args, s=self: self.parent.check_elements(s))
         self.aux_type.addItem("no")
         aux_label = QLabel("auxiliary:")
         self.basis_name_options.addRow(aux_label, self.aux_type)
     
-        self.custom_basis_kw = QLineEdit()
-        self.custom_basis_kw.textChanged.connect(self.apply_filter)
-        self.custom_basis_kw.textChanged.connect(self.update_tooltab)
-        self.custom_basis_kw.setPlaceholderText("filter basis sets")
-        self.custom_basis_kw.setClearButtonEnabled(True)
-        
-        keyword_label = QLabel("keyword:")
-        self.basis_name_options.addRow(keyword_label, self.custom_basis_kw)
-
         self.is_builtin = QCheckBox()
         self.is_builtin.setToolTip("checked: basis set is avaiable in the software with a keyword\n" + \
                                    "unchecked: basis set is stored in an external file")
