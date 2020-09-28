@@ -7,16 +7,12 @@ These tools enable users to rapidly modify several structures simultaneously, pr
 More information about SEQCROW features can be found on the [GitHub wiki](https://github.com/QChASM/SEQCROW/wiki).
 
 ## Installation
-1. Download <a href="https://github.com/QChASM/SEQCROW/raw/master/dist/SEQCROW-0.1-py3-none-any.whl" target="_blank">SEQCROW-0.1-py3-none-any.whl</a>
-2. On the ChimeraX command line, enter `toolshed install /path/to/SEQCROW-0.1-py3-none-any.whl`
-3. Restart ChimeraX
-4. If you have a personal AaronTools library already, you can specify the path to it in the SEQCROW settings. Open ChimeraX and go Favorites &rarr; Settings... &rarr; SEQCROW. You will have to restart ChimeraX if you change this setting. 
-
-## Updating
-1. Download <a href="https://github.com/QChASM/SEQCROW/raw/master/dist/SEQCROW-0.1-py3-none-any.whl" target="_blank">SEQCROW-0.1-py3-none-any.whl</a>
-2. On the ChimeraX command line, enter `toolshed uninstall SEQCROW`
-3. Restart ChimeraX
-4. On the ChimeraX command line, enter `toolshed install /path/to/SEQCROW-0.1-py3-none-any.whl`
+1. Install from the ChimeraX Toolshed
+   * Tools &rarr; More Tools...
+   * find and open the SEQCROW page
+   * click 'Install'
+2. Restart ChimeraX to get the new selectors under 'Select &rarr; Chemistry' and SEQCROW settings/preferences 
+3. If you have a personal AaronTools library already, you can specify the path to it in the SEQCROW settings. Open ChimeraX and go Favorites &rarr; Settings... &rarr; SEQCROW. You will have to restart ChimeraX if you change this setting. 
 
 ## Other Versions
 This is a plug-in for ChimeraX.
