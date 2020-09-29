@@ -1547,10 +1547,15 @@ class JobTypeOption(QWidget):
                             )
         
         if self.do_freq.checkState() == Qt.Checked:
-            job_types.append(FrequencyJob(numerical=(self.num_freq.checkState() == Qt.Checked or 
-                                                     self.raman.checkState() == Qt.Checked),
-                                          temperature=self.temp.value())
-                            )
+            if self.form == "ORCA":
+                job_types.append(FrequencyJob(numerical=(self.num_freq.checkState() == Qt.Checked or 
+                                                        self.raman.checkState() == Qt.Checked),
+                                            temperature=self.temp.value())
+                                )                
+            else:
+                job_types.append(FrequencyJob(numerical=self.num_freq.checkState() == Qt.Checked,
+                                              temperature=self.temp.value())
+                                )
 
         return job_types
 
@@ -2032,9 +2037,7 @@ class JobTypeOption(QWidget):
             if self.do_freq.checkState() == Qt.Checked:
                 route['freq'] = []
 
-                if self.raman.checkState() == Qt.Unchecked:
-                    route['freq'].append("NoRaman")
-                else:
+                if self.raman.checkState() == Qt.Checked:
                     route['freq'].append("Raman")
                     
                 if self.hpmodes.checkState() == Qt.Checked:
@@ -2048,7 +2051,6 @@ class JobTypeOption(QWidget):
                         if kw == "opt" or kw == "irc" :
                             #apparently, IRC can only read cartesian force constants and not interal coords
                             #opt can do ReadFC and ReadCartesianFC, but I'm just going to pick ReadCartesianFC
-                            route[kw].remove("CalcFC")
                             route[kw].append("ReadCartesianFC")
                             
             if self.chk_file_path.text() != "":
