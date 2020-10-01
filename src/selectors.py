@@ -171,21 +171,25 @@ def get_invariant(atom, atoms):
     (6) number of attached hydrogens (\d{1}): nH
     """
     #atom is chimerax atom
-    heavy = set([x for x in atom.neighbors if x.element.name != "H" and x in atoms])
+    heavy = [x.element.number for x in atom.neighbors if x.element.name != "H" and x in atoms]
     # number of non-hydrogen connections:
-    nconn = len(heavy)
+    s = str(len(heavy))
     # number of bonds with heavy atoms
-    nB = 0
-    for h in heavy:
-        nB += bond_order(h, atom)
+    for h in sorted(set(heavy)):
+        s += str(h)
+        s += str(heavy.count(h))
     # number of connected hydrogens
     nH = len([x for x in atom.neighbors if x in atoms]) - len(heavy)
+    s += str(nH)
     # atomic number
     z = atom.element.number
+    s += str(z)
+    
+    return s
 
-    return "{:01d}{:03d}{:03d}{:01d}".format(
-        int(nconn), int(nB * 10), int(z), int(nH)
-    )
+    #return "{:01d}{:03d}{:03d}{:01d}".format(
+    #    int(nconn), int(nB * 10), int(z), int(nH)
+    #)
     
 def bond_order(atom1, atom2):
     #atom is chimerax atom
