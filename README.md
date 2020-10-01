@@ -21,7 +21,7 @@ This is a plug-in for ChimeraX.
 The Chimera version of SEQCROW (ChimAARON) can be found on the [Chimera branch](https://github.com/QChASM/ChimAARON/tree/Chimera).
 
 ### ChimeraX Stable
-The most stable version can be found on the [master branch](https://github.com/QChASM/ChimAARON/tree/master) or the [ChimeraX toolshed](https://cxtoolshed.rbvi.ucsf.edu/apps/seqcrow)
+you are here
 
 ### ChimeraX Daily
-You are here
+For the latest features and bugs, check out the [dev branch](https://github.com/QChASM/ChimAARON/tree/dev)
