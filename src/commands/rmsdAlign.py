@@ -30,12 +30,12 @@ def rmsdAlign(session, models, reference, align=True, sort=False):
             #XXX: RMSD returns early (without giving ordered atoms) if align=False (which is the default)
             if order1 is None:
                 if sort:
-                    order1, _ = ref.reorder(canonical=True)
+                    order1, _ = ref.reorder()
                 else:
                     order1 = ref.atoms
 
             if sort:
-                order2, _ = rescol.reorder(canonical=True)
+                order2, _ = rescol.reorder()
             else:
                 order2 = rescol.atoms
             

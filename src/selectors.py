@@ -176,14 +176,14 @@ def get_invariant(atom, atoms):
     s = str(len(heavy))
     # number of bonds with heavy atoms
     for h in sorted(set(heavy)):
-        s += str(h)
-        s += str(heavy.count(h))
+        s += "%03d" % h
+        s += "%02d" % heavy.count(h)
     # number of connected hydrogens
     nH = len([x for x in atom.neighbors if x in atoms]) - len(heavy)
     s += str(nH)
     # atomic number
     z = atom.element.number
-    s += str(z)
+    s += "%03i" % z
     
     return s
 

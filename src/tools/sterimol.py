@@ -205,7 +205,7 @@ class Sterimol(ToolInstance):
             s += ".arrow %6.3f %6.3f %6.3f   %6.3f %6.3f %6.3f   0.1 0.25 %f\n" % (*l_start, *l_end, l/(l + 0.75))
         
         if self.display_radii.checkState() == Qt.Checked:
-            s += ".note radii"
+            s += ".note radii\n"
             s += ".transparency 75\n"
             color = None
             for atom in selection:
