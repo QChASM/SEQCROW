@@ -4,11 +4,11 @@
             maxSessionVersion="1"
             package="SEQCROW"
             purePython="true"
-            version="0.11">
+            version="0.12">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
-            <URL>http://catalysttrends.wheelergroupresearch.com/</URL>
+            <URL>http://qchasm.wheelergroupresearch.com/</URL>
             <License>license.txt</License>
             <Synopsis>Structure Editing and Quantum Chemical Representation and Organization for Workflows</Synopsis>
             <Description>SEQCROW is an AaronTools-based bundle for ChimeraX. 
@@ -53,7 +53,7 @@
             </Description>
             
             <Dependencies>
-                <Dependency name="ChimeraX-Core" version=">=1.1"/>
+                <Dependency name="ChimeraX-Core" version="==1.1"/>
                 <Dependency name="scipy"/>
                 <Dependency name="numpy"/>
                 <Dependency name="Send2Trash"/>

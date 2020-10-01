@@ -15,6 +15,8 @@ from collections import deque
 
 from time import perf_counter
 
+from warnings import warn
+
 Primes()
 BondOrder()
 
@@ -90,6 +92,7 @@ def substituent_selection(session, sub_name, models, results):
                     elements = sorted(frag.elements.names)
                     
                     if sub_elements != elements:
+                        #session.logger.info("wrong elements")
                         continue
 
                     #rank_start = perf_counter()
@@ -201,12 +204,20 @@ def bond_order(atom1, atom2):
         
     dist = np.linalg.norm(atom1.coord - atom2.coord)
     closest = 0, None
+    zs = []
     for order, length in bonds.items():
         diff = abs(length - dist)
-        if closest[1] is None or diff < closest[1]:
-            closest = order, diff
+        if diff == 0:
+            return float(order)
+        zs.append(np.exp(-diff))
     
-    return float(closest[0])
+    closest = 0
+    for z, o in zip(zs, bonds.keys()):
+        closest += z*float(o)
+    
+    closest /= sum(zs)
+
+    return round(closest, 1)
 
 def canonical_rank(structure, heavy_only=False, break_ties=True):
     """see AaronTools.geometry.Geometry.canonical_rank
@@ -220,7 +231,7 @@ def canonical_rank(structure, heavy_only=False, break_ties=True):
         # use prime numbers for product so products are distinct
         # eg: primes[2]*primes[2] != primes[1]*primes[4]
         partitions = {}
-        for i, a in enumerate(atoms):
+        for i, a in enumerate(sorted(atoms, key=lambda x, atoms=atoms: get_invariant(x, atoms))):
             key = primes[ranks[i]]
             for b in a.neighbors:
                 if b in atoms:
@@ -228,6 +239,7 @@ def canonical_rank(structure, heavy_only=False, break_ties=True):
             partitions.setdefault(ranks[i], {})
             partitions[ranks[i]].setdefault(key, [])
             partitions[ranks[i]][key] += [i]
+
         return update_ranks(ranks, partitions)
 
     def update_ranks(ranks, partitions):
@@ -273,6 +285,7 @@ def canonical_rank(structure, heavy_only=False, break_ties=True):
                 for j in idx_list[1:]:
                     b = atoms[j]
                     connected = [x for x in a.neighbors if x in b.neighbors]
+                    #connected = sorted(connected, key=lambda x, atoms=atoms: get_invariant(x, atoms))
                     if len(connected) == 1:
                         k = connected.pop()
                         if k in atoms:
