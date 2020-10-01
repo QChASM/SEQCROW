@@ -218,7 +218,12 @@ class ResidueCollection(Geometry):
                 
                 all_atoms.extend(new_res.atoms)
             
-            super().__init__(all_atoms, name=molecule.name, comment=molecule.comment if hasattr(molecule, "comment") else "", **kwargs)
+            super().__init__(all_atoms, 
+                             name=molecule.name, 
+                             comment=molecule.comment if hasattr(molecule, "comment") else "", 
+                             refresh_connected=False, 
+                             **kwargs,
+            )
         
             #update bonding to match that of the chimerax molecule
             for atom in all_atoms:

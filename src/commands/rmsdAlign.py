@@ -1,5 +1,6 @@
 import numpy as np
 
+from chimerax.atomic import AtomicStructure
 from chimerax.core.commands import BoolArg, ModelsArg, ModelArg, CmdDesc
 
 from SEQCROW.residue_collection import ResidueCollection
@@ -15,6 +16,8 @@ def rmsdAlign(session, models, reference, align=True, sort=False):
     order1 = None
     
     for model in models:
+        if not isinstance(model, AtomicStructure):
+            continue
         rescol = ResidueCollection(model)
         if align:
             rmsd = rescol.RMSD(ref, sort=sort, align=True)
