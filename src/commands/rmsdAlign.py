@@ -6,12 +6,12 @@ from chimerax.core.commands import BoolArg, ModelsArg, ModelArg, CmdDesc
 from SEQCROW.residue_collection import ResidueCollection
 
 rmsdAlign_description = CmdDesc(required=[("models", ModelsArg)], \
-                                keyword=[("reference", ModelArg), ("sort", BoolArg), ("align", BoolArg)], \
+                                keyword=[("reference", ModelArg), ("sort", BoolArg), ("align", BoolArg), ("heavyOnly", BoolArg)], \
                                 required_arguments=['reference'], synopsis=\
                                 "calculate the RMSD between the reference model and other models, " + \
                                 "with or without sorting the atoms or aligning the structures")
 
-def rmsdAlign(session, models, reference, align=True, sort=False):   
+def rmsdAlign(session, models, reference, align=True, sort=False, heavyOnly=False):   
     ref = ResidueCollection(reference)
     order1 = None
     
@@ -20,7 +20,7 @@ def rmsdAlign(session, models, reference, align=True, sort=False):
             continue
         rescol = ResidueCollection(model)
         if align:
-            rmsd = rescol.RMSD(ref, sort=sort, align=True)
+            rmsd = rescol.RMSD(ref, sort=sort, align=True, heavy_only=heavyOnly)
             session.logger.info("rmsd between %s and %s: %.4f" % (ref.atomspec, model.atomspec, rmsd))
             for atom in rescol.atoms:
                 #update coordinates (without rescol.update_chix - that's slower b/c it checks bonds)
@@ -41,13 +41,17 @@ def rmsdAlign(session, models, reference, align=True, sort=False):
             
             #recompute rmsd using untranslated coordinates (from original AtomicStructures)
             rmsd = 0
+            atoms = 0
             for a1, a2 in zip(order1, order2):
                 atom1 = a1.chix_atom
                 atom2 = a2.chix_atom
                 v = atom1.coord - atom2.coord
+                if heavyOnly and (atom1.element.name == "H" or atom2.element.name == "H"):
+                    continue
                 rmsd += np.dot(v, v)
+                atoms += 1
 
-            rmsd = np.sqrt(rmsd / len(rescol.atoms))
+            rmsd = np.sqrt(rmsd / atoms)
 
             session.logger.info("rmsd between %s and %s: %.4f" % (ref.atomspec, model.atomspec, rmsd))
     

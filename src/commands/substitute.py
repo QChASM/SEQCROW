@@ -5,6 +5,7 @@ from AaronTools.substituent import Substituent
 from chimerax.atomic import AtomsArg
 from chimerax.core.commands import BoolArg, CmdDesc, StringArg, DynamicEnum, ListOf
 
+from SEQCROW.finders import AtomSpec
 from SEQCROW.residue_collection import ResidueCollection, Residue
 
 
@@ -23,8 +24,54 @@ substitute_description = CmdDesc(required=[("selection", AtomsArg)], \
                                  synopsis="modify substituents")
 
 
-def substitute(session, selection, substituents, newName=None, guessAvoid=True, modify=True, minimize=False):
+def guessAvoidTargets(selection, session):
     models = {}
+    
+    for atom in selection:        
+        if any(bonded_atom in selection for bonded_atom in atom.neighbors):
+            try:
+                models, attached = avoidTargets(selection)
+                session.logger.warning("two adjacent atoms are both selected; use \"guessAvoid true\"")
+                return models, attached
+            except:
+                pass
+
+        if atom.structure not in models:
+            models[atom.structure] = {atom.residue:[atom]}
+
+        else:
+            if atom.residue not in models[atom.structure]:
+                models[atom.structure][atom.residue] = [atom]
+            else:
+                models[atom.structure][atom.residue].append(atom)
+    
+    return models, None
+
+def avoidTargets(selection):
+    models = {}
+    attached = {}
+
+    for atom in selection:
+        for bond in atom.bonds:
+            atom2 = bond.other_atom(atom)
+            if atom2 not in selection:
+                if atom in attached:
+                    raise RuntimeError("cannot determine previous substituent; multiple fragments unselected")
+    
+                attached[atom] = atom2
+    
+                if atom.structure not in models:
+                    models[atom.structure] = {atom.residue:[atom]}
+    
+                else:
+                    if atom.residue not in models[atom.structure]:
+                        models[atom.structure][atom.residue] = [atom]
+                    else:
+                        models[atom.structure][atom.residue].append(atom)
+    
+    return models, attached
+
+def substitute(session, selection, substituents, newName=None, guessAvoid=True, modify=True, minimize=False):
     attached = {}
     
     if newName is None:
@@ -36,34 +83,10 @@ def substitute(session, selection, substituents, newName=None, guessAvoid=True, 
     elif len(substituents) != len(newName):
         raise RuntimeError("number of substituents is not the same as the number of new names")
 
-    for atom in selection:
-        if not guessAvoid:
-            for bond in atom.bonds:
-                atom2 = bond.other_atom(atom)
-                if atom2 not in selection:
-                    if atom in attached:
-                        raise RuntimeError("cannot determine previous substituent; multiple fragments unselected")
-
-                    attached[atom] = atom2
-
-                    if atom.structure not in models:
-                        models[atom.structure] = {atom.residue:[atom]}
-
-                    else:
-                        if atom.residue not in models[atom.structure]:
-                            models[atom.structure][atom.residue] = [atom]
-                        else:
-                            models[atom.structure][atom.residue].append(atom)
-
-        else:
-            if atom.structure not in models:
-                models[atom.structure] = {atom.residue:[atom]}
-
-            else:
-                if atom.residue not in models[atom.structure]:
-                    models[atom.structure][atom.residue] = [atom]
-                else:
-                    models[atom.structure][atom.residue].append(atom)
+    if not guessAvoid:
+        models, attached = avoidTargets(selection)
+    else:
+        models, attached = guessAvoidTargets(selection, session)
 
     first_pass = True
     new_structures = []
@@ -72,8 +95,9 @@ def substitute(session, selection, substituents, newName=None, guessAvoid=True, 
         sub = Substituent(subname)
         for model in models:
             if modify and first_pass:
+                conv_res = []
                 for res in models[model]:
-                    conv_res = [res]
+                    conv_res.append(res)
                     if minimize:
                         for chix_res in model.residues:
                             if chix_res in conv_res:
@@ -83,7 +107,7 @@ def substitute(session, selection, substituents, newName=None, guessAvoid=True, 
                             for atom in chix_res.atoms:
                                 for target in models[model][res]:
                                     d = np.linalg.norm(atom.coord - target.coord)
-                                    if d < 15:
+                                    if d < 25:
                                         conv_res.append(chix_res)
                                         added_res = True
                                         break
@@ -92,21 +116,18 @@ def substitute(session, selection, substituents, newName=None, guessAvoid=True, 
                                     break
 
                 rescol = ResidueCollection(model, convert_residues=conv_res)
-                for res  in models[model]:
+                for res in models[model]:
                     residue = [resi for resi in rescol.residues if resi.chix_residue is res][0]
                     if newName is not None:
                         residue.name = newName[ndx]
 
                     for target in models[model][res]:
-                        if not guessAvoid:
-                            end = attached[target].atomspec
+                        if attached is not None:
+                            end = AtomSpec(attached[target].atomspec)
                         else:
                             end = None 
 
-                        residue.substitute(sub.copy(), target.atomspec, attached_to=end, minimize=minimize)
-
-                    if minimize:
-                        residue.minimize_sub_torsion()
+                        residue.substitute(sub.copy(), AtomSpec(target.atomspec), attached_to=end, minimize=minimize)
 
                     residue.update_chix(res)
 
@@ -123,12 +144,16 @@ def substitute(session, selection, substituents, newName=None, guessAvoid=True, 
                             continue
                         
                         added_res = False
-                        for atom in chix_res.atoms:
-                            for target in models[model][model.residues[model_copy.residues.index(chix_res)]]:
-                                d = np.linalg.norm(atom.coord - target.coord)
-                                if d < 15:
-                                    conv_res.append(chix_res)
-                                    added_res = True
+                        for res in models[model]:
+                            for target in models[model][res]:
+                                for atom in chix_res.atoms:
+                                    d = np.linalg.norm(atom.coord - target.coord)
+                                    if d < 25:
+                                        conv_res.append(chix_res)
+                                        added_res = True
+                                        break
+                                
+                                if added_res:
                                     break
                             
                             if added_res:
@@ -141,15 +166,16 @@ def substitute(session, selection, substituents, newName=None, guessAvoid=True, 
                         residue.name = newName[ndx]
 
                     for target in models[model][res]:
-                        if not guessAvoid:
-                            end = attached[target].atomspec
+                        if attached is not None:
+                            end = AtomSpec(model_copy.atoms[model.atoms.index(attached[target])].atomspec)
                         else:
                             end = None
 
-                        residue.substitute(sub.copy(), model_copy.atoms[model.atoms.index(target)].atomspec, attached_to=end, minimize=minimize)
-
-                    #if minimize:
-                    #    residue.minimize_sub_torsion()
+                        residue.substitute(sub.copy(), 
+                                           AtomSpec(model_copy.atoms[model.atoms.index(target)].atomspec), 
+                                           attached_to=end, 
+                                           minimize=minimize,
+                        )
 
                     residue.update_chix(res_copy)
 
