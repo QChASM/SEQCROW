@@ -4,7 +4,7 @@
             maxSessionVersion="1"
             package="SEQCROW"
             purePython="true"
-            version="0.12">
+            version="0.13">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -53,7 +53,7 @@
             </Description>
             
             <Dependencies>
-                <Dependency name="ChimeraX-Core" version="==1.1"/>
+                <Dependency name="ChimeraX-Core" version=">=1.1"/>
                 <Dependency name="scipy"/>
                 <Dependency name="numpy"/>
                 <Dependency name="Send2Trash"/>
@@ -188,13 +188,13 @@
                 <ChimeraXClassifier>ChimeraX :: Selector :: tBu      :: tert-Butyl substituent</ChimeraXClassifier>
 
                 <!--NOTE: this synopsis will not appear when `help <command>` is used-->
-                <ChimeraXClassifier>ChimeraX :: Command :: rmsdAlign :: Structure Analysis :: Calculate RMSD between structures</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: rmsdAlign  :: Structure Analysis :: Calculate RMSD between structures</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: substitute :: Structure Editing :: change substiuents</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Command :: fuseRing :: Structure Editing :: fuse a ring</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Command :: angle :: Structure Analysis :: angle defined by three atoms</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Command :: dihedral :: Structure Analysis :: dihedral angle defined by four atoms</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: fuseRing   :: Structure Editing :: fuse a ring</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: 123angle   :: Structure Analysis :: angle defined by three atoms</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: dihedral   :: Structure Analysis :: dihedral angle defined by four atoms</ChimeraXClassifier>
        </Classifiers>
-            
+    
     <AdditionalPackages>
         <Package name="AaronTools" folder="C:\Users\Tony Schaefer\Documents\GitHub\AaronTools">
         </Package>

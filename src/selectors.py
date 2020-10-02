@@ -48,7 +48,7 @@ def tm_selector(session, models, results):
 #reimplemented some AaronTools but with chimerax stuff because of 
 #performace reasons
 def substituent_selection(session, sub_name, models, results): 
-    #TODO: optimize
+    #TODO: optimize - or cheat and use cython or something
     #TODO: make it so it doesn't select things with just an H bonded to them
     #      e.g. sel OH should not select water molecules
     #      probably do a get_all_connected for each fragment and
@@ -162,66 +162,33 @@ def get_fragment(start, stop, max_len):
     return Atoms(frag)
 
 def get_invariant(atom, atoms):
-    """gets initial invariant
-    (1) number of non-hydrogen connections (\d{1}): nconn
-    (2) sum of bond order of non-hydrogen bonds * 10 (\d{2}): nB
-    (3) atomic number (\d{3}): z
-    #(4) sign of charge (\d{1})
-    #(5) absolute charge (\d{1})
-    (6) number of attached hydrogens (\d{1}): nH
     """
-    #atom is chimerax atom
-    heavy = set([x for x in atom.neighbors if x.element.name != "H" and x in atoms])
-    # number of non-hydrogen connections:
-    nconn = len(heavy)
-    # number of bonds with heavy atoms
-    nB = 0
-    for h in heavy:
-        nB += bond_order(h, atom)
-    # number of connected hydrogens
-    nH = len([x for x in atom.neighbors if x in atoms]) - len(heavy)
+    gets initial invariant based on self's element and the element of 
+    the atoms connected to self
+    same as AaronTools.Atom.get_neighbor_id
+    """
     # atomic number
     z = atom.element.number
-
-    return "{:01d}{:03d}{:03d}{:01d}".format(
-        int(nconn), int(nB * 10), int(z), int(nH)
-    )
-    
-def bond_order(atom1, atom2):
+    s = "%03i" % z
     #atom is chimerax atom
-    ele1 = atom1.element.name
-    ele2 = atom2.element.name
+    heavy = [x.element.number for x in atom.neighbors if x.element.name != "H" and x in atoms]
+    # number of non-hydrogen connections:
+    s += "%02i" % len(heavy)
+    # number of bonds with heavy atoms
+    for h in sorted(set(heavy)):
+        s += "%03i" % h
+        s += "%02i" % heavy.count(h)
+    # number of connected hydrogens
+    nH = len([x for x in atom.neighbors if x in atoms]) - len(heavy)
+    s += "%02i" % nH
     
-    try:
-        key = " ".join(sorted([ele1, ele2]))
-        bonds = BondOrder.bonds[key]
-    except KeyError:
-        if ele1 == "H" or ele2 == "H":
-            return 1
-        else:
-            BondOrder.warn_atoms.add((ele1, ele2))
-            return 1
-        
-    dist = np.linalg.norm(atom1.coord - atom2.coord)
-    closest = 0, None
-    zs = []
-    for order, length in bonds.items():
-        diff = abs(length - dist)
-        if diff == 0:
-            return float(order)
-        zs.append(np.exp(-diff))
-    
-    closest = 0
-    for z, o in zip(zs, bonds.keys()):
-        closest += z*float(o)
-    
-    closest /= sum(zs)
-
-    return round(closest, 1)
+    return s
 
 def canonical_rank(structure, heavy_only=False, break_ties=True):
-    """see AaronTools.geometry.Geometry.canonical_rank
-    structure is Atoms collection"""
+    """
+    see AaronTools.geometry.Geometry.canonical_rank
+    structure is Atoms collection
+    """
     primes = Primes.list(len(structure.instances()))
     atoms = []
     ranks = []
@@ -231,7 +198,7 @@ def canonical_rank(structure, heavy_only=False, break_ties=True):
         # use prime numbers for product so products are distinct
         # eg: primes[2]*primes[2] != primes[1]*primes[4]
         partitions = {}
-        for i, a in enumerate(sorted(atoms, key=lambda x, atoms=atoms: get_invariant(x, atoms))):
+        for i, a in enumerate(atoms):
             key = primes[ranks[i]]
             for b in a.neighbors:
                 if b in atoms:

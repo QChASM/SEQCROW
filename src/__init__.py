@@ -269,9 +269,9 @@ class _SEQCROW_API(BundleAPI):
             from .commands.fuseRing import fuseRing, fuseRing_description
             register("fuseRing", fuseRing_description, fuseRing)
         
-        elif command_info.name == "angle":
+        elif command_info.name == "123angle":
             from .commands.angle import angle, angle_description
-            register("angle", angle_description, angle)
+            register("123angle", angle_description, angle)
         
         elif command_info.name == "dihedral":
             from .commands.dihedral import dihedral, dihedral_description

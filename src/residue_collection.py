@@ -12,6 +12,8 @@ from chimerax.atomic import Residue as ChimeraResidue
 from chimerax.atomic import Atom as ChixAtom
 from chimerax.atomic.colors import element_color
 
+from SEQCROW.finders import AtomSpec
+
 from warnings import warn
 
 
@@ -71,6 +73,13 @@ class Residue(Geometry):
                 self.chain_id = "a"
             else:
                 self.chain_id = chain_id
+
+    def __repr__(self):
+        s = "%s\n" % self.atomspec
+        for atom in self.atoms:
+            s += "%-2s    %6.3f    %6.3f    %6.3f    %s\n" % (atom.element, *atom.coords, atom.atomspec if hasattr(atom, "atomspec") else "")
+        
+        return s.strip()
 
     def get_element_count(self):
         """returns a dictionary with element symbols as keys and values corresponding to the
@@ -191,6 +200,39 @@ class Residue(Geometry):
             if bond not in known_chix_bonds:
                 bond.delete()
 
+    def substitute(self, sub, target, *args, attached_to=None, **kwargs):
+        if attached_to is None:
+            from SEQCROW.selectors import get_fragment
+            
+            frags = []
+            target = self.find(target)[0]
+            print(target)
+            print(target.atomspec)
+            target_chix = target.chix_atom
+            for bonded_atom in target_chix.neighbors:
+                frags.append(get_fragment(bonded_atom, target, 1000))
+            
+            attached_to = None
+            longest_frag = None
+            
+            for test_end, (i, frag1) in zip(target_chix.neighbors, enumerate(frags)):
+                cyclic = False
+                for frag2 in frags[i+1:]:
+                    if frag1.intersects(frag2):
+                        cyclic = True
+                        break
+                
+                if cyclic:
+                    continue
+                
+                if attached_to is None or len(longest_frag) < len(frag1):
+                    longest_frag = frag1
+                    attached_to = test_end
+            
+            if attached_to is not None:
+                attached_to = self.find(AtomSpec(attached_to.atomspec))[0]
+            
+        super().substitute(sub, target, *args, attached_to=attached_to, **kwargs) 
 
 class ResidueCollection(Geometry):
     """geometry object used for SEQCROW to easily convert to AaronTools but keep residue info"""
@@ -272,7 +314,14 @@ class ResidueCollection(Geometry):
                 self.residues = [Residue(molecule, resnum=1, name="UNK")]
 
             return
-  
+
+    def __repr__(self):
+        s = "%s\n" % self.atomspec
+        for atom in self.atoms:
+            s += "%-2s    %6.3f    %6.3f    %6.3f    %s\n" % (atom.element, *atom.coords, atom.atomspec if hasattr(atom, "atomspec") else "")
+        
+        return s.strip()
+        
     def _atom_update(self):
         old_atoms = [a for a in self.atoms]
         self.atoms = []
