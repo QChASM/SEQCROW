@@ -107,7 +107,7 @@ def substitute(session, selection, substituents, newName=None, guessAvoid=True, 
                             for atom in chix_res.atoms:
                                 for target in models[model][res]:
                                     d = np.linalg.norm(atom.coord - target.coord)
-                                    if d < 25:
+                                    if d < 5:
                                         conv_res.append(chix_res)
                                         added_res = True
                                         break
@@ -127,7 +127,9 @@ def substitute(session, selection, substituents, newName=None, guessAvoid=True, 
                         else:
                             end = None 
 
-                        residue.substitute(sub.copy(), AtomSpec(target.atomspec), attached_to=end, minimize=minimize)
+                        # call substitute on the ResidueCollection b/c we need to see
+                        # the other residues if minimize=True
+                        rescol.substitute(sub.copy(), AtomSpec(target.atomspec), attached_to=end, minimize=minimize)
 
                     residue.update_chix(res)
 
@@ -148,7 +150,7 @@ def substitute(session, selection, substituents, newName=None, guessAvoid=True, 
                             for target in models[model][res]:
                                 for atom in chix_res.atoms:
                                     d = np.linalg.norm(atom.coord - target.coord)
-                                    if d < 25:
+                                    if d < 5:
                                         conv_res.append(chix_res)
                                         added_res = True
                                         break
@@ -171,7 +173,7 @@ def substitute(session, selection, substituents, newName=None, guessAvoid=True, 
                         else:
                             end = None
 
-                        residue.substitute(sub.copy(), 
+                        rescol.substitute(sub.copy(), 
                                            AtomSpec(model_copy.atoms[model.atoms.index(target)].atomspec), 
                                            attached_to=end, 
                                            minimize=minimize,

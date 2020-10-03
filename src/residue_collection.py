@@ -6,6 +6,7 @@ from AaronTools.atoms import Atom
 from AaronTools.const import TMETAL
 from AaronTools.geometry import Geometry
 from AaronTools.ring import Ring
+from AaronTools.finders import BondedTo
 
 from chimerax.atomic import AtomicStructure
 from chimerax.atomic import Residue as ChimeraResidue
@@ -206,8 +207,6 @@ class Residue(Geometry):
             
             frags = []
             target = self.find(target)[0]
-            print(target)
-            print(target.atomspec)
             target_chix = target.chix_atom
             for bonded_atom in target_chix.neighbors:
                 frags.append(get_fragment(bonded_atom, target, 1000))
@@ -232,7 +231,7 @@ class Residue(Geometry):
             if attached_to is not None:
                 attached_to = self.find(AtomSpec(attached_to.atomspec))[0]
             
-        super().substitute(sub, target, *args, attached_to=attached_to, **kwargs) 
+        return super().substitute(sub, target, *args, attached_to=attached_to, **kwargs) 
 
 class ResidueCollection(Geometry):
     """geometry object used for SEQCROW to easily convert to AaronTools but keep residue info"""
@@ -323,10 +322,10 @@ class ResidueCollection(Geometry):
         return s.strip()
         
     def _atom_update(self):
-        old_atoms = [a for a in self.atoms]
+        #old_atoms = [a for a in self.atoms]
         self.atoms = []
         for res in self.residues:
-            self.atoms.extend([a for a in res.atoms if a in old_atoms])
+            self.atoms.extend(res.atoms)
 
     def map_ligand(self, *args, **kwargs):
         """map_ligand, then put new atoms in the residue they are closest to"""
@@ -349,7 +348,7 @@ class ResidueCollection(Geometry):
             for atom in remove_atoms:
                 residue.atoms.remove(atom)
 
-    def substitute(self, sub, target, *args, **kwargs):
+    def substitute(self, sub, target, *args, minimize=False, **kwargs):
         """find the residue that target is on and substitute it for sub"""
         target = self.find(target)
         if len(target) != 1:
@@ -363,9 +362,22 @@ class ResidueCollection(Geometry):
         else:
             residue = residue[0]
         
-        residue.substitute(sub, target, *args, **kwargs)
+        # call substitute on residue so atoms are added to that residue
+        sub = residue.substitute(sub, target, *args, minimize=False, **kwargs)
 
         self._atom_update()
+
+        # minimize on self so other residues can be taken into account
+        if minimize:
+            sub_start = sub.find_exact(BondedTo(sub.end))[0]
+            shift = sub_start.coords.copy()
+            self.minimize_torsion(sub.atoms, 
+                                  sub_start.bond(sub.end), 
+                                  shift,
+                                  increment=10,
+            )
+
+        return sub
 
     def ring_substitute(self, target, ring, *args, **kwargs):
         """put a ring on the given targets"""
