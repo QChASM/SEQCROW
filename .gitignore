@@ -4,3 +4,5 @@ build
 *.pyc
 *.egg*
 AaronTools*
+setup.py
+cy_selectors.pyx
