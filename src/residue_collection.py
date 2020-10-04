@@ -98,6 +98,7 @@ class Residue(Geometry):
         """changes chimerax residue to match self"""
         elements = {}
         known_atoms = []
+        new_atoms = []
 
         #print("updating residue", self.name, chix_residue.name)
 
@@ -105,7 +106,7 @@ class Residue(Geometry):
 
         #print("updating residue:")
         #print(self.write(outfile=False))
-        
+
         for atom in self.atoms:
             #print(atom, hasattr(atom, "chix_atom"))
             if not hasattr(atom, "chix_atom") or \
@@ -119,14 +120,10 @@ class Residue(Geometry):
                 #    print("chix_atom deleted", atom)
                 #else:
                 #    print("atoms do not match", atom.chix_atom)
-                    
-                atom_name = "%s1" % atom.element
-                k = 1
-                while any([chix_atom.name == atom_name for chix_atom in chix_residue.atoms]):
-                    k += 1
-                    atom_name = "%s%i" % (atom.element, k)
                 
                 #print("new chix atom for", atom)
+                
+                atom_name = "new"
                 
                 new_atom = chix_residue.structure.new_atom(atom_name, atom.element)
                 new_atom.draw_mode = ChixAtom.BALL_STYLE
@@ -136,6 +133,7 @@ class Residue(Geometry):
                 chix_residue.add_atom(new_atom)
                 atom.chix_atom = new_atom
                 known_atoms.append(new_atom)
+                new_atoms.append(new_atom)
 
             else:
                 atom.chix_atom.coord = atom.coords
@@ -145,6 +143,15 @@ class Residue(Geometry):
             if atom not in known_atoms:
                 #print("deleting %s" % atom.atomspec)
                 atom.delete()
+        
+        for atom in new_atoms:
+            atom_name = "%s1" % atom.element.name
+            k = 1
+            while any([chix_atom.name == atom_name for chix_atom in known_atoms]):
+                k += 1
+                atom_name = "%s%i" % (atom.element.name, k)
+            
+            atom.name = atom_name
 
         if refresh_connected:
             self.refresh_chix_connected(chix_residue)
