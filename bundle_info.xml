@@ -4,7 +4,7 @@
             maxSessionVersion="1"
             package="SEQCROW"
             purePython="true"
-            version="0.13">
+            version="0.14">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -48,7 +48,7 @@
             * <b>rmsdAlign</b>                   - calculate RMSD and align molecular structures, similar to ChimeraX's built-in `align` command
             * <b>substitute</b>                  - add or change substituents
             * <b>fuseRing</b>                    - attach a ring to a structure
-            * <b>angle</b>                       - print the angle defined by three atoms to the log
+            * <b>123angle</b>                    - print the angle defined by three atoms to the log
             * <b>dihedral</b>                    - print the torsional angle defined by four atoms to the log
             </Description>
             

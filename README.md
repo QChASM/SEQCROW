@@ -7,9 +7,9 @@ These tools enable users to rapidly modify several structures simultaneously, pr
 More information about SEQCROW features can be found on the [GitHub wiki](https://github.com/QChASM/SEQCROW/wiki).
 
 ## Installation
-1. Download <a href="https://github.com/QChASM/ChimAARON/raw/dev/dist/SEQCROW-0.13-py3-none-any.whl" target="_blank">SEQCROW-0.13-py3-none-any.whl</a>
+1. Download <a href="https://github.com/QChASM/ChimAARON/raw/dev/dist/SEQCROW-0.14-py3-none-any.whl" target="_blank">SEQCROW-0.14-py3-none-any.whl</a>
 2. Open ChimeraX
-3. On the ChimeraX command line, enter `toolshed install /path/to/SEQCROW-0.13-py3-none-any.whl`
+3. On the ChimeraX command line, enter `toolshed install /path/to/SEQCROW-0.14-py3-none-any.whl`
 4. Restart ChimeraX
 5. If you have a personal AaronTools library already, you can specify the path to it in the SEQCROW settings. Open ChimeraX and go Favorites &rarr; Settings... &rarr; SEQCROW. You will have to restart ChimeraX if you change this setting. 
 
