@@ -6,6 +6,7 @@ from AaronTools.atoms import Atom
 from AaronTools.const import TMETAL
 from AaronTools.geometry import Geometry
 from AaronTools.ring import Ring
+from AaronTools.finders import BondedTo
 
 from chimerax.atomic import AtomicStructure
 from chimerax.atomic import Residue as ChimeraResidue
@@ -97,6 +98,7 @@ class Residue(Geometry):
         """changes chimerax residue to match self"""
         elements = {}
         known_atoms = []
+        new_atoms = []
 
         #print("updating residue", self.name, chix_residue.name)
 
@@ -104,7 +106,7 @@ class Residue(Geometry):
 
         #print("updating residue:")
         #print(self.write(outfile=False))
-        
+
         for atom in self.atoms:
             #print(atom, hasattr(atom, "chix_atom"))
             if not hasattr(atom, "chix_atom") or \
@@ -118,14 +120,10 @@ class Residue(Geometry):
                 #    print("chix_atom deleted", atom)
                 #else:
                 #    print("atoms do not match", atom.chix_atom)
-                    
-                atom_name = "%s1" % atom.element
-                k = 1
-                while any([chix_atom.name == atom_name for chix_atom in chix_residue.atoms]):
-                    k += 1
-                    atom_name = "%s%i" % (atom.element, k)
                 
                 #print("new chix atom for", atom)
+                
+                atom_name = "new"
                 
                 new_atom = chix_residue.structure.new_atom(atom_name, atom.element)
                 new_atom.draw_mode = ChixAtom.BALL_STYLE
@@ -135,6 +133,7 @@ class Residue(Geometry):
                 chix_residue.add_atom(new_atom)
                 atom.chix_atom = new_atom
                 known_atoms.append(new_atom)
+                new_atoms.append(new_atom)
 
             else:
                 atom.chix_atom.coord = atom.coords
@@ -144,6 +143,15 @@ class Residue(Geometry):
             if atom not in known_atoms:
                 #print("deleting %s" % atom.atomspec)
                 atom.delete()
+        
+        for atom in new_atoms:
+            atom_name = "%s1" % atom.element.name
+            k = 1
+            while any([chix_atom.name == atom_name for chix_atom in known_atoms]):
+                k += 1
+                atom_name = "%s%i" % (atom.element.name, k)
+            
+            atom.name = atom_name
 
         if refresh_connected:
             self.refresh_chix_connected(chix_residue)
@@ -206,8 +214,6 @@ class Residue(Geometry):
             
             frags = []
             target = self.find(target)[0]
-            print(target)
-            print(target.atomspec)
             target_chix = target.chix_atom
             for bonded_atom in target_chix.neighbors:
                 frags.append(get_fragment(bonded_atom, target, 1000))
@@ -232,7 +238,7 @@ class Residue(Geometry):
             if attached_to is not None:
                 attached_to = self.find(AtomSpec(attached_to.atomspec))[0]
             
-        super().substitute(sub, target, *args, attached_to=attached_to, **kwargs) 
+        return super().substitute(sub, target, *args, attached_to=attached_to, **kwargs) 
 
 class ResidueCollection(Geometry):
     """geometry object used for SEQCROW to easily convert to AaronTools but keep residue info"""
@@ -323,10 +329,10 @@ class ResidueCollection(Geometry):
         return s.strip()
         
     def _atom_update(self):
-        old_atoms = [a for a in self.atoms]
+        #old_atoms = [a for a in self.atoms]
         self.atoms = []
         for res in self.residues:
-            self.atoms.extend([a for a in res.atoms if a in old_atoms])
+            self.atoms.extend(res.atoms)
 
     def map_ligand(self, *args, **kwargs):
         """map_ligand, then put new atoms in the residue they are closest to"""
@@ -349,7 +355,7 @@ class ResidueCollection(Geometry):
             for atom in remove_atoms:
                 residue.atoms.remove(atom)
 
-    def substitute(self, sub, target, *args, **kwargs):
+    def substitute(self, sub, target, *args, minimize=False, **kwargs):
         """find the residue that target is on and substitute it for sub"""
         target = self.find(target)
         if len(target) != 1:
@@ -363,9 +369,22 @@ class ResidueCollection(Geometry):
         else:
             residue = residue[0]
         
-        residue.substitute(sub, target, *args, **kwargs)
+        # call substitute on residue so atoms are added to that residue
+        sub = residue.substitute(sub, target, *args, minimize=False, **kwargs)
 
         self._atom_update()
+
+        # minimize on self so other residues can be taken into account
+        if minimize:
+            sub_start = sub.find_exact(BondedTo(sub.end))[0]
+            shift = sub_start.coords.copy()
+            self.minimize_torsion(sub.atoms, 
+                                  sub_start.bond(sub.end), 
+                                  shift,
+                                  increment=10,
+            )
+
+        return sub
 
     def ring_substitute(self, target, ring, *args, **kwargs):
         """put a ring on the given targets"""
