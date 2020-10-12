@@ -59,7 +59,7 @@ class _InputGeneratorSettings(Settings):
         'last_ecp_elements': Value([], ListOf(StringArg), iter2str),
         'last_ecp_path': Value("", StringArg),
         'last_number_ecp': Value(0, IntArg),
-        'previous_method': Value("", StringArg),
+        'previous_method': Value("B3LYP", StringArg),
         'previous_custom_func': Value("", StringArg),       
         'previous_functional_names': Value([], ListOf(StringArg), iter2str),
         'previous_functional_needs_basis': Value([], ListOf(BoolArg), iter2str),
@@ -2031,9 +2031,6 @@ class JobTypeOption(QWidget):
             if self.do_geom_opt.checkState() == Qt.Checked:
                 route['opt'] = []
 
-                if self.ts_opt.checkState() == Qt.Checked:
-                    route['opt'].append("CalcFC")
-                    
             if self.do_freq.checkState() == Qt.Checked:
                 route['freq'] = []
 
@@ -2045,6 +2042,7 @@ class JobTypeOption(QWidget):
 
             link0 = {}
 
+            #XXX: Move to AaronTools theory
             if self.use_checkpoint.checkState() == Qt.Checked:
                 for kw in route:
                     if "CalcFC" in route[kw]:

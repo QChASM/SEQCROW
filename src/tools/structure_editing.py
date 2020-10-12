@@ -218,7 +218,7 @@ class EditStructure(ToolInstance):
         self.settings.minimize = minimize
 
         if len(new_name.strip()) > 0:
-            run(self.session, "substitute sel substituents %s newName %s guessAvoid %s modify %s minimize %s" %
+            run(self.session, "substitute sel substituents %s newName %s guessAttachment %s modify %s minimize %s" %
                               (subnames, \
                                new_name, \
                                not use_attached, \
@@ -227,7 +227,7 @@ class EditStructure(ToolInstance):
                 )
 
         else:
-            run(self.session, "substitute sel substituents %s guessAvoid %s modify %s minimize %s" %
+            run(self.session, "substitute sel substituents %s guessAttachment %s modify %s minimize %s" %
                               (subnames, \
                                not use_attached, \
                                self.close_previous_bool, \
