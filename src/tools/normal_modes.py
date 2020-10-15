@@ -27,7 +27,7 @@ from matplotlib import rc as matplotlib_rc
 
 from PyQt5.Qt import QIcon, QStyle
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QValidator
+from PyQt5.QtGui import QValidator, QFont
 from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, QTabWidget, QComboBox, \
                             QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, \
                             QFormLayout, QCheckBox, QHeaderView, QMenuBar, QAction, QFileDialog
@@ -55,6 +55,8 @@ class _NormalModeSettings(Settings):
         'peak_type': 'Gaussian', 
         'plot_type': 'Absorbance', 
     }
+
+
 
 class FPSSpinBox(QSpinBox):
     """spinbox that makes sure the value goes evenly into 60"""
@@ -110,6 +112,18 @@ class FPSSpinBox(QSpinBox):
 
 
 class FreqTableWidgetItem(QTableWidgetItem):
+    def setData(self, role, value):
+        super().setData(role, value)
+        
+        if role == Qt.DisplayRole:
+            font = QFont()
+            if "i" in value:
+                font.setItalic(True)
+            else:
+                font.setItalic(False)
+            
+            self.setFont(font)
+            
     def __lt__(self, other):
         return self.data(Qt.UserRole) < other.data(Qt.UserRole)
 
@@ -743,6 +757,8 @@ class IRPlot(ChildToolWindow):
                 row = item.data(Qt.UserRole)
         
         frequency = [freq.frequency for freq in fr.other['frequency'].data][row]
+        if frequency < 0:
+            return
         
         if ax.get_ylim()[1] > 50:
             y_vals = (10**(2-0.9), 100)

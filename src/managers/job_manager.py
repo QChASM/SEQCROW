@@ -67,6 +67,7 @@ class JobManager(ProviderManager):
         self._thread = None
 
     def init_queue(self):
+        """reads cached job list to fill in the queue"""
         scr_dir = os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR)
         self.jobs_list_filename = os.path.join(scr_dir, "job_list-2.json")
         if os.path.exists(self.jobs_list_filename):
@@ -176,6 +177,7 @@ class JobManager(ProviderManager):
                 self.session.logger.warning("SEQCROW's queue has been paused because a local job was running when ChimeraX was closed. The queue can be resumed with SEQCROW's job manager tool")
 
     def write_json(self, *args, **kwargs):
+        """updates the list of cached jobs"""
         d = {'finished':[], 'queued':[], 'check':[], 'error':[], 'killed':[]}
         job_running = False
         for job in self.jobs:
@@ -198,10 +200,15 @@ class JobManager(ProviderManager):
 
         d['job_running'] = job_running
 
+        #check if SEQCROW scratch directory exists before trying to write json
+        if not os.path.exists(os.path.dirname(self.jobs_list_filename)):
+            os.makedirs(os.path.dirname(self.jobs_list_filename))
+
         with open(self.jobs_list_filename, 'w') as f:
             dump(d, f)
 
     def job_finished(self, trigger_name, job):
+        """when a job is finished, open or update the structure as requested"""
         if self.session.seqcrow_settings.settings.JOB_FINISHED_NOTIFICATION == \
           'log and popup notifications' and self.session.ui.is_gui:
             #it's just an error message for now
@@ -264,15 +271,18 @@ class JobManager(ProviderManager):
         pass
     
     def job_started(self, trigger_name, job):
+        """prints 'job started' notification to log"""
         job.session.logger.info("%s: %s" % (trigger_name, job))
         pass
     
     def add_job(self, job):
+        """add job (LocalJob instance) to the queue"""
         if isinstance(job, LocalJob):
             self.local_jobs.append(job)
             self.triggers.activate_trigger(JOB_QUEUED, job)
 
     def increase_priotity(self, job):
+        """move job (LocalJob) up one position in the queue"""
         if isinstance(job, LocalJob):
             ndx = self.local_jobs.index(job)
             if ndx != 0:
@@ -290,6 +300,7 @@ class JobManager(ProviderManager):
                 self.triggers.activate_trigger(JOB_QUEUED, job)
 
     def decrease_priotity(self, job):
+        """move job (LocalJob) down one position in the queue"""
         if isinstance(job, LocalJob):
             ndx = self.local_jobs.index(job)
             if ndx != (len(self.local_jobs) - 1):
@@ -307,6 +318,7 @@ class JobManager(ProviderManager):
                 self.triggers.activate_trigger(JOB_QUEUED, job)
 
     def check_queue(self, *args):
+        """check to see if a waiting job can run"""
         for job in self.unknown_status_jobs:
             if isinstance(job, LocalJob):
                 fr = FileReader(job.output_name, just_geom=False)

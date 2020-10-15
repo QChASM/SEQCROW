@@ -16,7 +16,7 @@ substitute_description = CmdDesc(required=[("selection", AtomsArg)], \
                                                                   url="http://catalysttrends.wheelergroupresearch.com/AaronTools/substituents.php")
                                                            )), 
                                           ("newName", ListOf(StringArg)), 
-                                          ("guessAvoid", BoolArg),
+                                          ("guessAttachment", BoolArg),
                                           ("modify", BoolArg),
                                           ("minimize", BoolArg),
                                          ], \
@@ -24,14 +24,14 @@ substitute_description = CmdDesc(required=[("selection", AtomsArg)], \
                                  synopsis="modify substituents")
 
 
-def guessAvoidTargets(selection, session):
+def guessAttachmentTargets(selection, session):
     models = {}
     
     for atom in selection:        
         if any(bonded_atom in selection for bonded_atom in atom.neighbors):
             try:
                 models, attached = avoidTargets(selection)
-                session.logger.warning("two adjacent atoms are both selected; use \"guessAvoid true\"")
+                session.logger.warning("two adjacent atoms are both selected; use \"guessAttachment true\"")
                 return models, attached
             except:
                 pass
@@ -71,7 +71,7 @@ def avoidTargets(selection):
     
     return models, attached
 
-def substitute(session, selection, substituents, newName=None, guessAvoid=True, modify=True, minimize=False):
+def substitute(session, selection, substituents, newName=None, guessAttachment=True, modify=True, minimize=False):
     attached = {}
     
     if newName is None:
@@ -83,10 +83,10 @@ def substitute(session, selection, substituents, newName=None, guessAvoid=True, 
     elif len(substituents) != len(newName):
         raise RuntimeError("number of substituents is not the same as the number of new names")
 
-    if not guessAvoid:
+    if not guessAttachment:
         models, attached = avoidTargets(selection)
     else:
-        models, attached = guessAvoidTargets(selection, session)
+        models, attached = guessAttachmentTargets(selection, session)
 
     first_pass = True
     new_structures = []

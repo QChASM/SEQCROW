@@ -216,7 +216,7 @@ class Residue(Geometry):
             target = self.find(target)[0]
             target_chix = target.chix_atom
             for bonded_atom in target_chix.neighbors:
-                frags.append(get_fragment(bonded_atom, target, 1000))
+                frags.append(get_fragment(bonded_atom, target_chix, 1000))
             
             attached_to = None
             longest_frag = None
