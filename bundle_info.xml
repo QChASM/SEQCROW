@@ -4,7 +4,7 @@
             maxSessionVersion="1"
             package="SEQCROW"
             purePython="true"
-            version="0.14">
+            version="0.15">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
