@@ -150,7 +150,7 @@ class NormalModes(ToolInstance):
         
         #select which molecule's frequencies to visualize
         model_selector = FilereaderComboBox(self.session, otherItems=['frequency'])
-                
+
         model_selector.currentIndexChanged.connect(self.create_freq_table)
         self.model_selector = model_selector
         layout.addWidget(model_selector)

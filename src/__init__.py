@@ -19,10 +19,11 @@ class _SEQCROW_API(BundleAPI):
         from SEQCROW import settings as seqcrow_settings
         seqcrow_settings.settings = settings._SEQCROWSettings(session, "SEQCROW")
         if session.ui.is_gui:
-            from .presets import seqcrow_bse, seqcrow_s, indexLabel
+            from .presets import seqcrow_bse, seqcrow_s, seqcrow_vdw, indexLabel
 
             session.presets.add_presets("SEQCROW", {"ball-stick-endcap":lambda p=seqcrow_bse: p(session)})
             session.presets.add_presets("SEQCROW", {"sticks":lambda p=seqcrow_s: p(session)})
+            session.presets.add_presets("SEQCROW", {"VDW":lambda p=seqcrow_vdw: p(session)})
             session.presets.add_presets("SEQCROW", {"index labels":lambda p=indexLabel: p(session)})
 
             session.ui.triggers.add_handler('ready',
@@ -175,6 +176,10 @@ class _SEQCROW_API(BundleAPI):
             from .tools import AARONInputBuilder
             return AARONInputBuilder(session, ti.name)
         
+        elif ti.name == "Bond Editor":
+            from .tools import BondEditor
+            return BondEditor(session, ti.name)
+        
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)
 
@@ -269,13 +274,25 @@ class _SEQCROW_API(BundleAPI):
             from .commands.fuseRing import fuseRing, fuseRing_description
             register("fuseRing", fuseRing_description, fuseRing)
         
-        elif command_info.name == "123angle":
+        elif command_info.name == "angle":
             from .commands.angle import angle, angle_description
-            register("123angle", angle_description, angle)
+            register("angle", angle_description, angle)
         
         elif command_info.name == "dihedral":
             from .commands.dihedral import dihedral, dihedral_description
             register("dihedral", dihedral_description, dihedral)
+        
+        elif command_info.name == "tsbond":
+            from .commands.tsbond import tsbond, tsbond_description
+            register("tsbond", tsbond_description, tsbond)        
+        
+        elif command_info.name == "~tsbond":
+            from .commands.tsbond import erase_tsbond, erase_tsbond_description
+            register("~tsbond", erase_tsbond_description, erase_tsbond)
+
+        elif command_info.name == "sterimol":
+            from .commands.sterimol import sterimol, sterimol_description
+            register("sterimol", sterimol_description, sterimol)
 
     @staticmethod
     def register_selector_menus(session):

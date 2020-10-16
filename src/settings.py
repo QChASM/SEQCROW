@@ -12,8 +12,8 @@ class JobFinishedNotification(EnumOption):
     labels = ['log notification', 'log and popup notifications']
 
 class IOPresets(EnumOption):
-    values = ['None', 'Ball-Stick-Endcap', 'Sticks', 'Index Labels', 'Ball-Stick-Endcap + Index Labels', 'Sticks + Index Labels']
-    labels = ['None', 'Ball-Stick-Endcap', 'Sticks', 'Index Labels', 'Ball-Stick-Endcap + Index Labels', 'Sticks + Index Labels']
+    values = ['None', 'Ball-Stick-Endcap', 'Sticks', 'VDW', 'Index Labels', 'Ball-Stick-Endcap + Index Labels', 'Sticks + Index Labels', 'VDW + Index Labels']
+    labels = ['None', 'Ball-Stick-Endcap', 'Sticks', 'VDW', 'Index Labels', 'Ball-Stick-Endcap + Index Labels', 'Sticks + Index Labels', 'VDW + Index Labels']
 
 # 'settings' module attribute will be set by manager initialization
 class _SEQCROWSettings(Settings):

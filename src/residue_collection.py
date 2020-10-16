@@ -280,19 +280,6 @@ class ResidueCollection(Geometry):
                         continue
                     
                     atom.connected.add(atom2)
-                            
-                    
-            #for bond in molecule.bonds:
-            #    atom1 = bond.atoms[0]
-            #    atom2 = bond.atoms[1]
-            #    if self.convert_residues is not None and (atom1.residue not in self.convert_residues or atom2.residue not in self.convert_residues):
-            #        continue
-            #    
-            #    aaron_atom1 = [atom for atom in all_atoms if atom.chix_atom is atom1][0]
-            #    aaron_atom2 = [atom for atom in all_atoms if atom.chix_atom is atom2][0]
-            #
-            #    aaron_atom1.connected.add(aaron_atom2)
-            #    aaron_atom2.connected.add(aaron_atom1)
             
             #add bonds to metals
             tm_bonds = molecule.pseudobond_group(molecule.PBG_METAL_COORDINATION, create_type=None)
