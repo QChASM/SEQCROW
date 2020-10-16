@@ -9,3 +9,4 @@ from .input_generator import BuildQM
 from .job_manager_tool import JobQueue
 from .aaron_input_builder import AARONInputBuilder
 from .sterimol import Sterimol
+from .bond_editor import BondEditor

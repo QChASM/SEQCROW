@@ -4,7 +4,7 @@
             maxSessionVersion="1"
             package="SEQCROW"
             purePython="true"
-            version="0.15">
+            version="0.16">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -48,12 +48,13 @@
             * <b>rmsdAlign</b>                   - calculate RMSD and align molecular structures, similar to ChimeraX's built-in `align` command
             * <b>substitute</b>                  - add or change substituents
             * <b>fuseRing</b>                    - attach a ring to a structure
-            * <b>123angle</b>                    - print the angle defined by three atoms to the log
+            * <b>angle</b>                       - print the angle defined by three atoms to the log
             * <b>dihedral</b>                    - print the torsional angle defined by four atoms to the log
+            * <b>tsbond</b>                      - display forming/breaking bond as semi-transparent
             </Description>
             
             <Dependencies>
-                <Dependency name="ChimeraX-Core" version=">=1.1"/>
+                <Dependency name="ChimeraX-Core" version="==1.1"/>
                 <Dependency name="scipy"/>
                 <Dependency name="numpy"/>
                 <Dependency name="Send2Trash"/>
@@ -150,6 +151,7 @@
                 <ChimeraXClassifier>ChimeraX :: Tool :: Visualize Normal Modes         :: AaronTools         :: Visualize normal modes from a Gaussian output file as displacement vectors or as an animation</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Job Queue                      :: SEQCROW            :: View status of jobs</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Substituent Sterimol           :: Structure Analysis :: Calculate L, B1, and B5 Sterimol parameters for a substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Bond Editor                    :: Structure Editing  :: Draw or erase bonds</ChimeraXClassifier>
                 <!--ChimeraXClassifier>ChimeraX :: Tool :: AARON Input Builder :: AARON :: Build AARON input file</ChimeraXClassifier-->
                 
                 <ChimeraXClassifier>ChimeraX :: Selector :: tm       :: Transition metals</ChimeraXClassifier>
@@ -189,10 +191,13 @@
 
                 <!--NOTE: this synopsis will not appear when `help <command>` is used-->
                 <ChimeraXClassifier>ChimeraX :: Command :: rmsdAlign  :: Structure Analysis :: Calculate RMSD between structures</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Command :: substitute :: Structure Editing :: change substiuents</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Command :: fuseRing   :: Structure Editing :: fuse a ring</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Command :: 123angle   :: Structure Analysis :: angle defined by three atoms</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: substitute :: Structure Editing  :: change substiuents</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: fuseRing   :: Structure Editing  :: fuse a ring</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: angle      :: Structure Analysis :: angle defined by three atoms</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: dihedral   :: Structure Analysis :: dihedral angle defined by four atoms</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: tsbond     :: Structure Editing  :: display a forming/breaking bond as semi-transparent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: ~tsbond    :: Structure Editing  :: remove a forming/breaking bond</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: sterimol   :: Structure Analysis :: calculate L, B1, and B5 Sterimol parameters</ChimeraXClassifier>
        </Classifiers>
     
     <AdditionalPackages>

@@ -31,8 +31,8 @@ def seqcrow_bse(session, models=None):
     from chimerax.atomic.colors import element_color
     
 
+    apply_seqcrow_bse_lighting(session)
     if models is None:
-        apply_seqcrow_bse_lighting(session)
         models = session.models.list(type=AtomicStructure)
     elif isinstance(models, AtomicStructure):
         models = [models]
@@ -64,6 +64,41 @@ def seqcrow_bse(session, models=None):
                 atom.draw_mode = Atom.BALL_STYLE
             else:
                 atom.draw_mode = Atom.STICK_STYLE
+
+def seqcrow_vdw(session, models=None):
+    """atoms are displayed as B
+    atoms colored by Jmol colors"""
+
+    from AaronTools.const import VDW_RADII
+    from chimerax.atomic import AtomicStructure, Atom
+    from chimerax.atomic.colors import element_color
+    
+
+    apply_seqcrow_bse_lighting(session)
+    if models is None:
+        models = session.models.list(type=AtomicStructure)
+    elif isinstance(models, AtomicStructure):
+        models = [models]
+    
+    for m in models:
+        m.ball_scale = 1.0
+        for bond in m.bonds:
+            bond.halfbond = True
+            bond.radius = 0.16
+            bond.hide = False
+            
+        for atom in m.atoms:
+            ele = atom.element.name
+            color = element_color(atom.element.number)
+            if hasattr(atom, "ghost"):
+                color = tuple(*color, atom.color[-1])
+                
+            atom.color = color
+            
+            if ele in VDW_RADII:
+                atom.radius = VDW_RADII[ele]
+            
+            atom.draw_mode = Atom.BALL_STYLE
 
 def apply_seqcrow_s_lighting(session):
     view = session.main_view

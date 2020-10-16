@@ -55,6 +55,9 @@ class FileReaderManager(ProviderManager):
                     if "Sticks" in preset:
                         from SEQCROW.presets import seqcrow_s
                         seqcrow_s(model.session, models=model)
+                    if "VDW" in preset:
+                        from SEQCROW.presets import seqcrow_vdw
+                        seqcrow_vdw(model.session, models=model)
                     if "Index Labels" in preset:
                         from SEQCROW.presets import indexLabel
                         indexLabel(model.session, models=model)

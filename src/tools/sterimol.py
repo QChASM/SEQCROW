@@ -1,14 +1,10 @@
 import os
-import numpy as np
 
 from chimerax.core.tools import ToolInstance
 from chimerax.atomic import selected_atoms
-from chimerax.bild.bild import read_bild
 from chimerax.core.configfile import Value
 from chimerax.core.commands.cli import BoolArg
 from chimerax.core.settings import Settings
-
-from io import BytesIO
 
 from PyQt5.Qt import QClipboard
 from PyQt5.QtCore import Qt
@@ -21,7 +17,7 @@ from AaronTools.substituent import Substituent
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.finders import AtomSpec
-
+from SEQCROW.commands.sterimol import sterimol as sterimol_cmd
 
 class _SterimolSettings(Settings):
 
@@ -149,85 +145,17 @@ class Sterimol(ToolInstance):
         self.tool_window.manage(None)
 
     def calc_sterimol(self, *args):
-        selection = selected_atoms(self.session)
-        if len(selection) == 0:
-            self.session.logger.warning("nothing selected")
-            return
-        
-        model = selection[0].structure
-        
-        end = None
-
-        for atom in selection:
-            for bond in atom.bonds:
-                atom2 = bond.other_atom(atom)
-                if atom2 not in selection:
-                    if end is not None:
-                        self.session.logger.error("substituent can only have one bond to the rest of the molecule")
-                        return
-                    end = atom2
-
-
-        if end is None:
-            self.session.logger.error("atom the substituent is attached to must not be selected")
-
         self.settings.radii = self.radii_option.currentText()
         self.settings.display_radii = self.display_radii.checkState() == Qt.Checked
         self.settings.display_vectors = self.display_vectors.checkState() == Qt.Checked
 
-        convert_residues = set(atom.residue for atom in selection)
-        rescol = ResidueCollection(model, convert_residues=convert_residues)
-        substituent_atoms = rescol.find([AtomSpec(atom.atomspec) for atom in selection])
-        end_atom = rescol.find_exact(AtomSpec(end.atomspec))[0]
-        sub = Substituent(substituent_atoms, end=end_atom, detect=False)
-        
-        radii = self.radii_option.currentText().lower()
-        
-        l_start, l_end = sub.sterimol("L", return_vector=True, radii=radii)
-        l = np.linalg.norm(l_end - l_start)
-
-        b1_start, b1_end = sub.sterimol("B1", return_vector=True, radii=radii)
-        b1 = np.linalg.norm(b1_end - b1_start)
-        
-        b5_start, b5_end = sub.sterimol("B5", return_vector=True, radii=radii)
-        b5 = np.linalg.norm(b5_end - b5_start)
-        
-        s = ""
-        if self.display_vectors.checkState() == Qt.Checked:
-            s += ".color black\n"
-            s += ".note Sterimol B1\n"
-            s += ".arrow %6.3f %6.3f %6.3f   %6.3f %6.3f %6.3f   0.1 0.25 %f\n" % (*b1_start, *b1_end, b1/(b1 + 0.75))
-            s += ".color red\n"
-            s += ".note Sterimol B5\n"
-            s += ".arrow %6.3f %6.3f %6.3f   %6.3f %6.3f %6.3f   0.1 0.25 %f\n" % (*b5_start, *b5_end, b5/(b5 + 0.75))
-            s += ".color blue\n"
-            s += ".note Sterimol L\n"
-            s += ".arrow %6.3f %6.3f %6.3f   %6.3f %6.3f %6.3f   0.1 0.25 %f\n" % (*l_start, *l_end, l/(l + 0.75))
-        
-        if self.display_radii.checkState() == Qt.Checked:
-            s += ".note radii\n"
-            s += ".transparency 75\n"
-            color = None
-            for atom in selection:
-                if radii == "umn":
-                    r = VDW_RADII[atom.element.name]
-                elif radii == "bondi":
-                    r = BONDI_RADII[atom.element.name]
-                
-                if color is None or atom.color != color:
-                    color = atom.color
-                    rgb = [x/255. for x in atom.color]
-                    rgb.pop(-1)
-                    
-                    s += ".color %f %f %f\n" % tuple(rgb)
-                
-                s += ".sphere %f %f %f %f\n" % (*atom.coord, r)
-        
-        if self.display_radii.checkState() == Qt.Checked or self.display_vectors.checkState() == Qt.Checked:
-            stream = BytesIO(bytes(s, "utf-8"))
-            bild_obj, status = read_bild(self.session, stream, "Sterimol")
-            
-            self.session.models.add(bild_obj, parent=model)
+        l, b1, b5 = sterimol_cmd(self.session, 
+                                 selected_atoms(self.session), 
+                                 radii=self.radii_option.currentText(),
+                                 showVectors=self.display_vectors.checkState() == Qt.Checked,
+                                 showRadii=self.display_radii.checkState() == Qt.Checked,
+                                 return_values=True,
+                    )
         
         self.l_box.setText("%.2f" % l)
         self.b1_box.setText("%.2f" % b1)
