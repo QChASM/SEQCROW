@@ -24,17 +24,20 @@ substitute_description = CmdDesc(required=[("selection", AtomsArg)], \
                                  synopsis="modify substituents")
 
 
-def guessAttachmentTargets(selection, session):
+def guessAttachmentTargets(selection, session, allow_adjacent=True):
     models = {}
     
     for atom in selection:        
         if any(bonded_atom in selection for bonded_atom in atom.neighbors):
-            try:
-                models, attached = avoidTargets(selection)
-                session.logger.warning("two adjacent atoms are both selected; use \"guessAttachment true\"")
-                return models, attached
-            except:
-                pass
+            if allow_adjacent:
+                try:
+                    models, attached = avoidTargets(selection)
+                    session.logger.warning("two adjacent atoms are both selected; use \"guessAttachment true\"")
+                    return models, attached
+                except:
+                    pass
+            else:
+                raise RuntimeError("cannot select adjacent atoms")
 
         if atom.structure not in models:
             models[atom.structure] = {atom.residue:[atom]}

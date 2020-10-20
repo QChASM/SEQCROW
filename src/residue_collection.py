@@ -8,7 +8,7 @@ from AaronTools.geometry import Geometry
 from AaronTools.ring import Ring
 from AaronTools.finders import BondedTo
 
-from chimerax.atomic import AtomicStructure
+from chimerax.atomic import AtomicStructure, Element
 from chimerax.atomic import Residue as ChimeraResidue
 from chimerax.atomic import Atom as ChixAtom
 from chimerax.atomic.colors import element_color
@@ -46,7 +46,7 @@ class Residue(Geometry):
             
             self.chix_residue = geom
             
-            super().__init__(aaron_atoms, name=geom.name, **kwargs)
+            super().__init__(aaron_atoms, name=geom.name, refresh_connected=False, **kwargs)
             if resnum is None:
                 self.resnum = geom.number
             else:
@@ -136,6 +136,10 @@ class Residue(Geometry):
                 new_atoms.append(new_atom)
 
             else:
+                if atom.chix_atom.element.name != atom.element:
+                    atom.chix_atom.element = Element.get_element(atom.element)
+                    atom.chix_atom.color = element_color(atom.chix_atom.element.number)
+
                 atom.chix_atom.coord = atom.coords
                 known_atoms.append(atom.chix_atom)
                 

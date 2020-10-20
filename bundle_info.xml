@@ -4,7 +4,7 @@
             maxSessionVersion="1"
             package="SEQCROW"
             purePython="true"
-            version="0.16">
+            version="0.17">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -54,7 +54,7 @@
             </Description>
             
             <Dependencies>
-                <Dependency name="ChimeraX-Core" version="==1.1"/>
+                <Dependency name="ChimeraX-Core" version="~=1.1"/>
                 <Dependency name="scipy"/>
                 <Dependency name="numpy"/>
                 <Dependency name="Send2Trash"/>
