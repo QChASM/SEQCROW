@@ -21,7 +21,7 @@ def apply_seqcrow_bse_lighting(session):
     view.update_lighting = True
     view.redraw_needed = True
 
-def seqcrow_bse(session, models=None):
+def seqcrow_bse(session, models=None, atoms=None):
     """non-H atoms are displayed with B&S
     H atoms are displayed with S
     atoms colored by Jmol colors"""
@@ -29,34 +29,46 @@ def seqcrow_bse(session, models=None):
     from AaronTools.const import RADII
     from chimerax.atomic import AtomicStructure, Atom, Bond
     from chimerax.atomic.colors import element_color
-    
 
-    apply_seqcrow_bse_lighting(session)
+    if atoms is None:
+        apply_seqcrow_bse_lighting(session)
+
     if models is None:
-        models = session.models.list(type=AtomicStructure)
+        if atoms is None:
+            models = session.models.list(type=AtomicStructure)
+        else:
+            models = list(set([atom.structure for atom in atoms]))
     elif isinstance(models, AtomicStructure):
         models = [models]
     
     for m in models:
-        m.ball_scale = 0.4
+        if atoms is None:
+            m.ball_scale = 0.4
+        
+        if atoms is None:
+            atom_list = m.atoms
+        else:
+            atom_list = [atom for atom in atoms if (atom.structure is m or atom.residue is m)]
+        
         for bond in m.bonds:
-            bond.halfbond = True
-            bond.radius = 0.16
-            bond.hide = False
-            
-        for atom in m.atoms:
+            if any(a in atom_list for a in bond.atoms):
+                bond.halfbond = True
+                bond.radius = 0.16
+                bond.hide = False
+        
+        for atom in atom_list:
             ele = atom.element.name
             color = element_color(atom.element.number)
             if hasattr(atom, "ghost"):
                 color = tuple(*color, atom.color[-1])
                 
             atom.color = color
-            
+
             if ele in RADII:
                 #AaronTools has bonding radii, maybe I should use vdw?
                 #check to see how necessary this is
                 atom.radius = RADII[ele]
-            
+
             if ele != 'H':
                 atom.draw_mode = Atom.BALL_STYLE
             elif len(atom.neighbors) > 1:
@@ -65,7 +77,7 @@ def seqcrow_bse(session, models=None):
             else:
                 atom.draw_mode = Atom.STICK_STYLE
 
-def seqcrow_vdw(session, models=None):
+def seqcrow_vdw(session, models=None, atoms=None):
     """atoms are displayed as B
     atoms colored by Jmol colors"""
 
@@ -74,20 +86,34 @@ def seqcrow_vdw(session, models=None):
     from chimerax.atomic.colors import element_color
     
 
-    apply_seqcrow_bse_lighting(session)
+
+    if atoms is None:
+        apply_seqcrow_bse_lighting(session)
+
     if models is None:
-        models = session.models.list(type=AtomicStructure)
+        if atoms is None:
+            models = session.models.list(type=AtomicStructure)
+        else:
+            models = list(set([atom.structure for atom in atoms]))
     elif isinstance(models, AtomicStructure):
         models = [models]
     
     for m in models:
-        m.ball_scale = 1.0
+        if atoms is None:
+            m.ball_scale = 1.0
+
+        if atoms is None:
+            atom_list = m.atoms
+        else:
+            atom_list = [atom for atom in atoms if atom.structure is m]
+        
         for bond in m.bonds:
-            bond.halfbond = True
-            bond.radius = 0.16
-            bond.hide = False
-            
-        for atom in m.atoms:
+            if any(a in atom_list for a in bond.atoms):
+                bond.halfbond = True
+                bond.radius = 0.16
+                bond.hide = False
+                
+        for atom in atom_list:
             ele = atom.element.name
             color = element_color(atom.element.number)
             if hasattr(atom, "ghost"):
@@ -123,7 +149,7 @@ def apply_seqcrow_s_lighting(session):
     view.update_lighting = True
     view.redraw_needed = True
     
-def seqcrow_s(session, models=None):
+def seqcrow_s(session, models=None, atoms=None):
     """atoms are represented with sticks
     atoms colored by Jmol colors"""
 
@@ -131,20 +157,33 @@ def seqcrow_s(session, models=None):
     from chimerax.atomic import AtomicStructure, Atom, Bond
     from chimerax.atomic.colors import element_color
 
-    if models is None:
+    if atoms is None:
         apply_seqcrow_s_lighting(session)
-        models = session.models.list(type=AtomicStructure)
+
+    if models is None:
+        if atoms is None:
+            models = session.models.list(type=AtomicStructure)
+        else:
+            models = list(set([atom.structure for atom in atoms]))
     elif isinstance(models, AtomicStructure):
         models = [models]
     
     for m in models:
-        m.ball_scale = 0.625
+        if atoms is None:
+            m.ball_scale = 0.625
+
+        if atoms is None:
+            atom_list = m.atoms
+        else:
+            atom_list = [atom for atom in atoms if atom.structure is m]
+        
         for bond in m.bonds:
-            bond.halfbond = True
-            bond.radius = 0.25
-            bond.hide = False
-            
-        for atom in m.atoms:
+            if any(a in atom_list for a in bond.atoms):
+                bond.halfbond = True
+                bond.radius = 0.25
+                bond.hide = False
+                
+        for atom in atom_list:
             ele = atom.element.name
             color = element_color(atom.element.number)
             if hasattr(atom, "ghost"):

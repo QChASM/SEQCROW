@@ -24,13 +24,15 @@ from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.libraries import SubstituentTable, LigandTable, RingTable
 from SEQCROW.commands.substitute import guessAttachmentTargets
 from SEQCROW.finders import AtomSpec
-from SEQCROW.widgets import PeriodicTable
+from SEQCROW.widgets import PeriodicTable, ModelComboBox
+from SEQCROW.managers.filereader_manager import apply_seqcrow_preset
 
 
 class _EditStructureSettings(Settings):
     AUTO_SAVE = {'modify': Value(True, BoolArg), 
                  'guess': Value(True, BoolArg),
                  'minimize': Value(False, BoolArg), 
+                 'change_bonds': Value(True, BoolArg), 
                 }
 
 
@@ -233,14 +235,18 @@ class EditStructure(ToolInstance):
         self.vsepr.insertSeparator(0)
         changeelement_layout.addRow("VSEPR:", self.vsepr)
         
+        self.change_bonds = QCheckBox()
+        self.change_bonds.setChecked(self.settings.change_bonds)
+        changeelement_layout.addRow("adjust bond lengths:", self.change_bonds)
+        
         change_element_button = QPushButton("change selected elements")
         change_element_button.clicked.connect(self.do_change_element)
         changeelement_layout.addRow(change_element_button)
 
-        start_structure_button = QPushButton("start structure")
+        start_structure_button = QPushButton("place in:")
+        self.model_selector = ModelComboBox(self.session, addNew=True)
         start_structure_button.clicked.connect(self.do_new_atom)
-        changeelement_layout.addRow(start_structure_button)
-
+        changeelement_layout.addRow(start_structure_button, self.model_selector)
 
         self.alchemy_tabs.addTab(substitute_tab, "substitute")
         self.alchemy_tabs.addTab(maplig_tab, "swap ligand")
@@ -397,7 +403,8 @@ class EditStructure(ToolInstance):
     
     def do_change_element(self):
         element = self.element.text()
-        
+        adjust_bonds = self.change_bonds.isChecked()
+        self.settings.change_bonds = adjust_bonds
         vsepr = self.vsepr.currentText()
         
         if vsepr == "do not change":
@@ -457,13 +464,18 @@ class EditStructure(ToolInstance):
                         change_Hs = goal - cur_bonds
                         adjust_hydrogens = (change_Hs, vsepr)
 
-                    residue.change_element(targ, element, adjust_bonds=True, adjust_hydrogens=adjust_hydrogens)
+                    residue.change_element(targ, 
+                                           element, 
+                                           adjust_bonds=adjust_bonds, 
+                                           adjust_hydrogens=adjust_hydrogens,
+                    )
                 
                 residue.update_chix(res)    
     
     def do_new_atom(self):
         element = self.element.text()
-        
+        adjust_bonds = self.change_bonds.isChecked()
+        self.settings.change_bonds = adjust_bonds
         vsepr = self.vsepr.currentText()
         
         if vsepr == "do not change":
@@ -509,11 +521,28 @@ class EditStructure(ToolInstance):
             change_Hs = goal
             adjust_hydrogens = (change_Hs, vsepr)
         
-        rescol.change_element(atom, element, adjust_bonds=True, adjust_hydrogens=adjust_hydrogens)
+        rescol.change_element(atom, 
+                              element, 
+                              adjust_bonds=adjust_bonds, 
+                              adjust_hydrogens=adjust_hydrogens,
+        )
         
-        chix = rescol.get_chimera(self.session)
-        self.session.models.add([chix])
+        model = self.model_selector.currentData()
+        if model is None:
+            chix = rescol.get_chimera(self.session)
+            self.session.models.add([chix])
+            apply_seqcrow_preset(chix, fallback="Ball-Stick-Endcap")
+            self.model_selector.setCurrentIndex(self.model_selector.count()-1)
 
+        else:
+            res = model.new_residue("new", "a", len(model.residues)+1)
+            rescol.residues[0].update_chix(res)
+            run(self.session, "select add %s" % " ".join([atom.atomspec for atom in res.atoms]))
+    
+    def delete(self):
+        self.model_selector.deleteLater()
+
+        return super().delete()
     
 class SubstituentSelection(ChildToolWindow):
     def __init__(self, tool_instance, title, textBox=None, **kwargs):

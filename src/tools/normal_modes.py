@@ -14,7 +14,7 @@ from chimerax.core.commands import run
 from AaronTools.atoms import Atom
 from AaronTools.const import PHYSICAL
 from AaronTools.geometry import Geometry
-from AaronTools.trajectory import Pathway
+from AaronTools.pathway import Pathway
 
 from io import BytesIO
 

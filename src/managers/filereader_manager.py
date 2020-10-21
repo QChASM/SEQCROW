@@ -1,3 +1,5 @@
+from chimerax.atomic import AtomicStructure
+from chimerax.core.commands import run
 from chimerax.core.toolshed import ProviderManager
 from chimerax.core.models import REMOVE_MODELS, ADD_MODELS
 from chimerax.core.triggerset import TriggerSet
@@ -48,19 +50,10 @@ class FileReaderManager(ProviderManager):
         for model in models:
             if model in self.models:
                 if model.session.ui.is_gui:
-                    preset = model.session.seqcrow_settings.settings.SEQCROW_IO_PRESET
-                    if "Ball-Stick-Endcap" in preset:
-                        from SEQCROW.presets import seqcrow_bse
-                        seqcrow_bse(model.session, models=model)
-                    if "Sticks" in preset:
-                        from SEQCROW.presets import seqcrow_s
-                        seqcrow_s(model.session, models=model)
-                    if "VDW" in preset:
-                        from SEQCROW.presets import seqcrow_vdw
-                        seqcrow_vdw(model.session, models=model)
-                    if "Index Labels" in preset:
-                        from SEQCROW.presets import indexLabel
-                        indexLabel(model.session, models=model)
+                    apply_seqcrow_preset(model)
+            
+            elif isinstance(model, AtomicStructure):
+                apply_non_seqcrow_preset(model)
 
     def add_filereader(self, trigger_name, models_and_filereaders):
         """add models with filereader data to our list"""
@@ -137,4 +130,28 @@ class FileReaderManager(ProviderManager):
                     out[mdl].append(fr)
                     
         return out
+
+def apply_seqcrow_preset(model, atoms=None, fallback=None):
+    preset = model.session.seqcrow_settings.settings.SEQCROW_IO_PRESET
+    if fallback is not None and preset == "None":
+        preset = fallback
+    if "Ball-Stick-Endcap" in preset:
+        from SEQCROW.presets import seqcrow_bse
+        seqcrow_bse(model.session, models=[model], atoms=atoms)
+    if "Sticks" in preset:
+        from SEQCROW.presets import seqcrow_s
+        seqcrow_s(model.session, models=[model], atoms=atoms)
+    if "VDW" in preset:
+        from SEQCROW.presets import seqcrow_vdw
+        seqcrow_vdw(model.session, models=[model], atoms=atoms)
+    if "Index Labels" in preset:
+        from SEQCROW.presets import indexLabel
+        indexLabel(model.session, models=[model])
+
+def apply_non_seqcrow_preset(model):
+    preset = model.session.seqcrow_settings.settings.NON_SEQCROW_IO_PRESET
+    atomspec = model.atomspec
+    for line in preset:
+        cmd = line.replace("<model>", atomspec)
+        run(model.session, cmd)
     

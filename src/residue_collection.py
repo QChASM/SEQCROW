@@ -14,6 +14,7 @@ from chimerax.atomic import Atom as ChixAtom
 from chimerax.atomic.colors import element_color
 
 from SEQCROW.finders import AtomSpec
+from SEQCROW.managers.filereader_manager import apply_seqcrow_preset
 
 from warnings import warn
 
@@ -126,8 +127,6 @@ class Residue(Geometry):
                 atom_name = "new"
                 
                 new_atom = chix_residue.structure.new_atom(atom_name, atom.element)
-                new_atom.draw_mode = ChixAtom.BALL_STYLE
-                new_atom.color = element_color(new_atom.element.number)
                 new_atom.coord = atom.coords
                 
                 chix_residue.add_atom(new_atom)
@@ -138,7 +137,7 @@ class Residue(Geometry):
             else:
                 if atom.chix_atom.element.name != atom.element:
                     atom.chix_atom.element = Element.get_element(atom.element)
-                    atom.chix_atom.color = element_color(atom.chix_atom.element.number)
+                    new_atoms.append(atom.chix_atom)
 
                 atom.chix_atom.coord = atom.coords
                 known_atoms.append(atom.chix_atom)
@@ -163,6 +162,8 @@ class Residue(Geometry):
         for atom in chix_residue.atoms:
             if atom.serial_number == -1:
                 atom.serial_number = atom.structure.atoms.index(atom) + 1
+        
+        apply_seqcrow_preset(chix_residue.structure, atoms=new_atoms, fallback="Ball-Stick-Endcap")
 
     def refresh_chix_connected(self, chix_residue):
         known_bonds = []
@@ -297,7 +298,7 @@ class ResidueCollection(Geometry):
                     aaron_atom2 = self.find(atom2.atomspec)[0]
                     aaron_atom1.connected.add(aaron_atom2)
                     aaron_atom2.connected.add(aaron_atom1)
-                    
+
         else:
             #assume whatever we got is something AaronTools can turn into a Geometry
             super().__init__(molecule, **kwargs)
