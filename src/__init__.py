@@ -242,6 +242,17 @@ class _SEQCROW_API(BundleAPI):
                     def open_args(self):
                         return {'coordsets': BoolArg}
                         
+                return Info()            
+            
+            elif name == "FCHK file":
+                class Info(OpenerInfo):
+                    def open(self, session, data, file_name, **kw):
+                        return open_aarontools(session, data, file_name, format_name="FCHK file", **kw)
+            
+                    @property
+                    def open_args(self):
+                        return {}
+                        
                 return Info()
                 
         elif mgr == session.save_command:

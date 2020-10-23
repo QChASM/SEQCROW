@@ -1,10 +1,13 @@
-from chimerax.atomic import AtomicStructure
 from chimerax.core.commands import run
 from chimerax.core.toolshed import ProviderManager
 from chimerax.core.models import REMOVE_MODELS, ADD_MODELS
 from chimerax.core.triggerset import TriggerSet
 
 from inspect import signature
+
+from os import path
+
+import re
 
 FILEREADER_CHANGE = "AaronTools file opened or closed"
 FILEREADER_REMOVED = "AaronTools file closed"
@@ -52,8 +55,7 @@ class FileReaderManager(ProviderManager):
                 if model.session.ui.is_gui:
                     apply_seqcrow_preset(model)
             
-            elif isinstance(model, AtomicStructure):
-                apply_non_seqcrow_preset(model)
+            apply_non_seqcrow_preset(model)
 
     def add_filereader(self, trigger_name, models_and_filereaders):
         """add models with filereader data to our list"""
@@ -148,10 +150,26 @@ def apply_seqcrow_preset(model, atoms=None, fallback=None):
         from SEQCROW.presets import indexLabel
         indexLabel(model.session, models=[model])
 
+fmt_only = re.compile("(\S*):(.*)")
+
 def apply_non_seqcrow_preset(model):
     preset = model.session.seqcrow_settings.settings.NON_SEQCROW_IO_PRESET
     atomspec = model.atomspec
     for line in preset:
         cmd = line.replace("<model>", atomspec)
-        run(model.session, cmd)
+        fmt = fmt_only.match(cmd)
+        if fmt is not None and hasattr(model, "filename") and isinstance(model.filename, str):
+            file_types = fmt.group(1).split(",")
+            root, ext = path.splitext(model.filename)
+            ext = ext.strip(".")
+            if any(ext.lower() == e.lower() or model.name.lower().startswith("%s:" % e.lower()) for e in file_types):
+                run(model.session, fmt.group(2).strip())
+        
+        elif fmt is not None:
+            file_types = fmt.group(1).split(",")
+            if any(model.name.lower().startswith("%s:" % e.lower()) for e in file_types):
+                run(model.session, fmt.group(2).strip())
+            
+        else:
+            run(model.session, cmd)
     

@@ -144,10 +144,17 @@ class EditStructure(ToolInstance):
         maplig_button = QPushButton("swap ligand of current selection")
         maplig_button.clicked.connect(self.do_maplig)
         maplig_layout.addWidget(maplig_button, 2, 0, 1, 3, Qt.AlignTop)
-        
+
+        start_structure_button = QPushButton("place in:")
+        self.lig_model_selector = ModelComboBox(self.session, addNew=True)
+        start_structure_button.clicked.connect(self.do_new_lig)
+        maplig_layout.addWidget(start_structure_button, 3, 0, 1, 1, Qt.AlignTop)
+        maplig_layout.addWidget(self.lig_model_selector, 3, 1, 1, 2, Qt.AlignTop)
+
         maplig_layout.setRowStretch(0, 0)
         maplig_layout.setRowStretch(1, 0)
-        maplig_layout.setRowStretch(2, 1)
+        maplig_layout.setRowStretch(2, 0)
+        maplig_layout.setRowStretch(3, 1)
         
         
         #close ring
@@ -186,10 +193,17 @@ class EditStructure(ToolInstance):
         closering_button.clicked.connect(self.do_fusering)
         closering_layout.addWidget(closering_button, 3, 0, 1, 3, Qt.AlignTop)
 
+        start_structure_button = QPushButton("place in:")
+        self.ring_model_selector = ModelComboBox(self.session, addNew=True)
+        start_structure_button.clicked.connect(self.do_new_ring)
+        closering_layout.addWidget(start_structure_button, 4, 0, 1, 1, Qt.AlignTop)
+        closering_layout.addWidget(self.ring_model_selector, 4, 1, 1, 2, Qt.AlignTop)
+
         closering_layout.setRowStretch(0, 0)
         closering_layout.setRowStretch(1, 0)
         closering_layout.setRowStretch(2, 0)
-        closering_layout.setRowStretch(3, 1)
+        closering_layout.setRowStretch(3, 0)
+        closering_layout.setRowStretch(4, 1)
 
 
         #change element
@@ -472,6 +486,46 @@ class EditStructure(ToolInstance):
                 
                 residue.update_chix(res)    
     
+    def do_new_ring(self):
+        rings = self.ringname.text()
+        
+        for ring in rings.split(","):
+            ring = ring.strip()
+            
+            rescol = ResidueCollection(Ring(ring))
+        
+            model = self.ring_model_selector.currentData()
+            if model is None:
+                chix = rescol.get_chimera(self.session)
+                self.session.models.add([chix])
+                apply_seqcrow_preset(chix, fallback="Ball-Stick-Endcap")
+                self.ring_model_selector.setCurrentIndex(self.ring_model_selector.count()-1)
+    
+            else:
+                res = model.new_residue("new", "a", len(model.residues)+1)
+                rescol.residues[0].update_chix(res)
+                run(self.session, "select add %s" % " ".join([atom.atomspec for atom in res.atoms]))
+    
+    def do_new_lig(self):
+        ligands = self.ligname.text()
+        
+        for lig in ligands.split(","):
+            lig = lig.strip()
+            
+            rescol = ResidueCollection(Component(lig))
+        
+            model = self.lig_model_selector.currentData()
+            if model is None:
+                chix = rescol.get_chimera(self.session)
+                self.session.models.add([chix])
+                apply_seqcrow_preset(chix, fallback="Ball-Stick-Endcap")
+                self.lig_model_selector.setCurrentIndex(self.lig_model_selector.count()-1)
+    
+            else:
+                res = model.new_residue("new", "a", len(model.residues)+1)
+                rescol.residues[0].update_chix(res)
+                run(self.session, "select add %s" % " ".join([atom.atomspec for atom in res.atoms]))
+
     def do_new_atom(self):
         element = self.element.text()
         adjust_bonds = self.change_bonds.isChecked()
@@ -514,7 +568,7 @@ class EditStructure(ToolInstance):
             goal = 6
         
         atom = Atom(element=element, coords=[0., 0., 0.])
-        rescol = ResidueCollection([atom], name="new structure")
+        rescol = ResidueCollection([atom], name="new")
         
         adjust_hydrogens = vsepr
         if vsepr is not False:
@@ -540,6 +594,8 @@ class EditStructure(ToolInstance):
             run(self.session, "select add %s" % " ".join([atom.atomspec for atom in res.atoms]))
     
     def delete(self):
+        self.ring_model_selector.deleteLater()
+        self.lig_model_selector.deleteLater()
         self.model_selector.deleteLater()
 
         return super().delete()

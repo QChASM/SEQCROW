@@ -76,9 +76,14 @@ def register_settings_options(session):
             "Molecules opened through SEQCROW (xyz, log, etc.) will use this graphical preset"),
         
         "NON_SEQCROW_IO_PRESET" : (
-            "Preset for non-SEQCROW molecules\nuse <model> in place of model ID",
+            """commands executed when a model is added:
+use <model> in place of model ID
+prefix a command with the file type
+for it to only apply to new models
+from that file type 
+(e.g. cif: color <model>/A purple)""",
             StringsOption,
-            "opening a molecule from something besides an xyz, log, etc. file will run these commands"),
+            "opening a model will run these commands"),
     }
     
     job_settings_info = {

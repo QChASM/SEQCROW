@@ -126,6 +126,7 @@ class _InputGeneratorSettings(Settings):
                                                                                              'no_reorient':[], 
                                                                                              'no_com':[], 
                                                                                             }, \
+                                                                   PSI4_AFTER_JOB: ["fchk_writer = psi4.core.FCHKWriter(wfn)\nfchk_writer.write('output.fchk')"], \
                                              }), StringArg),
         'last_psi4_options': Value(dumps({}), StringArg),
         'last_program': Value("Gaussian", StringArg),
@@ -4698,12 +4699,12 @@ class ORCAKeywordOptions(KeywordOptions):
 
 class Psi4KeywordOptions(KeywordOptions):
     items = {'settings': PSI4_SETTINGS, \
-             'molecule': PSI4_COORDINATES, \
              'job': PSI4_JOB, \
-             'optking': PSI4_OPTKING, \
-             'before molecule': PSI4_BEFORE_GEOM, \
+             'molecule': PSI4_COORDINATES, \
              'before job': PSI4_BEFORE_JOB, \
              'after job': PSI4_AFTER_JOB, \
+             'optking': PSI4_OPTKING, \
+             'before molecule': PSI4_BEFORE_GEOM, \
              'comment': PSI4_COMMENT, \
             }
 

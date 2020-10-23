@@ -128,7 +128,7 @@ class BondEditor(ToolInstance):
         self.hbond_dashes = QSpinBox()
         self.hbond_dashes.setRange(0, 28)
         self.hbond_dashes.setSingleStep(2)
-        self.bond_radius.setSingleStep(0.005)
+        self.hbond_radius.setSingleStep(0.005)
         self.hbond_dashes.setValue(self.settings.hbond_dashes)
         hbond_options.addRow("dashes:", self.hbond_dashes)
         

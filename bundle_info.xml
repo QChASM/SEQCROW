@@ -4,7 +4,7 @@
             maxSessionVersion="1"
             package="SEQCROW"
             purePython="true"
-            version="0.17">
+            version="0.18">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -108,7 +108,15 @@
                           encoding="utf-8" 
                           nicknames="xyz" 
                           reference_url="https://en.wikipedia.org/wiki/XYZ_file_format" 
-                          synopsis="XYZ coordinate file"/>
+                          synopsis="XYZ coordinate file"/>                
+                
+                <Provider name="FCHK file" 
+                          category="Molecular structure" 
+                          suffixes=".fchk" 
+                          encoding="utf-8" 
+                          nicknames="fchk" 
+                          reference_url="http://theochem.mercer.edu/chm295/g09ur/f_formchk.htm" 
+                          synopsis="Formatted Checkpoint file"/>
             </Providers>
             
             <Providers manager="open command">
@@ -117,6 +125,7 @@
                 <Provider name="ORCA output file" want_path="false"/>
                 <Provider name="Psi4 output file" want_path="false"/>
                 <Provider name="XYZ file" want_path="false"/>
+                <Provider name="FCHK file" want_path="false"/>
             </Providers>
             
             <!--we can save Gaussian input files, but not with the save command-->
