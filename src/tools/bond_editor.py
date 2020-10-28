@@ -20,7 +20,6 @@ class _BondEditorSettings(Settings):
         "hbond_dashes":        Value(6, IntArg), 
         "hbond_radius":        Value(0.075, FloatArg), 
         "tsbond_color":        Value((0.67, 1., 1., 1.), TupleOf(FloatArg, 4), iter2str), 
-        "tsbond_halfbond":     Value(True, BoolArg), 
         "tsbond_transparency": Value(75., FloatArg),
         "tsbond_radius":       Value(0.16, FloatArg),
         "bond_color":          Value((0., 0., 0., 1.), TupleOf(FloatArg, 4), iter2str),
@@ -47,15 +46,8 @@ class BondEditor(ToolInstance):
         ts_bond_tab = QWidget()
         ts_options = QFormLayout(ts_bond_tab)
         
-        self.tsbond_halfbond = QCheckBox()
-        self.tsbond_halfbond.setChecked(self.settings.tsbond_halfbond)
-        self.tsbond_halfbond.setToolTip("each half of the bond will be colored according to the atom's color")
-        ts_options.addRow("half-bond:", self.tsbond_halfbond)
-        
         self.tsbond_color = ColorButton(has_alpha_channel=False, max_size=(16, 16))
         self.tsbond_color.set_color(self.settings.tsbond_color)
-        self.tsbond_color.setEnabled(self.tsbond_halfbond.checkState() != Qt.Checked)
-        self.tsbond_halfbond.stateChanged.connect(lambda state, widget=self.tsbond_color: self.tsbond_color.setEnabled(state != Qt.Checked))
         ts_options.addRow("color:", self.tsbond_color)
         
         self.tsbond_transparency = QSpinBox()
@@ -152,14 +144,9 @@ class BondEditor(ToolInstance):
     def run_tsbond(self, *args):
         args = ["tsbond", "sel"]
         
-        halfbond = self.tsbond_halfbond.checkState() == Qt.Checked
-        self.settings.tsbond_halfbond = halfbond
-        if halfbond:
-            args.extend(["halfbond", "true"])
-        else:
-            color = self.tsbond_color.get_color()
-            args.extend(["color", "rgb(%i, %i, %i)" % tuple(color[:-1])])
-            self.settings.tsbond_color = tuple([c/255. for c in color])
+        color = self.tsbond_color.get_color()
+        args.extend(["color", "rgb(%i, %i, %i)" % tuple(color[:-1])])
+        self.settings.tsbond_color = tuple([c/255. for c in color])
         
         radius = self.tsbond_radius.value()
         args.extend(["radius", "%.3f" % radius])

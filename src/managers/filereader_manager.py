@@ -167,7 +167,9 @@ def apply_non_seqcrow_preset(model):
         
         elif fmt is not None:
             file_types = fmt.group(1).split(",")
-            if any(model.name.lower().startswith("%s:" % e.lower()) for e in file_types):
+            root, ext = path.splitext(model.name)
+            ext = ext.strip(".")
+            if any(ext.lower() == e.lower() or model.name.lower().startswith("%s:" % e.lower()) for e in file_types):
                 run(model.session, fmt.group(2).strip())
             
         else:

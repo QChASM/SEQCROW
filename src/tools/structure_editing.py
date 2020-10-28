@@ -2,7 +2,7 @@ from AaronTools.substituent import Substituent
 from AaronTools.component import Component
 from AaronTools.ring import Ring
 
-from chimerax.atomic import selected_atoms, selected_residues
+from chimerax.atomic import selected_atoms, selected_residues, PseudobondGroup
 from chimerax.atomic.colors import element_color
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
@@ -465,6 +465,14 @@ class EditStructure(ToolInstance):
                     for neighbor in target.neighbors:
                         if neighbor.residue not in conv_res:
                             conv_res.append(neighbor.residue)
+            
+                    for pbg in self.session.models.list(type=PseudobondGroup):
+                        for pbond in pbg.pseudobonds:
+                            if target in pbond.atoms and all(atom.structure is model for atom in pbond.atoms):
+                                other_atom = pbond.other_atom(target)
+                                if other_atom.residue not in conv_res:
+                                    conv_res.append(other_atom.residue)
+                    
             
             rescol = ResidueCollection(model, convert_residues=conv_res)
             for res in models[model]:

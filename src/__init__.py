@@ -124,7 +124,9 @@ class _SEQCROW_API(BundleAPI):
         elif any(ti.name == name for name in ["Structure Modification", \
                                             "Change Substituents", \
                                             "Swap Transition Metal Ligands", \
-                                            "Fuse Ring"]):
+                                            "Fuse Ring", \
+                                            "Change Element", \
+                                            ]):
             from .tools import EditStructure
             for tool in session.tools.list():
                 if isinstance(tool, EditStructure):
@@ -134,7 +136,9 @@ class _SEQCROW_API(BundleAPI):
                     elif ti.name == "Swap Transition Metal Ligands":
                         tool.alchemy_tabs.setCurrentIndex(1)
                     elif ti.name == "Fuse Ring":
-                        tool.alchemy_tabs.setCurrentIndex(2)
+                        tool.alchemy_tabs.setCurrentIndex(2)                    
+                    elif ti.name == "Change Element":
+                        tool.alchemy_tabs.setCurrentIndex(3)
                     break
             else:
                 tool = EditStructure(session, ti.name)
@@ -144,7 +148,9 @@ class _SEQCROW_API(BundleAPI):
                 elif ti.name == "Swap Transition Metal Ligands":
                     tool.alchemy_tabs.setCurrentIndex(1)
                 elif ti.name == "Fuse Ring":
-                    tool.alchemy_tabs.setCurrentIndex(2)
+                    tool.alchemy_tabs.setCurrentIndex(2)                
+                elif ti.name == "Change Element":
+                    tool.alchemy_tabs.setCurrentIndex(3)
 
                 return tool        
         
