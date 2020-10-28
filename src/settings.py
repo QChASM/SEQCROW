@@ -1,7 +1,7 @@
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
-from chimerax.core.commands.cli import StringArg, EnumOf
-from chimerax.ui.options import InputFolderOption, EnumOption
+from chimerax.core.commands.cli import StringArg, EnumOf, ListOf
+from chimerax.ui.options import InputFolderOption, EnumOption, StringsOption
 
 from os import getenv, path
 
@@ -29,6 +29,7 @@ class _SEQCROWSettings(Settings):
         'SEQCROW_IO_PRESET': Value('None', 
                                    EnumOf(IOPresets.values),
                                   ),
+        'NON_SEQCROW_IO_PRESET': [],
     }
 
 
@@ -73,6 +74,16 @@ def register_settings_options(session):
             "Preset for molecules opened with SEQCROW", 
             IOPresets, 
             "Molecules opened through SEQCROW (xyz, log, etc.) will use this graphical preset"),
+        
+        "NON_SEQCROW_IO_PRESET" : (
+            """commands executed when a model is added:
+use <model> in place of model ID
+prefix a command with the file type
+for it to only apply to new models
+from that file type 
+(e.g. cif: color <model>/A purple)""",
+            StringsOption,
+            "opening a model will run these commands"),
     }
     
     job_settings_info = {

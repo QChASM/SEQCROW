@@ -14,7 +14,9 @@ class ModelComboBox(QComboBox):
     items will appear as "model.name (model id)"
     a tool's delete method should call deleteLater on instances of ModelComboBox
     """
-    def __init__(self, session, *args, modelTypes=[AtomicStructure], **kwargs):
+    def __init__(self, session, *args, modelTypes=[AtomicStructure], addNew=False, **kwargs):
+        """modelTypes - list(model subclasses) - types to show in the combobox
+        addNew        - bool - show "add new" in combobox"""
         super().__init__(*args, **kwargs)
         
         self._session = session
@@ -23,6 +25,9 @@ class ModelComboBox(QComboBox):
         self._del_handler = session.triggers.add_handler(REMOVE_MODELS, self._del_models)
     
         self.setSizeAdjustPolicy(self.AdjustToMinimumContentsLengthWithIcon)
+        
+        if addNew:
+            self.addItem("new structure", None)
     
         self._refresh_models()
 
@@ -50,7 +55,7 @@ class ModelComboBox(QComboBox):
             valid_mdls.extend(self._session.models.list(type=x))
 
         for i in range(self.count(), -1, -1):
-            if self.itemData(i) not in valid_mdls:
+            if self.itemData(i) not in valid_mdls and self.itemData(i) is not None:
                 self.removeItem(i)
         
         for x in self._mdl_types:

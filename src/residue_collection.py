@@ -8,12 +8,13 @@ from AaronTools.geometry import Geometry
 from AaronTools.ring import Ring
 from AaronTools.finders import BondedTo
 
-from chimerax.atomic import AtomicStructure
+from chimerax.atomic import AtomicStructure, Element
 from chimerax.atomic import Residue as ChimeraResidue
 from chimerax.atomic import Atom as ChixAtom
 from chimerax.atomic.colors import element_color
 
 from SEQCROW.finders import AtomSpec
+from SEQCROW.managers.filereader_manager import apply_seqcrow_preset
 
 from warnings import warn
 
@@ -46,7 +47,7 @@ class Residue(Geometry):
             
             self.chix_residue = geom
             
-            super().__init__(aaron_atoms, name=geom.name, **kwargs)
+            super().__init__(aaron_atoms, name=geom.name, refresh_connected=False, **kwargs)
             if resnum is None:
                 self.resnum = geom.number
             else:
@@ -126,8 +127,6 @@ class Residue(Geometry):
                 atom_name = "new"
                 
                 new_atom = chix_residue.structure.new_atom(atom_name, atom.element)
-                new_atom.draw_mode = ChixAtom.BALL_STYLE
-                new_atom.color = element_color(new_atom.element.number)
                 new_atom.coord = atom.coords
                 
                 chix_residue.add_atom(new_atom)
@@ -136,6 +135,10 @@ class Residue(Geometry):
                 new_atoms.append(new_atom)
 
             else:
+                if atom.chix_atom.element.name != atom.element:
+                    atom.chix_atom.element = Element.get_element(atom.element)
+                    new_atoms.append(atom.chix_atom)
+
                 atom.chix_atom.coord = atom.coords
                 known_atoms.append(atom.chix_atom)
                 
@@ -159,6 +162,8 @@ class Residue(Geometry):
         for atom in chix_residue.atoms:
             if atom.serial_number == -1:
                 atom.serial_number = atom.structure.atoms.index(atom) + 1
+        
+        apply_seqcrow_preset(chix_residue.structure, atoms=new_atoms, fallback="Ball-Stick-Endcap")
 
     def refresh_chix_connected(self, chix_residue):
         known_bonds = []
@@ -184,7 +189,7 @@ class Residue(Geometry):
                     #this could happen when previewing a substituent or w/e with the libadd tool
                     continue
                 
-                try:
+                if atom1 not in atom2.neighbors:
                     new_bond = chix_residue.structure.new_bond(atom1, atom2)
 
                     if any([aaron_atom.element in TMETAL for aaron_atom in [aaron_atom1, aaron_atom2]]):
@@ -193,19 +198,14 @@ class Residue(Geometry):
                         new_bond.delete()
                     else:
                         known_chix_bonds.append(new_bond)
-                except Exception as e:
-                    bond = [bond for bond in residue_bonds if atom1 in bond.atoms and atom2 in bond.atoms]
-                    if len(bond) != 1:
-                        continue
-                    else:
-                        bond = bond[0]
-                        
-                    if bond not in known_chix_bonds:
-                        known_chix_bonds.append(bond)
-                    pass
+                
+                else:
+                    bond = [b for b in atom1.bonds if atom2 in b.atoms][0]
+                    known_chix_bonds.append(bond)
         
         for bond in residue_bonds:
             if bond not in known_chix_bonds:
+                print("deleting bond %s" % str(bond))
                 bond.delete()
 
     def substitute(self, sub, target, *args, attached_to=None, **kwargs):
@@ -243,7 +243,7 @@ class Residue(Geometry):
 class ResidueCollection(Geometry):
     """geometry object used for SEQCROW to easily convert to AaronTools but keep residue info"""
     def __init__(self, molecule, convert_residues=None, **kwargs):
-        """molecule       - chimerax AtomicStructure or [AtomicStructure] or AaronTools Geometry (for easy compatibility stuff)
+        """molecule       - chimerax AtomicStructure or AaronTools Geometry (for easy compatibility stuff)
         convert_residues  - None to convert everything or [chimerax.atomic.Residue] to convert only specific residues
                             this only applies to chimerax AtomicStructures"""
         self.convert_residues = convert_residues
@@ -293,7 +293,7 @@ class ResidueCollection(Geometry):
                     aaron_atom2 = self.find(atom2.atomspec)[0]
                     aaron_atom1.connected.add(aaron_atom2)
                     aaron_atom2.connected.add(aaron_atom1)
-                    
+
         else:
             #assume whatever we got is something AaronTools can turn into a Geometry
             super().__init__(molecule, **kwargs)
@@ -483,11 +483,17 @@ class ResidueCollection(Geometry):
                     raise Exception("ResidueCollection does not correspond to AtomicStructure: \n%s\n\n%s" % \
                         (repr(self), repr(ResidueCollection(atomic_structure))))
                     
+        known_bonds = []
         for bond in atomic_structure.bonds:
             if self.convert_residues is None or all(atom.residue in self.convert_residues for atom in bond.atoms):
-                bond.delete()
+                a1, a2 = bond.atoms
+                aaron_atom1 = self.find_exact(AtomSpec(a1.atomspec))[0]
+                aaron_atom2 = self.find_exact(AtomSpec(a2.atomspec))[0]
+                if aaron_atom1 in aaron_atom2.connected:
+                    known_bonds.append(sorted((aaron_atom1, aaron_atom2,)))
+                else:
+                    bond.delete()
 
-        known_bonds = []
         for i, aaron_atom1 in enumerate(self.atoms):
             atom1 = [atom for atom in atomic_structure.atoms if aaron_atom1.chix_atom is atom][0]
 

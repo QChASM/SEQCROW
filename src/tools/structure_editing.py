@@ -2,7 +2,8 @@ from AaronTools.substituent import Substituent
 from AaronTools.component import Component
 from AaronTools.ring import Ring
 
-from chimerax.atomic import selected_atoms, selected_residues
+from chimerax.atomic import selected_atoms, selected_residues, PseudobondGroup
+from chimerax.atomic.colors import element_color
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.core.settings import Settings
@@ -16,15 +17,22 @@ from PyQt5.QtWidgets import QLabel, QLineEdit, QGridLayout, QPushButton, QTabWid
                             QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, \
                             QFormLayout, QCheckBox, QCompleter
 
+from AaronTools.const import ELEMENTS
+from AaronTools.atoms import Atom
+
 from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.libraries import SubstituentTable, LigandTable, RingTable
-
+from SEQCROW.commands.substitute import guessAttachmentTargets
+from SEQCROW.finders import AtomSpec
+from SEQCROW.widgets import PeriodicTable, ModelComboBox
+from SEQCROW.managers.filereader_manager import apply_seqcrow_preset
 
 
 class _EditStructureSettings(Settings):
     AUTO_SAVE = {'modify': Value(True, BoolArg), 
                  'guess': Value(True, BoolArg),
                  'minimize': Value(False, BoolArg), 
+                 'change_bonds': Value(True, BoolArg), 
                 }
 
 
@@ -50,143 +58,214 @@ class EditStructure(ToolInstance):
         self.alchemy_tabs = QTabWidget()
         
         #substitute
-        self.substitute_tab = QWidget()
-        self.substitute_layout = QGridLayout(self.substitute_tab) 
+        substitute_tab = QWidget()
+        substitute_layout = QGridLayout(substitute_tab) 
 
         sublabel = QLabel("substituent name:")
-        self.substitute_layout.addWidget(sublabel, 0, 0, Qt.AlignVCenter)
+        substitute_layout.addWidget(sublabel, 0, 0, Qt.AlignVCenter)
         
         self.subname = QLineEdit()
         sub_completer = NameCompleter(Substituent.list(), self.subname)
         self.subname.setCompleter(sub_completer)
         self.subname.setToolTip("name of substituent in the AaronTools library or your personal library\nseparate names with commas and uncheck 'modify selected structure' to create several structures")
-        self.substitute_layout.addWidget(self.subname, 0, 1, Qt.AlignVCenter)
+        substitute_layout.addWidget(self.subname, 0, 1, Qt.AlignVCenter)
         
         open_sub_lib = QPushButton("from library...")
         open_sub_lib.clicked.connect(self.open_sub_selector)
-        self.substitute_layout.addWidget(open_sub_lib, 0, 2, Qt.AlignTop)        
+        substitute_layout.addWidget(open_sub_lib, 0, 2, Qt.AlignTop)        
         
-        self.substitute_layout.addWidget(QLabel("modify selected structure:"), 1, 0, 1, 1, Qt.AlignVCenter)
+        substitute_layout.addWidget(QLabel("modify selected structure:"), 1, 0, 1, 1, Qt.AlignVCenter)
         
         self.close_previous_sub = QCheckBox()
         self.close_previous_sub.setToolTip("checked: selected structure will be modified\nunchecked: new model will be created for the modified structure")
         self.close_previous_sub.setChecked(self.settings.modify)
         self.close_previous_sub.stateChanged.connect(self.close_previous_change)
-        self.substitute_layout.addWidget(self.close_previous_sub, 1, 1, 1, 2, Qt.AlignTop)    
+        substitute_layout.addWidget(self.close_previous_sub, 1, 1, 1, 2, Qt.AlignTop)    
         
-        self.substitute_layout.addWidget(QLabel("relax substituent:"), 2, 0, 1, 1, Qt.AlignVCenter)
+        substitute_layout.addWidget(QLabel("relax substituent:"), 2, 0, 1, 1, Qt.AlignVCenter)
         
         self.minimize = QCheckBox()
         self.minimize.setToolTip("spin the added substituents to try to minimize the LJ potential energy")
         self.minimize.setChecked(self.settings.minimize)
-        self.substitute_layout.addWidget(self.minimize, 2, 1, 1, 1, Qt.AlignTop)
+        substitute_layout.addWidget(self.minimize, 2, 1, 1, 1, Qt.AlignTop)
         
-        self.substitute_layout.addWidget(QLabel("guess previous substituent:"), 3, 0, 1, 1, Qt.AlignVCenter)
+        substitute_layout.addWidget(QLabel("guess previous substituent:"), 3, 0, 1, 1, Qt.AlignVCenter)
         
         self.guess_old = QCheckBox()
         self.guess_old.setToolTip("checked: leave the longest connected fragment in the residue\nunchecked: previous substituent must be selected")
         self.guess_old.setChecked(self.settings.guess)
         self.guess_old.stateChanged.connect(lambda state, settings=self.settings: settings.__setattr__("guess", True if state == Qt.Checked else False))
-        self.substitute_layout.addWidget(self.guess_old, 3, 1, 1, 2, Qt.AlignTop)
+        substitute_layout.addWidget(self.guess_old, 3, 1, 1, 2, Qt.AlignTop)
         
-        self.substitute_layout.addWidget(QLabel("new residue name:"), 4, 0, 1, 1, Qt.AlignVCenter)
+        substitute_layout.addWidget(QLabel("new residue name:"), 4, 0, 1, 1, Qt.AlignVCenter)
         
         self.new_sub_name = QLineEdit()
         self.new_sub_name.setToolTip("change name of modified residues")
         self.new_sub_name.setPlaceholderText("leave blank to keep current")
-        self.substitute_layout.addWidget(self.new_sub_name, 4, 1, 1, 2, Qt.AlignTop)
+        substitute_layout.addWidget(self.new_sub_name, 4, 1, 1, 2, Qt.AlignTop)
         
         substitute_button = QPushButton("substitute current selection")
         substitute_button.clicked.connect(self.do_substitute)
-        self.substitute_layout.addWidget(substitute_button, 5, 0, 1, 3, Qt.AlignTop)
+        substitute_layout.addWidget(substitute_button, 5, 0, 1, 3, Qt.AlignTop)
         
-        self.substitute_layout.setRowStretch(0, 0)
-        self.substitute_layout.setRowStretch(1, 0)
-        self.substitute_layout.setRowStretch(2, 0)
-        self.substitute_layout.setRowStretch(3, 0)
-        self.substitute_layout.setRowStretch(4, 0)
-        self.substitute_layout.setRowStretch(5, 1)
+        substitute_layout.setRowStretch(0, 0)
+        substitute_layout.setRowStretch(1, 0)
+        substitute_layout.setRowStretch(2, 0)
+        substitute_layout.setRowStretch(3, 0)
+        substitute_layout.setRowStretch(4, 0)
+        substitute_layout.setRowStretch(5, 1)
         
         
         #map ligand
-        self.maplig_tab = QWidget()
-        self.maplig_layout = QGridLayout(self.maplig_tab)
+        maplig_tab = QWidget()
+        maplig_layout = QGridLayout(maplig_tab)
         
         liglabel = QLabel("ligand name:")
-        self.maplig_layout.addWidget(liglabel, 0, 0, Qt.AlignVCenter)
+        maplig_layout.addWidget(liglabel, 0, 0, Qt.AlignVCenter)
         
         self.ligname = QLineEdit()
         lig_completer = NameCompleter(Component.list(), self.ligname)
         self.ligname.setCompleter(lig_completer)
         self.ligname.setToolTip("name of ligand in the AaronTools library or your personal library\nseparate names with commas and uncheck 'modify selected structure' to create several structures")
-        self.maplig_layout.addWidget(self.ligname, 0, 1, Qt.AlignVCenter)
+        maplig_layout.addWidget(self.ligname, 0, 1, Qt.AlignVCenter)
         
         open_lig_lib = QPushButton("from library...")
         open_lig_lib.clicked.connect(self.open_lig_selector)
-        self.maplig_layout.addWidget(open_lig_lib, 0, 2, Qt.AlignTop)        
+        maplig_layout.addWidget(open_lig_lib, 0, 2, Qt.AlignTop)        
         
-        self.maplig_layout.addWidget(QLabel("modify selected structure:"), 1, 0, 1, 1, Qt.AlignVCenter)
+        maplig_layout.addWidget(QLabel("modify selected structure:"), 1, 0, 1, 1, Qt.AlignVCenter)
         
         self.close_previous_lig = QCheckBox()
         self.close_previous_lig.setToolTip("checked: selected structure will be modified\nunchecked: new model will be created for the modified structure")
         self.close_previous_lig.setChecked(self.settings.modify)
         self.close_previous_lig.stateChanged.connect(self.close_previous_change)
-        self.maplig_layout.addWidget(self.close_previous_lig, 1, 1, 1, 2, Qt.AlignTop)
+        maplig_layout.addWidget(self.close_previous_lig, 1, 1, 1, 2, Qt.AlignTop)
 
         maplig_button = QPushButton("swap ligand of current selection")
         maplig_button.clicked.connect(self.do_maplig)
-        self.maplig_layout.addWidget(maplig_button, 2, 0, 1, 3, Qt.AlignTop)
-        
-        self.maplig_layout.setRowStretch(0, 0)
-        self.maplig_layout.setRowStretch(1, 0)
-        self.maplig_layout.setRowStretch(2, 1)
+        maplig_layout.addWidget(maplig_button, 2, 0, 1, 3, Qt.AlignTop)
+
+        start_structure_button = QPushButton("place in:")
+        self.lig_model_selector = ModelComboBox(self.session, addNew=True)
+        start_structure_button.clicked.connect(self.do_new_lig)
+        maplig_layout.addWidget(start_structure_button, 3, 0, 1, 1, Qt.AlignTop)
+        maplig_layout.addWidget(self.lig_model_selector, 3, 1, 1, 2, Qt.AlignTop)
+
+        maplig_layout.setRowStretch(0, 0)
+        maplig_layout.setRowStretch(1, 0)
+        maplig_layout.setRowStretch(2, 0)
+        maplig_layout.setRowStretch(3, 1)
         
         
         #close ring
-        self.closering_tab = QWidget()
-        self.closering_layout = QGridLayout(self.closering_tab)
+        closering_tab = QWidget()
+        closering_layout = QGridLayout(closering_tab)
         
         ringlabel = QLabel("ring name:")
-        self.closering_layout.addWidget(ringlabel, 0, 0, Qt.AlignVCenter)
+        closering_layout.addWidget(ringlabel, 0, 0, Qt.AlignVCenter)
         
         self.ringname = QLineEdit()
         ring_completer = NameCompleter(Ring.list(), self.ringname)
         self.ringname.setCompleter(ring_completer)
         self.ringname.setToolTip("name of ring in the AaronTools library or your personal library\nseparate names with commas and uncheck 'modify selected structure' to create several structures")
-        self.closering_layout.addWidget(self.ringname, 0, 1, Qt.AlignVCenter)
+        closering_layout.addWidget(self.ringname, 0, 1, Qt.AlignVCenter)
         
         open_ring_lib = QPushButton("from library...")
         open_ring_lib.clicked.connect(self.open_ring_selector)
-        self.closering_layout.addWidget(open_ring_lib, 0, 2, Qt.AlignTop)        
+        closering_layout.addWidget(open_ring_lib, 0, 2, Qt.AlignTop)        
         
-        self.closering_layout.addWidget(QLabel("modify selected structure:"), 1, 0, 1, 1, Qt.AlignVCenter) 
+        closering_layout.addWidget(QLabel("modify selected structure:"), 1, 0, 1, 1, Qt.AlignVCenter) 
         
         self.close_previous_ring = QCheckBox()
         self.close_previous_ring.setToolTip("checked: selected structure will be modified\nunchecked: new model will be created for the modified structure")
         self.close_previous_ring.setChecked(self.settings.modify)
         self.close_previous_ring.stateChanged.connect(self.close_previous_change)
-        self.closering_layout.addWidget(self.close_previous_ring, 1, 1, 1, 2, Qt.AlignTop)
+        closering_layout.addWidget(self.close_previous_ring, 1, 1, 1, 2, Qt.AlignTop)
 
-        self.closering_layout.addWidget(QLabel("new residue name:"), 2, 0, 1, 1, Qt.AlignVCenter)
+        closering_layout.addWidget(QLabel("new residue name:"), 2, 0, 1, 1, Qt.AlignVCenter)
         
         self.new_ring_name = QLineEdit()
         self.new_ring_name.setToolTip("change name of modified residues")
         self.new_ring_name.setPlaceholderText("leave blank to keep current")
-        self.closering_layout.addWidget(self.new_ring_name, 2, 1, 1, 2, Qt.AlignTop)
+        closering_layout.addWidget(self.new_ring_name, 2, 1, 1, 2, Qt.AlignTop)
 
         closering_button = QPushButton("put a ring on current selection")
         closering_button.clicked.connect(self.do_fusering)
-        self.closering_layout.addWidget(closering_button, 3, 0, 1, 3, Qt.AlignTop)
+        closering_layout.addWidget(closering_button, 3, 0, 1, 3, Qt.AlignTop)
 
-        self.closering_layout.setRowStretch(0, 0)
-        self.closering_layout.setRowStretch(1, 0)
-        self.closering_layout.setRowStretch(2, 0)
-        self.closering_layout.setRowStretch(3, 1)
+        start_structure_button = QPushButton("place in:")
+        self.ring_model_selector = ModelComboBox(self.session, addNew=True)
+        start_structure_button.clicked.connect(self.do_new_ring)
+        closering_layout.addWidget(start_structure_button, 4, 0, 1, 1, Qt.AlignTop)
+        closering_layout.addWidget(self.ring_model_selector, 4, 1, 1, 2, Qt.AlignTop)
+
+        closering_layout.setRowStretch(0, 0)
+        closering_layout.setRowStretch(1, 0)
+        closering_layout.setRowStretch(2, 0)
+        closering_layout.setRowStretch(3, 0)
+        closering_layout.setRowStretch(4, 1)
 
 
-        self.alchemy_tabs.addTab(self.substitute_tab, "substitute")
-        self.alchemy_tabs.addTab(self.maplig_tab, "swap ligand")
-        self.alchemy_tabs.addTab(self.closering_tab, "fuse ring")
+        #change element
+        changeelement_tab = QWidget()
+        changeelement_layout = QFormLayout(changeelement_tab)
+        
+        self.element = QPushButton("C")
+        self.element.setMinimumWidth(int(1.3*self.element.fontMetrics().boundingRect("QQ").width()))
+        self.element.setMaximumWidth(int(1.3*self.element.fontMetrics().boundingRect("QQ").width()))
+        self.element.setMinimumHeight(int(1.5*self.element.fontMetrics().boundingRect("QQ").height()))
+        self.element.setMaximumHeight(int(1.5*self.element.fontMetrics().boundingRect("QQ").height()))
+        ele_color = tuple(list(element_color(ELEMENTS.index("C")))[:-1])
+        self.element.setStyleSheet("QPushButton { background: rgb(%i, %i, %i); color: %s; font-weight: bold; }" % (*ele_color, 'white' if sum(int(x < 150) - int(x > 250) for x in ele_color) - int(ele_color[1] > 200) + int(ele_color[2] > 200) >= 2 else 'black'))
+        self.element.clicked.connect(self.open_ptable)
+        changeelement_layout.addRow("element:", self.element)
+        
+        self.vsepr = QComboBox()
+        self.vsepr.addItems(["do not change",               # 0
+                             "linear (1 bond)",             # 1
+                             "linear (2 bonds)",            # 2 
+                             "trigonal planar (2 bonds)",   # 3
+                             "tetrahedral (2 bonds)",       # 4 
+                             "trigonal planar",             # 5
+                             "tetrahedral (3 bonds)",       # 6
+                             "T-shaped",                    # 7
+                             "tetrahedral",                 # 8
+                             "sawhorse",                    # 9
+                             "square planar",               #10
+                             "trigonal bipyramidal",        #11
+                             "square pyramidal",            #12
+                             "octahedral",                  #13
+                            ]
+        )
+        
+        self.vsepr.setCurrentIndex(8)
+        
+        self.vsepr.insertSeparator(13)
+        self.vsepr.insertSeparator(11)
+        self.vsepr.insertSeparator(8)
+        self.vsepr.insertSeparator(5)
+        self.vsepr.insertSeparator(2)
+        self.vsepr.insertSeparator(1)
+        self.vsepr.insertSeparator(0)
+        changeelement_layout.addRow("VSEPR:", self.vsepr)
+        
+        self.change_bonds = QCheckBox()
+        self.change_bonds.setChecked(self.settings.change_bonds)
+        changeelement_layout.addRow("adjust bond lengths:", self.change_bonds)
+        
+        change_element_button = QPushButton("change selected elements")
+        change_element_button.clicked.connect(self.do_change_element)
+        changeelement_layout.addRow(change_element_button)
+
+        start_structure_button = QPushButton("place in:")
+        self.model_selector = ModelComboBox(self.session, addNew=True)
+        start_structure_button.clicked.connect(self.do_new_atom)
+        changeelement_layout.addRow(start_structure_button, self.model_selector)
+
+        self.alchemy_tabs.addTab(substitute_tab, "substitute")
+        self.alchemy_tabs.addTab(maplig_tab, "swap ligand")
+        self.alchemy_tabs.addTab(closering_tab, "fuse ring")
+        self.alchemy_tabs.addTab(changeelement_tab, "change element")
 
         layout.addWidget(self.alchemy_tabs)
 
@@ -326,6 +405,9 @@ class EditStructure(ToolInstance):
 
     def open_ring_selector(self):
         self.tool_window.create_child_window("select rings", window_class=RingSelection, textBox=self.ringname)
+
+    def open_ptable(self):
+        self.tool_window.create_child_window("select element", window_class=PTable, button=self.element)
     
     def display_help(self):
         """Show the help for this tool in the help viewer."""
@@ -333,6 +415,198 @@ class EditStructure(ToolInstance):
         run(self.session,
             'open %s' % self.help if self.help is not None else "")
     
+    def do_change_element(self):
+        element = self.element.text()
+        adjust_bonds = self.change_bonds.isChecked()
+        self.settings.change_bonds = adjust_bonds
+        vsepr = self.vsepr.currentText()
+        
+        if vsepr == "do not change":
+            vsepr = False
+        elif vsepr == "linear (1 bond)":
+            vsepr = "linear 1"
+            goal = 1
+        elif vsepr == "linear (2 bonds)":
+            vsepr = "linear 2"
+            goal = 2
+        elif vsepr == "trigonal planar (2 bonds)":
+            vsepr = "bent 2 planar"
+            goal = 2
+        elif vsepr == "tetrahedral (2 bonds)":
+            vsepr = "bent 2 tetrahedral"
+            goal = 2
+        elif vsepr == "trigonal planar":
+            goal = 3
+        elif vsepr == "tetrahedral (3 bonds)":
+            vsepr = "bent 3 tetrahedral"
+            goal = 3
+        elif vsepr == "T-shaped":
+            vsepr = "t shaped"
+            goal = 3
+        elif vsepr == "tetrahedral":
+            goal = 4
+        elif vsepr == "sawhorse":
+            goal = 4
+        elif vsepr == "square planar":
+            goal = 4
+        elif vsepr == "trigonal bipyramidal":
+            goal = 5
+        elif vsepr == "square pyramidal":
+            goal = 5
+        elif vsepr == "octahedral":
+            goal = 6
+        
+        sel = selected_atoms(self.session)
+        models, _ = guessAttachmentTargets(sel, self.session, allow_adjacent=False)
+        for model in models:
+            conv_res = list(models[model].keys())
+            for res in models[model]:
+                for target in models[model][res]:
+                    for neighbor in target.neighbors:
+                        if neighbor.residue not in conv_res:
+                            conv_res.append(neighbor.residue)
+            
+                    for pbg in self.session.models.list(type=PseudobondGroup):
+                        for pbond in pbg.pseudobonds:
+                            if target in pbond.atoms and all(atom.structure is model for atom in pbond.atoms):
+                                other_atom = pbond.other_atom(target)
+                                if other_atom.residue not in conv_res:
+                                    conv_res.append(other_atom.residue)
+                    
+            
+            rescol = ResidueCollection(model, convert_residues=conv_res)
+            for res in models[model]:
+                residue = [resi for resi in rescol.residues if resi.chix_residue is res][0]
+                
+                for target in models[model][res]:
+                    targ = rescol.find_exact(AtomSpec(target.atomspec))[0]
+                    adjust_hydrogens = vsepr
+                    if vsepr is not False:
+                        cur_bonds = len(targ.connected)
+                        change_Hs = goal - cur_bonds
+                        adjust_hydrogens = (change_Hs, vsepr)
+
+                    residue.change_element(targ, 
+                                           element, 
+                                           adjust_bonds=adjust_bonds, 
+                                           adjust_hydrogens=adjust_hydrogens,
+                    )
+                
+                residue.update_chix(res)    
+    
+    def do_new_ring(self):
+        rings = self.ringname.text()
+        
+        for ring in rings.split(","):
+            ring = ring.strip()
+            
+            rescol = ResidueCollection(Ring(ring))
+        
+            model = self.ring_model_selector.currentData()
+            if model is None:
+                chix = rescol.get_chimera(self.session)
+                self.session.models.add([chix])
+                apply_seqcrow_preset(chix, fallback="Ball-Stick-Endcap")
+                self.ring_model_selector.setCurrentIndex(self.ring_model_selector.count()-1)
+    
+            else:
+                res = model.new_residue("new", "a", len(model.residues)+1)
+                rescol.residues[0].update_chix(res)
+                run(self.session, "select add %s" % " ".join([atom.atomspec for atom in res.atoms]))
+    
+    def do_new_lig(self):
+        ligands = self.ligname.text()
+        
+        for lig in ligands.split(","):
+            lig = lig.strip()
+            
+            rescol = ResidueCollection(Component(lig))
+        
+            model = self.lig_model_selector.currentData()
+            if model is None:
+                chix = rescol.get_chimera(self.session)
+                self.session.models.add([chix])
+                apply_seqcrow_preset(chix, fallback="Ball-Stick-Endcap")
+                self.lig_model_selector.setCurrentIndex(self.lig_model_selector.count()-1)
+    
+            else:
+                res = model.new_residue("new", "a", len(model.residues)+1)
+                rescol.residues[0].update_chix(res)
+                run(self.session, "select add %s" % " ".join([atom.atomspec for atom in res.atoms]))
+
+    def do_new_atom(self):
+        element = self.element.text()
+        adjust_bonds = self.change_bonds.isChecked()
+        self.settings.change_bonds = adjust_bonds
+        vsepr = self.vsepr.currentText()
+        
+        if vsepr == "do not change":
+            vsepr = False
+        elif vsepr == "linear (1 bond)":
+            vsepr = "linear 1"
+            goal = 1
+        elif vsepr == "linear (2 bonds)":
+            vsepr = "linear 2"
+            goal = 2
+        elif vsepr == "trigonal planar (2 bonds)":
+            vsepr = "bent 2 planar"
+            goal = 2
+        elif vsepr == "tetrahedral (2 bonds)":
+            vsepr = "bent 2 tetrahedral"
+            goal = 2
+        elif vsepr == "trigonal planar":
+            goal = 3
+        elif vsepr == "tetrahedral (3 bonds)":
+            vsepr = "bent 3 tetrahedral"
+            goal = 3
+        elif vsepr == "T-shaped":
+            vsepr = "t shaped"
+            goal = 3
+        elif vsepr == "tetrahedral":
+            goal = 4
+        elif vsepr == "sawhorse":
+            goal = 4
+        elif vsepr == "square planar":
+            goal = 4
+        elif vsepr == "trigonal bipyramidal":
+            goal = 5
+        elif vsepr == "square pyramidal":
+            goal = 5
+        elif vsepr == "octahedral":
+            goal = 6
+        
+        atom = Atom(element=element, coords=[0., 0., 0.])
+        rescol = ResidueCollection([atom], name="new")
+        
+        adjust_hydrogens = vsepr
+        if vsepr is not False:
+            change_Hs = goal
+            adjust_hydrogens = (change_Hs, vsepr)
+        
+        rescol.change_element(atom, 
+                              element, 
+                              adjust_bonds=adjust_bonds, 
+                              adjust_hydrogens=adjust_hydrogens,
+        )
+        
+        model = self.model_selector.currentData()
+        if model is None:
+            chix = rescol.get_chimera(self.session)
+            self.session.models.add([chix])
+            apply_seqcrow_preset(chix, fallback="Ball-Stick-Endcap")
+            self.model_selector.setCurrentIndex(self.model_selector.count()-1)
+
+        else:
+            res = model.new_residue("new", "a", len(model.residues)+1)
+            rescol.residues[0].update_chix(res)
+            run(self.session, "select add %s" % " ".join([atom.atomspec for atom in res.atoms]))
+    
+    def delete(self):
+        self.ring_model_selector.deleteLater()
+        self.lig_model_selector.deleteLater()
+        self.model_selector.deleteLater()
+
+        return super().delete()
     
 class SubstituentSelection(ChildToolWindow):
     def __init__(self, tool_instance, title, textBox=None, **kwargs):
@@ -423,6 +697,34 @@ class RingSelection(ChildToolWindow):
             
         self.textBox.setText(",".join(ring_names))
 
+
+class PTable(ChildToolWindow):
+    def __init__(self, tool_instance, title, button, **kwargs):
+        super().__init__(tool_instance, title, **kwargs)
+        
+        self.button = button
+        
+        self._build_ui()
+    
+    def _build_ui(self):
+        layout = QGridLayout()
+        
+        self.ptable = PeriodicTable(initial_elements=[self.button.text()], select_multiple=False)
+        self.ptable.elementSelectionChanged.connect(self.element_changed)
+        layout.addWidget(self.ptable)
+        
+        self.ui_area.setLayout(layout)
+        
+        self.manage(None)
+    
+    def element_changed(self, *args):
+        elements = self.ptable.selectedElements()
+        
+        if len(elements) == 1:
+            element = elements[0]
+            self.button.setText(element)
+            ele_color = tuple(list(element_color(ELEMENTS.index(element)))[:-1])
+            self.button.setStyleSheet("QPushButton { background: rgb(%i, %i, %i); color: %s; font-weight: bold; }" % (*ele_color, 'white' if sum(int(x < 150) - int(x > 250) for x in ele_color) - int(ele_color[1] > 200) + int(ele_color[2] > 200) >= 2 else 'black'))
 
 
 class NameCompleter(QCompleter):

@@ -59,7 +59,7 @@ class ElementButton(QPushButton):
 class PeriodicTable(QWidget):
     elementSelectionChanged = pyqtSignal()
     
-    def __init__(self, *args, initial_elements=[], **kwargs):
+    def __init__(self, *args, initial_elements=[], select_multiple=True, **kwargs):
         super().__init__(*args, **kwargs)
         
         layout = QGridLayout(self)
@@ -68,7 +68,10 @@ class PeriodicTable(QWidget):
         self._elements = {ele: ElementButton(ele) for ele in ELEMENTS if not any(ele == x for x in ['Bq', 'X'])}
         for ele in self._elements.keys():
             self._elements[ele].setTristate(False)
-            self._elements[ele].stateChanged.connect(lambda state, ele=ele: self.elementSelectionChanged.emit())
+            if select_multiple:
+                self._elements[ele].stateChanged.connect(lambda state, ele=ele: self.elementSelectionChanged.emit())
+            else:
+                self._elements[ele].stateChanged.connect(lambda state, ele=ele: self._single_ele_clicked(state, ele))
         
         elements_widget = QWidget()
         elements_layout = QGridLayout(elements_widget)
@@ -196,91 +199,98 @@ class PeriodicTable(QWidget):
             elements_layout.addWidget(self._elements['No'], 8, 15, Qt.AlignLeft | Qt.AlignTop)
             elements_layout.addWidget(self._elements['Lr'], 8, 16, Qt.AlignLeft | Qt.AlignTop)
         
-        organic_button = QPushButton("organic chemists'")
-        organic_button.setCheckable(True)
-        organic_button.clicked.connect(self._select_ochem)
-        #layout.addWidget(organic_button, 9, col, Qt.AlignTop)        
-
-        z_lt_37_button = QPushButton("H-Kr")
-        z_lt_37_button.setCheckable(True)
-        z_lt_37_button.clicked.connect(self._select_z_lt_37)
-        layout.addWidget(z_lt_37_button, 9, 0, Qt.AlignTop)        
-
-        z_ge_37_button = QPushButton("row 5+")
-        z_ge_37_button.setCheckable(True)
-        z_ge_37_button.clicked.connect(self._select_z_ge_37)
-        layout.addWidget(z_ge_37_button, 9, 1, Qt.AlignTop)
-
-        z_le_86_button = QPushButton("H-Rn")
-        z_le_86_button.setCheckable(True)
-        z_le_86_button.clicked.connect(self._select_z_le_86)
-        layout.addWidget(z_le_86_button, 9, 2, Qt.AlignTop)
-
-        tm_button = QPushButton("transition metals")
-        tm_button.setCheckable(True)
-        tm_button.clicked.connect(self._select_tm)
-        layout.addWidget(tm_button, 9, 3, Qt.AlignTop)       
-
-        all_button = QPushButton("all")
-        all_button.clicked.connect(self._select_all)
-        all_button.clicked.connect(lambda *args: organic_button.setChecked(False))
-        all_button.clicked.connect(lambda *args: tm_button.setChecked(False))        
-        all_button.clicked.connect(lambda *args: organic_button.setChecked(False))
-        all_button.clicked.connect(lambda *args: z_lt_37_button.setChecked(False))
-        all_button.clicked.connect(lambda *args: z_ge_37_button.setChecked(False))
-        all_button.clicked.connect(lambda *args: z_le_86_button.setChecked(False))
-        layout.addWidget(all_button, 10, 0, Qt.AlignTop)
+        if select_multiple:
+            organic_button = QPushButton("organic chemists'")
+            organic_button.setCheckable(True)
+            organic_button.clicked.connect(self._select_ochem)
+            #layout.addWidget(organic_button, 9, col, Qt.AlignTop)        
+    
+            z_lt_37_button = QPushButton("H-Kr")
+            z_lt_37_button.setCheckable(True)
+            z_lt_37_button.clicked.connect(self._select_z_lt_37)
+            layout.addWidget(z_lt_37_button, 9, 0, Qt.AlignTop)        
+    
+            z_ge_37_button = QPushButton("row 5+")
+            z_ge_37_button.setCheckable(True)
+            z_ge_37_button.clicked.connect(self._select_z_ge_37)
+            layout.addWidget(z_ge_37_button, 9, 1, Qt.AlignTop)
+    
+            z_le_86_button = QPushButton("H-Rn")
+            z_le_86_button.setCheckable(True)
+            z_le_86_button.clicked.connect(self._select_z_le_86)
+            layout.addWidget(z_le_86_button, 9, 2, Qt.AlignTop)
+    
+            tm_button = QPushButton("transition metals")
+            tm_button.setCheckable(True)
+            tm_button.clicked.connect(self._select_tm)
+            layout.addWidget(tm_button, 9, 3, Qt.AlignTop)       
+    
+            all_button = QPushButton("all")
+            all_button.clicked.connect(self._select_all)
+            all_button.clicked.connect(lambda *args: organic_button.setChecked(False))
+            all_button.clicked.connect(lambda *args: tm_button.setChecked(False))        
+            all_button.clicked.connect(lambda *args: organic_button.setChecked(False))
+            all_button.clicked.connect(lambda *args: z_lt_37_button.setChecked(False))
+            all_button.clicked.connect(lambda *args: z_ge_37_button.setChecked(False))
+            all_button.clicked.connect(lambda *args: z_le_86_button.setChecked(False))
+            layout.addWidget(all_button, 10, 0, Qt.AlignTop)
+            
+            invert = QPushButton("invert")
+            invert.clicked.connect(self._invert)
+            invert.clicked.connect(lambda *args: organic_button.setChecked(False))
+            invert.clicked.connect(lambda *args: tm_button.setChecked(False))        
+            invert.clicked.connect(lambda *args: organic_button.setChecked(False))
+            invert.clicked.connect(lambda *args: z_lt_37_button.setChecked(False))
+            invert.clicked.connect(lambda *args: z_ge_37_button.setChecked(False))
+            invert.clicked.connect(lambda *args: z_le_86_button.setChecked(False))
+            layout.addWidget(invert, 10, 2, Qt.AlignTop)
+    
+            clear = QPushButton("clear")
+            clear.clicked.connect(self._clear)
+            clear.clicked.connect(lambda *args: organic_button.setChecked(False))
+            clear.clicked.connect(lambda *args: tm_button.setChecked(False))        
+            clear.clicked.connect(lambda *args: organic_button.setChecked(False))
+            clear.clicked.connect(lambda *args: z_lt_37_button.setChecked(False))
+            clear.clicked.connect(lambda *args: z_ge_37_button.setChecked(False))
+            clear.clicked.connect(lambda *args: z_le_86_button.setChecked(False))
+            layout.addWidget(clear, 10, 1, Qt.AlignTop)
+    
+            reset = QPushButton("reset")
+            reset.clicked.connect(self._reset)
+            reset.clicked.connect(lambda *args: organic_button.setChecked(False))
+            reset.clicked.connect(lambda *args: tm_button.setChecked(False))        
+            reset.clicked.connect(lambda *args: organic_button.setChecked(False))
+            reset.clicked.connect(lambda *args: z_lt_37_button.setChecked(False))
+            reset.clicked.connect(lambda *args: z_ge_37_button.setChecked(False))
+            reset.clicked.connect(lambda *args: z_le_86_button.setChecked(False))
+            layout.addWidget(reset, 10, 3, Qt.AlignTop)
+            
+            layout.addWidget(elements_widget, 0, 0, 7, 4, Qt.AlignLeft | Qt.AlignTop)
+    
+            self.setSelectedElements(initial_elements)
+            self._initial_elements = initial_elements
+    
+            layout.setRowStretch(0, 0)
+            layout.setRowStretch(1, 0)
+            layout.setRowStretch(2, 0)
+            layout.setRowStretch(3, 0)
+            layout.setRowStretch(4, 0)
+            layout.setRowStretch(5, 0)
+            layout.setRowStretch(6, 0)
+            layout.setRowStretch(7, 0)
+            layout.setRowStretch(8, 0)
+            layout.setRowStretch(9, 0)
+            layout.setRowStretch(10, 1)
+            layout.setColumnStretch(0, 0)
+            layout.setColumnStretch(1, 1)
+            layout.setColumnStretch(2, 1)
+            layout.setColumnStretch(3, 1)
         
-        invert = QPushButton("invert")
-        invert.clicked.connect(self._invert)
-        invert.clicked.connect(lambda *args: organic_button.setChecked(False))
-        invert.clicked.connect(lambda *args: tm_button.setChecked(False))        
-        invert.clicked.connect(lambda *args: organic_button.setChecked(False))
-        invert.clicked.connect(lambda *args: z_lt_37_button.setChecked(False))
-        invert.clicked.connect(lambda *args: z_ge_37_button.setChecked(False))
-        invert.clicked.connect(lambda *args: z_le_86_button.setChecked(False))
-        layout.addWidget(invert, 10, 2, Qt.AlignTop)
-
-        clear = QPushButton("clear")
-        clear.clicked.connect(self._clear)
-        clear.clicked.connect(lambda *args: organic_button.setChecked(False))
-        clear.clicked.connect(lambda *args: tm_button.setChecked(False))        
-        clear.clicked.connect(lambda *args: organic_button.setChecked(False))
-        clear.clicked.connect(lambda *args: z_lt_37_button.setChecked(False))
-        clear.clicked.connect(lambda *args: z_ge_37_button.setChecked(False))
-        clear.clicked.connect(lambda *args: z_le_86_button.setChecked(False))
-        layout.addWidget(clear, 10, 1, Qt.AlignTop)
-
-        reset = QPushButton("reset")
-        reset.clicked.connect(self._reset)
-        reset.clicked.connect(lambda *args: organic_button.setChecked(False))
-        reset.clicked.connect(lambda *args: tm_button.setChecked(False))        
-        reset.clicked.connect(lambda *args: organic_button.setChecked(False))
-        reset.clicked.connect(lambda *args: z_lt_37_button.setChecked(False))
-        reset.clicked.connect(lambda *args: z_ge_37_button.setChecked(False))
-        reset.clicked.connect(lambda *args: z_le_86_button.setChecked(False))
-        layout.addWidget(reset, 10, 3, Qt.AlignTop)
-        
-        layout.addWidget(elements_widget, 0, 0, 7, 4, Qt.AlignLeft | Qt.AlignTop)
-
-        self.setSelectedElements(initial_elements)
-        self._initial_elements = initial_elements
-
-        layout.setRowStretch(0, 0)
-        layout.setRowStretch(1, 0)
-        layout.setRowStretch(2, 0)
-        layout.setRowStretch(3, 0)
-        layout.setRowStretch(4, 0)
-        layout.setRowStretch(5, 0)
-        layout.setRowStretch(6, 0)
-        layout.setRowStretch(7, 0)
-        layout.setRowStretch(8, 0)
-        layout.setRowStretch(9, 0)
-        layout.setRowStretch(10, 1)
-        layout.setColumnStretch(0, 0)
-        layout.setColumnStretch(1, 1)
-        layout.setColumnStretch(2, 1)
-        layout.setColumnStretch(3, 1)
+        else:
+            layout.addWidget(elements_widget)
+            if len(initial_elements) > 0:
+                self.setSelectedElements([initial_elements[0]])
+                self._initial_elements = [initial_elements[0]]
 
     def _select_ochem(self, add):
         self.blockSignals(True)
@@ -293,7 +303,7 @@ class PeriodicTable(QWidget):
         
         self.blockSignals(False)
         self.elementSelectionChanged.emit()
-            
+
     def _select_all(self):
         self.blockSignals(True)
         for ele in self._elements.keys():
@@ -301,7 +311,7 @@ class PeriodicTable(QWidget):
         
         self.blockSignals(False)
         self.elementSelectionChanged.emit()
-        
+
     def _select_tm(self, add):
         self.blockSignals(True)
         for ele in self._elements.keys():
@@ -313,7 +323,7 @@ class PeriodicTable(QWidget):
         
         self.blockSignals(False)
         self.elementSelectionChanged.emit()
-        
+
     def _select_z_lt_37(self, add):
         self.blockSignals(True)
         for ele in self._elements.keys():
@@ -325,7 +335,7 @@ class PeriodicTable(QWidget):
         
         self.blockSignals(False)
         self.elementSelectionChanged.emit()
-        
+
     def _select_z_le_86(self, add):
         self.blockSignals(True)
         for ele in self._elements.keys():
@@ -337,7 +347,7 @@ class PeriodicTable(QWidget):
         
         self.blockSignals(False)
         self.elementSelectionChanged.emit()
-        
+
     def _select_z_ge_37(self, add):
         self.blockSignals(True)
         for ele in self._elements.keys():
@@ -349,7 +359,7 @@ class PeriodicTable(QWidget):
         
         self.blockSignals(False)
         self.elementSelectionChanged.emit()
-            
+
     def _select_row_1(self, add):
         self.blockSignals(True)
         for ele in self._elements.keys():
@@ -362,7 +372,7 @@ class PeriodicTable(QWidget):
         
         self.blockSignals(False)
         self.elementSelectionChanged.emit()
-        
+
     def _select_row_2(self, add):
         self.blockSignals(True)
         for ele in self._elements.keys():
@@ -375,7 +385,7 @@ class PeriodicTable(QWidget):
         
         self.blockSignals(False)
         self.elementSelectionChanged.emit()
-        
+
     def _select_row_3(self, add):
         self.blockSignals(True)
         for ele in self._elements.keys():
@@ -388,7 +398,7 @@ class PeriodicTable(QWidget):
         
         self.blockSignals(False)
         self.elementSelectionChanged.emit()
-        
+
     def _select_row_4(self, add):
         self.blockSignals(True)
         for ele in self._elements.keys():
@@ -401,7 +411,7 @@ class PeriodicTable(QWidget):
         
         self.blockSignals(False)
         self.elementSelectionChanged.emit()
-        
+
     def _select_row_5(self, add):
         self.blockSignals(True)
         for ele in self._elements.keys():
@@ -414,7 +424,7 @@ class PeriodicTable(QWidget):
         
         self.blockSignals(False)
         self.elementSelectionChanged.emit()
-            
+
     def _select_row_6(self, add):
         self.blockSignals(True)
         for ele in self._elements.keys():
@@ -427,7 +437,7 @@ class PeriodicTable(QWidget):
         
         self.blockSignals(False)
         self.elementSelectionChanged.emit()
-            
+
     def _invert(self):
         self.blockSignals(True)
         for ele in self._elements.keys():
@@ -438,7 +448,7 @@ class PeriodicTable(QWidget):
         
         self.blockSignals(False)
         self.elementSelectionChanged.emit()
-        
+
     def _clear(self):
         self.blockSignals(True)
         for ele in self._elements.keys():
@@ -446,7 +456,20 @@ class PeriodicTable(QWidget):
         
         self.blockSignals(False)
         self.elementSelectionChanged.emit()
+
+    def _single_ele_clicked(self, state, ele):
+        if state == ElementButton.Checked:
+            self.blockSignals(True)
+            for ele2 in self._elements.keys():
+                if ele2 == ele:
+                    continue
+                
+                self._elements[ele2].setState(ElementButton.Unchecked)
+            
+            self.blockSignals(False)
         
+        self.elementSelectionChanged.emit()
+
     def selectedElements(self, abbreviate=False):
         elements = []
         for ele in self._elements.keys():

@@ -16,8 +16,13 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
         fmt = "dat"
     elif format_name == "XYZ file":
         fmt = "xyz"
+    elif format_name == "FCHK file":
+        fmt = "fchk"
 
     f = FileReader((file_name, fmt, stream), just_geom=False, get_all=True)
+
+    if hasattr(stream, "close") and callable(stream.close):
+        stream.close()
 
     geom = ResidueCollection(Geometry(f))
 
