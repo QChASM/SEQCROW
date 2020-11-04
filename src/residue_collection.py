@@ -3,10 +3,11 @@ import numpy as np
 import re
 
 from AaronTools.atoms import Atom
-from AaronTools.const import TMETAL
+from AaronTools.const import TMETAL, VDW_RADII
 from AaronTools.geometry import Geometry
 from AaronTools.ring import Ring
 from AaronTools.finders import BondedTo
+from AaronTools.fileIO import FileReader
 
 from chimerax.atomic import AtomicStructure, Element
 from chimerax.atomic import Residue as ChimeraResidue
@@ -15,8 +16,16 @@ from chimerax.atomic.colors import element_color
 
 from SEQCROW.finders import AtomSpec
 from SEQCROW.managers.filereader_manager import apply_seqcrow_preset
+from SEQCROW.commands.tsbond import tsbond
 
 from warnings import warn
+
+
+class _FauxAtomSelection:
+    """for fooling SEQCROW functions"""
+    def __init__(self, atoms=[], bonds=[]):
+        self.atoms = atoms
+        self.bonds = bonds
 
 
 def fromChimAtom(atom=None, *args, serial_number=None, atomspec=None, **kwargs):
@@ -314,7 +323,7 @@ class ResidueCollection(Geometry):
             s += "%-2s    %6.3f    %6.3f    %6.3f    %s\n" % (atom.element, *atom.coords, atom.atomspec if hasattr(atom, "atomspec") else "")
         
         return s.strip()
-        
+
     def _atom_update(self):
         #old_atoms = [a for a in self.atoms]
         self.atoms = []
@@ -554,5 +563,42 @@ class ResidueCollection(Geometry):
             #is the last geometry in the log or xyz file
             xyzs = self.all_geom_coordsets(filereader)
             struc.add_coordsets(xyzs, replace=True)
-
+        
+        if filereader is not None and "frequency" in filereader.other:
+            for mode in filereader.other["frequency"].data:
+                if mode.frequency < 0:
+                    for i, vec1 in enumerate(mode.vector):
+                        max_ovl_sign = 1
+                        max_ovl = None
+                        for j, vec2 in enumerate(mode.vector[:i]):
+                            if self.atoms[i] in self.atoms[j].connected:
+                                continue
+                            
+                            if self.atoms[i].dist(self.atoms[j]) < VDW_RADII[self.atoms[i].element] + VDW_RADII[self.atoms[j].element]:
+                                b = self.atoms[i].bond(self.atoms[j])
+                                if abs(np.dot(b, vec1)) < 0.9 * (np.linalg.norm(b) * np.linalg.norm(vec1)):
+                                    continue
+                                ovl = np.dot(vec1, vec2)
+                                if max_ovl is None or abs(ovl) > max_ovl:
+                                    if ovl < 0:
+                                        max_ovl_sign = -1
+                                    else:
+                                        max_ovl_sign = 1
+                                    max_ovl = abs(ovl)
+                        
+                        if max_ovl is None:
+                            continue
+                        
+                        for j, vec2 in enumerate(mode.vector[:i]):
+                            if self.atoms[i].dist(self.atoms[j]) < VDW_RADII[self.atoms[i].element] + VDW_RADII[self.atoms[j].element]:
+                                b = self.atoms[i].bond(self.atoms[j])
+                                if abs(np.dot(b, vec1)) < 0.9 * (np.linalg.norm(b) * np.linalg.norm(vec1)):
+                                    continue
+                                ovl = np.dot(vec1, vec2)
+                                if abs(ovl) < 0.01:
+                                    continue
+                                if abs(ovl) > 0.975 * (np.linalg.norm(vec1) * np.linalg.norm(vec2)) and np.sign(ovl) == np.sign(max_ovl_sign):
+                                    sel = _FauxAtomSelection(atoms=(struc.atoms[i], struc.atoms[j]))
+                                    tsbond(session, sel)
+                                
         return struc
