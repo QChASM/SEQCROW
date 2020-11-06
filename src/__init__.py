@@ -185,6 +185,10 @@ class _SEQCROW_API(BundleAPI):
         elif ti.name == "Bond Editor":
             from .tools import BondEditor
             return BondEditor(session, ti.name)
+                
+        elif ti.name == "Rotate":
+            from .tools import PrecisionRotate
+            return PrecisionRotate(session, ti.name)
         
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)

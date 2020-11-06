@@ -26,7 +26,7 @@ from matplotlib.figure import Figure
 from matplotlib import rc as matplotlib_rc
 
 from PyQt5.Qt import QIcon, QStyle
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QRect, QItemSelectionModel 
 from PyQt5.QtGui import QValidator, QFont
 from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, QTabWidget, QComboBox, \
                             QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, \
@@ -325,6 +325,8 @@ class NormalModes(ToolInstance):
             if mode.intensity is not None:
                 intensity.setData(Qt.DisplayRole, round(mode.intensity, 2))
             self.table.setItem(row, 1, intensity)
+        
+        self.table.setSelection(QRect(0, 0, 2, 1), QItemSelectionModel.Select)
     
     def change_mw_option(self, state):
         """toggle bool associated with mass-weighting option"""

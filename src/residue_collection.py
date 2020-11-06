@@ -3,10 +3,11 @@ import numpy as np
 import re
 
 from AaronTools.atoms import Atom
-from AaronTools.const import TMETAL
+from AaronTools.const import TMETAL, VDW_RADII, MASS
 from AaronTools.geometry import Geometry
 from AaronTools.ring import Ring
 from AaronTools.finders import BondedTo
+from AaronTools.fileIO import FileReader
 
 from chimerax.atomic import AtomicStructure, Element
 from chimerax.atomic import Residue as ChimeraResidue
@@ -15,8 +16,16 @@ from chimerax.atomic.colors import element_color
 
 from SEQCROW.finders import AtomSpec
 from SEQCROW.managers.filereader_manager import apply_seqcrow_preset
+from SEQCROW.commands.tsbond import tsbond
 
 from warnings import warn
+
+
+class _FauxAtomSelection:
+    """for fooling SEQCROW functions"""
+    def __init__(self, atoms=[], bonds=[]):
+        self.atoms = atoms
+        self.bonds = bonds
 
 
 def fromChimAtom(atom=None, *args, serial_number=None, atomspec=None, **kwargs):
@@ -242,10 +251,12 @@ class Residue(Geometry):
 
 class ResidueCollection(Geometry):
     """geometry object used for SEQCROW to easily convert to AaronTools but keep residue info"""
-    def __init__(self, molecule, convert_residues=None, **kwargs):
+    def __init__(self, molecule, convert_residues=None, bonds_matter=True, **kwargs):
         """molecule       - chimerax AtomicStructure or AaronTools Geometry (for easy compatibility stuff)
         convert_residues  - None to convert everything or [chimerax.atomic.Residue] to convert only specific residues
-                            this only applies to chimerax AtomicStructures"""
+                            this only applies to chimerax AtomicStructures
+        bonds_matter      - False to skip adding bonds/determining connectivity based on ChimeraX AtomicStructure
+        """
         self.convert_residues = convert_residues
         
         if isinstance(molecule, AtomicStructure):
@@ -272,6 +283,9 @@ class ResidueCollection(Geometry):
                              refresh_connected=False, 
                              **kwargs,
             )
+        
+            if not bonds_matter:
+                return
         
             #update bonding to match that of the chimerax molecule
             for atom in all_atoms:
@@ -314,7 +328,7 @@ class ResidueCollection(Geometry):
             s += "%-2s    %6.3f    %6.3f    %6.3f    %s\n" % (atom.element, *atom.coords, atom.atomspec if hasattr(atom, "atomspec") else "")
         
         return s.strip()
-        
+
     def _atom_update(self):
         #old_atoms = [a for a in self.atoms]
         self.atoms = []
@@ -434,11 +448,21 @@ class ResidueCollection(Geometry):
         out = {'geom missing': geom_missing, 'chix missing': chix_missing}
         return out
     
-    def update_chix(self, atomic_structure):
-        """update chimerax atomic structure to match self
-        may also change residue numbers for self"""
+    def update_chix(self, atomic_structure, refresh_connected=True):
+        """
+        update chimerax atomic structure to match self
+        may also change residue numbers for self
+        refresh_connected - False to skip updating connectivity
+        """
 
         atomic_structure.comment = self.comment
+
+        if not refresh_connected:
+            for atom in self.atoms:
+                if hasattr(atom, "chix_atom"):
+                    atom.chix_atom.coord = atom.coords
+            
+            return
 
         for residue in self.residues:
             if residue.chix_residue is None or \
@@ -554,5 +578,46 @@ class ResidueCollection(Geometry):
             #is the last geometry in the log or xyz file
             xyzs = self.all_geom_coordsets(filereader)
             struc.add_coordsets(xyzs, replace=True)
+        
+        # if it's a frequency file, draw TS bonds for imaginary modes
+        # as far as I'm concerned, this is magic
+        # if it stops working, maybe just delete it
+        # - Tony from the past
+        if filereader is not None and "frequency" in filereader.other:
+            for mode in filereader.other["frequency"].data:
+                if mode.frequency < 0:
+                    max_ovl = None
+                    for i, vec1 in enumerate(mode.vector):
+                        for j, vec2 in enumerate(mode.vector[:i]):
+                            if self.atoms[i] in self.atoms[j].connected:
+                                continue
+                            
+                            if self.atoms[i].dist(self.atoms[j]) < VDW_RADII[self.atoms[i].element] + VDW_RADII[self.atoms[j].element]:
+                                b = self.atoms[i].bond(self.atoms[j])
+                                if abs(np.dot(b, vec1)) < 0.9 * (np.linalg.norm(b) * np.linalg.norm(vec1)):
+                                    continue
+                                ovl = np.dot(vec1, vec2) * np.sqrt(MASS[self.atoms[i].element]) * np.sqrt(MASS[self.atoms[j].element])
+                                if ovl > 0:
+                                    continue
+                                if max_ovl is None or abs(ovl) > max_ovl:
+                                    max_ovl = abs(ovl)
+                        
+                    if max_ovl is None:
+                        continue
+
+                    for i, vec1 in enumerate(mode.vector):
+                        for j, vec2 in enumerate(mode.vector[:i]):
+                            if self.atoms[i].dist(self.atoms[j]) < VDW_RADII[self.atoms[i].element] + VDW_RADII[self.atoms[j].element]:
+                                b = self.atoms[i].bond(self.atoms[j])
+                                if 0.5 * (abs(np.dot(b, vec1)) + abs(np.dot(b, vec2))) \
+                                   < 0.45 * (np.linalg.norm(b) * np.linalg.norm(vec1) + np.linalg.norm(b) * np.linalg.norm(vec2)):
+                                    continue
+                                ovl = np.dot(vec1, vec2) * np.sqrt(MASS[self.atoms[i].element]) * np.sqrt(MASS[self.atoms[j].element])
+                                if abs(ovl) < 0.1 or ovl > 0:
+                                    continue
+                                tol = 0.9
+                                if abs(ovl) > tol * (np.linalg.norm(vec1) * np.linalg.norm(vec2) * np.sqrt(MASS[self.atoms[i].element]) * np.sqrt(MASS[self.atoms[j].element])):
+                                    sel = _FauxAtomSelection(atoms=(struc.atoms[i], struc.atoms[j]))
+                                    tsbond(session, sel)
 
         return struc

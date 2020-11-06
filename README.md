@@ -14,6 +14,7 @@ More information about SEQCROW features can be found on the [GitHub wiki](https:
 2. Restart ChimeraX to get the new selectors under 'Select &rarr; Chemistry' and SEQCROW settings/preferences 
 3. If you have a personal AaronTools library already, you can specify the path to it in the SEQCROW settings. Open ChimeraX and go Favorites &rarr; Settings... &rarr; SEQCROW. You will have to restart ChimeraX if you change this setting. 
 
+
 ## Other Versions
 This is a plug-in for ChimeraX.
 

@@ -24,7 +24,7 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
     if hasattr(stream, "close") and callable(stream.close):
         stream.close()
 
-    geom = ResidueCollection(Geometry(f))
+    geom = ResidueCollection(f)
 
     structure = geom.get_chimera(session, coordsets=(f.all_geom is not None and len(f.all_geom) > 1), filereader=f)
     #associate the AaronTools FileReader with each structure
