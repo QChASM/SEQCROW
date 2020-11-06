@@ -1,6 +1,6 @@
 import numpy as np
 
-from chimerax.atomic import selected_atoms, selected_bonds
+from chimerax.atomic import selected_atoms, selected_bonds, AtomicStructure
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.ui.widgets import ColorButton
@@ -13,12 +13,19 @@ from PyQt5.QtWidgets import QGridLayout, QFormLayout, QCheckBox, QTabWidget, QPu
                             QSpinBox, QDoubleSpinBox, QWidget
 
 from SEQCROW.utils import iter2str
+from SEQCROW.residue_collection import ResidueCollection
+
+from AaronTools.finders import AnyTransitionMetal
+
 
 class _BondEditorSettings(Settings):
     AUTO_SAVE = {
         "hbond_color":         Value((0., 0.75, 1., 1.), TupleOf(FloatArg, 4), iter2str), 
         "hbond_dashes":        Value(6, IntArg), 
-        "hbond_radius":        Value(0.075, FloatArg), 
+        "hbond_radius":        Value(0.075, FloatArg),         
+        "tm_bond_color":       Value((147./255, 112./255, 219./255, 1.), TupleOf(FloatArg, 4), iter2str), 
+        "tm_bond_dashes":      Value(6, IntArg), 
+        "tm_bond_radius":      Value(0.075, FloatArg), 
         "tsbond_color":        Value((0.67, 1., 1., 1.), TupleOf(FloatArg, 4), iter2str), 
         "tsbond_transparency": Value(75., FloatArg),
         "tsbond_radius":       Value(0.16, FloatArg),
@@ -131,11 +138,41 @@ class BondEditor(ToolInstance):
         erase_hbonds = QPushButton("erase all H-bonds")
         erase_hbonds.clicked.connect(lambda *, ses=self.session: run(ses, "~hbonds"))
         hbond_options.addRow(erase_hbonds)
+
+
+        tm_bond_tab = QWidget()
+        tm_bond_options = QFormLayout(tm_bond_tab)
+        
+        self.tm_bond_color = ColorButton(has_alpha_channel=True, max_size=(16, 16))
+        self.tm_bond_color.set_color(self.settings.tm_bond_color)
+        tm_bond_options.addRow("color:", self.tm_bond_color)
+        
+        self.tm_bond_radius = QDoubleSpinBox()
+        self.tm_bond_radius.setDecimals(3)
+        self.tm_bond_radius.setSuffix(" \u212B")
+        self.tm_bond_radius.setValue(self.settings.tm_bond_radius)
+        tm_bond_options.addRow("radius:", self.tm_bond_radius)
+        
+        self.tm_bond_dashes = QSpinBox()
+        self.tm_bond_dashes.setRange(0, 28)
+        self.tm_bond_dashes.setSingleStep(2)
+        self.tm_bond_radius.setSingleStep(0.005)
+        self.tm_bond_dashes.setValue(self.settings.tm_bond_dashes)
+        tm_bond_options.addRow("dashes:", self.tm_bond_dashes)
+        
+        draw_tm_bonds = QPushButton("draw metal coordination bonds")
+        draw_tm_bonds.clicked.connect(self.run_tm_bond)
+        tm_bond_options.addRow(draw_tm_bonds)
+        
+        erase_tm_bonds = QPushButton("erase all metal coordination bonds")
+        erase_tm_bonds.clicked.connect(self.del_tm_bond)
+        tm_bond_options.addRow(erase_tm_bonds)
         
         
         tabs.addTab(bond_tab, "covalent bonds")
         tabs.addTab(ts_bond_tab, "TS bonds")
         tabs.addTab(hbond_tab, "H-bonds")
+        tabs.addTab(tm_bond_tab, "coordination bonds")
         
         self.tool_window.ui_area.setLayout(layout)
         
@@ -209,3 +246,41 @@ class BondEditor(ToolInstance):
         self.settings.hbond_dashes = dashes
         
         run(self.session, " ".join(args))
+    
+    def run_tm_bond(self, *args):
+        color = self.tm_bond_color.get_color()
+        self.settings.tm_bond_color = tuple([c/255. for c in color])
+        
+        radius = self.tm_bond_radius.value()
+        self.settings.tm_bond_radius = radius
+
+        dashes = self.tm_bond_dashes.value()
+        self.settings.tm_bond_dashes = dashes
+
+        
+        models = self.session.models.list(type=AtomicStructure)
+        for model in models:
+            rescol = ResidueCollection(model, bonds_matter=False)
+            try:
+                tm_list = rescol.find([AnyTransitionMetal(), "Na", "K", "Rb", "Cs", "Fr", "Mg", "Ca", "Sr", "Ba", "Ra"])
+                for tm in tm_list:
+                    for atom in rescol.atoms:
+                        if atom is tm:
+                            continue
+                        
+                        if atom.is_connected(tm):
+                            pbg = model.pseudobond_group(model.PBG_METAL_COORDINATION, create_type="normal")
+                            pbg.new_pseudobond(tm.chix_atom, atom.chix_atom)
+                            pbg.dashes = dashes
+                            pbg.color = color
+                            pbg.radius = radius
+                            
+            except LookupError:
+                pass
+
+    def del_tm_bond(self, *args):
+        models = self.session.models.list(type=AtomicStructure)
+        for model in models:
+            pbg = model.pseudobond_group(model.PBG_METAL_COORDINATION, create_type=None)
+            if pbg is not None:
+                pbg.delete()

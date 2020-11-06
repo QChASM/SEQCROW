@@ -261,6 +261,10 @@ class EditStructure(ToolInstance):
         self.model_selector = ModelComboBox(self.session, addNew=True)
         start_structure_button.clicked.connect(self.do_new_atom)
         changeelement_layout.addRow(start_structure_button, self.model_selector)
+        
+        delete_atoms_button = QPushButton("delete selected atoms")
+        delete_atoms_button.clicked.connect(self.delete_atoms)
+        changeelement_layout.addRow(delete_atoms_button)
 
         self.alchemy_tabs.addTab(substitute_tab, "substitute")
         self.alchemy_tabs.addTab(maplig_tab, "swap ligand")
@@ -600,6 +604,11 @@ class EditStructure(ToolInstance):
             res = model.new_residue("new", "a", len(model.residues)+1)
             rescol.residues[0].update_chix(res)
             run(self.session, "select add %s" % " ".join([atom.atomspec for atom in res.atoms]))
+    
+    def delete_atoms(self, *args):
+        atoms = selected_atoms(self.session)
+        for atom in atoms:
+            atom.delete()
     
     def delete(self):
         self.ring_model_selector.deleteLater()

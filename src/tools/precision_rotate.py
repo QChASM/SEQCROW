@@ -1,21 +1,27 @@
 import numpy as np
 
-from chimerax.atomic import selected_atoms, selected_bonds
+from chimerax.atomic import selected_atoms, selected_bonds, get_triggers
+from chimerax.bild.bild import read_bild
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.ui.widgets import ColorButton
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
 from chimerax.core.commands import run, BoolArg, ColorArg, FloatArg, IntArg, TupleOf
+from chimerax.core.generic3d import Generic3DModel 
+from chimerax.core.selection import SELECTION_CHANGED
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QGridLayout, QFormLayout, QCheckBox, QTabWidget, QPushButton, \
                             QSpinBox, QDoubleSpinBox, QWidget, QLabel, QStatusBar, QComboBox, \
                             QHBoxLayout, QDial
 
+from io import BytesIO
+
 from SEQCROW.utils import iter2str
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.finders import AtomSpec
+
 
 class _PrecisionRotateSettings(Settings):
     AUTO_SAVE = {
@@ -37,6 +43,12 @@ class PrecisionRotate(ToolInstance):
         self.manual_center = {}
         
         self._build_ui()
+
+        self._show_rot_vec = self.session.triggers.add_handler(SELECTION_CHANGED, self.show_rot_vec)
+        global_triggers = get_triggers()
+        self._changes = global_triggers.add_handler("changes done", self.show_rot_vec)
+        
+        self.show_rot_vec()
     
     def _build_ui(self):
         layout = QGridLayout()
@@ -72,6 +84,7 @@ class PrecisionRotate(ToolInstance):
             c.setSingleStep(0.01)
             c.setRange(-100, 100)
             # c.setSuffix(t)
+            c.valueChanged.connect(self.show_rot_vec)
             vector_layout.addWidget(c)
         
         layout.addWidget(vector, 1, 2, 1, 1, Qt.AlignTop)
@@ -110,21 +123,37 @@ class PrecisionRotate(ToolInstance):
         self.angle.setSuffix("°")
         layout.addWidget(self.angle, 2, 1, 1, 1, Qt.AlignLeft | Qt.AlignVCenter)
         
-        rotate_button = QPushButton("rotate current selection")
+        layout.addWidget(QLabel("preview rotation axis:"), 3, 0, 1, 1, Qt.AlignLeft | Qt.AlignVCenter)
+        self.display_rot_vec = QCheckBox()
+        self.display_rot_vec.setCheckState(Qt.Checked)
+        self.display_rot_vec.stateChanged.connect(self.show_rot_vec)
+        layout.addWidget(self.display_rot_vec, 3, 1, 1, 1, Qt.AlignLeft | Qt.AlignVCenter)
+        
+        rotate_button = QPushButton("rotate selected atoms")
         rotate_button.clicked.connect(self.do_rotate)
-        layout.addWidget(rotate_button, 3, 0, 1, 3, Qt.AlignTop)
+        layout.addWidget(rotate_button, 4, 0, 1, 3, Qt.AlignTop)
 
         self.status_bar = QStatusBar()
         self.status_bar.setSizeGripEnabled(False)
-        layout.addWidget(self.status_bar, 4, 0, 1, 3, Qt.AlignTop)
+        layout.addWidget(self.status_bar, 5, 0, 1, 3, Qt.AlignTop)
         
         self.vector_option.currentTextChanged.connect(self.show_auto_status)
+        self.cor_button.clicked.connect(lambda *args: self.show_auto_status("select atoms"))
+        
+        self.cor_button.clicked.connect(self.show_rot_vec)
+        self.set_cor_selection.clicked.connect(self.show_rot_vec)
+        self.vector_option.currentIndexChanged.connect(self.show_rot_vec)
+        self.axis.currentIndexChanged.connect(self.show_rot_vec)
+        self.bond_button.clicked.connect(self.show_rot_vec)
+        self.perp_button.clicked.connect(self.show_rot_vec)
+        self.group_button.clicked.connect(self.show_rot_vec)
         
         layout.setRowStretch(0, 0)
         layout.setRowStretch(1, 0)
         layout.setRowStretch(2, 0)
         layout.setRowStretch(3, 0)
-        layout.setRowStretch(4, 1)
+        layout.setRowStretch(4, 0)
+        layout.setRowStretch(5, 1)
         
         layout.setColumnStretch(0, 0)
         layout.setColumnStretch(1, 1)
@@ -149,8 +178,6 @@ class PrecisionRotate(ToolInstance):
             atoms = models[model]
             coords = np.array([atom.coord for atom in atoms])
             self.manual_center[model] = np.mean(coords, axis=0)
-        
-        print(self.manual_center)
 
     def show_auto_status(self, text):
         if self.cor_button.text() == "automatic":
@@ -160,7 +187,7 @@ class PrecisionRotate(ToolInstance):
                 self.status_bar.showMessage("center set to centroid of atoms")
             else:
                 self.status_bar.showMessage("center set to centroid of rotating atoms")
-        
+
         else:
             self.status_bar.showMessage("center set to centroid of selected atoms")
 
@@ -177,8 +204,6 @@ class PrecisionRotate(ToolInstance):
         
         self.bonds = {model:(bond.atoms[0].coord - bond.atoms[1].coord) for model, bond in zip(models, bonds)}
         self.bond_centers = {model:bond.atoms[1].coord for model, bond in zip(models, bonds)}
-        
-        print(self.bonds)
 
     def set_perpendicular(self, *args):
         atoms = selected_atoms(self.session)
@@ -207,9 +232,7 @@ class PrecisionRotate(ToolInstance):
             
             self.perpendiculars[model] = vector
             self.perp_centers[model] = np.mean(atom_coords, axis=0)
-    
-        print(self.perpendiculars)
-    
+        
     def set_group(self, *args):
         atoms = selected_atoms(self.session)
         if len(atoms) == 0:
@@ -227,13 +250,9 @@ class PrecisionRotate(ToolInstance):
         
             self.groups[model] = np.mean(atom_coords, axis=0)
         
-        print(self.groups)
-        
     def do_rotate(self, *args):
         selection = selected_atoms(self.session)
-        
-        print(self.groups)
-        
+
         models = {}
         for atom in selection:
             if atom.structure not in models:
@@ -306,22 +325,129 @@ class PrecisionRotate(ToolInstance):
             
             if self.vector_option.currentText() == "centroid of atoms" and self.cor_button.text() != "automatic":
                 v = v - c
-            
-            print(v, c, angle)
-            
+
             residues = []
             for atom in models[model]:
                 if atom.residue not in residues:
                     residues.append(atom.residue)
             
-            rescol = ResidueCollection(model, convert_residues=residues)
+            rescol = ResidueCollection(model, convert_residues=residues, bonds_matter=False)
             
             rescol.rotate(v, angle, center=c, targets=[AtomSpec(atom.atomspec) for atom in models[model]])
+
+            rescol.update_chix(model, refresh_connected=False)
+
+    def show_rot_vec(self, *args):
+        for model in self.session.models.list(type=Generic3DModel):
+            if model.name == "rotation vector":
+                model.delete()
+    
+        if self.display_rot_vec.checkState() == Qt.Unchecked:
+            return
+        
+        selection = selected_atoms(self.session)
+
+        if len(selection) == 0:
+            return
+
+        models = {}
+        for atom in selection:
+            if atom.structure not in models:
+                models[atom.structure] = [atom]
+            else:
+                models[atom.structure].append(atom)
+        
+        if len(models.keys()) == 0:
+            return
+    
+        if self.vector_option.currentText() == "axis":
+            if self.axis.currentText() == "z":
+                vector = np.array([0., 0., 1.])
+            elif self.axis.currentText() == "y":
+                vector = np.array([0., 1., 0.])            
+            elif self.axis.currentText() == "x":
+                vector = np.array([1., 0., 0.])
+        
+        elif self.vector_option.currentText() == "bond":
+            vector = self.bonds
+        
+        elif self.vector_option.currentText() == "perpendicular to plane":
+            vector = self.perpendiculars
+        
+        elif self.vector_option.currentText() == "centroid of atoms":
+            vector = self.groups
+        
+        elif self.vector_option.currentText() == "custom":
+            x = self.vector_x.value()
+            y = self.vector_y.value()
+            z = self.vector_z.value()
+            vector = np.array([x, y, z])
+        
+        angle = np.deg2rad(self.angle.value())
+        
+        center = {}
+        for model in models:
+            atoms = models[model]
+            coords = np.array([atom.coord for atom in atoms])
+            center[model] = np.mean(coords, axis=0)
+        
+        if self.cor_button.text() == "automatic":
+            if self.vector_option.currentText() == "perpendicular to plane":
+                center = self.perp_centers
             
-            rescol.update_chix(model)
+            elif self.vector_option.currentText() == "bond":
+                center = self.bond_centers
         
+        else:
+            center = self.manual_center
+
+        for model in models:
+            if isinstance(vector, dict):
+                if model not in vector.keys():
+                    continue
+                else:
+                    v = vector[model]
+            
+            else:
+                v = vector
+            
+            if isinstance(center, dict):
+                if model not in center.keys():
+                    continue
+                else:
+                    c = center[model]
+            
+            else:
+                c = center
+            
+            if self.vector_option.currentText() == "centroid of atoms" and self.cor_button.text() != "automatic":
+                v = v - c
+
+            if np.linalg.norm(v) == 0:
+                continue
+
+            residues = []
+            for atom in models[model]:
+                if atom.residue not in residues:
+                    residues.append(atom.residue)
+            
+            v_c = c + v
+            
+            s = ".color red\n"
+            s += ".arrow %10.6f %10.6f %10.6f   %10.6f %10.6f %10.6f   0.2 0.4 0.7\n" % (*c, *v_c)
+            
+            stream = BytesIO(bytes(s, 'utf-8'))
+            bild_obj, status = read_bild(self.session, stream, "rotation vector")
+
+            self.session.models.add(bild_obj, parent=model)
+
+    def delete(self):
+        self.session.triggers.remove_handler(self._show_rot_vec)
+        global_triggers = get_triggers()
+        global_triggers.remove_handler(self._changes)
         
+        for model in self.session.models.list(type=Generic3DModel):
+            if model.name == "rotation vector":
+                model.delete()
         
-        
-        
-        
+        return super().delete()
