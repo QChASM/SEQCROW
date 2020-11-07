@@ -96,12 +96,16 @@ class SEQCROW_Theory(Theory):
         s = header
 
         if geometry is not None:
-            if self.sapt:
+            if self.method.sapt:
+                atoms_not_in_monomer = [a for a in geometry.atoms]
                 for monomer, charge, mult in zip(monomers, self.charge[1:], self.multiplicity[1:]):
                     s += "--\n"
                     s += "%2i %i\n" % (charge, mult)
                     if isinstance(self.geometry, AtomicStructure):
                         for atom in monomer:
+                            if atom in atoms_not_in_monomer:
+                                atoms_not_in_monomer.remove(atom)
+                            
                             if use_bohr:
                                 #this is the angstrom-bohr conversion that psi4 uses
                                 coords = [x / UNIT.A0_TO_BOHR for x in atom.coord]
@@ -111,6 +115,7 @@ class SEQCROW_Theory(Theory):
                 
                     elif isinstance(self.geometry, Geometry):
                         for atom in monomer:
+                            atoms_not_in_monomer.remove(atom)
                             if isinstance(atom, ChixAtom):
                                 atom = self.geometry.find_exact(AtomSpec(atom.atomspec))[0]
                             if use_bohr:
@@ -118,7 +123,10 @@ class SEQCROW_Theory(Theory):
                             else:
                                 coords = atom.coords
                             s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element, *coords)
-                        
+                
+                if len(atoms_not_in_monomer) > 0:
+                    warnings.append("there are %i atoms not in a monomer" % len(atoms_not_in_monomer))
+                
             else:
                 if isinstance(self.geometry, AtomicStructure):
                     for atom in self.geometry.atoms:

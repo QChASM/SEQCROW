@@ -713,7 +713,7 @@ class BuildQM(ToolInstance):
             elif program == "ORCA":
                 output, warnings = self.theory.write_orca_input(**combined_dict)
             elif program == "Psi4":
-                if self.theory.sapt:
+                if self.theory.method.sapt:
                     monomers = self.method_widget.sapt_layers.layers
                     output, warnings = self.theory.write_psi4_input(monomers=monomers, **combined_dict)
                     
@@ -753,7 +753,7 @@ class BuildQM(ToolInstance):
         always called before creating an input file"""
         model = self.model_selector.currentData()
 
-        meth, sapt = self.method_widget.getMethod(update_settings)
+        meth = self.method_widget.getMethod(update_settings)
         basis = self.get_basis_set(update_settings)
 
         dispersion = self.method_widget.getDispersion(update_settings)
@@ -761,7 +761,7 @@ class BuildQM(ToolInstance):
         grid = self.method_widget.getGrid(update_settings)      
         charge = self.job_widget.getCharge(update_settings)
         mult = self.job_widget.getMultiplicity(update_settings)
-        if sapt:
+        if meth.sapt:
             charges = [widget.value() for widget in \
                           [self.method_widget.sapt_layers.tabs.widget(i).charge for i in range(0, self.method_widget.sapt_layers.tabs.count())]
             ]
@@ -787,7 +787,7 @@ class BuildQM(ToolInstance):
         self.theory = SEQCROW_Theory(charge=charge, multiplicity=mult, \
                                      method=meth, basis=basis, empirical_dispersion=dispersion, \
                                      grid=grid, processors=nproc, memory=mem, job_type=jobs, \
-                                     solvent=solvent, geometry=model, sapt=sapt)
+                                     solvent=solvent, geometry=model)
     
     def change_model(self, index):
         """changes model to the one selected in self.model_selector (index is basically ignored"""
@@ -897,7 +897,7 @@ class BuildQM(ToolInstance):
         elif program == "ORCA":
             output, warnings = self.theory.write_orca_input(**combined_dict)
         elif program == "Psi4":
-            if self.theory.sapt:
+            if self.theory.method.sapt:
                 monomers = self.method_widget.sapt_layers.layers
                 output, warnings = self.theory.write_psi4_input(monomers=monomers, **combined_dict)
                 
@@ -945,7 +945,7 @@ class BuildQM(ToolInstance):
         elif program == "Psi4":
             filename, _ = QFileDialog.getSaveFileName(filter="Psi4 input files (*.in)")
             if filename:
-                if self.theory.sapt:
+                if self.theory.method.sapt:
                     monomers = self.method_widget.sapt_layers.layers
                     output, warnings = self.theory.write_psi4_input(monomers=monomers, **combined_dict)
                     
@@ -2220,13 +2220,18 @@ class LayerWidget(QWidget):
                 for i, layer in enumerate(self.layers):
                     if i == cur_ndx:
                         continue
-                    
-                    if atom in layer[::-1]:
-                        ndx = layer.index(atom)
                         
-                        other_layer_table = self.tabs.widget(i).table
-                        
-                        other_layer_table.removeRow(ndx)
+                    other_layer_table = self.tabs.widget(i)
+                    if other_layer_table is None:
+                        continue
+                    else:
+                        other_layer_table = other_layer_table.table
+                    for atom2 in layer[::-1]:
+                        if atom is atom2:
+                            print("removing", atom2.atomspec, "from monomer", i + 1)
+                            ndx = layer.index(atom)
+                            layer.pop(ndx)
+                            other_layer_table.removeRow(ndx)
                 
                 row = table.rowCount()
                 table.insertRow(row)
@@ -2315,7 +2320,7 @@ class MethodOption(QWidget):
     GAUSSIAN_DISPERSION = ["Grimme D2", "Zero-damped Grimme D3", "Becke-Johnson damped Grimme D3", "Petersson-Frisch"]
     GAUSSIAN_GRIDS = ["Default", "SuperFineGrid", "UltraFine", "FineGrid"]
     
-    ORCA_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D3", "B3PW91", "B97-D", "BP86", "PBE0", "HF-3c", "AM1"]
+    ORCA_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D3", "B3PW91", "B97-D2", "BP86", "PBE0", "HF-3c", "AM1"]
     ORCA_DISPERSION = ["Grimme D2", "Zero-damped Grimme D3", "Becke-Johnson damped Grimme D3", "Grimme D4"]
     ORCA_GRIDS = ["Default", "Grid7", "Grid6", "Grid5", "Grid4"]
 
@@ -2373,7 +2378,7 @@ class MethodOption(QWidget):
         
         self.sapt_type = QComboBox()
         # TODO: charge-transfer sapt
-        self.sapt_type.addItems(["standard", "F/I", "spin-flip"])
+        self.sapt_type.addItems(["standard", "spin-flip"])
         self.sapt_type.currentIndexChanged.connect(self.something_changed)
         sapt_layout.addRow("SAPT type:", self.sapt_type)
         
@@ -2381,6 +2386,8 @@ class MethodOption(QWidget):
         self.sapt_level.addItems(["0", "2", "2+", "2+(3)", "2+3"])
         self.sapt_level.currentIndexChanged.connect(self.something_changed)
         sapt_layout.addRow("SAPT order:", self.sapt_level)
+        
+        self.sapt_type.currentTextChanged.connect(lambda text, widget=self.sapt_level: widget.setEnabled(text != "spin-flip"))
         
         self.sapt_layers = LayerWidget(self.settings, session, "monomer")  
         sapt_layout.addRow(self.sapt_layers)
@@ -2615,25 +2622,18 @@ class MethodOption(QWidget):
 
     def getMethod(self, update_settings=True):
         """returns Method corresponding to current settings"""
-        if self.form == "Gaussian":
-            if self.method_option.currentText() == "B3LYP":
-                if update_settings:
-                    self.settings.previous_method = "Gaussian's B3LYP"
-                
-                return Method("Gaussian's B3LYP", False), False
-            
         if not any(self.method_option.currentText() == x for x in ["other", "SAPT"]):
             method = self.method_option.currentText()
             #omega doesn't get decoded right
             if update_settings:
                 self.settings.previous_method = method.replace('ω', 'w')
             
-            if method in KNOWN_SEMI_EMPIRICAL:
+            if any(method.upper() == x.upper() for x in KNOWN_SEMI_EMPIRICAL):
                 is_semiempirical = True
             else:
                 is_semiempirical = False
                 
-            return Method(method, is_semiempirical), False
+            return Method(method, is_semiempirical=is_semiempirical, sapt=False)
         
         elif self.method_option.currentText() == "SAPT":
             if update_settings:
@@ -2650,7 +2650,7 @@ class MethodOption(QWidget):
                 sapt_level = self.sapt_level.currentText()
                 method += sapt_level
             
-            return Method(method, False), True
+            return Method(method, is_semiempirical=False, sapt=True)
         
         elif self.method_option.currentText() == "other":
             if update_settings:
@@ -2678,7 +2678,7 @@ class MethodOption(QWidget):
                         row = self.previously_used_table.rowCount()
                         self.add_previously_used(row, method, not is_semiempirical)
 
-            return Method(method, is_semiempirical), False
+            return Method(method, is_semiempirical=is_semiempirical, sapt=False)
 
     def getDispersion(self, update_settings=True):
         """returns EmpiricalDispersion corresponding to current settings"""
