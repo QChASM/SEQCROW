@@ -7,7 +7,9 @@ from AaronTools.theory import *
 from AaronTools.const import UNIT
 
 from chimerax.atomic import AtomicStructure
+from chimerax.atomic import Atom as ChixAtom
 
+from SEQCROW.finders import AtomSpec
 
 class SEQCROW_Theory(Theory):
     def write_gaussian_input(self, fname=None, **other_kw_dict):
@@ -80,7 +82,7 @@ class SEQCROW_Theory(Theory):
 
         return s, warnings
 
-    def write_psi4_input(self, fname=None, **other_kw_dict):
+    def write_psi4_input(self, fname=None, monomers=None, **other_kw_dict):
         geometry = self.geometry
         warnings = []
         
@@ -94,22 +96,46 @@ class SEQCROW_Theory(Theory):
         s = header
 
         if geometry is not None:
-            if isinstance(self.geometry, AtomicStructure):
-                for atom in self.geometry.atoms:
-                    if use_bohr:
-                        #this is the angstrom-bohr conversion that psi4 uses
-                        coords = [x / UNIT.A0_TO_BOHR for x in atom.coord]
-                    else:
-                        coords = atom.coord
-                    s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element.name, *coords)
-
-            elif isinstance(self.geometry, Geometry):
-                for atom in self.geometry.atoms:
-                    if use_bohr:
-                        coords = [x / UNIT.A0_TO_BOHR for x in atom.coords]
-                    else:
-                        coords = atom.coords
-                    s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element, *coords)
+            if self.sapt:
+                for monomer, charge, mult in zip(monomers, self.charge[1:], self.multiplicity[1:]):
+                    s += "--\n"
+                    s += "%2i %i\n" % (charge, mult)
+                    if isinstance(self.geometry, AtomicStructure):
+                        for atom in monomer:
+                            if use_bohr:
+                                #this is the angstrom-bohr conversion that psi4 uses
+                                coords = [x / UNIT.A0_TO_BOHR for x in atom.coord]
+                            else:
+                                coords = atom.coord
+                            s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element.name, *coords)
+                
+                    elif isinstance(self.geometry, Geometry):
+                        for atom in monomer:
+                            if isinstance(atom, ChixAtom):
+                                atom = self.geometry.find_exact(AtomSpec(atom.atomspec))[0]
+                            if use_bohr:
+                                coords = [x / UNIT.A0_TO_BOHR for x in atom.coords]
+                            else:
+                                coords = atom.coords
+                            s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element, *coords)
+                        
+            else:
+                if isinstance(self.geometry, AtomicStructure):
+                    for atom in self.geometry.atoms:
+                        if use_bohr:
+                            #this is the angstrom-bohr conversion that psi4 uses
+                            coords = [x / UNIT.A0_TO_BOHR for x in atom.coord]
+                        else:
+                            coords = atom.coord
+                        s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element.name, *coords)
+                
+                elif isinstance(self.geometry, Geometry):
+                    for atom in self.geometry.atoms:
+                        if use_bohr:
+                            coords = [x / UNIT.A0_TO_BOHR for x in atom.coords]
+                        else:
+                            coords = atom.coords
+                        s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element, *coords)
 
         footer, footer_warnings = self.make_footer(geometry,
                                                    style='psi4', 
