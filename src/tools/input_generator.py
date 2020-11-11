@@ -2313,6 +2313,7 @@ class LayerWidget(QWidget):
         for i in range(0, self.tabs.count()):
             self.tabs.setTabText(i, "%s %i" % (self.tab_text, i + 1))
 
+
 class MethodOption(QWidget):
     #TODO: make checking the "is_semiempirical" box disable the basis functions tab of the parent tab widget
     #      dispersion names can be moved to EmpiricalDispersion
@@ -2378,7 +2379,7 @@ class MethodOption(QWidget):
         
         self.sapt_type = QComboBox()
         # TODO: charge-transfer sapt
-        self.sapt_type.addItems(["standard", "spin-flip"])
+        self.sapt_type.addItems(["standard", "F/I", "spin-flip"])
         self.sapt_type.currentIndexChanged.connect(self.something_changed)
         sapt_layout.addRow("SAPT type:", self.sapt_type)
         
@@ -2636,8 +2637,6 @@ class MethodOption(QWidget):
             return Method(method, is_semiempirical=is_semiempirical, sapt=False)
         
         elif self.method_option.currentText() == "SAPT":
-            if update_settings:
-                self.settings.previous_method = "SAPT"
             
             if self.sapt_type.currentText() == "standard":
                 method = "sapt"
@@ -2649,6 +2648,9 @@ class MethodOption(QWidget):
             if method != "sf-sapt":
                 sapt_level = self.sapt_level.currentText()
                 method += sapt_level
+            
+            if update_settings:
+                self.settings.previous_method = method
             
             return Method(method, is_semiempirical=False, sapt=True)
         
@@ -2736,7 +2738,7 @@ class MethodOption(QWidget):
             test_value = "B3LYP"
         
         ndx = self.method_option.findText(test_value, Qt.MatchExactly)
-        if ndx < 0:
+        if ndx < 0 and "sapt" not in test_value:
             ndx = self.method_option.findText("other", Qt.MatchExactly)
             if isinstance(func, Method):
                 self.method_kw.setText(func.name)
@@ -2744,6 +2746,26 @@ class MethodOption(QWidget):
             else:
                 self.method_kw.setText(func)
                 self.is_semiempirical.setChecked(any(func == semi_func.upper() for semi_func in KNOWN_SEMI_EMPIRICAL))
+        
+        elif "sapt" in test_value:
+            ndx = self.method_option.findText("SAPT", Qt.MatchExactly)
+            m = QRegularExpression("(.*)sapt(.*)")
+            match = m.match(test_value)
+            sapt_type = match.captured(1)
+            sapt_level = match.captured(2)
+
+            if sapt_type == "sf-":
+                type_ndx = self.sapt_type.findText("spin-flip", Qt.MatchExactly)
+            elif sapt_type == "fi":
+                type_ndx = self.sapt_type.findText("F/I", Qt.MatchExactly)
+            else:
+                type_ndx = 0
+            
+            self.sapt_type.setCurrentIndex(type_ndx)
+            
+            if sapt_level is not None:
+                level_ndx = self.sapt_level.findText(sapt_level, Qt.MatchExactly)
+                self.sapt_level.setCurrentIndex(level_ndx)
 
         self.method_option.setCurrentIndex(ndx)
 

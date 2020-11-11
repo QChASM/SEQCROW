@@ -4,7 +4,7 @@ from AaronTools.utils.utils import combine_dicts
 from AaronTools.atoms import Atom
 from AaronTools.geometry import Geometry
 from AaronTools.theory import *
-from AaronTools.const import UNIT
+from AaronTools.const import UNIT, ELEMENTS
 
 from chimerax.atomic import AtomicStructure
 from chimerax.atomic import Atom as ChixAtom
@@ -96,7 +96,52 @@ class SEQCROW_Theory(Theory):
         s = header
 
         if geometry is not None:
-            if self.method.sapt:
+            if self.method.sapt and sum(self.multiplicity[1:]) - len(self.multiplicity[1:]) + 1 > self.multiplicity[0]:
+                seps = []
+                for i, m1 in enumerate(monomers[:-1]):
+                    seps.append(0)
+                    # needs to be i+1 for some reason...
+                    for m2 in monomers[:i+1]:
+                        seps[-1] += len(m2)
+    
+                for monomer in monomers:
+                    print("monomer")
+                    for atom in monomer:
+                        print(atom.atomspec)
+                        
+                s += "    fragment_separators=%s,\n" % repr(seps[:-1])
+                if isinstance(self.geometry, AtomicStructure):
+                    s += "    elez=%s,\n" % repr([atom.element.number for monomer in monomers for atom in monomer])
+                else:
+                    s += "    elez=%s,\n" % repr([ELEMENTS.index(atom.element) for monomer in monomers for atom in monomer])
+
+                s += "    fragment_multiplicities=%s,\n" % repr(self.multiplicity[1:])
+                s += "    fragment_charges=%s,\n" % repr(self.charge[1:])
+                s += "    geom=["
+                i = 0
+                for monomer in monomers:
+                    print("monomer")
+                    for atom in monomer:
+                        print(atom)
+                for monomer in monomers:
+                    s += "\n"
+                    for atom in monomer:
+                        if isinstance(self.geometry, AtomicStructure):
+                            coords = atom.coord
+                        else:
+                            coords = atom.coords
+                        
+                        if use_bohr:
+                            coords = [x / UNIT.A0_TO_BOHR for x in coords]
+                            
+                        s += "        %10.6f, %10.6f, %10.6f,\n" % tuple(coords)
+    
+                
+                s += "    ],\n"
+                s += ")\n\n"
+                s += "activate(mol)\n"
+            
+            elif self.method.sapt:
                 atoms_not_in_monomer = [a for a in geometry.atoms]
                 for monomer, charge, mult in zip(monomers, self.charge[1:], self.multiplicity[1:]):
                     s += "--\n"
