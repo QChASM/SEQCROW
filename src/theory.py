@@ -172,6 +172,8 @@ class SEQCROW_Theory(Theory):
                 if len(atoms_not_in_monomer) > 0:
                     warnings.append("there are %i atoms not in a monomer" % len(atoms_not_in_monomer))
                 
+                s += "}\n"
+                
             else:
                 if isinstance(self.geometry, AtomicStructure):
                     for atom in self.geometry.atoms:
@@ -189,6 +191,8 @@ class SEQCROW_Theory(Theory):
                         else:
                             coords = atom.coords
                         s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element, *coords)
+                
+                s += "}\n"
 
         footer, footer_warnings = self.make_footer(geometry,
                                                    style='psi4', 
