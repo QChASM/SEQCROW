@@ -934,7 +934,6 @@ class BuildQM(ToolInstance):
         if program == "Gaussian":
             filename, _ = QFileDialog.getSaveFileName(filter="Gaussian input files (*.com *.gjf)")
             if filename:
-                print(filename)
                 output, warnings = self.theory.write_gaussian_input(fname=filename, **combined_dict)
         
         elif program == "ORCA":
@@ -2228,7 +2227,6 @@ class LayerWidget(QWidget):
                         other_layer_table = other_layer_table.table
                     for atom2 in layer[::-1]:
                         if atom is atom2:
-                            print("removing", atom2.atomspec, "from monomer", i + 1)
                             ndx = layer.index(atom)
                             layer.pop(ndx)
                             other_layer_table.removeRow(ndx)
@@ -2294,8 +2292,14 @@ class LayerWidget(QWidget):
             
             self.set_layer(use_atoms=atoms)
         
+        # we'll have an empty monomer when we first open the input builder
+        # before the molecule is set
+        # this empty monomer would stick around until it is removed
+        while len(self.layers) > self.tabs.count():
+            self.layers.pop(-1)
+
         self.something_changed.emit()
-    
+        
     def check_deleted_atoms(self, *args):
         for i, layer in enumerate(self.layers):
             table = self.tabs.widget(i)
