@@ -32,6 +32,11 @@ def sterimol(session, selection, radii="UMN", showVectors=True, showRadii=True, 
     l = None
     b1 = None
     b5 = None
+    targets = []
+    neighbors = []
+    ls = []
+    b1s = []
+    b5s = []
     
     info = "<pre>substituent atom\tbonded atom\tL\tB1\tB5\n"
     
@@ -103,6 +108,11 @@ def sterimol(session, selection, radii="UMN", showVectors=True, showRadii=True, 
                     session.models.add(bild_obj, parent=model)
                 
                 info += "%-16s\t%-11s\t%.2f\t%.2f\t%.2f\n" % (target.atomspec, attached[target].atomspec, l, b1, b5)
+                targets.append(target.atomspec)
+                neighbors.append(attached[target].atomspec)
+                ls.append(l)
+                b1s.append(b1)
+                b5s.append(b5)
     
     info = info.strip()
     info += "</pre>"
@@ -110,4 +120,4 @@ def sterimol(session, selection, radii="UMN", showVectors=True, showRadii=True, 
         session.logger.info(info, is_html=True)
     
     if return_values:
-        return l, b1, b5
+        return targets, neighbors, ls, b1s, b5s

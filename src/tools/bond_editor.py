@@ -35,6 +35,9 @@ class _BondEditorSettings(Settings):
     }
 
 class BondEditor(ToolInstance):
+
+    help = "https://github.com/QChASM/SEQCROW/wiki/Bond-Editor-Tool"
+
     def __init__(self, session, name):
         super().__init__(session, name)
         

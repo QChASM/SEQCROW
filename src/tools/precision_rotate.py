@@ -28,6 +28,9 @@ class _PrecisionRotateSettings(Settings):
     }
 
 class PrecisionRotate(ToolInstance):
+
+    help = "https://github.com/QChASM/SEQCROW/wiki/Rotate-Tool"
+
     def __init__(self, session, name):
         super().__init__(session, name)
         

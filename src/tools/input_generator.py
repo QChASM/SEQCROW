@@ -314,7 +314,7 @@ class BuildQM(ToolInstance):
         self.job_widget.jobTypeChanged.connect(self.update_preview)
         
         #method stuff
-        self.method_widget = MethodOption(self.settings, init_form=init_form)
+        self.method_widget = MethodOption(self.settings, self.session, init_form=init_form)
         self.method_widget.methodChanged.connect(self.update_preview)
 
         #basis set stuff
@@ -713,7 +713,12 @@ class BuildQM(ToolInstance):
             elif program == "ORCA":
                 output, warnings = self.theory.write_orca_input(**combined_dict)
             elif program == "Psi4":
-                output, warnings = self.theory.write_psi4_input(**combined_dict)
+                if self.theory.method.sapt:
+                    monomers = self.method_widget.sapt_layers.layers
+                    output, warnings = self.theory.write_psi4_input(monomers=monomers, **combined_dict)
+                    
+                else:
+                    output, warnings = self.theory.write_psi4_input(**combined_dict)
     
             self.preview_window.setPreview(output, warnings)
 
@@ -756,6 +761,20 @@ class BuildQM(ToolInstance):
         grid = self.method_widget.getGrid(update_settings)      
         charge = self.job_widget.getCharge(update_settings)
         mult = self.job_widget.getMultiplicity(update_settings)
+        if meth.sapt:
+            charges = [widget.value() for widget in \
+                          [self.method_widget.sapt_layers.tabs.widget(i).charge for i in range(0, self.method_widget.sapt_layers.tabs.count())]
+            ]
+            multiplicities = [widget.value() for widget in \
+                          [self.method_widget.sapt_layers.tabs.widget(i).multiplicity for i in range(0, self.method_widget.sapt_layers.tabs.count())]
+            ]
+            
+            charge = [charge]
+            charge.extend(charges)
+            
+            mult = [mult]
+            mult.extend(multiplicities)
+
         nproc = self.job_widget.getNProc(update_settings)
         mem = self.job_widget.getMem(update_settings)
         jobs = self.job_widget.getJobs() #job settings get updated during getKWDict
@@ -779,6 +798,7 @@ class BuildQM(ToolInstance):
         mdl = self.model_selector.currentData()
 
         self.job_widget.setStructure(mdl)
+        self.method_widget.sapt_layers.setStructure(mdl)
         self.check_elements()
 
         if mdl in self.session.filereader_manager.filereader_dict:
@@ -799,6 +819,7 @@ class BuildQM(ToolInstance):
             elements = set(mdl.atoms.elements.names)
             self.basis_widget.setElements(elements)
             self.job_widget.check_deleted_atoms()
+            self.method_widget.sapt_layers.check_deleted_atoms()
     
     def get_basis_set(self, update_settings=False):
         """get BasisSet object from the basis widget"""
@@ -876,7 +897,12 @@ class BuildQM(ToolInstance):
         elif program == "ORCA":
             output, warnings = self.theory.write_orca_input(**combined_dict)
         elif program == "Psi4":
-            output, warnings = self.theory.write_psi4_input(**combined_dict)
+            if self.theory.method.sapt:
+                monomers = self.method_widget.sapt_layers.layers
+                output, warnings = self.theory.write_psi4_input(monomers=monomers, **combined_dict)
+                
+            else:
+                output, warnings = self.theory.write_psi4_input(**combined_dict)
 
         for warning in warnings:
             self.session.logger.warning(warning)
@@ -919,8 +945,13 @@ class BuildQM(ToolInstance):
         elif program == "Psi4":
             filename, _ = QFileDialog.getSaveFileName(filter="Psi4 input files (*.in)")
             if filename:
-                output, warnings = self.theory.write_psi4_input(fname=filename, **combined_dict)
-
+                if self.theory.method.sapt:
+                    monomers = self.method_widget.sapt_layers.layers
+                    output, warnings = self.theory.write_psi4_input(monomers=monomers, **combined_dict)
+                    
+                else:
+                    output, warnings = self.theory.write_psi4_input(**combined_dict)
+                    
         for warning in warnings:
             self.session.logger.warning(warning)
             
@@ -2010,7 +2041,7 @@ class JobTypeOption(QWidget):
         if update_settings:
             self.settings.last_nproc = self.nprocs.value()
         
-        if self.nprocs.value() != 0:
+        if self.nprocs.value() > 0:
             return self.nprocs.value()
         else:
             return None
@@ -2126,6 +2157,163 @@ class JobTypeOption(QWidget):
                 self.constrained_torsions.remove(torsion)
 
 
+class LayerWidget(QWidget):
+    something_changed = pyqtSignal()
+    
+    def __init__(self, settings, session, tab_text, parent=None):
+        super().__init__(parent)
+
+        self._session = session
+        self.structure = None
+        self.tab_text = tab_text
+
+        self.layers = []
+
+        layout = QGridLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.tabs = QTabWidget()
+        self.tabs.setTabsClosable(True)
+        self.tabs.tabCloseRequested.connect(self.tab_close_clicked)
+        self.tabs.tabCloseRequested.connect(lambda *args: self.something_changed.emit())
+        layout.addWidget(self.tabs, 0, 0, 2, 1, Qt.AlignTop)
+        
+        set_layer_button = QPushButton("current %s selected" % tab_text)
+        set_layer_button.clicked.connect(self.set_layer)
+        layout.addWidget(set_layer_button, 0, 1, 1, 1, Qt.AlignBottom)
+        
+        add_layer_button = QPushButton("new %s" % tab_text)
+        add_layer_button.clicked.connect(self.add_tab)
+        layout.addWidget(add_layer_button, 1, 1, 1, 1, Qt.AlignTop)
+        
+        layout.setColumnStretch(0, 1)
+        layout.setColumnStretch(1, 0)
+        
+        layout.setRowStretch(0, 1)
+        layout.setRowStretch(1, 1)
+        
+        self.set_layer()
+    
+    def setStructure(self, structure):
+        self.structure = structure
+        self.tabs.clear()
+        self.add_tab()
+        self.set_layer(use_atoms=structure.atoms)
+    
+    def set_layer(self, *args, use_atoms=False):
+        cur_ndx = self.tabs.currentIndex()
+        if cur_ndx == -1:
+            self.add_tab()
+            return
+        
+        table = self.tabs.widget(cur_ndx).table
+        table.setRowCount(0)
+        self.layers[cur_ndx] = []
+        
+        if use_atoms:
+            atoms = use_atoms
+        else:
+            atoms = selected_atoms(self._session)
+        
+        for atom in atoms:
+            if atom.structure is self.structure:
+                for i, layer in enumerate(self.layers):
+                    if i == cur_ndx:
+                        continue
+                        
+                    other_layer_table = self.tabs.widget(i)
+                    if other_layer_table is None:
+                        continue
+                    else:
+                        other_layer_table = other_layer_table.table
+                    for atom2 in layer[::-1]:
+                        if atom is atom2:
+                            print("removing", atom2.atomspec, "from monomer", i + 1)
+                            ndx = layer.index(atom)
+                            layer.pop(ndx)
+                            other_layer_table.removeRow(ndx)
+                
+                row = table.rowCount()
+                table.insertRow(row)
+                
+                atomspec = QTableWidgetItem()
+                atomspec.setData(Qt.DisplayRole, atom.atomspec)
+                table.setItem(row, 0, atomspec)
+                
+                self.layers[cur_ndx].append(atom)\
+        
+        self.something_changed.emit()
+
+    def add_tab(self, *args):
+        widget = QWidget()
+        layout = QGridLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        table = QTableWidget()
+        table.setColumnCount(1)
+        table.setHorizontalHeaderLabels(["atoms"])
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        layout.addWidget(table, 0, 0, 3, 1, Qt.AlignTop)
+        
+        charge = QSpinBox()
+        charge.setRange(-5, 5)
+        charge.valueChanged.connect(lambda *args: self.something_changed.emit())
+        layout.addWidget(QLabel("charge:"), 0, 1, 1, 1, Qt.AlignLeft)
+        layout.addWidget(charge, 0, 2, 1, 1, Qt.AlignVCenter)
+        
+        multiplicity = QSpinBox()
+        multiplicity.setRange(1, 3)
+        multiplicity.valueChanged.connect(lambda *args: self.something_changed.emit())
+        layout.addWidget(QLabel("multiplicity:"), 1, 1, 1, 1, Qt.AlignLeft)
+        layout.addWidget(multiplicity, 1, 2, 1, 1, Qt.AlignTop)
+        
+        layout.addWidget(QWidget(), 2, 1, 1, 1, Qt.AlignTop) 
+        
+        layout.setColumnStretch(0, 1)
+        layout.setColumnStretch(1, 0)
+        layout.setColumnStretch(2, 0)
+        
+        layout.setRowStretch(0, 0)
+        layout.setRowStretch(1, 0)
+        layout.setRowStretch(2, 1)
+        
+        self.layers.append([])
+        
+        widget.table = table
+        widget.charge = charge
+        widget.multiplicity = multiplicity
+        
+        self.tabs.addTab(widget, "%s %i" % (self.tab_text, self.tabs.count() + 1))
+        self.tabs.setCurrentIndex(self.tabs.count()-1)
+        
+        if self.structure is not None:
+            atoms = []
+            for atom in self.structure.atoms:
+                if not any(atom in layer for layer in self.layers):
+                    atoms.append(atom)
+            
+            self.set_layer(use_atoms=atoms)
+        
+        self.something_changed.emit()
+    
+    def check_deleted_atoms(self, *args):
+        for i, layer in enumerate(self.layers):
+            table = self.tabs.widget(i)
+            if table is None:
+                continue
+            table = table.table
+            for atom in layer[::-1]:
+                if atom.deleted:
+                    table.removeRow(layer.index(atom))
+                    layer.remove(atom)
+
+    def tab_close_clicked(self, ndx):
+        self.tabs.removeTab(ndx)
+        self.layers.pop(ndx)
+        for i in range(0, self.tabs.count()):
+            self.tabs.setTabText(i, "%s %i" % (self.tab_text, i + 1))
+
+
 class MethodOption(QWidget):
     #TODO: make checking the "is_semiempirical" box disable the basis functions tab of the parent tab widget
     #      dispersion names can be moved to EmpiricalDispersion
@@ -2133,20 +2321,21 @@ class MethodOption(QWidget):
     GAUSSIAN_DISPERSION = ["Grimme D2", "Zero-damped Grimme D3", "Becke-Johnson damped Grimme D3", "Petersson-Frisch"]
     GAUSSIAN_GRIDS = ["Default", "SuperFineGrid", "UltraFine", "FineGrid"]
     
-    ORCA_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D3", "B3PW91", "B97-D", "BP86", "PBE0", "HF-3c", "AM1"]
+    ORCA_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D3", "B3PW91", "B97-D2", "BP86", "PBE0", "HF-3c", "AM1"]
     ORCA_DISPERSION = ["Grimme D2", "Zero-damped Grimme D3", "Becke-Johnson damped Grimme D3", "Grimme D4"]
     ORCA_GRIDS = ["Default", "Grid7", "Grid6", "Grid5", "Grid4"]
 
-    PSI4_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D", "B3PW91", "B97-D", "BP86", "PBE0", "CCSD", "CCSD(T)"]
+    PSI4_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D", "B3PW91", "B97-D", "BP86", "PBE0", "SAPT", "CCSD", "CCSD(T)"]
     PSI4_DISPERSION = ["Grimme D1", "Grimme D2", "Zero-damped Grimme D3", "Becke-Johnson damped Grimme D3", \
                        "Becke-Johnson damped modified Grimme D3", "Chai & Head-Gordon", "Nonlocal Approximation", \
                        "Pernal, Podeszwa, Patkowski, & Szalewicz", "Podeszwa, Katarzyna, Patkowski, & Szalewicz", \
-                       "Řezác, Greenwell, & Beran"]
+                       "Řezác, Greenwell, & Beran", "Coupled-Cluster Doubles", "Coupled-Cluster Doubles + Řezác, Greenwell, & Beran", \
+    ]
     PSI4_GRIDS = ["Default", "(250, 974)", "(175, 974)", "(60, 770)", "(99, 590)", "(55, 590)", "(50, 434)", "(75, 302)"]
 
     methodChanged = pyqtSignal()
     
-    def __init__(self, settings, init_form, parent=None):
+    def __init__(self, settings, session, init_form, parent=None):
         super().__init__(parent)
 
         self.settings = settings
@@ -2183,6 +2372,28 @@ class MethodOption(QWidget):
         self.is_semiempirical.setToolTip("check if basis set is integral to the method (e.g. semi-empirical methods)")
 
         func_form_layout.addRow(semi_empirical_label, self.is_semiempirical)
+
+        sapt_widget = QWidget()
+        sapt_layout = QFormLayout(sapt_widget)
+        sapt_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.sapt_type = QComboBox()
+        # TODO: charge-transfer sapt
+        self.sapt_type.addItems(["standard", "F/I", "spin-flip"])
+        self.sapt_type.currentIndexChanged.connect(self.something_changed)
+        sapt_layout.addRow("SAPT type:", self.sapt_type)
+        
+        self.sapt_level = QComboBox()
+        self.sapt_level.addItems(["0", "2", "2+", "2+(3)", "2+3"])
+        self.sapt_level.currentIndexChanged.connect(self.something_changed)
+        sapt_layout.addRow("SAPT order:", self.sapt_level)
+        
+        self.sapt_type.currentTextChanged.connect(lambda text, widget=self.sapt_level: widget.setEnabled(text != "spin-flip"))
+        
+        self.sapt_layers = LayerWidget(self.settings, session, "monomer")  
+        sapt_layout.addRow(self.sapt_layers)
+        self.sapt_layers.something_changed.connect(self.something_changed)
+        func_form_layout.addRow(sapt_widget)
 
         layout.addWidget(method_form, 0, 0, Qt.AlignTop)
 
@@ -2243,6 +2454,7 @@ class MethodOption(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         
         self.method_option.currentTextChanged.connect(self.method_changed)
+        self.method_option.currentTextChanged.connect(lambda text: sapt_widget.setVisible(text == "SAPT"))
         self.setOptions(self.form)
         self.setPreviousStuff()
         self.method_kw.textChanged.connect(self.apply_filter)
@@ -2411,27 +2623,38 @@ class MethodOption(QWidget):
 
     def getMethod(self, update_settings=True):
         """returns Method corresponding to current settings"""
-        if self.form == "Gaussian":
-            if self.method_option.currentText() == "B3LYP":
-                if update_settings:
-                    self.settings.previous_method = "Gaussian's B3LYP"
-                
-                return Method("Gaussian's B3LYP", False)
-            
-        if self.method_option.currentText() != "other":
+        if not any(self.method_option.currentText() == x for x in ["other", "SAPT"]):
             method = self.method_option.currentText()
             #omega doesn't get decoded right
             if update_settings:
                 self.settings.previous_method = method.replace('ω', 'w')
             
-            if method in KNOWN_SEMI_EMPIRICAL:
+            if any(method.upper() == x.upper() for x in KNOWN_SEMI_EMPIRICAL):
                 is_semiempirical = True
             else:
                 is_semiempirical = False
                 
-            return Method(method, is_semiempirical)
+            return Method(method, is_semiempirical=is_semiempirical, sapt=False)
+        
+        elif self.method_option.currentText() == "SAPT":
             
-        else:
+            if self.sapt_type.currentText() == "standard":
+                method = "sapt"
+            elif self.sapt_type.currentText() == "F/I":
+                method = "fisapt"
+            elif self.sapt_type.currentText() == "spin-flip":
+                method = "sf-sapt"
+            
+            if method != "sf-sapt":
+                sapt_level = self.sapt_level.currentText()
+                method += sapt_level
+            
+            if update_settings:
+                self.settings.previous_method = method
+            
+            return Method(method, is_semiempirical=False, sapt=True)
+        
+        elif self.method_option.currentText() == "other":
             if update_settings:
                 self.settings.previous_method = "other"
             
@@ -2457,7 +2680,7 @@ class MethodOption(QWidget):
                         row = self.previously_used_table.rowCount()
                         self.add_previously_used(row, method, not is_semiempirical)
 
-            return Method(method, is_semiempirical)
+            return Method(method, is_semiempirical=is_semiempirical, sapt=False)
 
     def getDispersion(self, update_settings=True):
         """returns EmpiricalDispersion corresponding to current settings"""
@@ -2515,7 +2738,7 @@ class MethodOption(QWidget):
             test_value = "B3LYP"
         
         ndx = self.method_option.findText(test_value, Qt.MatchExactly)
-        if ndx < 0:
+        if ndx < 0 and "sapt" not in test_value:
             ndx = self.method_option.findText("other", Qt.MatchExactly)
             if isinstance(func, Method):
                 self.method_kw.setText(func.name)
@@ -2523,6 +2746,26 @@ class MethodOption(QWidget):
             else:
                 self.method_kw.setText(func)
                 self.is_semiempirical.setChecked(any(func == semi_func.upper() for semi_func in KNOWN_SEMI_EMPIRICAL))
+        
+        elif "sapt" in test_value:
+            ndx = self.method_option.findText("SAPT", Qt.MatchExactly)
+            m = QRegularExpression("(.*)sapt(.*)")
+            match = m.match(test_value)
+            sapt_type = match.captured(1)
+            sapt_level = match.captured(2)
+
+            if sapt_type == "sf-":
+                type_ndx = self.sapt_type.findText("spin-flip", Qt.MatchExactly)
+            elif sapt_type == "fi":
+                type_ndx = self.sapt_type.findText("F/I", Qt.MatchExactly)
+            else:
+                type_ndx = 0
+            
+            self.sapt_type.setCurrentIndex(type_ndx)
+            
+            if sapt_level is not None:
+                level_ndx = self.sapt_level.findText(sapt_level, Qt.MatchExactly)
+                self.sapt_level.setCurrentIndex(level_ndx)
 
         self.method_option.setCurrentIndex(ndx)
 

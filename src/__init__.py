@@ -315,6 +315,10 @@ class _SEQCROW_API(BundleAPI):
             from .commands.sterimol import sterimol, sterimol_description
             register("sterimol", sterimol_description, sterimol)
 
+        elif command_info.name == "percentVolumeBuried":
+            from .commands.percent_Vbur import percent_vbur, vbur_description
+            register("percentVolumeBuried", vbur_description, percent_vbur)
+
     @staticmethod
     def register_selector_menus(session):
         add_submenu = session.ui.main_window.add_select_submenu
