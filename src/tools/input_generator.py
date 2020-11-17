@@ -2041,7 +2041,7 @@ class JobTypeOption(QWidget):
         if update_settings:
             self.settings.last_nproc = self.nprocs.value()
         
-        if self.nprocs.value() != 0:
+        if self.nprocs.value() > 0:
             return self.nprocs.value()
         else:
             return None

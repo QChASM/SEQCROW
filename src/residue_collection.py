@@ -56,13 +56,14 @@ class Residue(Geometry):
             
             self.chix_residue = geom
             
+            self.atomspec = None
             super().__init__(aaron_atoms, name=geom.name, refresh_connected=False, **kwargs)
             if resnum is None:
                 self.resnum = geom.number
             else:
                 self.resnum = resnum
                 
-            if atomspec is None:
+            if atomspec is None and hasattr(geom, "atomspec"):
                 self.atomspec = geom.atomspec
             else:
                 self.atomspec = atomspec
@@ -343,11 +344,8 @@ class ResidueCollection(Geometry):
         for atom in self.atoms:
             if not any(atom in residue for residue in self.residues):
                 atoms_not_in_residue.append(atom)
-        
-        new_lig = Residue(atoms_not_in_residue, name="LIG", resnum=len(self.residues)+1)
-        self.residues.append(new_lig)
 
-        for residue in self.residues:
+        for residue in self.residues[::-1]:
             remove_atoms = []
             for atom in residue.atoms:
                 if atom not in self.atoms:
@@ -355,7 +353,13 @@ class ResidueCollection(Geometry):
             
             for atom in remove_atoms:
                 residue.atoms.remove(atom)
-
+            
+            if len(residue.atoms) == 0:
+                self.residues.remove(residue)
+        
+        new_lig = Residue(atoms_not_in_residue, name="LIG", resnum=len([res for res in self.residues if len(res.atoms) > 0])+1)
+        self.residues.append(new_lig)
+        
     def substitute(self, sub, target, *args, minimize=False, **kwargs):
         """find the residue that target is on and substitute it for sub"""
         target = self.find(target)

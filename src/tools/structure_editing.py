@@ -141,7 +141,7 @@ class EditStructure(ToolInstance):
         self.close_previous_lig.stateChanged.connect(self.close_previous_change)
         maplig_layout.addWidget(self.close_previous_lig, 1, 1, 1, 2, Qt.AlignTop)
 
-        maplig_button = QPushButton("swap ligand of current selection")
+        maplig_button = QPushButton("swap ligand with selected coordinating atoms")
         maplig_button.clicked.connect(self.do_maplig)
         maplig_layout.addWidget(maplig_button, 2, 0, 1, 3, Qt.AlignTop)
 
@@ -323,6 +323,9 @@ class EditStructure(ToolInstance):
     def do_maplig(self):
         lignames = self.ligname.text()
         selection = self.session.seqcrow_ordered_selection_manager.selection
+        sel = selected_atoms(self.session)
+        if len(sel) != len(selection) or not all(a in selection for a in sel) or not all(a in sel for a in selection):
+            selection = sel
         
         if len(selection) < 1:
             raise RuntimeWarning("nothing selected")
@@ -330,9 +333,9 @@ class EditStructure(ToolInstance):
         models = {}
         for atom in selection:
             if atom.structure not in models:
-                models[atom.structure] = [str(atom.atomspec)]
+                models[atom.structure] = [AtomSpec(atom.atomspec)]
             else:
-                models[atom.structure].append(str(atom.atomspec))        
+                models[atom.structure].append(AtomSpec(atom.atomspec))        
         
         first_pass = True
         new_structures = []
