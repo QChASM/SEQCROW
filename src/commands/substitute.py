@@ -59,7 +59,13 @@ def avoidTargets(selection):
             atom2 = bond.other_atom(atom)
             if atom2 not in selection:
                 if atom in attached:
-                    raise RuntimeError("cannot determine previous substituent; multiple fragments unselected")
+                    raise RuntimeError(
+                        "cannot determine previous substituent\n" +
+                        "substituents should have one bond to the rest of the molecule\n" +
+                        "it is assumed that the substituent(s) is/are selected and the rest of the molecule is not\n" +
+                        "this selection has at least two bonds to the rest of the molecule:\n" +
+                        "%s-%s\n%s-%s" % (atom.atomspec, attached[atom].atomspec, atom.atomspec, atom2.atomspec)
+                    )
     
                 attached[atom] = atom2
     

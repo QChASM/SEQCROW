@@ -5,6 +5,7 @@ from chimerax.atomic import selected_atoms
 from chimerax.core.configfile import Value
 from chimerax.core.commands.cli import BoolArg
 from chimerax.core.settings import Settings
+from chimerax.core.generic3d import Generic3DModel 
 
 from PyQt5.Qt import QClipboard
 from PyQt5.QtCore import Qt
@@ -31,9 +32,10 @@ class _SterimolSettings(Settings):
     }
 
 class Sterimol(ToolInstance):
-    SESSION_ENDURING = False
-    SESSION_SAVE = False         
+
     help = "https://github.com/QChASM/SEQCROW/wiki/Sterimol-Tool"
+    SESSION_ENDURING = True
+    SESSION_SAVE = True
     
     def __init__(self, session, name):       
         super().__init__(session, name)
@@ -62,9 +64,13 @@ class Sterimol(ToolInstance):
         self.display_radii.setChecked(self.settings.display_radii)
         layout.addRow("show radii:", self.display_radii)
         
-        calc_sterimol_button = QPushButton("calculate parameters")
+        calc_sterimol_button = QPushButton("calculate parameters for selected substituents")
         calc_sterimol_button.clicked.connect(self.calc_sterimol)
         layout.addRow(calc_sterimol_button)
+        
+        remove_sterimol_button = QPushButton("remove Sterimol visualizations")
+        remove_sterimol_button.clicked.connect(self.del_sterimol)
+        layout.addRow(remove_sterimol_button)
         
         self.table = QTableWidget()
         self.table.setColumnCount(5)
@@ -238,6 +244,11 @@ class Sterimol(ToolInstance):
                 f.write(s.strip())
                 
             self.session.logger.status("saved to %s" % filename)
+    
+    def del_sterimol(self):
+        for model in self.session.models.list(type=Generic3DModel):
+            if model.name == "Sterimol":
+                model.delete()
     
     def display_help(self):
         """Show the help for this tool in the help viewer."""

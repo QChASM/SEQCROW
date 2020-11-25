@@ -29,8 +29,10 @@ vbur_description = CmdDesc(required=[("selection", ModelsArg)], \
                                         ("scale", FloatArg), 
                                         ("onlyAtoms", AtomsArg), 
                                         ("centerAtoms", AtomsArg), 
+                                        ("byCenter", BoolArg), 
                                ],
-                               synopsis="calculate volume buried by ligands around a metal center"
+                               synopsis="calculate volume buried by ligands around a metal center",
+                               url="https://github.com/QChASM/SEQCROW/wiki/Commands#percentVolumeBuried",
                        )
 
 def percent_vbur(session, 
@@ -44,6 +46,7 @@ def percent_vbur(session,
                  minimumIterations=25,
                  onlyAtoms=None,
                  centerAtoms=None,
+                 byCenter=False,
     ):
     
     models = {model:[atom for atom in model.atoms if onlyAtoms is not None and atom in onlyAtoms] for model in selection if isinstance(model, AtomicStructure)}
@@ -66,11 +69,28 @@ def percent_vbur(session,
         
         if len(center) == 0:
             rescol.detect_components()
-            center = rescol.center
-            
-        for c in center:
+            center_atoms = rescol.center
+        else:
+            center_atoms = rescol.find(center)
+        
+        if byCenter:
+            for c in center_atoms:
+                vbur = rescol.percent_buried_volume(targets=targets,
+                                                    center=c,
+                                                    radius=radius,
+                                                    radii=radii,
+                                                    scale=scale,
+                                                    method=method,
+                                                    rpoints=int(radialPoints),
+                                                    apoints=int(angularPoints),
+                                                    min_iter=minimumIterations,
+                )
+                    
+                s += "%s\t%s\t%4.1f%%\n" % (model.atomspec, c.atomspec, vbur)
+        
+        else:
             vbur = rescol.percent_buried_volume(targets=targets,
-                                                center=c,
+                                                center=center_atoms,
                                                 radius=radius,
                                                 radii=radii,
                                                 scale=scale,
@@ -79,8 +99,9 @@ def percent_vbur(session,
                                                 apoints=int(angularPoints),
                                                 min_iter=minimumIterations,
             )
+                
+            s += "%s\t%s\t%4.1f%%\n" % (model.atomspec,", ".join([c.atomspec for c in center]), vbur)
             
-            s += "%s\t%s\t%4.1f%%\n" % (model.atomspec, c.atomspec, vbur)
     
     s = s.strip()
     s += "</pre>"

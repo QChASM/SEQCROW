@@ -10,19 +10,29 @@ from os.path import basename
 
 
 class ModelComboBox(QComboBox):
-    """combobox for models 
-    items will appear as "model.name (model id)"
+    """
+    combobox for models 
+    items will appear as "model.name (model.atomspec)"
     a tool's delete method should call deleteLater on instances of ModelComboBox
     """
-    def __init__(self, session, *args, modelTypes=[AtomicStructure], addNew=False, **kwargs):
-        """modelTypes - list(model subclasses) - types to show in the combobox
-        addNew        - bool - show "add new" in combobox"""
+    def __init__(self, session, *args, modelTypes=[AtomicStructure], addNew=False, autoUpdate=True, **kwargs):
+        """
+        modelTypes - list(model subclasses) - types to show in the combobox
+        addNew        - bool - show "add new" in combobox
+        autoUpdate    - bool - create handlers for when models are added or removed
+                               these can be troublesome if deleteLater, destroy, or close 
+                               are not called when this widget is discarded 
+        """
         super().__init__(*args, **kwargs)
         
         self._session = session
         self._mdl_types = modelTypes
-        self._add_handler = session.triggers.add_handler(ADD_MODELS, self._add_models)
-        self._del_handler = session.triggers.add_handler(REMOVE_MODELS, self._del_models)
+        if autoUpdate:
+            self._add_handler = session.triggers.add_handler(ADD_MODELS, self._add_models)
+            self._del_handler = session.triggers.add_handler(REMOVE_MODELS, self._del_models)
+        else:
+            self._add_handler = None
+            self._del_handler = None
     
         self.setSizeAdjustPolicy(self.AdjustToMinimumContentsLengthWithIcon)
         
@@ -32,22 +42,30 @@ class ModelComboBox(QComboBox):
         self._refresh_models()
 
     def deleteLater(self, *args, **kwargs):
-        self._session.triggers.remove_handler(self._add_handler)
-        self._session.triggers.remove_handler(self._del_handler)
+        if self._add_handler is not None:
+            self._session.triggers.remove_handler(self._add_handler)
+            self._session.triggers.remove_handler(self._del_handler)
         
         return super().deleteLater(*args, **kwargs)
 
     def destroy(self, *args, **kwargs):
-        self._session.triggers.remove_handler(self._add_handler)
-        self._session.triggers.remove_handler(self._del_handler)
+        if self._add_handler is not None:
+            self._session.triggers.remove_handler(self._add_handler)
+            self._session.triggers.remove_handler(self._del_handler)
         
         return super().destroy(*args, **kwargs)
 
     def close(self, *args, **kwargs):
-        self._session.triggers.remove_handler(self._add_handler)
-        self._session.triggers.remove_handler(self._del_handler)
+        if self._add_handler is not None:
+            self._session.triggers.remove_handler(self._add_handler)
+            self._session.triggers.remove_handler(self._del_handler)
         
         return super().close(*args, **kwargs)
+
+    def options_string(self):
+        mdl = self.currentData()
+        if mdl is not None:
+            return "models %s" % mdl.atomspec
 
     def _refresh_models(self):
         valid_mdls = []

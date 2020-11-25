@@ -37,10 +37,11 @@ class _EditStructureSettings(Settings):
 
 
 class EditStructure(ToolInstance):
-    SESSION_ENDURING = False
-    SESSION_SAVE = False         
+
     help = "https://github.com/QChASM/SEQCROW/wiki/Structure-Modification-Tool"
-    
+    SESSION_ENDURING = True
+    SESSION_SAVE = True
+
     def __init__(self, session, name):       
         super().__init__(session, name)
         

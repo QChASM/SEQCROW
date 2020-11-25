@@ -21,9 +21,10 @@ from warnings import warn
 # TODO: change decorations to use ChimeraX atom/bond defaults
 
 class LibAdd(ToolInstance):
-    SESSION_ENDURING = False
-    SESSION_SAVE = False         
+
     help = "https://github.com/QChASM/SEQCROW/wiki/Add-to-Personal-Library-Tool"
+    SESSION_ENDURING = True
+    SESSION_SAVE = True
     
     def __init__(self, session, name):       
         super().__init__(session, name)

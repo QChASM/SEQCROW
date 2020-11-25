@@ -4,23 +4,16 @@ from chimerax.atomic import selected_atoms, selected_bonds, get_triggers
 from chimerax.bild.bild import read_bild
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
-from chimerax.ui.widgets import ColorButton
 from chimerax.core.settings import Settings
-from chimerax.core.configfile import Value
-from chimerax.core.commands import run, BoolArg, ColorArg, FloatArg, IntArg, TupleOf
 from chimerax.core.generic3d import Generic3DModel 
 from chimerax.core.selection import SELECTION_CHANGED
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QGridLayout, QFormLayout, QCheckBox, QTabWidget, QPushButton, \
-                            QSpinBox, QDoubleSpinBox, QWidget, QLabel, QStatusBar, QComboBox, \
-                            QHBoxLayout, QDial
+from PyQt5.QtWidgets import QGridLayout, QFormLayout, QCheckBox, QPushButton, \
+                            QDoubleSpinBox, QWidget, QLabel, QStatusBar, QComboBox, \
+                            QHBoxLayout
 
 from io import BytesIO
-
-from SEQCROW.utils import iter2str
-from SEQCROW.residue_collection import ResidueCollection
-from SEQCROW.finders import AtomSpec
 
 
 class _PrecisionRotateSettings(Settings):
@@ -30,7 +23,9 @@ class _PrecisionRotateSettings(Settings):
 class PrecisionRotate(ToolInstance):
 
     help = "https://github.com/QChASM/SEQCROW/wiki/Rotate-Tool"
-
+    SESSION_ENDURING = True
+    SESSION_SAVE = True
+    
     def __init__(self, session, name):
         super().__init__(session, name)
         
@@ -58,13 +53,12 @@ class PrecisionRotate(ToolInstance):
         
         layout.addWidget(QLabel("center of rotation:"), 0, 0, 1, 1, Qt.AlignLeft | Qt.AlignVCenter)
         
-        self.cor_button = QPushButton("automatic")
-        self.cor_button.setCheckable(True)
-        self.cor_button.toggled.connect(lambda b, widget=self.cor_button: widget.setText("select atoms" if b else "automatic"))
+        self.cor_button = QComboBox()
+        self.cor_button.addItems(["automatic", "select atoms", "view's center of rotation"])
         layout.addWidget(self.cor_button, 0, 1, 1, 1, Qt.AlignTop)
         
         self.set_cor_selection = QPushButton("set selection")
-        self.cor_button.toggled.connect(lambda b, widget=self.set_cor_selection: widget.setEnabled(b))
+        self.cor_button.currentTextChanged.connect(lambda t, widget=self.set_cor_selection: widget.setEnabled(t == "select atoms"))
         self.set_cor_selection.clicked.connect(self.manual_cor)
         layout.addWidget(self.set_cor_selection, 0, 2, 1, 1, Qt.AlignTop)
         self.set_cor_selection.setEnabled(False)
@@ -141,9 +135,9 @@ class PrecisionRotate(ToolInstance):
         layout.addWidget(self.status_bar, 5, 0, 1, 3, Qt.AlignTop)
         
         self.vector_option.currentTextChanged.connect(self.show_auto_status)
-        self.cor_button.clicked.connect(lambda *args: self.show_auto_status("select atoms"))
+        self.cor_button.currentIndexChanged.connect(lambda *args: self.show_auto_status("select atoms"))
         
-        self.cor_button.clicked.connect(self.show_rot_vec)
+        self.cor_button.currentIndexChanged.connect(self.show_rot_vec)
         self.set_cor_selection.clicked.connect(self.show_rot_vec)
         self.vector_option.currentIndexChanged.connect(self.show_rot_vec)
         self.axis.currentIndexChanged.connect(self.show_rot_vec)
@@ -183,7 +177,7 @@ class PrecisionRotate(ToolInstance):
             self.manual_center[model] = np.mean(coords, axis=0)
 
     def show_auto_status(self, text):
-        if self.cor_button.text() == "automatic":
+        if self.cor_button.currentText() == "automatic":
             if text == "bond":
                 self.status_bar.showMessage("center set to one of the bonded atoms")
             elif text == "perpendicular to plane":
@@ -191,8 +185,11 @@ class PrecisionRotate(ToolInstance):
             else:
                 self.status_bar.showMessage("center set to centroid of rotating atoms")
 
-        else:
+        elif self.cor_button.currentText() == "select atoms":
             self.status_bar.showMessage("center set to centroid of selected atoms")
+        
+        else:
+            self.status_bar.showMessage("center set to view's center of rotation")
 
     def set_bonds(self, *args):
         bonds = selected_bonds(self.session)
@@ -235,7 +232,7 @@ class PrecisionRotate(ToolInstance):
             
             self.perpendiculars[model] = vector
             self.perp_centers[model] = np.mean(atom_coords, axis=0)
-        
+
     def set_group(self, *args):
         atoms = selected_atoms(self.session)
         if len(atoms) == 0:
@@ -252,7 +249,7 @@ class PrecisionRotate(ToolInstance):
                     atom_coords.append(atom.coord)
         
             self.groups[model] = np.mean(atom_coords, axis=0)
-        
+
     def do_rotate(self, *args):
         selection = selected_atoms(self.session)
 
@@ -297,15 +294,18 @@ class PrecisionRotate(ToolInstance):
             coords = np.array([atom.coord for atom in atoms])
             center[model] = np.mean(coords, axis=0)
         
-        if self.cor_button.text() == "automatic":
+        if self.cor_button.currentText() == "automatic":
             if self.vector_option.currentText() == "perpendicular to plane":
                 center = self.perp_centers
             
             elif self.vector_option.currentText() == "bond":
                 center = self.bond_centers
         
-        else:
+        elif self.cor_button.currentText() == "select atoms":
             center = self.manual_center
+        
+        else:
+            center = self.session.main_view.center_of_rotation
 
         for model in models:
             if isinstance(vector, dict):
@@ -326,19 +326,25 @@ class PrecisionRotate(ToolInstance):
             else:
                 c = center
             
-            if self.vector_option.currentText() == "centroid of atoms" and self.cor_button.text() != "automatic":
+            if self.vector_option.currentText() == "centroid of atoms" and self.cor_button.currentText() != "automatic":
                 v = v - c
 
-            residues = []
-            for atom in models[model]:
-                if atom.residue not in residues:
-                    residues.append(atom.residue)
+            v = v / np.linalg.norm(v)
+            q = np.hstack(([np.cos(angle / 2)], v * np.sin(angle / 2)))
             
-            rescol = ResidueCollection(model, convert_residues=residues, bonds_matter=False)
-            
-            rescol.rotate(v, angle, center=c, targets=[AtomSpec(atom.atomspec) for atom in models[model]])
-
-            rescol.update_chix(model, refresh_connected=False)
+            q /= np.linalg.norm(q)
+            qs = q[0]
+            qv = q[1:]
+        
+            xyz = np.array([a.coord for a in models[model]])
+            xyz -= c
+            xprod = np.cross(qv, xyz)
+            qs_xprod = 2 * qs * xprod
+            qv_xprod = 2 * np.cross(qv, xprod)
+    
+            xyz += qs_xprod + qv_xprod + c
+            for t, coord in zip(models[model], xyz):
+                t.coord = coord
 
     def show_rot_vec(self, *args):
         for model in self.session.models.list(type=Generic3DModel):
@@ -394,15 +400,18 @@ class PrecisionRotate(ToolInstance):
             coords = np.array([atom.coord for atom in atoms])
             center[model] = np.mean(coords, axis=0)
         
-        if self.cor_button.text() == "automatic":
+        if self.cor_button.currentText() == "automatic":
             if self.vector_option.currentText() == "perpendicular to plane":
                 center = self.perp_centers
             
             elif self.vector_option.currentText() == "bond":
                 center = self.bond_centers
         
-        else:
+        elif self.cor_button.currentText() == "select atoms":
             center = self.manual_center
+        
+        else:
+            center = self.session.main_view.center_of_rotation
 
         for model in models:
             if isinstance(vector, dict):
@@ -423,7 +432,7 @@ class PrecisionRotate(ToolInstance):
             else:
                 c = center
             
-            if self.vector_option.currentText() == "centroid of atoms" and self.cor_button.text() != "automatic":
+            if self.vector_option.currentText() == "centroid of atoms" and self.cor_button.currentText() != "automatic":
                 v = v - c
 
             if np.linalg.norm(v) == 0:
