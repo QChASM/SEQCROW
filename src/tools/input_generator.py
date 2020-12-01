@@ -10,15 +10,14 @@ from json import dumps, loads, dump, load
 
 from configparser import ConfigParser
 
-from PyQt5.Qt import QClipboard, QStyle, QIcon
 from PyQt5.QtCore import Qt, QRegularExpression, pyqtSignal
-from PyQt5.QtGui import QKeySequence, QFontMetrics, QFontDatabase
+from PyQt5.QtGui import QKeySequence, QFontMetrics, QFontDatabase, QClipboard, QIcon
 from PyQt5.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, \
                             QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, \
                             QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, \
                             QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView, QTextBrowser, \
                             QStatusBar, QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem, QSizePolicy, \
-                            QToolBox
+                            QToolBox, QStyle 
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.utils import iter2str

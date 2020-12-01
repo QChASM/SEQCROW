@@ -4,11 +4,10 @@ from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.core.tools import ToolInstance
 from chimerax.core.commands import run
 
-from PyQt5.Qt import QIcon, QStyle
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFontDatabase
+from PyQt5.QtGui import QFontDatabase, QIcon
 from PyQt5.QtWidgets import QGridLayout, QTextBrowser, QPushButton, QTreeWidget, QTreeWidgetItem, \
-                            QWidget, QMessageBox, QFileDialog, QToolButton, QSizePolicy
+                            QWidget, QMessageBox, QFileDialog, QToolButton, QSizePolicy, QStyle
 
 from send2trash import send2trash
 
@@ -46,7 +45,6 @@ class JobQueue(ToolInstance):
         self.fill_tree()
 
     def _build_ui(self):
-        #TODO: browse local files button
         layout = QGridLayout()
         
         layout.setContentsMargins(0,0,0,0)

@@ -7,9 +7,8 @@ from chimerax.core.commands.cli import BoolArg
 from chimerax.core.settings import Settings
 from chimerax.core.generic3d import Generic3DModel 
 
-from PyQt5.Qt import QClipboard
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QKeySequence
+from PyQt5.QtGui import QKeySequence, QClipboard
 from PyQt5.QtWidgets import QPushButton, QFormLayout, QComboBox, QLineEdit, QLabel, QCheckBox, QMenuBar, QAction, \
                             QFileDialog, QApplication, QTableWidget, QTableWidgetItem, QHeaderView
 

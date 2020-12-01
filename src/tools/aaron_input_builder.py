@@ -9,14 +9,14 @@ from chimerax.core.models import ADD_MODELS, REMOVE_MODELS
 
 from json import dumps, loads, dump, load
 
-from PyQt5.Qt import QClipboard, QStyle, QIcon
 from PyQt5.QtCore import Qt, QRegularExpression, pyqtSignal
-from PyQt5.QtGui import QKeySequence, QFontMetrics, QFontDatabase
+from PyQt5.QtGui import QKeySequence, QFontMetrics, QFontDatabase, QClipboard, QIcon
 from PyQt5.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, \
                             QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, \
                             QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, \
                             QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView, QTextBrowser, \
-                            QStatusBar, QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem, QSizePolicy
+                            QStatusBar, QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem, QSizePolicy, \
+                            QStyle
 
 from SEQCROW.widgets import PeriodicTable
 from SEQCROW.tools.input_generator import MethodOption, BasisWidget, _InputGeneratorSettings
