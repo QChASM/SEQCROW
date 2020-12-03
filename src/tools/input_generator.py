@@ -696,14 +696,17 @@ class BuildQM(ToolInstance):
             return
 
         self.update_theory(update_settings=False)
-        
+
         self.check_elements()
         if self.preview_window is not None:
             self.update_theory(update_settings=False)
 
             kw_dict = self.job_widget.getKWDict(False)
             other_kw_dict = self.other_keywords_widget.getKWDict(False)
-            
+        
+            if len(other_kw_dict["comments"]) == 0:
+                other_kw_dict["comments"] = [self.theory.geometry.name]
+
             combined_dict = combine_dicts(kw_dict, other_kw_dict)
     
             program = self.file_type.currentText()
@@ -886,6 +889,9 @@ class BuildQM(ToolInstance):
         other_kw_dict = self.other_keywords_widget.getKWDict()
         self.settings.save()
         
+        if len(other_kw_dict["comments"]) == 0:
+            other_kw_dict["comments"] = [self.theory.geometry.name]
+
         combined_dict = combine_dicts(kw_dict, other_kw_dict)
         
         self.settings.last_program = self.file_type.currentText()
@@ -922,6 +928,9 @@ class BuildQM(ToolInstance):
         kw_dict = self.job_widget.getKWDict()
         other_kw_dict = self.other_keywords_widget.getKWDict()
         self.settings.save()
+        
+        if len(other_kw_dict["comments"]) == 0:
+            other_kw_dict["comments"] = [self.theory.geometry.name]
         
         combined_dict = combine_dicts(kw_dict, other_kw_dict)
         

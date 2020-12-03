@@ -226,6 +226,7 @@ class PrecisionRotate(ToolInstance):
                 continue
             
             xyz = np.array(atom_coords)
+            xyz -= np.mean(atom_coords, axis=0)
             R = np.dot(xyz.T, xyz)
             u, s, vh = np.linalg.svd(R, compute_uv=True)
             vector = u[:,-1]

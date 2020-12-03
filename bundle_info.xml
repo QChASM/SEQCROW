@@ -58,6 +58,7 @@
                 <Dependency name="scipy"/>
                 <Dependency name="numpy"/>
                 <Dependency name="Send2Trash"/>
+                <Dependency name="stripy"/>
             </Dependencies>
             
             <Categories>
