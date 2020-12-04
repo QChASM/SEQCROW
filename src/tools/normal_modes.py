@@ -46,7 +46,7 @@ class _NormalModeSettings(Settings):
         'arrow_color': Value((0.0, 1.0, 0.0, 1.0), TupleOf(FloatArg, 4), iter2str),
         'arrow_scale': Value(1.5, FloatArg),
         'anim_scale': Value(0.2, FloatArg),
-        'anim_duration': Value(120, IntArg),
+        'anim_duration': Value(60, IntArg),
         'anim_fps': Value(60, IntArg), 
         'fwhm': Value(5, FloatArg), 
         'peak_type': 'Gaussian', 
@@ -193,7 +193,6 @@ class NormalModes(ToolInstance):
         vector_opts.addRow("use mass-weighted:", self.vec_use_mass_weighted)
 
         self.vector_color = ColorButton(has_alpha_channel=True, max_size=(16, 16))
-        self.vector_color.setToolTip("color of vectors")
         self.vector_color.set_color(self.settings.arrow_color)
         vector_opts.addRow("vector color:", self.vector_color)
 

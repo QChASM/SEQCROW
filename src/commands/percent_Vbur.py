@@ -2,7 +2,7 @@ import numpy as np
 
 from io import BytesIO
 
-from chimerax.core.commands import BoolArg, StringArg, CmdDesc, EnumOf, FloatArg, IntArg, ModelsArg, run
+from chimerax.core.commands import BoolArg, StringArg, CmdDesc, EnumOf, FloatArg, IntArg, ModelsArg, Or, TupleOf, run
 from chimerax.atomic import AtomsArg, AtomicStructure
 from chimerax.core.models import Surface
 
@@ -33,15 +33,15 @@ vbur_description = CmdDesc(required=[("selection", ModelsArg)], \
                                         ("minimumIterations", IntArg), 
                                         ("scale", FloatArg), 
                                         ("onlyAtoms", AtomsArg), 
-                                        ("centerAtoms", AtomsArg), 
-                                        ("byCenter", BoolArg), 
+                                        ("center", Or(AtomsArg, TupleOf(FloatArg, 3))), 
+                                        ("useCentroid", BoolArg), 
                                         ("displaySphere", BoolArg), 
                                         ("pointSpacing", FloatArg), 
                                         ("intersectionScale", FloatArg), 
                                         ("palette", StringArg), 
                                         
                                ],
-                               synopsis="calculate volume buried by ligands around a metal center",
+                               synopsis="calculate volume buried by ligands around a center",
                                url="https://github.com/QChASM/SEQCROW/wiki/Commands#percentVolumeBuried",
                        )
 
@@ -55,17 +55,20 @@ def percent_vbur(session,
                  angularPoints=1454, 
                  minimumIterations=25,
                  onlyAtoms=None,
-                 centerAtoms=None,
-                 byCenter=False,
+                 center=None,
+                 useCentroid=True,
                  displaySphere=False,
                  pointSpacing=0.075,
                  intersectionScale=2,
                  palette="rainbow",
+                 return_values=False,
 ):
+    
+    out = []
     
     models = {model:[atom for atom in model.atoms if onlyAtoms is not None and atom in onlyAtoms] for model in selection if isinstance(model, AtomicStructure)}
     
-    s = "<pre>model\tcenter atom\t%Vbur\n"
+    s = "<pre>model\tcenter\t%Vbur\n"
     
     for model in models:
         if len(models[model]) == 0:
@@ -73,22 +76,25 @@ def percent_vbur(session,
         else:
             targets = [AtomSpec(atom.atomspec) for atom in models[model]]
         
-        center = []
-        if centerAtoms is not None:
-            for atom in centerAtoms:
-                if atom in model.atoms:
-                    center.append(AtomSpec(atom.atomspec))
+        if center is not None:
+            if isinstance(center, tuple):
+                mdl_center = np.array(center)
+            else:
+                mdl_center = [AtomSpec(atom.atomspec) for atom in model.atoms if atom in center]
+
+        else:
+            mdl_center = []
         
         rescol = ResidueCollection(model)
         
-        if len(center) == 0:
+        if len(mdl_center) == 0:
             rescol.detect_components()
-            center_atoms = rescol.center
-        else:
-            center_atoms = rescol.find(center)
+            mdl_center = rescol.center
+        elif not isinstance(center, np.ndarray):
+            mdl_center = rescol.find([AtomSpec(c.atomspec) for c in center])
         
-        if byCenter:
-            for c in center_atoms:
+        if not useCentroid and not isinstance(center, np.ndarray):
+            for c in mdl_center:
                 vbur = rescol.percent_buried_volume(
                     targets=targets,
                     center=c,
@@ -101,7 +107,8 @@ def percent_vbur(session,
                     min_iter=minimumIterations,
                 )
                     
-                s += "%s\t%s\t%4.1f%%\n" % (model.atomspec, c.atomspec, vbur)
+                s += "%s\t%s\t%4.1f%%\n" % (model.name, c.atomspec, vbur)
+                out.append((model.name, c.atomspec, vbur))
         
                 if displaySphere:
                     mdl = vbur_vis(
@@ -120,15 +127,17 @@ def percent_vbur(session,
                     center_coords = rescol.COM(c)
                     args = [
                         "color", "radial", atomspec,
-                        "center", ",".join([str(x) for x in center_coords]),
+                        "center", ",".join(["%.4f" % x for x in center_coords]),
                         "palette", palette,
+                        ";",
+                        "transparency", atomspec, "30", 
                     ]
                     
                     run(session, " ".join(args))
         else:
             vbur = rescol.percent_buried_volume(
                 targets=targets,
-                center=center_atoms,
+                center=mdl_center,
                 radius=radius,
                 radii=radii,
                 scale=scale,
@@ -138,8 +147,13 @@ def percent_vbur(session,
                 min_iter=minimumIterations,
             )
                 
-            s += "%s\t%s\t%4.1f%%\n" % (model.atomspec,", ".join([c.atomspec for c in center]), vbur)
-        
+            if not isinstance(mdl_center, np.ndarray):
+                s += "%s\t%s\t%4.1f%%\n" % (model.name, ", ".join([c.atomspec for c in mdl_center]), vbur)
+                out.append((model.name, ", ".join([c.atomspec for c in mdl_center]), vbur))
+            else:
+                s += "%s\t%s\t%4.1f%%\n" % (model.name, ",".join(["%.3f" % c for c in mdl_center]), vbur)
+                out.append((model.name, ",".join(["%.3f" % c for c in mdl_center]), vbur))
+
             if displaySphere:
                 mdl = vbur_vis(
                         session,
@@ -148,17 +162,22 @@ def percent_vbur(session,
                         radii,
                         scale,
                         radius,
-                        center_atoms,
+                        mdl_center,
                         pointSpacing,
                         intersectionScale,
                 )
                 model.add([mdl])
                 atomspec = mdl.atomspec
-                center_coords = rescol.COM(center_atoms)
+                if not isinstance(mdl_center, np.ndarray):
+                    center_coords = rescol.COM(mdl_center)
+                else:
+                    center_coords = mdl_center
                 args = [
                     "color", "radial", atomspec,
-                    "center", ",".join([str(x) for x in center_coords]),
+                    "center", ",".join(["%.4f" % x for x in center_coords]),
                     "palette", palette,
+                    ";",
+                    "transparency", atomspec, "30", 
                 ]
                 
                 run(session, " ".join(args))
@@ -166,7 +185,10 @@ def percent_vbur(session,
     s = s.strip()
     s += "</pre>"
     
-    session.logger.info(s, is_html=True)
+    if not return_values:
+        session.logger.info(s, is_html=True)
+    else:
+        return out
 
 
 def vbur_vis(
@@ -188,7 +210,10 @@ def vbur_vis(
     normals = []
     triangles = []
     
-    center_coords = geom.COM(center)
+    if isinstance(center, np.ndarray):
+        center_coords = center
+    else:
+        center_coords = geom.COM(center)
 
     if isinstance(radii, dict):
         radii_dict = radii
@@ -205,7 +230,10 @@ def vbur_vis(
         center = [center]
     
     if targets is None:
-        atoms = [atom for atom in geom.atoms if atom not in center]
+        if len(center) == 1:
+            atoms = [atom for atom in geom.atoms if atom not in center]
+        else:
+            atoms = geom.atoms
     else:
         atoms = geom.find(targets)
     

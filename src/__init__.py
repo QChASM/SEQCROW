@@ -190,6 +190,10 @@ class _SEQCROW_API(BundleAPI):
             from .tools import PrecisionRotate
             return PrecisionRotate(session, ti.name)
         
+        elif ti.name == "Buried Volume":
+            from .tools import PercentVolumeBuried
+            return PercentVolumeBuried(session, ti.name)
+        
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)
 

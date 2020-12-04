@@ -26,7 +26,6 @@ class _SterimolSettings(Settings):
         "display_radii": Value(True, BoolArg),
         "display_vectors": Value(True, BoolArg),
         "include_header": Value(True, BoolArg),
-        "include_header": Value(True, BoolArg),
         "delimiter": "comma",
     }
 
@@ -180,19 +179,19 @@ class Sterimol(ToolInstance):
             targ = QTableWidgetItem()
             targ.setData(Qt.DisplayRole, t)
             self.table.setItem(row, 0, targ)
-                        
+
             neigh = QTableWidgetItem()
             neigh.setData(Qt.DisplayRole, b)
             self.table.setItem(row, 1, neigh)
-                        
+
             li = QTableWidgetItem()
             li.setData(Qt.DisplayRole, "%.2f" % l)
             self.table.setItem(row, 2, li)
-                        
+
             b1i = QTableWidgetItem()
             b1i.setData(Qt.DisplayRole, "%.2f" % b1)
             self.table.setItem(row, 3, b1i)
-                        
+
             b5i = QTableWidgetItem()
             b5i.setData(Qt.DisplayRole, "%.2f" % b5)
             self.table.setItem(row, 4, b5i)
