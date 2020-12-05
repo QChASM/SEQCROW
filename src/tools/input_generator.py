@@ -282,6 +282,11 @@ class BuildQM(ToolInstance):
         #find a better trigger - only need changes to coordinates and elements
         #'changes done' fires when other things happen like selecting atoms
         self._changes = global_triggers.add_handler("changes done", self.update_preview)
+        
+        # this tool is big by default
+        # unless the user has saved its position, make it small
+        if name not in self.session.ui.settings.tool_positions['windows']:
+            self.tool_window.shrink_to_fit()
 
     def _build_ui(self):
         #build an interface with a dropdown menu to select software package
@@ -2859,7 +2864,7 @@ class BasisOption(QWidget):
         self.custom_basis_kw.textChanged.connect(self.update_tooltab)
         self.custom_basis_kw.setPlaceholderText("filter basis sets")
         self.custom_basis_kw.setClearButtonEnabled(True)
-        keyword_label = QLabel("keyword:")
+        keyword_label = QLabel("name:")
         self.basis_name_options.addRow(keyword_label, self.custom_basis_kw)
         
         self.aux_type = QComboBox()
@@ -3484,7 +3489,10 @@ class BasisWidget(QWidget):
             builtin = self.settings.last_custom_ecp_builtin[use_saved]
             new_basis.setBasis(name, custom, builtin)
             #new_basis.setSelectedElements(self.settings.last_ecp_elements[use_saved].split(','))
-            
+        
+        else:
+            new_basis.setBasis()
+
         new_basis.basis_changed()
         
         self.ecp_options.append(new_basis)

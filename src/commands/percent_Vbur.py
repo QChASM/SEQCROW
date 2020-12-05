@@ -261,6 +261,8 @@ def vbur_vis(
     
     sphere = fibonacci_sphere(n=n_grid, radius=radius)
     
+    # add points right where spheres intersect
+    # this makes the intersections look less pokey
     d_ac = distance_matrix(coords, [center_coords])
     center_added_points = []
     atom_added_points = [[] for atom in atoms_within_radius]
@@ -358,6 +360,12 @@ def vbur_vis(
     shapes = []
     
     for i in range(0, len(coords)):
+        # get a grid of points around each atom
+        # remove any points that are close to an intersection
+        # this makes it less likely for the triangulation to choose
+        # one of these points instead of one that we already added
+        # then, if we have to remove a triangle involving one of these points later,
+        # it won't leave a gap
         n_atom_grid = int(radius_list[i]**2 * n_grid / radius**2)
         atom_sphere = fibonacci_sphere(radius=radius_list[i], n=n_atom_grid)
         n_atom_grid = len(atom_sphere)
@@ -378,6 +386,7 @@ def vbur_vis(
             n_atom_grid = len(atom_sphere)
             atom_sphere = np.concatenate((atom_sphere, np.array(atom_added_points[i]) - coords[i]))
     
+        # triangulation uses longitude and latitude
         lat = np.arcsin(atom_sphere[:,2] / radius_list[i])
         lon = np.arctan2(atom_sphere[:,1], atom_sphere[:,0])
         
@@ -389,6 +398,10 @@ def vbur_vis(
         remove_v = []
         new_ndx = np.zeros(len(atom_sphere), dtype=int)
 
+        # remove any points that are covered by another atom
+        # only loop over n_atom_grid points so we don't remove
+        # any points right on the intersection b/c of 
+        # numerical issues
         del_count = 0
         atom_grid_dist = distance_matrix(atom_sphere, coords)
         center_atom_grid_dist = distance_matrix(atom_sphere, [center_coords])[:,0]
@@ -423,6 +436,8 @@ def vbur_vis(
             for k, v in enumerate(ti):
                 new_t[j][k] = new_ndx[v]
         
+        # we don't need any triangles that only involve intersection points
+        # these triangles are inside the intersection
         remove_t = []
         for j, ti in enumerate(new_t):
             if all(t >= n_atom_grid for t in ti):
@@ -440,7 +455,7 @@ def vbur_vis(
         vertices.extend(atom_sphere)
         normals.extend(norms)
     
-    
+
     remove_ndx = []
     if len(center_added_points) > 0:
         dist_mat = distance_matrix(sphere, center_added_points)

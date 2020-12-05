@@ -29,6 +29,8 @@ class _VburSettings(Settings):
         "minimum_iterations": 25,
         "use_centroid": Value(False, BoolArg), 
         "display_cutout": Value(False, BoolArg), 
+        "point_spacing": 0.075,
+        "intersection_scale": 2.0, 
         "include_header": Value(True, BoolArg),
         "delimiter": "comma",
     }
@@ -66,6 +68,15 @@ class PercentVolumeBuried(ToolInstance):
         self.scale.setRange(1., 1.5)
         layout.addRow("VDW scale:", self.scale)
         
+        set_ligand_atoms = QPushButton("set ligands to current selection")
+        set_ligand_atoms.clicked.connect(self.set_ligand_atoms)
+        set_ligand_atoms.setToolTip(
+            "specify atoms to use in calculation\n" +
+            "by default, all atoms will be used unless a single center is specified\n" +
+            "in the case of a single center, all atoms except the center is used"
+        )
+        layout.addRow(set_ligand_atoms)
+        
         self.radius = QDoubleSpinBox()
         self.radius.setValue(self.settings.center_radius)
         self.radius.setSuffix(" \u212B")
@@ -76,7 +87,7 @@ class PercentVolumeBuried(ToolInstance):
         
         self.method = QComboBox()
         self.method.addItems(["Lebedev", "Monte-Carlo"])
-        self.method.setToolTip("Lebedev: systematic method, gives reproducable results\n" +
+        self.method.setToolTip("Lebedev: deterministic method\n" +
                                "Monte-Carlo: non-deterministic method"
         )
         ndx = self.method.findText(self.settings.method, Qt.MatchExactly)
@@ -109,6 +120,7 @@ class PercentVolumeBuried(ToolInstance):
         
         self.min_iter = QSpinBox()
         self.min_iter.setValue(self.settings.minimum_iterations)
+        self.min_iter.setRange(0, 10000)
         self.min_iter.setToolTip("each iteration is 3000 points\n" +
                                  "iterations continue until convergence criteria are met"
         )
@@ -123,18 +135,49 @@ class PercentVolumeBuried(ToolInstance):
         
         self.method.currentTextChanged.connect(lambda text, widget=leb_widget: widget.setVisible(text == "Lebedev"))
         self.method.currentTextChanged.connect(lambda text, widget=mc_widget: widget.setVisible(text == "Monte-Carlo"))
-        
-        set_ligand_atoms = QPushButton("set ligands to current selection")
-        set_ligand_atoms.clicked.connect(self.set_ligand_atoms)
-        layout.addRow(set_ligand_atoms)
-        
+
         self.use_centroid = QCheckBox()
         self.use_centroid.setChecked(self.settings.use_centroid)
+        self.use_centroid.setToolTip(
+            "place the center between selected atoms\n" +
+            "might be useful for polydentate ligands"
+        )
         layout.addRow("use centroid of centers:", self.use_centroid)
         
         self.display_cutout = QCheckBox()
         self.display_cutout.setChecked(self.settings.display_cutout)
+        self.display_cutout.setToolTip("show free volume")
         layout.addRow("display cutout:", self.display_cutout)
+        
+        self.point_spacing = QDoubleSpinBox()
+        self.point_spacing.setDecimals(3)
+        self.point_spacing.setRange(0.01, 0.5)
+        self.point_spacing.setSingleStep(0.005)
+        self.point_spacing.setSuffix(" \u212B")
+        self.point_spacing.setValue(self.settings.point_spacing)
+        self.point_spacing.setToolTip(
+            "distance between points on cutout\n" +
+            "smaller spacing will narrow gaps, but increase time to create the cutout"
+        )
+        layout.addRow("point spacing:", self.point_spacing)
+        
+        self.intersection_scale = QDoubleSpinBox()
+        self.intersection_scale.setDecimals(2)
+        self.intersection_scale.setRange(1., 10.)
+        self.intersection_scale.setSingleStep(0.5)
+        self.intersection_scale.setSuffix("x")
+        self.intersection_scale.setToolTip(
+            "relative density of points where VDW radii intersect\n" +
+            "higher density will narrow gaps, but increase time to create cutout"
+        )
+        self.intersection_scale.setValue(self.settings.intersection_scale)
+        layout.addRow("intersection density:", self.intersection_scale)
+        
+        self.point_spacing.setEnabled(self.settings.display_cutout)
+        self.intersection_scale.setEnabled(self.settings.display_cutout)
+        
+        self.display_cutout.stateChanged.connect(lambda state, widget=self.point_spacing: widget.setEnabled(state == Qt.Checked))
+        self.display_cutout.stateChanged.connect(lambda state, widget=self.intersection_scale: widget.setEnabled(state == Qt.Checked))
         
         calc_vbur_button = QPushButton("calculate % buried volume for selected centers")
         calc_vbur_button.clicked.connect(self.calc_vbur)
@@ -263,9 +306,9 @@ class PercentVolumeBuried(ToolInstance):
         
         method = self.method.currentText()
         self.settings.method = method
-        args["method"] = method
         
         if method == "Lebedev":
+            args["method"] = "lebedev"
             rad_pts = self.radial_points.currentText()
             self.settings.radial_points = rad_pts
             args["radialPoints"] = rad_pts
@@ -275,6 +318,7 @@ class PercentVolumeBuried(ToolInstance):
             args["angularPoints"] = ang_pts
         
         elif method == "Monte-Carlo":
+            args["method"] = "mc"
             min_iter = self.min_iter.value()
             self.settings.minimum_iterations = min_iter
             args["minimumIterations"] = min_iter
@@ -282,6 +326,15 @@ class PercentVolumeBuried(ToolInstance):
         display_cutout = self.display_cutout.checkState() == Qt.Checked
         self.settings.display_cutout = display_cutout
         args["displaySphere"] = display_cutout
+
+        if display_cutout:
+            point_spacing = self.point_spacing.value()
+            self.settings.point_spacing = point_spacing
+            args["pointSpacing"] = point_spacing
+            
+            intersection_scale = self.intersection_scale.value()
+            self.settings.intersection_scale = intersection_scale
+            args["intersectionScale"] = intersection_scale
 
         if len(self.ligand_atoms) > 0:
             args["onlyAtoms"] = [a for a in self.ligand_atoms if not a.deleted]
@@ -311,6 +364,7 @@ class PercentVolumeBuried(ToolInstance):
             
             v = QTableWidgetItem()
             v.setData(Qt.DisplayRole, "%.1f" % vbur)
+            v.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
             self.table.setItem(row, 2, v)
         
         self.table.resizeColumnToContents(0)
