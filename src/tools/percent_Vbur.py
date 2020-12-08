@@ -6,16 +6,26 @@ from chimerax.core.configfile import Value
 from chimerax.core.commands import BoolArg
 from chimerax.core.settings import Settings
 from chimerax.core.models import Surface
+from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QKeySequence, QClipboard
 from PyQt5.QtWidgets import QPushButton, QFormLayout, QComboBox, QLineEdit, QLabel, QCheckBox, \
                             QMenuBar, QAction, QFileDialog, QApplication, QTableWidget, \
-                            QTableWidgetItem, QHeaderView, QDoubleSpinBox, QSpinBox, QWidget
+                            QTableWidgetItem, QHeaderView, QDoubleSpinBox, QSpinBox, QWidget, \
+                            QGridLayout
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.finders import AtomSpec
 from SEQCROW.commands.percent_Vbur import percent_vbur as percent_vbur_cmd
+from SEQCROW.tools.per_frame_plot import NavigationToolbar
+
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
+import matplotlib.pyplot as plt
+
+import copy
+
+import numpy as np
 
 class _VburSettings(Settings):
 
@@ -28,11 +38,12 @@ class _VburSettings(Settings):
         "radial_points": "20",
         "minimum_iterations": 25,
         "use_centroid": Value(False, BoolArg), 
-        "display_cutout": Value(False, BoolArg), 
+        "display_cutout": "no", 
         "point_spacing": 0.075,
         "intersection_scale": 2.0, 
         "include_header": Value(True, BoolArg),
         "delimiter": "comma",
+        "steric_map": False,
     }
 
 class PercentVolumeBuried(ToolInstance):
@@ -44,7 +55,6 @@ class PercentVolumeBuried(ToolInstance):
     def __init__(self, session, name):       
         super().__init__(session, name)
         
-        from chimerax.ui import MainToolWindow
         self.tool_window = MainToolWindow(self)
         
         self.settings = _VburSettings(self.session, name)
@@ -112,6 +122,10 @@ class PercentVolumeBuried(ToolInstance):
         self.angular_points.setCurrentIndex(ndx)
         leb_layout.addRow("angular points:", self.angular_points)
         
+        self.steric_map = QCheckBox()
+        self.steric_map.setChecked(self.settings.steric_map)
+        leb_layout.addRow("create steric map:", self.steric_map)
+        
         layout.addRow(leb_widget)
         
         mc_widget = QWidget()
@@ -143,11 +157,13 @@ class PercentVolumeBuried(ToolInstance):
             "might be useful for polydentate ligands"
         )
         layout.addRow("use centroid of centers:", self.use_centroid)
-        
-        self.display_cutout = QCheckBox()
-        self.display_cutout.setChecked(self.settings.display_cutout)
-        self.display_cutout.setToolTip("show free volume")
-        layout.addRow("display cutout:", self.display_cutout)
+
+        self.display_cutout = QComboBox()
+        self.display_cutout.addItems(["no", "free", "buried"])
+        ndx = self.display_cutout.findText(self.settings.display_cutout, Qt.MatchExactly)
+        self.display_cutout.setCurrentIndex(ndx)
+        self.display_cutout.setToolTip("show free or buried volume")
+        layout.addRow("display volume:", self.display_cutout)
         
         self.point_spacing = QDoubleSpinBox()
         self.point_spacing.setDecimals(3)
@@ -173,11 +189,11 @@ class PercentVolumeBuried(ToolInstance):
         self.intersection_scale.setValue(self.settings.intersection_scale)
         layout.addRow("intersection density:", self.intersection_scale)
         
-        self.point_spacing.setEnabled(self.settings.display_cutout)
-        self.intersection_scale.setEnabled(self.settings.display_cutout)
+        self.point_spacing.setEnabled(self.settings.display_cutout != "no")
+        self.intersection_scale.setEnabled(self.settings.display_cutout != "no")
         
-        self.display_cutout.stateChanged.connect(lambda state, widget=self.point_spacing: widget.setEnabled(state == Qt.Checked))
-        self.display_cutout.stateChanged.connect(lambda state, widget=self.intersection_scale: widget.setEnabled(state == Qt.Checked))
+        self.display_cutout.currentTextChanged.connect(lambda text, widget=self.point_spacing: widget.setEnabled(text != "no"))
+        self.display_cutout.currentTextChanged.connect(lambda text, widget=self.intersection_scale: widget.setEnabled(text != "no"))
         
         calc_vbur_button = QPushButton("calculate % buried volume for selected centers")
         calc_vbur_button.clicked.connect(self.calc_vbur)
@@ -300,9 +316,17 @@ class PercentVolumeBuried(ToolInstance):
         self.settings.center_radius = radius
         args["radius"] = radius
         
+        steric_map = self.steric_map.checkState() == Qt.Checked
+        self.settings.steric_map = steric_map
+        args["steric_map"] = steric_map
+
         use_centroid = self.use_centroid.checkState() == Qt.Checked
         self.settings.use_centroid = use_centroid
         args["useCentroid"] = use_centroid
+        
+        if not use_centroid:
+            self.settings.steric_map = steric_map
+            args["steric_map"] = steric_map
         
         method = self.method.currentText()
         self.settings.method = method
@@ -316,18 +340,22 @@ class PercentVolumeBuried(ToolInstance):
             ang_pts = self.angular_points.currentText()
             self.settings.angular_points = ang_pts
             args["angularPoints"] = ang_pts
-        
+
         elif method == "Monte-Carlo":
             args["method"] = "mc"
             min_iter = self.min_iter.value()
             self.settings.minimum_iterations = min_iter
             args["minimumIterations"] = min_iter
+            
+            steric_map = False
+            args["steric_map"] = False
         
-        display_cutout = self.display_cutout.checkState() == Qt.Checked
+        display_cutout = self.display_cutout.currentText()
         self.settings.display_cutout = display_cutout
-        args["displaySphere"] = display_cutout
+        if display_cutout != "no":
+            args["displaySphere"] = display_cutout
 
-        if display_cutout:
+        if display_cutout is not None:
             point_spacing = self.point_spacing.value()
             self.settings.point_spacing = point_spacing
             args["pointSpacing"] = point_spacing
@@ -350,22 +378,45 @@ class PercentVolumeBuried(ToolInstance):
         
         self.table.setRowCount(0)
         
-        for mdl, cent, vbur in info:
-            row = self.table.rowCount()
-            self.table.insertRow(row)
-            
-            m = QTableWidgetItem()
-            m.setData(Qt.DisplayRole, mdl)
-            self.table.setItem(row, 0, m)
-            
-            c = QTableWidgetItem()
-            c.setData(Qt.DisplayRole, cent)
-            self.table.setItem(row, 1, c)
-            
-            v = QTableWidgetItem()
-            v.setData(Qt.DisplayRole, "%.1f" % vbur)
-            v.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            self.table.setItem(row, 2, v)
+        if steric_map:
+            for mdl, cent, vbur, map_info in info:
+                row = self.table.rowCount()
+                self.table.insertRow(row)
+                
+                m = QTableWidgetItem()
+                m.setData(Qt.DisplayRole, mdl)
+                self.table.setItem(row, 0, m)
+                
+                c = QTableWidgetItem()
+                c.setData(Qt.DisplayRole, cent)
+                self.table.setItem(row, 1, c)
+                
+                v = QTableWidgetItem()
+                v.setData(Qt.DisplayRole, ",".join(["%.1f" % x for x in vbur]))
+                v.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+                self.table.setItem(row, 2, v)
+                
+                x, y, z, min_alt, max_alt = map_info
+                plot = self.tool_window.create_child_window("steric map of %s" % mdl, window_class=StericMap)
+                plot.set_data(x, y, z, min_alt, max_alt, vbur, radius)
+
+        else:
+            for mdl, cent, vbur in info:
+                row = self.table.rowCount()
+                self.table.insertRow(row)
+                
+                m = QTableWidgetItem()
+                m.setData(Qt.DisplayRole, mdl)
+                self.table.setItem(row, 0, m)
+                
+                c = QTableWidgetItem()
+                c.setData(Qt.DisplayRole, cent)
+                self.table.setItem(row, 1, c)
+                
+                v = QTableWidgetItem()
+                v.setData(Qt.DisplayRole, "%.1f" % vbur)
+                v.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+                self.table.setItem(row, 2, v)
         
         self.table.resizeColumnToContents(0)
         self.table.resizeColumnToContents(1)
@@ -419,7 +470,7 @@ class PercentVolumeBuried(ToolInstance):
     
     def del_vbur(self):
         for model in self.session.models.list(type=Surface):
-            if model.name.startswith("%Vbur"):
+            if model.name.startswith("%Vbur") or model.name.startswith("%Vfree"):
                 model.delete()
     
     def display_help(self):
@@ -427,3 +478,41 @@ class PercentVolumeBuried(ToolInstance):
         from chimerax.core.commands import run
         run(self.session,
             'open %s' % self.help if self.help is not None else "")
+
+class StericMap(ChildToolWindow):
+    def __init__(self, tool_instance, title, *args, **kwargs):
+        super().__init__(tool_instance, title, statusbar=False, *args, **kwargs)
+
+        self._build_ui()
+    
+    def _build_ui(self):
+        self.layout = QGridLayout()
+        
+        self.ui_area.setLayout(self.layout)
+        self.manage(None)
+    
+    def set_data(self, x, y, z, min_alt, max_alt, vbur, radius):
+        fig, ax = plt.subplots()
+        steric_map = ax.contourf(x, y, z, extend="min", cmap=copy.copy(plt.cm.get_cmap("jet")), levels=np.linspace(min_alt, max_alt, num=20))
+        steric_map.cmap.set_under('w')
+        steric_lines = ax.contour(x, y, z, extend="min", colors='k', levels=np.linspace(min_alt, max_alt, num=20))
+        bar = fig.colorbar(steric_map, format="%.1f")
+        bar.set_label("altitude (Å)")
+        ax.set_aspect("equal")
+        
+        ax.hlines(0, -radius, radius, color='k')
+        ax.vlines(0, -radius, radius, color='k')
+        
+        ax.text( 0.7 * radius,  0.9 * radius, "%.1f%%" % vbur[0])
+        ax.text(-0.9 * radius,  0.9 * radius, "%.1f%%" % vbur[1])
+        ax.text(-0.9 * radius, -0.9 * radius, "%.1f%%" % vbur[2])
+        ax.text( 0.7 * radius, -0.9 * radius, "%.1f%%" % vbur[3])
+        
+        canvas = Canvas(fig)
+        
+        self.layout.addWidget(canvas)
+        
+        toolbar_widget = QWidget()
+        toolbar = NavigationToolbar(canvas, toolbar_widget)
+        toolbar.setMaximumHeight(24)
+        self.layout.addWidget(toolbar)

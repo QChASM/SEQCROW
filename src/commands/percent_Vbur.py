@@ -35,7 +35,7 @@ vbur_description = CmdDesc(required=[("selection", ModelsArg)], \
                                         ("onlyAtoms", AtomsArg), 
                                         ("center", Or(AtomsArg, TupleOf(FloatArg, 3))), 
                                         ("useCentroid", BoolArg), 
-                                        ("displaySphere", BoolArg), 
+                                        ("displaySphere", EnumOf(["free", "buried"])), 
                                         ("pointSpacing", FloatArg), 
                                         ("intersectionScale", FloatArg), 
                                         ("palette", StringArg), 
@@ -57,11 +57,12 @@ def percent_vbur(session,
                  onlyAtoms=None,
                  center=None,
                  useCentroid=True,
-                 displaySphere=False,
+                 displaySphere=None,
                  pointSpacing=0.075,
                  intersectionScale=2,
                  palette="rainbow",
                  return_values=False,
+                 steric_map=False,
 ):
     
     out = []
@@ -95,22 +96,57 @@ def percent_vbur(session,
         
         if not useCentroid and not isinstance(center, np.ndarray):
             for c in mdl_center:
-                vbur = rescol.percent_buried_volume(
-                    targets=targets,
-                    center=c,
-                    radius=radius,
-                    radii=radii,
-                    scale=scale,
-                    method=method,
-                    rpoints=int(radialPoints),
-                    apoints=int(angularPoints),
-                    min_iter=minimumIterations,
-                )
+                if steric_map:
+                    if targets is not None:
+                        key_atoms = []
+                        targets = rescol.find(targets)
+                        for atom in targets:
+                            if c in atom.connected or atom in c.connected:
+                                key_atoms.append(atom)
+                    else:
+                        key_atoms = None
+
+                    x, y, z, min_alt, max_alt, basis, targets = rescol.steric_map(
+                        center=c,
+                        key_atoms=key_atoms,
+                        radii=radii,
+                        return_basis=True,
+                        num_pts=100,
+                    )
                     
-                s += "%s\t%s\t%4.1f%%\n" % (model.name, c.atomspec, vbur)
-                out.append((model.name, c.atomspec, vbur))
+                    vbur = rescol.percent_buried_volume(
+                        targets=targets,
+                        basis=basis,
+                        center=c,
+                        radius=radius,
+                        radii=radii,
+                        scale=scale,
+                        method=method,
+                        rpoints=int(radialPoints),
+                        apoints=int(angularPoints),
+                        min_iter=minimumIterations,
+                    )
+                    
+                    out.append((model.name, c.atomspec, vbur, (x, y, z, min_alt, max_alt)))
+                
+                else:
+                    vbur = rescol.percent_buried_volume(
+                        targets=targets,
+                        center=c,
+                        radius=radius,
+                        radii=radii,
+                        scale=scale,
+                        method=method,
+                        rpoints=int(radialPoints),
+                        apoints=int(angularPoints),
+                        min_iter=minimumIterations,
+                    )
+                        
+                    s += "%s\t%s\t%4.1f%%\n" % (model.name, c.atomspec, vbur)
+                
+                    out.append((model.name, c.atomspec, vbur))
         
-                if displaySphere:
+                if displaySphere is not None:
                     mdl = vbur_vis(
                             session,
                             rescol,
@@ -121,6 +157,7 @@ def percent_vbur(session,
                             c,
                             pointSpacing,
                             intersectionScale,
+                            displaySphere,
                     )
                     model.add([mdl])
                     atomspec = mdl.atomspec
@@ -135,26 +172,63 @@ def percent_vbur(session,
                     
                     run(session, " ".join(args))
         else:
-            vbur = rescol.percent_buried_volume(
-                targets=targets,
-                center=mdl_center,
-                radius=radius,
-                radii=radii,
-                scale=scale,
-                method=method,
-                rpoints=int(radialPoints),
-                apoints=int(angularPoints),
-                min_iter=minimumIterations,
-            )
+            if steric_map:
+                if targets is not None:
+                    key_atoms = []
+                    targets = rescol.find(targets)
+                    for atom in targets:
+                        if any(c in atom.connected for c in mdl_center):
+                            key_atoms.append(atom)
+                else:
+                    key_atoms = None
+                        
+                x, y, z, min_alt, max_alt, basis, targets = rescol.steric_map(
+                    center=mdl_center,
+                    key_atoms=key_atoms,
+                    radii=radii,
+                    return_basis=True,
+                    num_pts=100,
+                )
                 
-            if not isinstance(mdl_center, np.ndarray):
-                s += "%s\t%s\t%4.1f%%\n" % (model.name, ", ".join([c.atomspec for c in mdl_center]), vbur)
-                out.append((model.name, ", ".join([c.atomspec for c in mdl_center]), vbur))
-            else:
-                s += "%s\t%s\t%4.1f%%\n" % (model.name, ",".join(["%.3f" % c for c in mdl_center]), vbur)
-                out.append((model.name, ",".join(["%.3f" % c for c in mdl_center]), vbur))
+                vbur = rescol.percent_buried_volume(
+                    targets=targets,
+                    basis=basis,
+                    center=mdl_center,
+                    radius=radius,
+                    radii=radii,
+                    scale=scale,
+                    method=method,
+                    rpoints=int(radialPoints),
+                    apoints=int(angularPoints),
+                    min_iter=minimumIterations,
+                )
+                
+                if not isinstance(mdl_center, np.ndarray):
+                    out.append((model.name, ",".join([c.atomspec for c in mdl_center]), vbur, (x, y, z, min_alt, max_alt)))
+                else:
+                    out.append((model.name, ",".join(["%.3f" % c for c in mdl_center]), vbur, (x, y, z, min_alt, max_alt)))
 
-            if displaySphere:
+            else:
+                vbur = rescol.percent_buried_volume(
+                    targets=targets,
+                    center=mdl_center,
+                    radius=radius,
+                    radii=radii,
+                    scale=scale,
+                    method=method,
+                    rpoints=int(radialPoints),
+                    apoints=int(angularPoints),
+                    min_iter=minimumIterations,
+                )
+                
+                if not isinstance(mdl_center, np.ndarray):
+                    s += "%s\t%s\t%4.1f%%\n" % (model.name, ", ".join([c.atomspec for c in mdl_center]), vbur)
+                    out.append((model.name, ", ".join([c.atomspec for c in mdl_center]), vbur))
+                else:
+                    s += "%s\t%s\t%4.1f%%\n" % (model.name, ",".join(["%.3f" % c for c in mdl_center]), vbur)
+                    out.append((model.name, ",".join(["%.3f" % c for c in mdl_center]), vbur))
+
+            if displaySphere is not None:
                 mdl = vbur_vis(
                         session,
                         rescol,
@@ -165,6 +239,7 @@ def percent_vbur(session,
                         mdl_center,
                         pointSpacing,
                         intersectionScale,
+                        displaySphere,
                 )
                 model.add([mdl])
                 atomspec = mdl.atomspec
@@ -201,10 +276,14 @@ def vbur_vis(
         center, 
         point_spacing, 
         intersection_scale,
+        volume_type,
 ):
     # number of points is based on surface area
     n_grid = int(4 * np.pi * radius**2 / point_spacing)
-    model = Surface("%%Vbur for %s" % geom.name, session)
+    if volume_type == "buried":
+        model = Surface("%%Vbur for %s" % geom.name, session)
+    else:
+        model = Surface("%%Vfree for %s" % geom.name, session)
     # verts, norms, and triangles for the drawing
     vertices = []
     normals = []
@@ -356,9 +435,7 @@ def vbur_vis(
                     else:
                         atom_added_points[i].append(prev_r + p + coords[i])
                         atom_added_points[j].append(prev_r + p + coords[i])
-    
-    shapes = []
-    
+  
     for i in range(0, len(coords)):
         # get a grid of points around each atom
         # remove any points that are close to an intersection
@@ -431,23 +508,20 @@ def vbur_vis(
             atom_sphere.pop(vi)
             tri = tri[np.all(tri != vi, axis=1)]
         
-        new_t = tri
-        for j, ti in enumerate(tri):
+        new_t = tri.tolist()
+        # remove_t = []
+        # for j, ti in enumerate(new_t):
+        #     if all(t >= n_atom_grid for t in ti):
+        #         remove_t.append(j)
+        # 
+        # for vi in remove_t[::-1]:
+        #     new_t.pop(vi)
+        new_t = np.array(new_t)
+
+        for j, ti in enumerate(new_t):
             for k, v in enumerate(ti):
                 new_t[j][k] = new_ndx[v]
-        
-        # we don't need any triangles that only involve intersection points
-        # these triangles are inside the intersection
-        remove_t = []
-        for j, ti in enumerate(new_t):
-            if all(t >= n_atom_grid for t in ti):
-                remove_t.append(j)
-        
-        new_t = new_t.tolist()
-        for vi in remove_t[::-1]:
-            new_t.pop(vi)
-        new_t = np.array(new_t)
-        
+  
         atom_sphere = np.array(atom_sphere)
         norms = (atom_sphere - coords[i]) / radius_list[i]
         
@@ -487,11 +561,18 @@ def vbur_vis(
     del_count = 0
     center_grid_dist = distance_matrix(sphere, coords)
     for i in range(0, n_sphere):
-        for j in range(0, len(coords)):
-            if center_grid_dist[i,j] + 1e-3 < radius_list[j]:
+        if volume_type == "free":
+            for j in range(0, len(coords)):
+                    if center_grid_dist[i,j] < radius_list[j]:
+                        remove_v.append(i)
+                        del_count += 1
+                        break
+            
+        elif volume_type == "buried":
+            if all(center_grid_dist[i,j] > radius_list[j] for j in range(0, len(coords))):
                 remove_v.append(i)
                 del_count += 1
-                break
+
         new_ndx[i] = i - del_count
         
     for i in range(n_sphere, len(sphere)):
@@ -501,12 +582,23 @@ def vbur_vis(
     for vi in remove_v[::-1]:
         sphere.pop(vi)
         tri = tri[np.all(tri != vi, axis=1)]
-    
-    new_t = tri
-    for i, ti in enumerate(tri):
+
+    new_t = tri.tolist()
+    if volume_type == "buried":
+        remove_t = []
+        for j, ti in enumerate(new_t):
+            if all(t >= n_sphere for t in ti):
+                remove_t.append(j)
+        
+        for vi in remove_t[::-1]:
+            new_t.pop(vi)
+
+    new_t = np.array(new_t)
+
+    for i, ti in enumerate(new_t):
         for j, v in enumerate(ti):
             new_t[i][j] = new_ndx[v]
-    
+
     sphere = np.array(sphere)
     norms = (sphere - center_coords) / radius
     
