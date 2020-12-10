@@ -63,6 +63,8 @@ def percent_vbur(session,
                  palette="rainbow",
                  return_values=False,
                  steric_map=False,
+                 num_pts=100,
+                 shape="circle",
 ):
     
     out = []
@@ -112,7 +114,8 @@ def percent_vbur(session,
                         radii=radii,
                         radius=radius,
                         return_basis=True,
-                        num_pts=100,
+                        num_pts=num_pts,
+                        shape=shape,
                     )
                     
                     vbur = rescol.percent_buried_volume(
@@ -189,7 +192,8 @@ def percent_vbur(session,
                     radius=radius,
                     radii=radii,
                     return_basis=True,
-                    num_pts=100,
+                    num_pts=num_pts,
+                    shape=shape,
                 )
                 
                 vbur = rescol.percent_buried_volume(

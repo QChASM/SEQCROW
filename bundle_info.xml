@@ -225,11 +225,12 @@
         <DataDir>Substituents</DataDir>
         <DataDir>Rings</DataDir>
         <DataDir>utils</DataDir>
+        <DataDir>utils\quad_grids</DataDir>
         <DataFile>bond_data.json</DataFile>
         <DataFile>calculated_bond_lengths.json</DataFile>
         <DataFile>config.ini</DataFile>
         <DataFile>README.md</DataFile>
         <DataFile>LICENSE</DataFile>
     </DataFiles>
-
+	
 </BundleInfo>

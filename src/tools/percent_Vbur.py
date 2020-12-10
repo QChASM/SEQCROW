@@ -13,7 +13,7 @@ from PyQt5.QtGui import QKeySequence, QClipboard
 from PyQt5.QtWidgets import QPushButton, QFormLayout, QComboBox, QLineEdit, QLabel, QCheckBox, \
                             QMenuBar, QAction, QFileDialog, QApplication, QTableWidget, \
                             QTableWidgetItem, QHeaderView, QDoubleSpinBox, QSpinBox, QWidget, \
-                            QGridLayout
+                            QGridLayout, QTabWidget, QGroupBox
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.finders import AtomSpec
@@ -44,6 +44,12 @@ class _VburSettings(Settings):
         "include_header": Value(True, BoolArg),
         "delimiter": "comma",
         "steric_map": False,
+        "num_pts": 100,
+        "include_vbur": True,
+        "map_shape": "circle", 
+        "auto_minmax": True,
+        "map_max": 3.5,
+        "map_min": -3.5,
     }
 
 class PercentVolumeBuried(ToolInstance):
@@ -64,19 +70,29 @@ class PercentVolumeBuried(ToolInstance):
         self._build_ui()
 
     def _build_ui(self):
-        layout = QFormLayout()
+        layout = QGridLayout()
+
+        tabs = QTabWidget()
+        calc_widget = QWidget()
+        calc_layout = QFormLayout(calc_widget)
+        vis_widget = QWidget()
+        vis_layout = QFormLayout(vis_widget)
+        layout.addWidget(tabs)
+        
+        tabs.addTab(calc_widget, "calculation")
+        tabs.addTab(vis_widget, "visualization")
 
         self.radii_option = QComboBox()
         self.radii_option.addItems(["Bondi", "UMN"])
         ndx = self.radii_option.findText(self.settings.radii, Qt.MatchExactly)
         self.radii_option.setCurrentIndex(ndx)
-        layout.addRow("radii:", self.radii_option)
+        calc_layout.addRow("radii:", self.radii_option)
        
         self.scale = QDoubleSpinBox()
         self.scale.setValue(self.settings.vdw_scale)
         self.scale.setSingleStep(0.01)
         self.scale.setRange(1., 1.5)
-        layout.addRow("VDW scale:", self.scale)
+        calc_layout.addRow("VDW scale:", self.scale)
         
         set_ligand_atoms = QPushButton("set ligands to current selection")
         set_ligand_atoms.clicked.connect(self.set_ligand_atoms)
@@ -85,15 +101,15 @@ class PercentVolumeBuried(ToolInstance):
             "by default, all atoms will be used unless a single center is specified\n" +
             "in the case of a single center, all atoms except the center is used"
         )
-        layout.addRow(set_ligand_atoms)
+        calc_layout.addRow(set_ligand_atoms)
         
         self.radius = QDoubleSpinBox()
         self.radius.setValue(self.settings.center_radius)
         self.radius.setSuffix(" \u212B")
         self.radius.setDecimals(1)
         self.radius.setSingleStep(0.1)
-        self.radius.setRange(1., 5.)
-        layout.addRow("radius around center:", self.radius)
+        self.radius.setRange(1., 15.)
+        calc_layout.addRow("radius around center:", self.radius)
         
         self.method = QComboBox()
         self.method.addItems(["Lebedev", "Monte-Carlo"])
@@ -102,7 +118,7 @@ class PercentVolumeBuried(ToolInstance):
         )
         ndx = self.method.findText(self.settings.method, Qt.MatchExactly)
         self.method.setCurrentIndex(ndx)
-        layout.addRow("integration method:", self.method)
+        calc_layout.addRow("integration method:", self.method)
         
         leb_widget = QWidget()
         leb_layout = QFormLayout(leb_widget)
@@ -121,12 +137,8 @@ class PercentVolumeBuried(ToolInstance):
         ndx = self.angular_points.findText(self.settings.angular_points, Qt.MatchExactly)
         self.angular_points.setCurrentIndex(ndx)
         leb_layout.addRow("angular points:", self.angular_points)
-        
-        self.steric_map = QCheckBox()
-        self.steric_map.setChecked(self.settings.steric_map)
-        leb_layout.addRow("create steric map:", self.steric_map)
-        
-        layout.addRow(leb_widget)
+
+        calc_layout.addRow(leb_widget)
         
         mc_widget = QWidget()
         mc_layout = QFormLayout(mc_widget)
@@ -140,7 +152,7 @@ class PercentVolumeBuried(ToolInstance):
         )
         mc_layout.addRow("minimum interations:", self.min_iter)
         
-        layout.addRow(mc_widget)
+        calc_layout.addRow(mc_widget)
         
         if self.settings.method == "Lebedev":
             mc_widget.setVisible(False)
@@ -156,14 +168,87 @@ class PercentVolumeBuried(ToolInstance):
             "place the center between selected atoms\n" +
             "might be useful for polydentate ligands"
         )
-        layout.addRow("use centroid of centers:", self.use_centroid)
+        calc_layout.addRow("use centroid of centers:", self.use_centroid)
 
+        steric_map_options = QGroupBox("steric map")
+        steric_map_layout = QFormLayout(steric_map_options)
+        
+        self.steric_map = QCheckBox()
+        self.steric_map.setChecked(self.settings.steric_map)
+        self.steric_map.setToolTip("produce a 2D projection of steric bulk\ncauses buried volume to be reported for individual quadrants")
+        steric_map_layout.addRow("create steric map:", self.steric_map)
+        
+        self.num_pts = QSpinBox()
+        self.num_pts.setRange(25, 250)
+        self.num_pts.setValue(self.settings.num_pts)
+        self.num_pts.setToolTip("number of points along x and y axes")
+        steric_map_layout.addRow("number of points:", self.num_pts)
+        
+        self.include_vbur = QCheckBox()
+        self.include_vbur.setChecked(self.settings.include_vbur)
+        steric_map_layout.addRow("label quadrants with %V<sub>bur</sub>", self.include_vbur)
+
+        self.map_shape = QComboBox()
+        self.map_shape.addItems(["circle", "square"])
+        ndx = self.map_shape.findText(self.settings.map_shape, Qt.MatchExactly)
+        self.map_shape.setCurrentIndex(ndx)
+        steric_map_layout.addRow("map shape:", self.map_shape)
+        
+        self.auto_minmax = QCheckBox()
+        self.auto_minmax.setChecked(self.settings.auto_minmax)
+        steric_map_layout.addRow("automatic min. and max.:", self.auto_minmax)
+        
+        self.map_min = QDoubleSpinBox()
+        self.map_min.setRange(-15., 3.5)
+        self.map_min.setSingleStep(0.1)
+        self.map_min.setValue(self.settings.map_min)
+        steric_map_layout.addRow("minimum value:", self.map_min)    
+        
+        self.map_max = QDoubleSpinBox()
+        self.map_max.setRange(-3.5, 15.)
+        self.map_max.setSingleStep(0.1)
+        self.map_max.setValue(self.settings.map_max)
+        steric_map_layout.addRow("maximum value:", self.map_max)
+        
+        self.num_pts.setEnabled(self.settings.steric_map)
+        self.steric_map.stateChanged.connect(lambda state, widget=self.num_pts: widget.setEnabled(state == Qt.Checked))
+        
+        self.include_vbur.setEnabled(self.settings.steric_map)
+        self.steric_map.stateChanged.connect(lambda state, widget=self.include_vbur: widget.setEnabled(state == Qt.Checked))        
+
+        self.map_shape.setEnabled(self.settings.steric_map)
+        self.steric_map.stateChanged.connect(lambda state, widget=self.map_shape: widget.setEnabled(state == Qt.Checked))        
+        
+        self.auto_minmax.setEnabled(self.settings.steric_map)
+        self.steric_map.stateChanged.connect(lambda state, widget=self.auto_minmax: widget.setEnabled(state == Qt.Checked))        
+        
+        self.map_min.setEnabled(not self.settings.auto_minmax and self.settings.steric_map)
+        self.steric_map.stateChanged.connect(
+            lambda state, widget=self.map_min, widget2=self.auto_minmax: widget.setEnabled(state == Qt.Checked and not widget2.isChecked())
+        )
+        self.auto_minmax.stateChanged.connect(
+            lambda state, widget=self.map_min, widget2=self.steric_map: widget.setEnabled(not state == Qt.Checked and widget2.isChecked())
+        )
+
+        self.map_max.setEnabled(not self.settings.auto_minmax and self.settings.steric_map)
+        self.steric_map.stateChanged.connect(
+            lambda state, widget=self.map_max, widget2=self.auto_minmax: widget.setEnabled(state == Qt.Checked and not widget2.isChecked())
+        )
+        self.auto_minmax.stateChanged.connect(
+            lambda state, widget=self.map_max, widget2=self.steric_map: widget.setEnabled(not state == Qt.Checked and widget2.isChecked())
+        )
+        
+        vis_layout.addRow(steric_map_options)
+        
+        cutout_options = QGroupBox("volume cutout")
+        cutout_layout = QFormLayout(cutout_options)
+        
         self.display_cutout = QComboBox()
         self.display_cutout.addItems(["no", "free", "buried"])
         ndx = self.display_cutout.findText(self.settings.display_cutout, Qt.MatchExactly)
         self.display_cutout.setCurrentIndex(ndx)
         self.display_cutout.setToolTip("show free or buried volume")
-        layout.addRow("display volume:", self.display_cutout)
+        cutout_layout.addRow("display volume:", self.display_cutout)
         
         self.point_spacing = QDoubleSpinBox()
         self.point_spacing.setDecimals(3)
@@ -175,7 +260,7 @@ class PercentVolumeBuried(ToolInstance):
             "distance between points on cutout\n" +
             "smaller spacing will narrow gaps, but increase time to create the cutout"
         )
-        layout.addRow("point spacing:", self.point_spacing)
+        cutout_layout.addRow("point spacing:", self.point_spacing)
         
         self.intersection_scale = QDoubleSpinBox()
         self.intersection_scale.setDecimals(2)
@@ -187,7 +272,7 @@ class PercentVolumeBuried(ToolInstance):
             "higher density will narrow gaps, but increase time to create cutout"
         )
         self.intersection_scale.setValue(self.settings.intersection_scale)
-        layout.addRow("intersection density:", self.intersection_scale)
+        cutout_layout.addRow("intersection density:", self.intersection_scale)
         
         self.point_spacing.setEnabled(self.settings.display_cutout != "no")
         self.intersection_scale.setEnabled(self.settings.display_cutout != "no")
@@ -195,13 +280,15 @@ class PercentVolumeBuried(ToolInstance):
         self.display_cutout.currentTextChanged.connect(lambda text, widget=self.point_spacing: widget.setEnabled(text != "no"))
         self.display_cutout.currentTextChanged.connect(lambda text, widget=self.intersection_scale: widget.setEnabled(text != "no"))
         
+        vis_layout.addRow(cutout_options)
+        
         calc_vbur_button = QPushButton("calculate % buried volume for selected centers")
         calc_vbur_button.clicked.connect(self.calc_vbur)
-        layout.addRow(calc_vbur_button)
+        calc_layout.addRow(calc_vbur_button)
         
         remove_vbur_button = QPushButton("remove % buried volume visualizations")
         remove_vbur_button.clicked.connect(self.del_vbur)
-        layout.addRow(remove_vbur_button)
+        cutout_layout.addRow(remove_vbur_button)
         
         self.table = QTableWidget()
         self.table.setColumnCount(3)
@@ -212,7 +299,7 @@ class PercentVolumeBuried(ToolInstance):
         self.table.resizeColumnToContents(1)
         self.table.resizeColumnToContents(2)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-        layout.addRow(self.table)
+        calc_layout.addRow(self.table)
 
         menu = QMenuBar()
         
@@ -319,14 +406,21 @@ class PercentVolumeBuried(ToolInstance):
         steric_map = self.steric_map.checkState() == Qt.Checked
         self.settings.steric_map = steric_map
         args["steric_map"] = steric_map
+        
+        num_pts = self.num_pts.value()
+        self.settings.num_pts = num_pts
+        args["num_pts"] = num_pts
+        
+        include_vbur = self.include_vbur.checkState() == Qt.Checked
+        self.settings.include_vbur = include_vbur
 
         use_centroid = self.use_centroid.checkState() == Qt.Checked
         self.settings.use_centroid = use_centroid
         args["useCentroid"] = use_centroid
         
-        if not use_centroid:
-            self.settings.steric_map = steric_map
-            args["steric_map"] = steric_map
+        shape = self.map_shape.currentText()
+        self.settings.map_shape = shape
+        args["shape"] = shape
         
         method = self.method.currentText()
         self.settings.method = method
@@ -346,9 +440,6 @@ class PercentVolumeBuried(ToolInstance):
             min_iter = self.min_iter.value()
             self.settings.minimum_iterations = min_iter
             args["minimumIterations"] = min_iter
-            
-            steric_map = False
-            args["steric_map"] = False
         
         display_cutout = self.display_cutout.currentText()
         self.settings.display_cutout = display_cutout
@@ -368,6 +459,15 @@ class PercentVolumeBuried(ToolInstance):
             args["onlyAtoms"] = [a for a in self.ligand_atoms if not a.deleted]
             if len(args["onlyAtoms"]) == 0:
                 args["onlyAtoms"] = None
+
+        auto_minmax = self.auto_minmax.checkState() == Qt.Checked
+        self.settings.auto_minmax = auto_minmax
+        if not auto_minmax:
+            map_max = self.map_max.value()
+            self.settings.map_max = map_max
+            
+            map_min = self.settings.map_min
+            self.settings.map_min = map_min
 
         info = percent_vbur_cmd(
             self.session,
@@ -398,7 +498,10 @@ class PercentVolumeBuried(ToolInstance):
                 
                 x, y, z, min_alt, max_alt = map_info
                 plot = self.tool_window.create_child_window("steric map of %s" % mdl, window_class=StericMap)
-                plot.set_data(x, y, z, min_alt, max_alt, vbur, radius)
+                if auto_minmax:
+                    plot.set_data(x, y, z, min_alt, max_alt, vbur, radius, include_vbur)
+                else:
+                    plot.set_data(x, y, z, map_min, map_max, vbur, radius, include_vbur)
 
         else:
             for mdl, cent, vbur in info:
@@ -491,22 +594,27 @@ class StericMap(ChildToolWindow):
         self.ui_area.setLayout(self.layout)
         self.manage(None)
     
-    def set_data(self, x, y, z, min_alt, max_alt, vbur, radius):
+    def set_data(self, x, y, z, min_alt, max_alt, vbur, radius, include_vbur):
         fig, ax = plt.subplots()
-        steric_map = ax.contourf(x, y, z, extend="min", cmap=copy.copy(plt.cm.get_cmap("jet")), levels=np.linspace(min_alt, max_alt, num=20))
+        steric_map = ax.contourf(x, y, z, extend="min", cmap=copy.copy(plt.cm.get_cmap("jet")), levels=np.linspace(min_alt, max_alt, num=21))
         steric_map.cmap.set_under('w')
-        steric_lines = ax.contour(x, y, z, extend="min", colors='k', levels=np.linspace(min_alt, max_alt, num=20))
+        steric_lines = ax.contour(x, y, z, extend="min", colors='k', levels=np.linspace(min_alt, max_alt, num=21))
         bar = fig.colorbar(steric_map, format="%.1f")
         bar.set_label("altitude (Å)")
         ax.set_aspect("equal")
         
-        ax.hlines(0, -radius, radius, color='k')
-        ax.vlines(0, -radius, radius, color='k')
+        if include_vbur:
+            ax.hlines(0, -radius, radius, color='k')
+            ax.vlines(0, -radius, radius, color='k')
+            
+            ax.text( 0.7 * radius,  0.9 * radius, "%.1f%%" % vbur[0])
+            ax.text(-0.9 * radius,  0.9 * radius, "%.1f%%" % vbur[1])
+            ax.text(-0.9 * radius, -0.9 * radius, "%.1f%%" % vbur[2])
+            ax.text( 0.7 * radius, -0.9 * radius, "%.1f%%" % vbur[3])
         
-        ax.text( 0.7 * radius,  0.9 * radius, "%.1f%%" % vbur[0])
-        ax.text(-0.9 * radius,  0.9 * radius, "%.1f%%" % vbur[1])
-        ax.text(-0.9 * radius, -0.9 * radius, "%.1f%%" % vbur[2])
-        ax.text( 0.7 * radius, -0.9 * radius, "%.1f%%" % vbur[3])
+        if include_vbur:
+            circle = plt.Circle((0, 0), radius, color="k", fill=False, linewidth=4)
+            ax.add_artist(circle)
         
         canvas = Canvas(fig)
         
