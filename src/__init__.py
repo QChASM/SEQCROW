@@ -193,6 +193,10 @@ class _SEQCROW_API(BundleAPI):
         elif ti.name == "Buried Volume":
             from .tools import PercentVolumeBuried
             return PercentVolumeBuried(session, ti.name)
+
+        elif ti.name == "File Info":
+            from .tools import Info
+            return Info(session, ti.name)
         
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)

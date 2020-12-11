@@ -10,10 +10,10 @@ from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QKeySequence, QClipboard
-from PyQt5.QtWidgets import QPushButton, QFormLayout, QComboBox, QLineEdit, QLabel, QCheckBox, \
-                            QMenuBar, QAction, QFileDialog, QApplication, QTableWidget, \
-                            QTableWidgetItem, QHeaderView, QDoubleSpinBox, QSpinBox, QWidget, \
-                            QGridLayout, QTabWidget, QGroupBox
+from PyQt5.QtWidgets import QPushButton, QFormLayout, QComboBox, QCheckBox, QMenuBar, QAction, \
+                            QFileDialog, QApplication, QTableWidget, QTableWidgetItem, \
+                            QHeaderView, QSpinBox, QWidget, QGridLayout, \
+                            QTabWidget, QGroupBox
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.finders import AtomSpec

@@ -12,3 +12,4 @@ from .sterimol import Sterimol
 from .bond_editor import BondEditor
 from .precision_rotate import PrecisionRotate
 from .percent_Vbur import PercentVolumeBuried
+from .info import Info
