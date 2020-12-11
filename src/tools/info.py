@@ -19,6 +19,9 @@ class _InfoSettings(Settings):
    
    
 class Info(ToolInstance):
+    
+    help = "https://github.com/QChASM/SEQCROW/wiki/File-Info-Tool"
+    
     def __init__(self, session, name):       
         super().__init__(session, name)
         
