@@ -10,15 +10,14 @@ from json import dumps, loads, dump, load
 
 from configparser import ConfigParser
 
-from PyQt5.Qt import QClipboard, QStyle, QIcon
 from PyQt5.QtCore import Qt, QRegularExpression, pyqtSignal
-from PyQt5.QtGui import QKeySequence, QFontMetrics, QFontDatabase
+from PyQt5.QtGui import QKeySequence, QFontMetrics, QFontDatabase, QClipboard, QIcon
 from PyQt5.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, \
                             QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, \
                             QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, \
                             QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView, QTextBrowser, \
                             QStatusBar, QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem, QSizePolicy, \
-                            QToolBox
+                            QToolBox, QStyle 
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.utils import iter2str
@@ -245,8 +244,8 @@ class BuildQM(ToolInstance):
     additional options - generic (and uncurated) options 
     """
     
-    SESSION_ENDURING = False
-    SESSION_SAVE = False         
+    SESSION_ENDURING = True
+    SESSION_SAVE = True         
 
     help = "https://github.com/QChASM/SEQCROW/wiki/Build-QM-Input-Tool"
 
@@ -283,6 +282,11 @@ class BuildQM(ToolInstance):
         #find a better trigger - only need changes to coordinates and elements
         #'changes done' fires when other things happen like selecting atoms
         self._changes = global_triggers.add_handler("changes done", self.update_preview)
+        
+        # this tool is big by default
+        # unless the user has saved its position, make it small
+        if name not in self.session.ui.settings.tool_positions['windows']:
+            self.tool_window.shrink_to_fit()
 
     def _build_ui(self):
         #build an interface with a dropdown menu to select software package
@@ -697,14 +701,17 @@ class BuildQM(ToolInstance):
             return
 
         self.update_theory(update_settings=False)
-        
+
         self.check_elements()
         if self.preview_window is not None:
             self.update_theory(update_settings=False)
 
             kw_dict = self.job_widget.getKWDict(False)
             other_kw_dict = self.other_keywords_widget.getKWDict(False)
-            
+        
+            if len(other_kw_dict["comments"]) == 0:
+                other_kw_dict["comments"] = [self.theory.geometry.name]
+
             combined_dict = combine_dicts(kw_dict, other_kw_dict)
     
             program = self.file_type.currentText()
@@ -887,6 +894,9 @@ class BuildQM(ToolInstance):
         other_kw_dict = self.other_keywords_widget.getKWDict()
         self.settings.save()
         
+        if len(other_kw_dict["comments"]) == 0:
+            other_kw_dict["comments"] = [self.theory.geometry.name]
+
         combined_dict = combine_dicts(kw_dict, other_kw_dict)
         
         self.settings.last_program = self.file_type.currentText()
@@ -924,6 +934,9 @@ class BuildQM(ToolInstance):
         other_kw_dict = self.other_keywords_widget.getKWDict()
         self.settings.save()
         
+        if len(other_kw_dict["comments"]) == 0:
+            other_kw_dict["comments"] = [self.theory.geometry.name]
+        
         combined_dict = combine_dicts(kw_dict, other_kw_dict)
         
         self.settings.last_program = self.file_type.currentText()
@@ -934,7 +947,6 @@ class BuildQM(ToolInstance):
         if program == "Gaussian":
             filename, _ = QFileDialog.getSaveFileName(filter="Gaussian input files (*.com *.gjf)")
             if filename:
-                print(filename)
                 output, warnings = self.theory.write_gaussian_input(fname=filename, **combined_dict)
         
         elif program == "ORCA":
@@ -2228,7 +2240,6 @@ class LayerWidget(QWidget):
                         other_layer_table = other_layer_table.table
                     for atom2 in layer[::-1]:
                         if atom is atom2:
-                            print("removing", atom2.atomspec, "from monomer", i + 1)
                             ndx = layer.index(atom)
                             layer.pop(ndx)
                             other_layer_table.removeRow(ndx)
@@ -2294,8 +2305,14 @@ class LayerWidget(QWidget):
             
             self.set_layer(use_atoms=atoms)
         
+        # we'll have an empty monomer when we first open the input builder
+        # before the molecule is set
+        # this empty monomer would stick around until it is removed
+        while len(self.layers) > self.tabs.count():
+            self.layers.pop(-1)
+
         self.something_changed.emit()
-    
+        
     def check_deleted_atoms(self, *args):
         for i, layer in enumerate(self.layers):
             table = self.tabs.widget(i)
@@ -2847,7 +2864,7 @@ class BasisOption(QWidget):
         self.custom_basis_kw.textChanged.connect(self.update_tooltab)
         self.custom_basis_kw.setPlaceholderText("filter basis sets")
         self.custom_basis_kw.setClearButtonEnabled(True)
-        keyword_label = QLabel("keyword:")
+        keyword_label = QLabel("name:")
         self.basis_name_options.addRow(keyword_label, self.custom_basis_kw)
         
         self.aux_type = QComboBox()
@@ -3472,7 +3489,10 @@ class BasisWidget(QWidget):
             builtin = self.settings.last_custom_ecp_builtin[use_saved]
             new_basis.setBasis(name, custom, builtin)
             #new_basis.setSelectedElements(self.settings.last_ecp_elements[use_saved].split(','))
-            
+        
+        else:
+            new_basis.setBasis()
+
         new_basis.basis_changed()
         
         self.ecp_options.append(new_basis)

@@ -99,17 +99,13 @@ class SEQCROW_Theory(Theory):
             if self.method.sapt and sum(self.multiplicity[1:]) - len(self.multiplicity[1:]) + 1 > self.multiplicity[0]:
                 seps = []
                 for i, m1 in enumerate(monomers[:-1]):
+                    print(i)
                     seps.append(0)
-                    # needs to be i+1 for some reason...
-                    for m2 in monomers[:i+1]:
+                    for m2 in monomers[: i + 1]:
+                        print(len(m2))
                         seps[-1] += len(m2)
     
-                for monomer in monomers:
-                    print("monomer")
-                    for atom in monomer:
-                        print(atom.atomspec)
-                        
-                s += "    fragment_separators=%s,\n" % repr(seps[:-1])
+                s += "    fragment_separators=%s,\n" % repr(seps)
                 if isinstance(self.geometry, AtomicStructure):
                     s += "    elez=%s,\n" % repr([atom.element.number for monomer in monomers for atom in monomer])
                 else:
@@ -119,10 +115,7 @@ class SEQCROW_Theory(Theory):
                 s += "    fragment_charges=%s,\n" % repr(self.charge[1:])
                 s += "    geom=["
                 i = 0
-                for monomer in monomers:
-                    print("monomer")
-                    for atom in monomer:
-                        print(atom)
+
                 for monomer in monomers:
                     s += "\n"
                     for atom in monomer:
@@ -172,6 +165,8 @@ class SEQCROW_Theory(Theory):
                 if len(atoms_not_in_monomer) > 0:
                     warnings.append("there are %i atoms not in a monomer" % len(atoms_not_in_monomer))
                 
+                s += "}\n"
+                
             else:
                 if isinstance(self.geometry, AtomicStructure):
                     for atom in self.geometry.atoms:
@@ -189,6 +184,8 @@ class SEQCROW_Theory(Theory):
                         else:
                             coords = atom.coords
                         s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element, *coords)
+                
+                s += "}\n"
 
         footer, footer_warnings = self.make_footer(geometry,
                                                    style='psi4', 

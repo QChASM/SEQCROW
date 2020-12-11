@@ -25,12 +25,11 @@ from matplotlib.backend_bases import MouseEvent
 from matplotlib.figure import Figure
 from matplotlib import rc as matplotlib_rc
 
-from PyQt5.Qt import QIcon, QStyle
 from PyQt5.QtCore import Qt, QRect, QItemSelectionModel 
-from PyQt5.QtGui import QValidator, QFont
+from PyQt5.QtGui import QValidator, QFont, QIcon
 from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, QTabWidget, QComboBox, \
                             QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, \
-                            QFormLayout, QCheckBox, QHeaderView, QMenuBar, QAction, QFileDialog
+                            QFormLayout, QCheckBox, QHeaderView, QMenuBar, QAction, QFileDialog, QStyle
 
 from SEQCROW.tools.per_frame_plot import NavigationToolbar
 from SEQCROW.utils import iter2str
@@ -38,9 +37,7 @@ from SEQCROW.widgets import FilereaderComboBox
 
 #TODO:
 #make double clicking something in the table visualize it
-#add an option to reset coordinates
-#  - vectors sometimes end up in the wrong place b/c 
-#    geom coords don't match model coords for opt + freq jobs
+
 
 matplotlib_rc('font',  **{'sans-serif' : 'Arial', 'family' : 'sans-serif'})
 
@@ -49,7 +46,7 @@ class _NormalModeSettings(Settings):
         'arrow_color': Value((0.0, 1.0, 0.0, 1.0), TupleOf(FloatArg, 4), iter2str),
         'arrow_scale': Value(1.5, FloatArg),
         'anim_scale': Value(0.2, FloatArg),
-        'anim_duration': Value(120, IntArg),
+        'anim_duration': Value(60, IntArg),
         'anim_fps': Value(60, IntArg), 
         'fwhm': Value(5, FloatArg), 
         'peak_type': 'Gaussian', 
@@ -196,7 +193,6 @@ class NormalModes(ToolInstance):
         vector_opts.addRow("use mass-weighted:", self.vec_use_mass_weighted)
 
         self.vector_color = ColorButton(has_alpha_channel=True, max_size=(16, 16))
-        self.vector_color.setToolTip("color of vectors")
         self.vector_color.set_color(self.settings.arrow_color)
         vector_opts.addRow("vector color:", self.vector_color)
 

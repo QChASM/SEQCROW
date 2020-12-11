@@ -190,6 +190,14 @@ class _SEQCROW_API(BundleAPI):
             from .tools import PrecisionRotate
             return PrecisionRotate(session, ti.name)
         
+        elif ti.name == "Buried Volume":
+            from .tools import PercentVolumeBuried
+            return PercentVolumeBuried(session, ti.name)
+
+        elif ti.name == "File Info":
+            from .tools import Info
+            return Info(session, ti.name)
+        
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)
 
@@ -278,6 +286,13 @@ class _SEQCROW_API(BundleAPI):
                     @property
                     def save_args(self):
                         return {'models': ModelsArg, 'comment': StringArg}
+                    
+                    def save_args_widget(self, session):
+                        from .widgets import ModelComboBox
+                        return ModelComboBox(session, autoUpdate=False)
+                    
+                    def save_args_string_from_widget(self, widget):
+                        return widget.options_string()
                         
                 return Info()
 
@@ -317,7 +332,11 @@ class _SEQCROW_API(BundleAPI):
 
         elif command_info.name == "percentVolumeBuried":
             from .commands.percent_Vbur import percent_vbur, vbur_description
-            register("percentVolumeBuried", vbur_description, percent_vbur)
+            register("percentVolumeBuried", vbur_description, percent_vbur)        
+        
+        elif command_info.name == "duplicate":
+            from .commands.duplicate import duplicate, duplicate_description
+            register("duplicate", duplicate_description, duplicate)
 
     @staticmethod
     def register_selector_menus(session):
@@ -328,5 +347,49 @@ class _SEQCROW_API(BundleAPI):
             if sub not in ELEMENTS and sub.isalnum():
                 add_selector(substituent_menu, sub, sub)
 
+    @staticmethod
+    def get_class(name):
+        if name == "BondEditor":
+            from .tools import BondEditor
+            return BondEditor
+        elif name == "AaronTools_Library":
+            from .tools import AaronTools_Library
+            return AaronTools_Library
+        elif name == "Thermochem":
+            from .tools import Thermochem
+            return Thermochem
+        elif name == "FileReaderPanel":
+            from .tools import FileReaderPanel
+            return FileReaderPanel
+        elif name == "BuildQM":
+            from .tools import BuildQM
+            return BuildQM
+        elif name == "JobQueue":
+            from .tools import JobQueue
+            return JobQueue
+        elif name == "LibAdd":
+            from .tools import LibAdd
+            return LibAdd
+        elif name == "NormalModes":
+            from .tools import NormalModes
+            return NormalModes
+        elif name == "EnergyPlot":
+            from .tools import EnergyPlot
+            return EnergyPlot
+        elif name == "PrecisionRotate":
+            from .tools import PrecisionRotate
+            return PrecisionRotate
+        elif name == "Sterimol":
+            from .tools import Sterimol
+            return Sterimol
+        elif name == "EditStructure":
+            from .tools import EditStructure
+            return EditStructure
+
+    @staticmethod
+    def finish(session, bundle_info):
+        del session.filereader_manager
+        del session.seqcrow_ordered_selection_manager
+        del session.seqcrow_job_manager
 
 bundle_api = _SEQCROW_API()

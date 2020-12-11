@@ -1,10 +1,10 @@
 <BundleInfo name="SEQCROW" 
             customInit="true"
-            minSessionVersion="1"
-            maxSessionVersion="1"
+            minSessionVersion="3"
+            maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="0.20">
+            version="0.21">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -58,6 +58,7 @@
                 <Dependency name="scipy"/>
                 <Dependency name="numpy"/>
                 <Dependency name="Send2Trash"/>
+                <Dependency name="stripy"/>
             </Dependencies>
             
             <Categories>
@@ -163,6 +164,8 @@
                 <ChimeraXClassifier>ChimeraX :: Tool :: Bond Editor                    :: Structure Editing  :: Draw or erase bonds</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Change Element                 :: Structure Editing  :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Rotate                         :: Structure Editing  :: Rotate all or part of a molecular structure</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Buried Volume                  :: Structure Analysis :: Calculate percent buried volume</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: File Info                      :: AaronTools         :: Miscellaneous file data</ChimeraXClassifier>
                 <!--ChimeraXClassifier>ChimeraX :: Tool :: AARON Input Builder :: AARON :: Build AARON input file</ChimeraXClassifier-->
                 
                 <ChimeraXClassifier>ChimeraX :: Selector :: tm       :: Transition metals</ChimeraXClassifier>
@@ -210,10 +213,11 @@
                 <ChimeraXClassifier>ChimeraX :: Command :: ~tsbond             :: Structure Editing  :: remove a forming/breaking bond</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: sterimol            :: Structure Analysis :: calculate L, B1, and B5 Sterimol parameters</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: percentVolumeBuried :: Structure Analysis :: calculate percent volume buried by ligands around a metal center</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: duplicate           :: Structure Editing  :: duplicate selected atoms</ChimeraXClassifier>
        </Classifiers>
     
     <AdditionalPackages>
-        <Package name="AaronTools" folder="C:\Users\Tony Schaefer\Documents\GitHub\AaronTools">
+        <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools">
         </Package>
     </AdditionalPackages>
 
@@ -222,11 +226,12 @@
         <DataDir>Substituents</DataDir>
         <DataDir>Rings</DataDir>
         <DataDir>utils</DataDir>
+        <DataDir>utils\quad_grids</DataDir>
         <DataFile>bond_data.json</DataFile>
         <DataFile>calculated_bond_lengths.json</DataFile>
         <DataFile>config.ini</DataFile>
         <DataFile>README.md</DataFile>
         <DataFile>LICENSE</DataFile>
     </DataFiles>
-
+	
 </BundleInfo>

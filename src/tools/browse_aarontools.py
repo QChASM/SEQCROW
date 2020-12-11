@@ -36,9 +36,10 @@ class _BrowseLibSettings(Settings):
 #make the AaronTools 'database' be discoverable (so open Me AaronTools works or whatever)
     
 class AaronTools_Library(ToolInstance):
-    SESSION_ENDURING = False
-    SESSION_SAVE = False         
+
     help = "https://github.com/QChASM/SEQCROW/wiki/Browse-AaronTools-Libraries-Tool"
+    SESSION_ENDURING = True
+    SESSION_SAVE = True
     
     def __init__(self, session, name):       
         super().__init__(session, name)

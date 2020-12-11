@@ -9,13 +9,12 @@ from chimerax.core.commands.cli import FloatArg, BoolArg, StringArg, IntArg
 
 from numpy import isclose
 
-from PyQt5.Qt import QClipboard, QStyle, QIcon
 from PyQt5.QtCore import Qt, QSize, pyqtSignal
-from PyQt5.QtGui import QKeySequence
+from PyQt5.QtGui import QKeySequence, QClipboard, QIcon
 from PyQt5.QtWidgets import QLabel, QGridLayout, QComboBox, QSplitter, QLineEdit, QDoubleSpinBox, \
                             QMenuBar, QFileDialog, QAction, QApplication, QWidget, QGroupBox, QStatusBar, \
                             QTabWidget, QTreeWidget, QSizePolicy, QPushButton, QHeaderView, QHBoxLayout, \
-                            QTreeWidgetItem
+                            QTreeWidgetItem, QStyle
 
 from os.path import basename
 
