@@ -13,7 +13,7 @@ from PyQt5.QtGui import QKeySequence, QClipboard
 from PyQt5.QtWidgets import QPushButton, QFormLayout, QComboBox, QCheckBox, QMenuBar, QAction, \
                             QFileDialog, QApplication, QTableWidget, QTableWidgetItem, \
                             QHeaderView, QSpinBox, QWidget, QGridLayout, \
-                            QTabWidget, QGroupBox
+                            QTabWidget, QGroupBox, QDoubleSpinBox
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.finders import AtomSpec
@@ -372,6 +372,7 @@ class PercentVolumeBuried(ToolInstance):
 
     def set_ligand_atoms(self):
         self.ligand_atoms = selected_atoms(self.session)
+        self.session.logger.status("set ligand to current selection")
 
     def calc_vbur(self):
         args = dict()
