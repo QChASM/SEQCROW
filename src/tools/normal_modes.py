@@ -446,9 +446,9 @@ class NormalModes(ToolInstance):
         dX = self._get_coord_change(geom, vector, scale)
         
         #atoms can't be deep copied for some reason
-        Xf = geom.coords() + dX
-        X = geom.coords()
-        Xr = geom.coords() - dX
+        Xf = geom.coords + dX
+        X = geom.coords
+        Xr = geom.coords - dX
         
         S = Pathway(geom, np.array([Xf, X, Xr, X, Xf]))
         
@@ -485,7 +485,7 @@ class NormalModes(ToolInstance):
                     tool.delete()
                     
         geom = Geometry(fr)
-        for atom, coord in zip(model.atoms, geom.coords()):
+        for atom, coord in zip(model.atoms, geom.coords):
             atom.coord = coord
     
     def display_help(self):
