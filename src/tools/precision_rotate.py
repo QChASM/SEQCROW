@@ -8,8 +8,8 @@ from chimerax.core.settings import Settings
 from chimerax.core.generic3d import Generic3DModel 
 from chimerax.core.selection import SELECTION_CHANGED
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QGridLayout, QFormLayout, QCheckBox, QPushButton, \
+from PySide2.QtCore import Qt
+from PySide2.QtWidgets import QGridLayout, QFormLayout, QCheckBox, QPushButton, \
                             QDoubleSpinBox, QWidget, QLabel, QStatusBar, QComboBox, \
                             QHBoxLayout
 
@@ -464,3 +464,14 @@ class PrecisionRotate(ToolInstance):
                 model.delete()
         
         return super().delete()
+
+    def close(self):
+        self.session.triggers.remove_handler(self._show_rot_vec)
+        global_triggers = get_triggers()
+        global_triggers.remove_handler(self._changes)
+        
+        for model in self.session.models.list(type=Generic3DModel):
+            if model.name == "rotation vector":
+                model.delete()
+        
+        return super().close()

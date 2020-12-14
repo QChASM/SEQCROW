@@ -10,9 +10,9 @@ from json import dumps, loads, dump, load
 
 from configparser import ConfigParser
 
-from PyQt5.QtCore import Qt, QRegularExpression, pyqtSignal
-from PyQt5.QtGui import QKeySequence, QFontMetrics, QFontDatabase, QClipboard, QIcon
-from PyQt5.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, \
+from PySide2.QtCore import Qt, QRegularExpression, Signal
+from PySide2.QtGui import QKeySequence, QFontMetrics, QFontDatabase, QClipboard, QIcon
+from PySide2.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, \
                             QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, \
                             QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, \
                             QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView, QTextBrowser, \
@@ -299,7 +299,7 @@ class BuildQM(ToolInstance):
         
         basics_form = QWidget()
         form_layout = QFormLayout(basics_form)
-                
+
         self.file_type = QComboBox()
         self.file_type.addItems(['Gaussian', 'ORCA', 'Psi4'])
         ndx = self.file_type.findText(init_form, Qt.MatchExactly)
@@ -406,6 +406,8 @@ class BuildQM(ToolInstance):
         #run.addAction(remotely)
         
         menu.setNativeMenuBar(False)
+        # need to keep a reference to menu for PySide2 reasons...
+        self._menu = menu
         layout.setMenuBar(menu)
 
         self.tool_window.ui_area.setLayout(layout)
@@ -979,7 +981,17 @@ class BuildQM(ToolInstance):
         
         self.model_selector.deleteLater()
         
-        return super().delete()
+        return super().delete()    
+    
+    def close(self):
+        """deregister trigger handlers"""
+        #overload delete to de-register handler
+        global_triggers = get_triggers()
+        global_triggers.remove_handler(self._changes)
+        
+        self.model_selector.deleteLater()
+        
+        return super().close()
 
     def display_help(self):
         """Show the help for this tool in the help viewer."""
@@ -996,7 +1008,7 @@ class JobTypeOption(QWidget):
         - contrained optimization
         - solvent
     """
-    jobTypeChanged = pyqtSignal()
+    jobTypeChanged = Signal()
     
     GAUSSIAN_SOLVENT_MODELS = ["PCM", "SMD", "CPCM", "Dipole", "IPCM", "SCIPCM"]
     ORCA_SOLVENT_MODELS = ["SMD", "CPCM"]
@@ -1244,7 +1256,7 @@ class JobTypeOption(QWidget):
         freq_opt_form.addRow("high-precision modes:", self.hpmodes)
 
         self.raman = QCheckBox()
-        self.raman.setCheckState(self.settings.last_raman)
+        self.raman.setChecked(self.settings.last_raman)
         self.raman.stateChanged.connect(self.something_changed)
         freq_opt_form.addRow("Raman intensities:", self.raman)
 
@@ -2170,7 +2182,7 @@ class JobTypeOption(QWidget):
 
 
 class LayerWidget(QWidget):
-    something_changed = pyqtSignal()
+    something_changed = Signal()
     
     def __init__(self, settings, session, tab_text, parent=None):
         super().__init__(parent)
@@ -2350,7 +2362,7 @@ class MethodOption(QWidget):
     ]
     PSI4_GRIDS = ["Default", "(250, 974)", "(175, 974)", "(60, 770)", "(99, 590)", "(55, 590)", "(50, 434)", "(75, 302)"]
 
-    methodChanged = pyqtSignal()
+    methodChanged = Signal()
     
     def __init__(self, settings, session, init_form, parent=None):
         super().__init__(parent)
@@ -2808,7 +2820,7 @@ class BasisOption(QWidget):
     selecting an element on the list will deselect it on lists for other BasisOptions
     """
     
-    basisChanged = pyqtSignal()
+    basisChanged = Signal()
 
     #for psi4, ECP's are included in basis set definitions
     options = ["def2-SVP", "def2-TZVP", "aug-cc-pVDZ", "aug-cc-pVTZ", "6-311+G**", "SDD", "LANL2DZ", "other"]
@@ -3388,7 +3400,7 @@ class ECPOption(BasisOption):
 class BasisWidget(QWidget):
     """widget to store and manage BasisOptions and ECPOptions"""
     
-    basisChanged = pyqtSignal()
+    basisChanged = Signal()
     
     def __init__(self, settings, init_form="Gaussian", parent=None):
         super().__init__(parent)
@@ -3868,8 +3880,8 @@ class CurrentOptTable(QTableWidget):
 class OneLayerKeyWordOption(QWidget):
     #TODO:
     #* add option to not save (who wants to save a comment? some people might, but I don't)
-    optionChanged = pyqtSignal()
-    settingsChanged = pyqtSignal()
+    optionChanged = Signal()
+    settingsChanged = Signal()
     
     def __init__(self, name, last_list=[], previous_list=[], multiline=False, parent=None):
         """
@@ -4135,8 +4147,8 @@ class OneLayerKeyWordOption(QWidget):
 class TwoLayerKeyWordOption(QWidget):
     """widget for 'two-layer' options
     like opt(noeigentest)"""
-    optionChanged = pyqtSignal()
-    settingsChanged = pyqtSignal()
+    optionChanged = Signal()
+    settingsChanged = Signal()
     
     def __init__(self, name, last_dict, previous_dict, opt_fmt, \
                  one_opt_per_kw=False, parent=None):
@@ -4678,8 +4690,8 @@ class KeywordOptions(QWidget):
     route_opt_fmt               str; % style formating to convert two strings (e.g. %s=(%s))
     comment_opt_fmt             str; % style formating to convert two strings (e.g. %s=(%s))
     """
-    optionsChanged = pyqtSignal()
-    settingsChanged = pyqtSignal()
+    optionsChanged = Signal()
+    settingsChanged = Signal()
     
     items = {}
     previous_option_name = None
@@ -5091,7 +5103,7 @@ class Psi4KeywordOptions(KeywordOptions):
 
 class KeywordWidget(QWidget):
     """widget shown on 'additional options' tab"""
-    additionalOptionsChanged = pyqtSignal()
+    additionalOptionsChanged = Signal()
 
     def __init__(self, settings, init_form, parent=None):
         super().__init__(parent)

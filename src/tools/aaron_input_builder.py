@@ -9,9 +9,9 @@ from chimerax.core.models import ADD_MODELS, REMOVE_MODELS
 
 from json import dumps, loads, dump, load
 
-from PyQt5.QtCore import Qt, QRegularExpression, pyqtSignal
-from PyQt5.QtGui import QKeySequence, QFontMetrics, QFontDatabase, QClipboard, QIcon
-from PyQt5.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, \
+from PySide2.QtCore import Qt, QRegularExpression, Signal
+from PySide2.QtGui import QKeySequence, QFontMetrics, QFontDatabase, QClipboard, QIcon
+from PySide2.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, \
                             QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, \
                             QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, \
                             QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView, QTextBrowser, \
@@ -110,6 +110,7 @@ class AARONSettingsWidget(QWidget):
         self.presets_menu = menu.addMenu("Presets")
         
         menu.setNativeMenuBar(False)
+        self._menu = menu
         layout.setMenuBar(menu)
         
         self.settings = settings

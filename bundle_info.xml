@@ -1,10 +1,10 @@
-<BundleInfo name="SEQCROW" 
+<BundleInfo name="ChimeraX_SEQCROW" 
             customInit="true"
             minSessionVersion="3"
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="0.22a">
+            version="0.24a0">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -58,7 +58,9 @@
                 <Dependency name="scipy"/>
                 <Dependency name="numpy"/>
                 <Dependency name="Send2Trash"/>
+				<!-- wait for stripy to support python 3.8 https://pypi.org/project/stripy/
                 <Dependency name="stripy"/>
+				-->
             </Dependencies>
             
             <Categories>
@@ -148,7 +150,8 @@
                 <!--NOTE:
                 including my own Bundle line will prevent anything after it from being loaded
                 ChimeraX's devel build
-                ChimeraXClassifier>ChimeraX :: Bundle :: General,Input/Output,Structure Editing,External Program :: 1,1 :: SEQCROW :: ChimAARON,SEQCRO,SEQCROW :: true</ChimeraXClassifier-->
+				ChimeraXClassifier>ChimeraX :: Bundle :: General,Input/Output,Structure Editing,External Program :: 1,1 :: SEQCROW :: ChimAARON,SEQCRO,SEQCROW :: true</ChimeraXClassifier
+				-->
                 <ChimeraXClassifier>ChimeraX :: Tool :: Build QM Input                 :: AaronTools         :: Create Gaussian, ORCA, or Psi4 input file</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Structure Modification         :: AaronTools         :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Change Substituents            :: Structure Editing  :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
@@ -164,8 +167,10 @@
                 <ChimeraXClassifier>ChimeraX :: Tool :: Bond Editor                    :: Structure Editing  :: Draw or erase bonds</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Change Element                 :: Structure Editing  :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Rotate                         :: Structure Editing  :: Rotate all or part of a molecular structure</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Buried Volume                  :: Structure Analysis :: Calculate percent buried volume</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: File Info                      :: AaronTools         :: Miscellaneous file data</ChimeraXClassifier>
+                <!--wait for stripy to support python 3.8
+				<ChimeraXClassifier>ChimeraX :: Tool :: Buried Volume                  :: Structure Analysis :: Calculate percent buried volume</ChimeraXClassifier>
+                -->
+				<ChimeraXClassifier>ChimeraX :: Tool :: File Info                      :: AaronTools         :: Miscellaneous file data</ChimeraXClassifier>
                 <!--ChimeraXClassifier>ChimeraX :: Tool :: AARON Input Builder :: AARON :: Build AARON input file</ChimeraXClassifier-->
                 
                 <ChimeraXClassifier>ChimeraX :: Selector :: tm       :: Transition metals</ChimeraXClassifier>
@@ -212,8 +217,10 @@
                 <ChimeraXClassifier>ChimeraX :: Command :: tsbond              :: Structure Editing  :: display a forming/breaking bond as semi-transparent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: ~tsbond             :: Structure Editing  :: remove a forming/breaking bond</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: sterimol            :: Structure Analysis :: calculate L, B1, and B5 Sterimol parameters</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Command :: percentVolumeBuried :: Structure Analysis :: calculate percent volume buried by ligands around a metal center</ChimeraXClassifier>
-                <!--
+                <!--wait for stripy to support python 3.8
+				<ChimeraXClassifier>ChimeraX :: Command :: percentVolumeBuried :: Structure Analysis :: calculate percent volume buried by ligands around a metal center</ChimeraXClassifier>
+                -->
+				<!--
 				<ChimeraXClassifier>ChimeraX :: Command :: duplicate           :: Structure Editing  :: duplicate selected atoms</ChimeraXClassifier>
 				-->
 	   </Classifiers>

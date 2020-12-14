@@ -3,9 +3,9 @@ import numpy as np
 from chimerax.core.tools import ToolInstance
 from chimerax.core.models import REMOVE_MODELS
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QGuiApplication
-from PyQt5.QtWidgets import QGridLayout, QWidget, QMenuBar, QAction, QFileDialog
+from PySide2.QtCore import Qt
+from PySide2.QtGui import QGuiApplication
+from PySide2.QtWidgets import QGridLayout, QWidget, QMenuBar, QAction, QFileDialog
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
@@ -24,7 +24,7 @@ keyboardModifiers = QGuiApplication.keyboardModifiers
 class NavigationToolbar(NavigationToolbar2QT):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
+
     toolitems = list(NavigationToolbar2QT.toolitems)
     for i in range(0, len(toolitems)):
         if toolitems[i][0] in ['Back', 'Forward', 'Subplots', 'Edit']:
@@ -66,7 +66,7 @@ class EnergyPlot(ToolInstance):
         self.dragging = False
         
         self._model_closed = self.session.triggers.add_handler(REMOVE_MODELS, self.check_closed_models)
-        
+
     def _build_ui(self):
         layout = QGridLayout()
         
@@ -143,7 +143,7 @@ class EnergyPlot(ToolInstance):
         file.triggered.connect(self.save)
         
         menu.setNativeMenuBar(False)
-        
+        self._menu = menu
         layout.setMenuBar(menu)
         
         self.tool_window.ui_area.setLayout(layout)
@@ -300,4 +300,9 @@ class EnergyPlot(ToolInstance):
     def delete(self):
         self.session.triggers.remove_handler(self._model_closed)
         
-        super().delete()
+        super().delete()    
+    
+    def close(self):
+        self.session.triggers.remove_handler(self._model_closed)
+        
+        super().close()

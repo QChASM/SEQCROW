@@ -12,8 +12,8 @@ from chimerax.core.commands import BoolArg, run
 
 from io import BytesIO
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QLabel, QLineEdit, QGridLayout, QPushButton, QTabWidget, QComboBox, \
+from PySide2.QtCore import Qt
+from PySide2.QtWidgets import QLabel, QLineEdit, QGridLayout, QPushButton, QTabWidget, QComboBox, \
                             QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, \
                             QFormLayout, QCheckBox, QCompleter
 
@@ -619,7 +619,14 @@ class EditStructure(ToolInstance):
         self.lig_model_selector.deleteLater()
         self.model_selector.deleteLater()
 
-        return super().delete()
+        return super().delete()    
+    
+    def close(self):
+        self.ring_model_selector.deleteLater()
+        self.lig_model_selector.deleteLater()
+        self.model_selector.deleteLater()
+
+        return super().close()
     
 class SubstituentSelection(ChildToolWindow):
     def __init__(self, tool_instance, title, textBox=None, **kwargs):

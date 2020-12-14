@@ -25,9 +25,9 @@ from matplotlib.backend_bases import MouseEvent
 from matplotlib.figure import Figure
 from matplotlib import rc as matplotlib_rc
 
-from PyQt5.QtCore import Qt, QRect, QItemSelectionModel 
-from PyQt5.QtGui import QValidator, QFont, QIcon
-from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, QTabWidget, QComboBox, \
+from PySide2.QtCore import Qt, QRect, QItemSelectionModel 
+from PySide2.QtGui import QValidator, QFont, QIcon
+from PySide2.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, QTabWidget, QComboBox, \
                             QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, \
                             QFormLayout, QCheckBox, QHeaderView, QMenuBar, QAction, QFileDialog, QStyle
 
@@ -446,7 +446,6 @@ class NormalModes(ToolInstance):
 
         dX = self._get_coord_change(geom, vector, scale)
         
-        #atoms can't be deep copied for some reason
         Xf = geom.coords + dX
         X = geom.coords
         Xr = geom.coords - dX
@@ -510,6 +509,11 @@ class NormalModes(ToolInstance):
 
         return super().delete()
     
+    def close(self):
+        self.model_selector.deleteLater()
+
+        return super().close()
+    
 
 class IRPlot(ChildToolWindow):
     def __init__(self, tool_instance, title, **kwargs):
@@ -564,7 +568,7 @@ class IRPlot(ChildToolWindow):
         file.triggered.connect(self.save)
         
         menu.setNativeMenuBar(False)
-        
+        self._menu = menu
         layout.setMenuBar(menu)        
         self.ui_area.setLayout(layout)
         self.manage(None)

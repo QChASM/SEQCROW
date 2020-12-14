@@ -7,9 +7,9 @@ from chimerax.core.commands.cli import BoolArg
 from chimerax.core.settings import Settings
 from chimerax.core.generic3d import Generic3DModel 
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QKeySequence, QClipboard
-from PyQt5.QtWidgets import QPushButton, QFormLayout, QComboBox, QLineEdit, QLabel, QCheckBox, QMenuBar, QAction, \
+from PySide2.QtCore import Qt
+from PySide2.QtGui import QKeySequence, QClipboard
+from PySide2.QtWidgets import QPushButton, QFormLayout, QComboBox, QLineEdit, QLabel, QCheckBox, QMenuBar, QAction, \
                             QFileDialog, QApplication, QTableWidget, QTableWidgetItem, QHeaderView
 
 from AaronTools.const import VDW_RADII, BONDI_RADII
@@ -148,6 +148,7 @@ class Sterimol(ToolInstance):
         semicolon.triggered.connect(lambda *args, action=space: action.setChecked(False))
 
         menu.setNativeMenuBar(False)
+        self._menu = menu
         layout.setMenuBar(menu)
         
         self.tool_window.ui_area.setLayout(layout)

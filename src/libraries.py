@@ -1,6 +1,6 @@
-from PyQt5.QtWidgets import QTableWidgetItem
-from PyQt5.QtCore import Qt, QSortFilterProxyModel, QRegularExpression
-from PyQt5.QtWidgets import QWidget, QTableWidget, QGridLayout, QLineEdit, QComboBox, QLabel, QHeaderView
+from PySide2.QtWidgets import QTableWidgetItem
+from PySide2.QtCore import Qt, QSortFilterProxyModel, QRegularExpression
+from PySide2.QtWidgets import QWidget, QTableWidget, QGridLayout, QLineEdit, QComboBox, QLabel, QHeaderView
 
 from glob import glob
 

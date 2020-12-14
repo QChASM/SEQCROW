@@ -1,7 +1,7 @@
 import os
 import subprocess
 
-from PyQt5.QtCore import QThread, pyqtSignal
+from PySide2.QtCore import QThread, Signal
 
 from time import asctime, localtime
 

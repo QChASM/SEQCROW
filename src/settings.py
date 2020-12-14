@@ -50,7 +50,7 @@ class FileOption(InputFolderOption):
 
 
     def _launch_browser(self, *args):
-        from PyQt5.QtWidgets import QFileDialog
+        from PySide2.QtWidgets import QFileDialog
         import os
         if self.start_folder is None or not os.path.exists(self.start_folder):
             start_folder = os.getcwd()

@@ -9,8 +9,8 @@ from chimerax.std_commands.coordset_gui import CoordinateSetSlider
 
 from io import BytesIO
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QLabel, QGridLayout, QPushButton, QTreeWidget, QWidget, QVBoxLayout, QTreeWidgetItem, QCheckBox
+from PySide2.QtCore import Qt
+from PySide2.QtWidgets import QLabel, QGridLayout, QPushButton, QTreeWidget, QWidget, QVBoxLayout, QTreeWidgetItem, QCheckBox
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.managers.filereader_manager import FILEREADER_CHANGE 
@@ -210,3 +210,11 @@ class FileReaderPanel(ToolInstance):
         self.session.triggers.remove_handler(self._molid_change)
         self.session.triggers.remove_handler(self._molname_change)
         super().delete()
+    
+    def close(self):
+        """overload close"""
+        self.session.filereader_manager.triggers.remove_handler(self._fr_change)
+        self.session.triggers.remove_handler(self._add_models)
+        self.session.triggers.remove_handler(self._molid_change)
+        self.session.triggers.remove_handler(self._molname_change)
+        super().close()

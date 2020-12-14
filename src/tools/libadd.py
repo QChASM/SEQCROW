@@ -4,8 +4,8 @@ import numpy as np
 from chimerax.core.tools import ToolInstance
 from chimerax.atomic import selected_atoms
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QGridLayout, QPushButton, QTabWidget, QWidget, QVBoxLayout, QLineEdit, QLabel, QSpinBox, QFormLayout, QMessageBox
+from PySide2.QtCore import Qt
+from PySide2.QtWidgets import QGridLayout, QPushButton, QTabWidget, QWidget, QVBoxLayout, QLineEdit, QLabel, QSpinBox, QFormLayout, QMessageBox
 
 from AaronTools.component import Component
 from AaronTools.ring import Ring

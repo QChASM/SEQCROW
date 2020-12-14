@@ -1,8 +1,8 @@
 from SEQCROW.widgets import FilereaderComboBox
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QKeySequence, QClipboard
-from PyQt5.QtWidgets import QVBoxLayout, QTableWidget, QTableWidgetItem, \
+from PySide2.QtCore import Qt
+from PySide2.QtGui import QKeySequence, QClipboard
+from PySide2.QtWidgets import QVBoxLayout, QTableWidget, QTableWidgetItem, \
                             QTabWidget, QHeaderView, QSizePolicy, QMenuBar, QAction, \
                             QFileDialog, QApplication
 
@@ -112,6 +112,7 @@ class Info(ToolInstance):
         # semicolon.triggered.connect(lambda *args, action=space: action.setChecked(False))
 
         menu.setNativeMenuBar(False)
+        self._menu = menu
         layout.setMenuBar(menu)
 
 
@@ -215,4 +216,9 @@ class Info(ToolInstance):
     def delete(self):
         self.file_selector.deleteLater()
 
-        return super().delete()
+        return super().delete()    
+    
+    def close(self):
+        self.file_selector.deleteLater()
+
+        return super().close()

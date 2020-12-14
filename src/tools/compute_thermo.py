@@ -9,9 +9,9 @@ from chimerax.core.commands.cli import FloatArg, BoolArg, StringArg, IntArg
 
 from numpy import isclose
 
-from PyQt5.QtCore import Qt, QSize, pyqtSignal
-from PyQt5.QtGui import QKeySequence, QClipboard, QIcon
-from PyQt5.QtWidgets import QLabel, QGridLayout, QComboBox, QSplitter, QLineEdit, QDoubleSpinBox, \
+from PySide2.QtCore import Qt, QSize, Signal
+from PySide2.QtGui import QKeySequence, QClipboard, QIcon
+from PySide2.QtWidgets import QLabel, QGridLayout, QComboBox, QSplitter, QLineEdit, QDoubleSpinBox, \
                             QMenuBar, QFileDialog, QAction, QApplication, QWidget, QGroupBox, QStatusBar, \
                             QTabWidget, QTreeWidget, QSizePolicy, QPushButton, QHeaderView, QHBoxLayout, \
                             QTreeWidgetItem, QStyle
@@ -466,6 +466,7 @@ class Thermochem(ToolInstance):
         semicolon.triggered.connect(lambda *args, action=space: action.setChecked(False))
 
         menu.setNativeMenuBar(False)
+        self._menu = menu
         layout.setMenuBar(menu)
 
         self.tool_window.ui_area.setLayout(layout)
@@ -850,10 +851,25 @@ class Thermochem(ToolInstance):
         
         return super().delete()           
 
+    def close(self):
+        #overload because closing a tool window doesn't destroy any widgets on it
+        self.settings.ref_col_1 = self.ref_group.tree.columnWidth(0)
+        self.settings.ref_col_2 = self.ref_group.tree.columnWidth(1)
+        
+        self.settings.other_col_1 = self.other_group.tree.columnWidth(0)
+        self.settings.other_col_2 = self.other_group.tree.columnWidth(1)
+        
+        self.sp_selector.deleteLater()
+        self.thermo_selector.deleteLater()
+        self.ref_group.deleteLater()
+        self.other_group.deleteLater()
+        
+        return super().close()           
+
 
 class ThermoGroup(QWidget):
     """widget used for the 'other' and 'reference' frames on the relative tab"""
-    changes = pyqtSignal()
+    changes = Signal()
     
     def __init__(self, name, session, nrg_fr, thermo_co, size, *args, **kwargs):
         super().__init__(*args, **kwargs)

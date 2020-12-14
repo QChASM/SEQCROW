@@ -9,8 +9,8 @@ from chimerax.core.commands.cli import FloatArg, TupleOf
 
 from io import BytesIO
 
-from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtWidgets import QGridLayout, QPushButton, QCheckBox, QTabWidget, QWidget, QVBoxLayout
+from PySide2 import QtWidgets, QtCore
+from PySide2.QtWidgets import QGridLayout, QPushButton, QCheckBox, QTabWidget, QWidget, QVBoxLayout
 
 from AaronTools.component import Component
 from AaronTools.ring import Ring
@@ -193,7 +193,7 @@ class AaronTools_Library(ToolInstance):
                 bild_obj = ghost_connection_highlight(substituent, color, self.session)
             
                 self.session.models.add(bild_obj, parent=chimera_substituent)
-        
+
     def showRingWalk(self, state):
         if state == QtCore.Qt.Checked:
             self.showRingWalkBool = True
