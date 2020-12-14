@@ -266,6 +266,7 @@ class NormalModes(ToolInstance):
         self.fwhm.setToolTip("width of peaks at half of their maximum value")
         ir_layout.addRow("FWHM:", self.fwhm)
         
+        self.fwhm.setEnabled(self.peak_type.currentText() != "Delta")
         self.peak_type.currentTextChanged.connect(lambda text, widget=self.fwhm: widget.setEnabled(text != "Delta"))
         
         show_plot = QPushButton("show plot")

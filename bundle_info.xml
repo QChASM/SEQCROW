@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="0.22">
+            version="0.22a">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -213,8 +213,10 @@
                 <ChimeraXClassifier>ChimeraX :: Command :: ~tsbond             :: Structure Editing  :: remove a forming/breaking bond</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: sterimol            :: Structure Analysis :: calculate L, B1, and B5 Sterimol parameters</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: percentVolumeBuried :: Structure Analysis :: calculate percent volume buried by ligands around a metal center</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Command :: duplicate           :: Structure Editing  :: duplicate selected atoms</ChimeraXClassifier>
-       </Classifiers>
+                <!--
+				<ChimeraXClassifier>ChimeraX :: Command :: duplicate           :: Structure Editing  :: duplicate selected atoms</ChimeraXClassifier>
+				-->
+	   </Classifiers>
     
     <AdditionalPackages>
         <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools">
