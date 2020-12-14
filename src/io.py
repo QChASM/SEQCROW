@@ -19,35 +19,53 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
     elif format_name == "FCHK file":
         fmt = "fchk"
 
-    f = FileReader((file_name, fmt, stream), just_geom=False, get_all=True)
+    fr = FileReader((file_name, fmt, stream), just_geom=False, get_all=True)
 
     if hasattr(stream, "close") and callable(stream.close):
         stream.close()
 
-    geom = ResidueCollection(f)
+    geom = ResidueCollection(fr)
 
-    structure = geom.get_chimera(session, coordsets=(f.all_geom is not None and len(f.all_geom) > 1), filereader=f)
+    structure = geom.get_chimera(session, coordsets=(fr.all_geom is not None and len(fr.all_geom) > 1), filereader=fr)
     #associate the AaronTools FileReader with each structure
-    session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([structure], [f]))
+    session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([structure], [fr]))
 
     if coordsets:
         from chimerax.std_commands.coordset_gui import CoordinateSetSlider
         from SEQCROW.tools import EnergyPlot
         
         slider = CoordinateSetSlider(session, structure)
-        if "energy" in f.other:
-            nrg_plot = EnergyPlot(session, structure, f)
+        if "energy" in fr.other:
+            nrg_plot = EnergyPlot(session, structure, fr)
             if not nrg_plot.opened:
                 warn("energy plot could not be opened\n" + \
                      "there might be a mismatch between energy entries and structure entries in %s" % file_name)
                 nrg_plot.delete()                    
 
-    if f.all_geom is not None and len(f.all_geom) > 1:
-        structure.active_coordset_id = len(f.all_geom)
+    if fr.all_geom is not None and len(fr.all_geom) > 1:
+        structure.active_coordset_id = len(fr.all_geom)
         if coordsets:
-            slider.set_slider(len(f.all_geom))
+            slider.set_slider(len(fr.all_geom))
 
-    status = "Opened %s as a %s %s" % (file_name, format_name, "movie" if coordsets else "")
+    if fr.file_type == "dat":
+        format_name = "Psi4 output file"
+    elif fr.file_type == "out":
+        format_name = "ORCA output file"
+
+    if format_name == "Gaussian input file":
+        a_or_an = "a"
+    elif format_name == "Gaussian output file":
+        a_or_an = "a"    
+    elif format_name == "ORCA output file":
+        a_or_an = "an"
+    elif format_name == "Psi4 output file":
+        a_or_an = "a"
+    elif format_name == "XYZ file":
+        a_or_an = "an"
+    elif format_name == "FCHK file":
+        a_or_an = "an"
+        
+    status = "Opened %s as %s %s %s" % (file_name, a_or_an, format_name, "movie" if coordsets else "")
 
     return [structure], status
 

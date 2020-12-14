@@ -54,9 +54,12 @@ class _SEQCROW_API(BundleAPI):
         open an AaronTools-readable structure (see AaronTools.fileIO.read_types)
         session     - chimerax Session 
         path        - str, path to file
-        format_name - str, file format (see setup.py)
-        coordsets   - bool, load as trajectory"""
+        format_name - str, file format
+        coordsets   - bool, load as trajectory
+        """
         from .io import open_aarontools
+        
+        session.logger.info("loading %s file" % format_name)
 
         return open_aarontools(session, path, format_name=format_name, coordsets=coordsets)
 
@@ -196,8 +199,6 @@ class _SEQCROW_API(BundleAPI):
     def run_provider(session, name, mgr, **kw):
         if mgr == session.open_command:
             from SEQCROW.io import open_aarontools
-            #TODO:
-            #make use of AaronTools' ability to read file-like objects
             
             if name == "Gaussian input file":
                 class Info(OpenerInfo):
@@ -220,7 +221,7 @@ class _SEQCROW_API(BundleAPI):
                         return {'coordsets': BoolArg}
                         
                 return Info()
-                            
+
             elif name == "ORCA output file":
                 class Info(OpenerInfo):
                     def open(self, session, data, file_name, **kw):
@@ -231,6 +232,7 @@ class _SEQCROW_API(BundleAPI):
                         return {'coordsets': BoolArg}
                         
                 return Info()
+                
             elif name == "Psi4 output file":
                 class Info(OpenerInfo):
                     def open(self, session, data, file_name, **kw):
@@ -241,7 +243,7 @@ class _SEQCROW_API(BundleAPI):
                         return {'coordsets': BoolArg}
                         
                 return Info()
-                                           
+
             elif name == "XYZ file":
                 class Info(OpenerInfo):
                     def open(self, session, data, file_name, **kw):

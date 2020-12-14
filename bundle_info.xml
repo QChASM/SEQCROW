@@ -99,7 +99,7 @@
                           
                 <Provider name="Psi4 output file" 
                           category="Molecular structure" 
-                          suffixes=".dat" 
+                          suffixes=".dat,.out" 
                           encoding="utf-8" 
                           nicknames="dat" 
                           synopsis="Psi4 output file"/>
