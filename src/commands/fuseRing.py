@@ -2,12 +2,12 @@ import numpy as np
 
 from AaronTools.ring import Ring
 
-from chimerax.atomic import AtomsArg
+from chimerax.atomic import OrderedAtomsArg
 from chimerax.core.commands import BoolArg, CmdDesc, StringArg, DynamicEnum, ListOf
 
 from SEQCROW.residue_collection import ResidueCollection, Residue
 
-fuseRing_description = CmdDesc(required=[("selection", AtomsArg)], \
+fuseRing_description = CmdDesc(required=[("selection", OrderedAtomsArg)], \
                                 keyword=[("rings", ListOf(DynamicEnum(Ring.list, \
                                                           name="ring", \
                                                           case_sensitive=True, \
@@ -79,10 +79,6 @@ def minimal_ring_convert(atomic_structure, atom1, atom2, avoid=None):
     return residues
 
 def fuseRing(session, selection, rings, newName=None, modify=True):
-    ordered_selection = session.seqcrow_ordered_selection_manager.selection
-    if len(ordered_selection) == len(selection):
-        selection = ordered_selection
-    
     if newName is None:
         pass
     elif any(len(name.strip()) > 4 for name in newName):

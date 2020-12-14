@@ -37,10 +37,6 @@ class _SEQCROW_API(BundleAPI):
             os.environ['AARONLIB'] = seqcrow_settings.settings.AARONLIB
 
         session.seqcrow_settings = seqcrow_settings
-        
-        #XXX:
-        #initialize is called after init_manager 
-        session.seqcrow_job_manager.init_queue()
 
         #register selectors from the user's personal library
         for sub in Substituent.list():
@@ -85,12 +81,7 @@ class _SEQCROW_API(BundleAPI):
             from .managers import FileReaderManager
             session.filereader_manager = FileReaderManager(session, name)
             return session.filereader_manager
-            
-        elif name == "seqcrow_ordered_selection_manager":
-            from SEQCROW.managers import OrderedSelectionManager
-            session.seqcrow_ordered_selection_manager = OrderedSelectionManager(session, name)
-            return session.seqcrow_ordered_selection_manager
-            
+
         elif name == "seqcrow_job_manager":
             from SEQCROW.managers import JobManager
             session.seqcrow_job_manager = JobManager(session, name)
@@ -389,7 +380,6 @@ class _SEQCROW_API(BundleAPI):
     @staticmethod
     def finish(session, bundle_info):
         del session.filereader_manager
-        del session.seqcrow_ordered_selection_manager
         del session.seqcrow_job_manager
 
 bundle_api = _SEQCROW_API()

@@ -33,6 +33,9 @@ class JobQueue(ToolInstance):
         
         self.tool_window = MainToolWindow(self)        
 
+        if not self.session.seqcrow_job_manager.initialized:
+            self.session.seqcrow_job_manager.init_queue()
+
         self._build_ui()
         
         self._job_queued = self.session.seqcrow_job_manager.triggers.add_handler(JOB_QUEUED,

@@ -323,10 +323,7 @@ class EditStructure(ToolInstance):
 
     def do_maplig(self):
         lignames = self.ligname.text()
-        selection = self.session.seqcrow_ordered_selection_manager.selection
-        sel = selected_atoms(self.session)
-        if len(sel) != len(selection) or not all(a in selection for a in sel) or not all(a in sel for a in selection):
-            selection = sel
+        selection = selected_atoms(self.session)
         
         if len(selection) < 1:
             raise RuntimeWarning("nothing selected")

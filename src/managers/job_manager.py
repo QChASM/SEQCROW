@@ -34,6 +34,7 @@ class JobManager(ProviderManager):
         self.unknown_status_jobs = []
         self.paused = False
         self._thread = None
+        self.initialized = False
         self.queue_dict = {}
 
         self.triggers = TriggerSet()
@@ -44,7 +45,6 @@ class JobManager(ProviderManager):
         self.triggers.add_trigger(JOB_QUEUED)
         self.triggers.add_handler(JOB_QUEUED, self.check_queue)
         self.triggers.add_handler(JOB_QUEUED, self.write_json)
-        # self.session.triggers.add_handler('app quit', self.write_json)
 
     def __setattr__(self, attr, val):
         if attr == "paused":
@@ -176,6 +176,8 @@ class JobManager(ProviderManager):
             if self.paused:
                 self.session.logger.warning("SEQCROW's queue has been paused because a local job was running when ChimeraX was closed. The queue can be resumed with SEQCROW's job manager tool")
 
+        self.initialized = True
+
     def write_json(self, *args, **kwargs):
         """updates the list of cached jobs"""
         d = {'finished':[], 'queued':[], 'check':[], 'error':[], 'killed':[]}
@@ -199,6 +201,9 @@ class JobManager(ProviderManager):
                 d['killed'].append(job.get_json())
 
         d['job_running'] = job_running
+
+        if not self.initialized:
+            self.init_queue()
 
         #check if SEQCROW scratch directory exists before trying to write json
         if not os.path.exists(os.path.dirname(self.jobs_list_filename)):

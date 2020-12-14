@@ -184,7 +184,7 @@ class LibAdd(ToolInstance):
 
     def libadd_ring(self):
         """add ring to library or open it in a new model"""
-        selection = self.session.seqcrow_ordered_selection_manager.selection
+        selection = selected_atoms(self.session)
         
         if not selection.single_structure:
             raise RuntimeError("selected atoms must be on the same model")
