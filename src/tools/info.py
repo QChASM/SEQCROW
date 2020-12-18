@@ -1,10 +1,10 @@
 from SEQCROW.widgets import FilereaderComboBox
 
-from PySide2.QtCore import Qt
+from PySide2.QtCore import Qt, QRegularExpression
 from PySide2.QtGui import QKeySequence, QClipboard
 from PySide2.QtWidgets import QVBoxLayout, QTableWidget, QTableWidgetItem, \
                             QTabWidget, QHeaderView, QSizePolicy, QMenuBar, QAction, \
-                            QFileDialog, QApplication
+                            QFileDialog, QApplication, QLineEdit, QLabel
 
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
@@ -87,6 +87,11 @@ class Info(ToolInstance):
         self.table.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
         layout.insertWidget(1, self.table, 1)
         
+        self.filter = QLineEdit()
+        self.filter.setPlaceholderText("filter data")
+        self.filter.textChanged.connect(self.apply_filter)
+        self.filter.setClearButtonEnabled(True)
+        layout.insertWidget(2, self.filter, 0)
         
         menu = QMenuBar()
         
@@ -239,7 +244,16 @@ class Info(ToolInstance):
             s = ""
         
         for i in range(0, self.table.rowCount()):
-            s += delim.join([item.data(Qt.DisplayRole) for item in [self.table.item(i, j) for j in range(0, 2)]])
+            if self.table.isRowHidden(i):
+                continue
+            s += delim.join(
+                [
+                    item.text().replace("<sub>", "").replace("</sub>", "") for item in [
+                        self.table.item(i, j) if self.table.item(i, j) is not None 
+                        else self.table.cellWidget(i, j) for j in range(0, 2)
+                    ]
+                ]
+            )
             s += "\n"
         
         return s
@@ -269,6 +283,13 @@ class Info(ToolInstance):
             return
         
         fr = self.file_selector.currentData()
+        item = QTableWidgetItem()
+        item.setData(Qt.DisplayRole, "name")
+        val = QTableWidgetItem()
+        val.setData(Qt.DisplayRole, fr.name)
+        self.table.insertRow(0)
+        self.table.setItem(0, 0, item)
+        self.table.setItem(0, 1, val)
         for info in fr.other.keys():
             if info == "archive" and not self.settings.archive:
                 continue
@@ -293,7 +314,13 @@ class Info(ToolInstance):
                         info.lower().endswith("energy") or
                         info.startswith("E(")
                 ):
-                    info_name += " (%s)" % self.settings.energy
+                    if self.settings.energy == "Hartree":
+                        info_name += " (E<sub>h</sub>)"
+                    else:
+                        info_name += " (%s)" % self.settings.energy
+                    info_name = info_name.replace("orrelation", "orr.")
+                    info_name = info_name.replace("Same-spin", "SS")
+                    info_name = info_name.replace("Opposite-spin", "OS")
                     if self.settings.energy == "kcal/mol":
                         val *= UNIT.HART_TO_KCAL
                     elif self.settings.energy == "kJ/mol":
@@ -301,8 +328,7 @@ class Info(ToolInstance):
 
                     val = "%.9f" % val
 
-                item.setData(Qt.DisplayRole, info_name)
-                self.table.setItem(row, 0, item)
+                self.table.setCellWidget(row, 0, QLabel(info_name))
                 
                 value = QTableWidgetItem()
                 val = str(val)
@@ -377,6 +403,32 @@ class Info(ToolInstance):
         
         self.table.resizeColumnToContents(0)
         self.table.resizeColumnToContents(1)
+        
+        self.apply_filter()
+    
+    def apply_filter(self, text=None):
+        if text is None:
+            text = self.filter.text()
+
+        if text:
+            text = text.replace("(", "\(")
+            text = text.replace(")", "\)")
+            m = QRegularExpression(text)
+            m.setPatternOptions(QRegularExpression.CaseInsensitiveOption)
+            if m.isValid():
+                m.optimize()
+                filter = lambda row_num: m.match(
+                    self.table.item(row_num, 0).text() if self.table.item(row_num, 0) is not None
+                    else self.table.cellWidget(row_num, 0).text().replace("<sub>", "").replace("</sub>", "")
+                ).hasMatch()
+            else:
+                return
+
+        else:
+            filter = lambda row: True
+            
+        for i in range(0, self.table.rowCount()):
+            self.table.setRowHidden(i, not filter(i))
     
     def delete(self):
         self.file_selector.deleteLater()
