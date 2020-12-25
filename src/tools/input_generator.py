@@ -19,11 +19,11 @@ from PySide2.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitt
                             QStatusBar, QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem, QSizePolicy, \
                             QToolBox, QStyle 
 
-from SEQCROW.residue_collection import ResidueCollection
+from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.utils import iter2str
 from SEQCROW.jobs import ORCAJob, GaussianJob, Psi4Job
-from SEQCROW.theory import SEQCROW_Basis, SEQCROW_ECP, SEQCROW_Theory
 from SEQCROW.widgets import PeriodicTable, ModelComboBox
+from SEQCROW.finders import AtomSpec
 
 from AaronTools.config import Config, SECTIONS
 from AaronTools.const import TMETAL
@@ -69,161 +69,242 @@ class _InputGeneratorSettings(Settings):
         'previous_solvent_model': Value("None", StringArg),
         'previous_solvent_name': Value("", StringArg),
         #shh these are just jsons
-        'previous_gaussian_options': Value(dumps({GAUSSIAN_ROUTE: {'opt': ['NoEigenTest', 'Tight', 'VeryTight'], \
-                                                                          'DensityFit': [], \
-                                                                          'pop': ['NBO', 'NBOREAD', 'NBO7'], \
-                                                                          'scrf': ['COSMORS'], \
-                                                                          'Integral':['grid=99302'], \
-                                                                        }, \
-                                                  GAUSSIAN_COMMENT:[], \
-                                                  GAUSSIAN_PRE_ROUTE: {'LindaWorkers':
-                                                                                #I found this example online at http://wild.life.nctu.edu.tw/~jsyu/compchem/g09/g09ur/m_linda.htm
-                                                                                #I don't know if it works (I don't use linda)
-                                                                                ["spain", "hamlet:2", "ophelia:4"], \
-                                                                             }, \
-                                                  GAUSSIAN_POST: ['$nbo RESONANCE NBOSUM E2PERT=0.0 NLMO BNDIDX $end'], \
-                                                 }), StringArg),
+        'previous_gaussian_options': Value(
+            dumps(
+                {
+                    GAUSSIAN_ROUTE: {
+                        'opt': ['NoEigenTest', 'Tight', 'VeryTight'],
+                        'DensityFit': [],
+                        'pop': ['NBO', 'NBOREAD', 'NBO7'],
+                        'scrf': ['COSMORS'],
+                        'Integral': ['grid=99302'],
+                    },
+                    GAUSSIAN_COMMENT:[],
+                    GAUSSIAN_PRE_ROUTE: {
+                        'LindaWorkers':
+                            #I found this example online at
+                            # http://wild.life.nctu.edu.tw/~jsyu/compchem/g09/g09ur/m_linda.htm
+                            #I don't know if it works (I don't use linda)
+                            ["spain", "hamlet:2", "ophelia:4"],
+                    },
+                    GAUSSIAN_POST: [
+                        '$nbo RESONANCE NBOSUM E2PERT=0.0 NLMO BNDIDX $end'
+                    ],
+                }
+            ),
+            StringArg
+        ),
         'last_gaussian_options': Value(dumps({GAUSSIAN_ROUTE:{}}), StringArg),
         'previous_orca_solvent_model': Value("None", StringArg),
         'previous_orca_solvent_name': Value("", StringArg),
-        'previous_orca_options': Value(dumps({ORCA_ROUTE:['TightSCF'], \
-                                              ORCA_BLOCKS:{'basis':['decontract true'], \
-                                                                  'elprop':['Quadrupole True'], \
-                                                                  'freq':['Increment 0.001'], \
-                                                                  'geom':['Calc_Hess true']}, \
-                                                                 }), StringArg),
-        #just the blocks that are used by the tool
+        'previous_orca_options': Value(
+            dumps(
+                {
+                    ORCA_ROUTE: ['TightSCF'],
+                    ORCA_BLOCKS: {
+                        'basis': ['decontract true'],
+                        'elprop': ['Quadrupole True'],
+                        'freq': ['Increment 0.001'],
+                        'geom': ['Calc_Hess true']
+                    },
+                }
+            ),
+            StringArg
+        ),
+        # just the blocks that are used by the tool
         'last_orca_options': Value(dumps({}), StringArg),
-        'previous_psi4_options': Value(dumps({PSI4_SETTINGS:{'reference': \
-                                                                                ['rhf', 'rohf', 'uhf', 'cuhf', 'rks', 'uks'], \
-                                                                    'diag_method': \
-                                                                                #the psi4 manual seems to imply that davidson and sem are
-                                                                                #the same and different
-                                                                                ['rsp', 'olsen', 'mitrushenkov', 'davidson', 'sem'], \
-                                                                    'ex_level': \
-                                                                                ['1', '2', '3'], \
-                                                                    'fci': \
-                                                                                ['true', 'false'], \
-                                                                   }, \
-                                                                   PSI4_BEFORE_GEOM: [], \
-                                                                   PSI4_BEFORE_JOB: ['activate(auto_fragments())'], \
-                                                                   PSI4_JOB: {'energy': \
-                                                                                        ['return_wfn=True', 'dft_method=pbe0'], \
-                                                                                     'optimize': \
-                                                                                        ['return_wfn=True', "engine='geometric'"], \
-                                                                                     'gradient': \
-                                                                                        ['return_wfn=True'], \
-                                                                                     'frequencies': \
-                                                                                        ['return_wfn=True', \
-                                                                                         'dertype=\'gradient\'', 'dertype=\'energy\''\
-                                                                                        ], \
-                                                                                    }, \
-                                                                   PSI4_COMMENT: [], \
-                                                                   PSI4_COORDINATES: {'units':['angstrom', 'bohr'], 
-                                                                                             'pubchem':['benzene'], 
-                                                                                             'symmetry':['c1', 'c2', 'ci', 'cs', 'd2', 'c2h', 'c2v', 'd2h'], 
-                                                                                             'no_reorient':[], 
-                                                                                             'no_com':[], 
-                                                                                            }, \
-                                                                   PSI4_AFTER_JOB: ["fchk_writer = psi4.core.FCHKWriter(wfn)\nfchk_writer.write('output.fchk')"], \
-                                             }), StringArg),
+        'previous_psi4_options': Value(
+            dumps(
+                {
+                    PSI4_SETTINGS:{
+                        'reference': ['rhf', 'rohf', 'uhf', 'cuhf', 'rks', 'uks'],
+                        'diag_method': [
+                            'rsp',
+                            'olsen',
+                            'mitrushenkov',
+                            'davidson',
+                            'sem'
+                        ],
+                        'ex_level': ['1', '2', '3'], 
+                        'fci': ['true', 'false'], 
+                    },
+                    PSI4_BEFORE_GEOM: [],
+                    PSI4_BEFORE_JOB: ['activate(auto_fragments())'],
+                    PSI4_JOB: {
+                        'energy': ['return_wfn=True', 'dft_method=pbe0'],
+                        'optimize': ['return_wfn=True', "engine='geometric'"],
+                        'gradient': ['return_wfn=True'],
+                        'frequencies': [
+                            'return_wfn=True',
+                            'dertype=\'gradient\'',
+                            'dertype=\'energy\''
+                        ],
+                    },
+                    PSI4_COMMENT: [],
+                    PSI4_MOLECULE: {
+                        'units': ['angstrom', 'bohr'], 
+                        'pubchem': ['benzene'], 
+                        'symmetry': ['c1', 'c2', 'ci', 'cs', 'd2', 'c2h', 'c2v', 'd2h'], 
+                        'no_reorient': [], 
+                        'no_com': [], 
+                    },
+                    PSI4_AFTER_JOB: [
+                        "fchk_writer = psi4.core.FCHKWriter(wfn)\nfchk_writer.write('output.fchk')"
+                    ],
+                }
+            ),
+            StringArg
+        ),
         'last_psi4_options': Value(dumps({}), StringArg),
         'last_program': Value("Gaussian", StringArg),
-        }
+    }
         
     AUTO_SAVE = {
-        'gaussian_presets': Value(dumps({
-                                       "quick optimize":{"opt":True, \
-                                                         "ts":False, \
-                                                         "freq":False, \
-                                                         "semi-empirical":False, \
-                                                         "solvent model":'None', \
-                                                         "solvent":'', \
-                                                         "method":'PM6', \
-                                                         "grid":None, \
-                                                         "disp":None, \
-                                                         "basis": {'name':[], 'auxiliary':[], 'file':[], 'elements':[]}, \
-                                                         "ecp": {'name':[], 'file':[], 'elements':[]}, \
-                                                         "other": {}, \
-                                                        }, \
-                                        }), StringArg), \
-        'orca_presets': Value(dumps({
-                                       "quick optimize":{"opt":True, \
-                                                         "ts":False, \
-                                                         "freq":False, \
-                                                         "semi-empirical":False, \
-                                                         "solvent model":'None', \
-                                                         "solvent":'', \
-                                                         "method":'HF-3c', \
-                                                         "grid":None, \
-                                                         "disp":None, \
-                                                         "basis": {'name':[], 'auxiliary':[], 'file':[], 'elements':[]}, \
-                                                         "ecp": {'name':[], 'file':[], 'elements':[]}, \
-                                                         "other": {}, \
-                                                      }, \
-                                       "DLPNO single-point":{"opt":False, \
-                                                             "ts":False, \
-                                                             "freq":False, \
-                                                             "semi-empirical":False, \
-                                                             "solvent model":'None', \
-                                                             "solvent":'', \
-                                                             "method":'DLPNO-CCSD(T)', \
-                                                             "grid":None, \
-                                                             "disp":None, \
-                                                             "basis": {'name':["cc-pVTZ", "cc-pVTZ"], 
-                                                                       'auxiliary':[None, "C"], 
-                                                                       'file':[False, False], 
-                                                                       'elements':['all', 'all']
-                                                                      }, \
-                                                             "ecp": {'name':[], 'file':[], 'elements':['all']}, \
-                                                             "other": {ORCA_ROUTE:['TightSCF']}, \
-                                                  }, \
-                                       }), StringArg), \
-        'psi4_presets': Value(dumps({
-                                     "quick optimize":{"opt":True, \
-                                                       "ts":False, \
-                                                       "freq":False, \
-                                                       "semi-empirical":False, \
-                                                       "solvent model":'None', \
-                                                       "solvent":'', \
-                                                       "method":'HF', \
-                                                       "grid":None, \
-                                                       "disp":None, \
-                                                       "basis": {'name':['sto-3g'], 'auxiliary':[None], 'file':[False], 'elements':['all']}, \
-                                                       "ecp": {'name':[], 'file':[], 'elements':[]}, \
-                                                       "other": {}, \
-                                                       }, \
-                                     "custom dft":{"opt":False, \
-                                                   "ts":False, \
-                                                   "freq":False, \
-                                                   "semi-empirical":False, \
-                                                   "method":'SCF', \
-                                                   "grid":None, \
-                                                   "disp":None, \
-                                                   "basis": {'name':['def2-SVP'], 'auxiliary':[None], 'file':[False], 'elements':['all']}, \
-                                                   "ecp": {'name':[], 'file':[], 'elements':[]}, \
-                                                   "other":{
-                                                            PSI4_BEFORE_GEOM: [ \
-                                                            """lol_idk = {
-    #this is included as an example; it is not a tested DFT method
-    "name": "seqcrow_example",
-    "x_methods": {"GGA_X_B88": {"alpha": 0.580}},
-    "x_hf": {"alpha": 0.420},
-    "c_methods": {"GGA_C_LYP": {"alpha": 0.678}}, 
-    "dispersion": {"type": "d3bj", 
-                   "params": {'s6':  1.0000,  
-                              's8':  0.1337, 
-                              'a1': -0.0789, 
-                              'a2':  0.0091, 
-                    }
-                  }
-}
-"""                                                        
-                                                            ], \
-                                                            PSI4_JOB: {'energy':['dft_method=lol_idk']}, \
-                                                      }, \
-                                        }, \
-                                    }), StringArg), \
+        'gaussian_presets': Value(
+            dumps(
+                {
+                    "quick optimize": {
+                        "opt": True,
+                        "ts": False,
+                        "freq": False,
+                        "semi-empirical": False,
+                        "solvent model": 'None',
+                        "solvent": '',
+                        "method": 'PM6',
+                        "grid": None,
+                        "disp": None,
+                        "basis": {'name':[], 'auxiliary':[], 'file':[], 'elements':[]},
+                        "ecp": {'name':[], 'file':[], 'elements':[]},
+                        "other": {},
+                    },
+                }
+            ),
+            StringArg
+        ),
+        'orca_presets': Value(
+            dumps(
+                {
+                    "quick optimize":{
+                        "opt":True,
+                        "ts":False,
+                        "freq":False,
+                        "semi-empirical":False,
+                        "solvent model":'None',
+                        "solvent":'',
+                        "method":'HF-3c',
+                        "grid":None,
+                        "disp":None,
+                        "basis": {
+                            'name':[],
+                            'auxiliary':[],
+                            'file':[],
+                            'elements':[]
+                        },
+                        "ecp": {
+                            'name':[],
+                            'file':[],
+                            'elements':[]
+                        },
+                        "other": {},
+                    },
+                    "DLPNO single-point":{
+                        "opt":False,
+                        "ts":False,
+                        "freq":False,
+                        "semi-empirical":False,
+                        "solvent model":'None',
+                        "solvent":'',
+                        "method":'DLPNO-CCSD(T)',
+                        "grid":None,
+                        "disp":None,
+                        "basis": {
+                            'name':["cc-pVTZ", "cc-pVTZ"], 
+                            'auxiliary':[None, "C"], 
+                            'file':[False, False], 
+                            'elements':['all', 'all']
+                        },
+                        "ecp": {
+                            'name':[],
+                            'file':[],
+                            'elements':[]
+                        },
+                        "other": {ORCA_ROUTE:['TightSCF']},
+                    },
+                }
+            ),
+            StringArg
+        ),
+        'psi4_presets': Value(
+            dumps(
+                {
+                    "quick optimize":{
+                        "opt":True,
+                        "ts":False,
+                        "freq":False,
+                        "semi-empirical":False,
+                        "solvent model":'None',
+                        "solvent":'',
+                        "method":'HF',
+                        "grid":None,
+                        "disp":None,
+                        "basis": {
+                            'name':['sto-3g'],
+                            'auxiliary':[None],
+                            'file':[False],
+                            'elements':['all']
+                        },
+                        "ecp": {
+                            'name':[],
+                            'file':[],
+                            'elements':[]
+                        },
+                        "other": {},
+                    },
+                    "custom dft":{
+                        "opt":False,
+                        "ts":False,
+                        "freq":False,
+                        "semi-empirical":False,
+                        "method":'SCF',
+                        "grid":None,
+                        "disp":None,
+                        "basis": {
+                            'name':['def2-SVP'],
+                            'auxiliary':[None],
+                            'file':[False],
+                            'elements':['all']
+                        },
+                        "ecp": {
+                            'name':[],
+                            'file':[],
+                            'elements':[]
+                        },
+                        "other":{
+                            PSI4_BEFORE_GEOM: [ \
+                                "lol_idk = {\n" +
+                                #this is included as an example; it is not a tested DFT method
+                                "   \"name\": \"seqcrow_example\",\n" +
+                                "   \"x_methods\": {\"GGA_X_B88\": {\"alpha\": 0.580}},\n" +
+                                "   \"x_hf\": {\"alpha\": 0.420},\n" +
+                                "   \"c_methods\": {\"GGA_C_LYP\": {\"alpha\": 0.678}},\n" +
+                                "   \"dispersion\": {\n" +
+                                "       \"type\": \"d3bj\",\n" + 
+                                "       \"params\": {\n" +
+                                "           \"s6\":  1.0000,\n" +  
+                                "           \"s8\":  0.1337,\n" +
+                                "           \"a1\": -0.0789,\n" +
+                                "           \"a2\":  0.0091,\n" +
+                                "       }\n" +
+                                "   }\n" +
+                                "}\n",
+                            ],
+                            PSI4_JOB: {'energy':['dft_method=lol_idk']},
+                        },
+                    },
+                }
+            ),
+            StringArg
+        ),
         'on_finished': Value('do nothing', StringArg), 
     }
     
@@ -278,10 +359,7 @@ class BuildQM(ToolInstance):
 
         global_triggers = get_triggers()
 
-        #TODO: 
-        #find a better trigger - only need changes to coordinates and elements
-        #'changes done' fires when other things happen like selecting atoms
-        self._changes = global_triggers.add_handler("changes done", self.update_preview)
+        self._changes = global_triggers.add_handler("changes", self.update_preview)
         
         # this tool is big by default
         # unless the user has saved its position, make it small
@@ -501,14 +579,14 @@ class BuildQM(ToolInstance):
                 aux_type = preset['basis']['auxiliary'][i]
                 user_defined = preset['basis']['file'][i]
                 
-                basis_list.append(SEQCROW_Basis(name, elements, aux_type=aux_type, user_defined=user_defined))
+                basis_list.append(Basis(name, elements, aux_type=aux_type, user_defined=user_defined))
                 
             ecp_list = []
             for i, name in enumerate(preset['ecp']['name']):
                 elements = preset['ecp']['elements'][i]
                 user_defined = preset['ecp']['file'][i]
                 
-                ecp_list.append(SEQCROW_ECP(name, elements, user_defined=user_defined))
+                ecp_list.append(ECP(name, elements, user_defined=user_defined))
     
             basis_set = BasisSet(basis_list, ecp_list)
             
@@ -696,40 +774,59 @@ class BuildQM(ToolInstance):
             self.preview_window = self.tool_window.create_child_window("Input Preview", window_class=InputPreview)
             self.update_preview()
 
-    def update_preview(self, *args, **kw):
-        """whenever a setting is changed, this should be called to update the preview"""
-        model = self.model_selector.currentData()
-        if model is None:
-            return
+    def get_file_contents(self, update_settings=True):
+        self.update_theory(update_settings=update_settings)
+        
+        kw_dict = self.job_widget.getKWDict()
+        other_kw_dict = self.other_keywords_widget.getKWDict()
+        if update_settings:
+            self.settings.save()
 
-        self.update_theory(update_settings=False)
+        combined_dict = combine_dicts(kw_dict, other_kw_dict)
+
+        program = self.file_type.currentText()
+        if program == "Gaussian":
+            header, header_warnings = self.theory.get_gaussian_header(return_warnings=True, **combined_dict)
+            molecule, mol_warnings = self.theory.get_gaussian_molecule(return_warnings=True, **combined_dict)
+            footer, footer_warnings = self.theory.get_gaussian_footer(return_warnings=True, **combined_dict)
+            contents = header + molecule + footer
+            warnings = header_warnings + mol_warnings + footer_warnings
+            return contents, warnings
+        elif program == "ORCA":
+            header, header_warnings = self.theory.get_orca_header(return_warnings=True, **combined_dict)
+            molecule = ""
+            fmt = "{:<3s} {: 10.6f} {: 10.6f} {: 10.6f}\n"
+            for atom in self.theory.geometry.atoms:
+                molecule += fmt.format(atom.element, *atom.coords)
+    
+            molecule += "*\n"
+            contents = header + molecule
+            warnings = header_warnings
+            return contents, warnings
+        elif program == "Psi4":
+            header, header_warnings = self.theory.get_psi4_header(return_warnings=True, **combined_dict)
+            molecule, mol_warnings = self.theory.get_psi4_molecule(return_warnings=True, **combined_dict)
+            footer, footer_warnings = self.theory.get_psi4_footer(return_warnings=True, **combined_dict)
+            contents = header + molecule + footer
+            warnings = header_warnings + mol_warnings + footer_warnings
+            return contents, warnings
+
+    def update_preview(self, trigger_name=None, changes=None):
+        """whenever a setting is changed, this should be called to update the preview"""
+        if changes is not None:
+            mdl = self.model_selector.currentData()
+            if mdl not in changes.modified_atomic_structures():
+                return
+
+        model = self.model_selector.currentData()
+        if not model:
+            return
 
         self.check_elements()
         if self.preview_window is not None:
-            self.update_theory(update_settings=False)
-
-            kw_dict = self.job_widget.getKWDict(False)
-            other_kw_dict = self.other_keywords_widget.getKWDict(False)
-        
-            if len(other_kw_dict["comments"]) == 0:
-                other_kw_dict["comments"] = [self.theory.geometry.name]
-
-            combined_dict = combine_dicts(kw_dict, other_kw_dict)
-    
-            program = self.file_type.currentText()
-            if program == "Gaussian":
-                output, warnings = self.theory.write_gaussian_input(**combined_dict)
-            elif program == "ORCA":
-                output, warnings = self.theory.write_orca_input(**combined_dict)
-            elif program == "Psi4":
-                if self.theory.method.sapt:
-                    monomers = self.method_widget.sapt_layers.layers
-                    output, warnings = self.theory.write_psi4_input(monomers=monomers, **combined_dict)
-                    
-                else:
-                    output, warnings = self.theory.write_psi4_input(**combined_dict)
-    
-            self.preview_window.setPreview(output, warnings)
+            contents, warnings = self.get_file_contents(update_settings=False)
+            if contents is not None and warnings is not None:
+                self.preview_window.setPreview(contents, warnings)
 
     def change_file_type(self, *args):
         """change the file type
@@ -760,7 +857,7 @@ class BuildQM(ToolInstance):
     def update_theory(self, update_settings=True):
         """grabs the current settings and updates self.theory
         always called before creating an input file"""
-        model = self.model_selector.currentData()
+        rescol = ResidueCollection(self.model_selector.currentData(), bonds_matter=False)
 
         meth = self.method_widget.getMethod(update_settings)
         basis = self.get_basis_set(update_settings)
@@ -770,7 +867,7 @@ class BuildQM(ToolInstance):
         grid = self.method_widget.getGrid(update_settings)      
         charge = self.job_widget.getCharge(update_settings)
         mult = self.job_widget.getMultiplicity(update_settings)
-        if meth.sapt:
+        if isinstance(meth, SAPTMethod):
             charges = [widget.value() for widget in \
                           [self.method_widget.sapt_layers.tabs.widget(i).charge for i in range(0, self.method_widget.sapt_layers.tabs.count())]
             ]
@@ -783,6 +880,14 @@ class BuildQM(ToolInstance):
             
             mult = [mult]
             mult.extend(multiplicities)
+            
+            rescol.components = [
+                Residue(
+                    rescol.find([AtomSpec(atom.atomspec) for atom in layer]),
+                    refresh_connected=False
+                ) if layer else Residue([], refresh_ranks=False, refresh_connected=False)
+                for layer in self.method_widget.sapt_layers.layers
+            ]
 
         nproc = self.job_widget.getNProc(update_settings)
         mem = self.job_widget.getMem(update_settings)
@@ -793,10 +898,19 @@ class BuildQM(ToolInstance):
         if update_settings:
             self.settings.save()
         
-        self.theory = SEQCROW_Theory(charge=charge, multiplicity=mult, \
-                                     method=meth, basis=basis, empirical_dispersion=dispersion, \
-                                     grid=grid, processors=nproc, memory=mem, job_type=jobs, \
-                                     solvent=solvent, geometry=model)
+        self.theory = Theory(
+            charge=charge,
+            multiplicity=mult,
+            method=meth,
+            basis=basis,
+            empirical_dispersion=dispersion,
+            grid=grid,
+            processors=nproc,
+            memory=mem,
+            job_type=jobs,
+            solvent=solvent,
+            geometry=rescol
+        )
     
     def change_model(self, index):
         """changes model to the one selected in self.model_selector (index is basically ignored"""
@@ -845,27 +959,6 @@ class BuildQM(ToolInstance):
         """run job"""
         self.update_theory()
 
-        #for local jobs, AtomicStructure is converted to ResidueCollection
-        #if the AtomicStructure is closed and there are constraints, the
-        #job would error out when writing the input file b/c the atoms are
-        #deleted
-        #but ResidueCollection atoms are still there
-        model = self.model_selector.currentData()
-        self.theory.geometry = ResidueCollection(model)
-        for job in self.theory.job_type:
-            if hasattr(job, "constraints"):
-                new_constraints = {}
-                if job.constraints is not None:
-                    for key in job.constraints:
-                        new_constraints[key] = []
-                        for item in job.constraints[key]:
-                            if hasattr(item, "__iter__"):
-                                new_constraints[key].append([atom for atom in self.theory.geometry.atoms if atom.chix_atom in item])
-                            else:
-                                new_constraints[key].append([atom for atom in self.theory.geometry.atoms if atom.chix_atom is item][0])        
-                    
-                    job.constraints = new_constraints
-
         kw_dict = self.job_widget.getKWDict()
         other_kw_dict = self.other_keywords_widget.getKWDict()
         self.settings.save()
@@ -890,31 +983,7 @@ class BuildQM(ToolInstance):
 
     def copy_input(self):
         """copies input file to the clipboard"""
-        self.update_theory()
-
-        kw_dict = self.job_widget.getKWDict()
-        other_kw_dict = self.other_keywords_widget.getKWDict()
-        self.settings.save()
-        
-        if len(other_kw_dict["comments"]) == 0:
-            other_kw_dict["comments"] = [self.theory.geometry.name]
-
-        combined_dict = combine_dicts(kw_dict, other_kw_dict)
-        
-        self.settings.last_program = self.file_type.currentText()
-        
-        program = self.file_type.currentText()
-        if program == "Gaussian":
-            output, warnings = self.theory.write_gaussian_input(**combined_dict)
-        elif program == "ORCA":
-            output, warnings = self.theory.write_orca_input(**combined_dict)
-        elif program == "Psi4":
-            if self.theory.method.sapt:
-                monomers = self.method_widget.sapt_layers.layers
-                output, warnings = self.theory.write_psi4_input(monomers=monomers, **combined_dict)
-                
-            else:
-                output, warnings = self.theory.write_psi4_input(**combined_dict)
+        output, warnings = self.get_file_contents(update_settings=True)
 
         for warning in warnings:
             self.session.logger.warning(warning)
@@ -930,47 +999,30 @@ class BuildQM(ToolInstance):
     def save_input(self):
         """save input to a file
         a file dialog will open asking for a file location"""
-        self.update_theory()
-
-        kw_dict = self.job_widget.getKWDict()
-        other_kw_dict = self.other_keywords_widget.getKWDict()
-        self.settings.save()
-        
-        if len(other_kw_dict["comments"]) == 0:
-            other_kw_dict["comments"] = [self.theory.geometry.name]
-        
-        combined_dict = combine_dicts(kw_dict, other_kw_dict)
-        
-        self.settings.last_program = self.file_type.currentText()
-
-        warnings = []
 
         program = self.file_type.currentText()
+        self.settings.last_program = program
         if program == "Gaussian":
             filename, _ = QFileDialog.getSaveFileName(filter="Gaussian input files (*.com *.gjf)")
-            if filename:
-                output, warnings = self.theory.write_gaussian_input(fname=filename, **combined_dict)
-        
+
         elif program == "ORCA":
             filename, _ = QFileDialog.getSaveFileName(filter="ORCA input files (*.inp)")
-            if filename:
-                output, warnings = self.theory.write_orca_input(fname=filename, **combined_dict)
-        
+
         elif program == "Psi4":
             filename, _ = QFileDialog.getSaveFileName(filter="Psi4 input files (*.in)")
-            if filename:
-                if self.theory.method.sapt:
-                    monomers = self.method_widget.sapt_layers.layers
-                    output, warnings = self.theory.write_psi4_input(monomers=monomers, **combined_dict)
-                    
-                else:
-                    output, warnings = self.theory.write_psi4_input(**combined_dict)
-                    
+
+        if not filename:
+            return
+
+        contents, warnings = self.get_file_contents(update_settings=True)
+        with open(filename, "w") as f:
+            f.write(contents)
+
         for warning in warnings:
             self.session.logger.warning(warning)
-            
+
         self.update_preview()
-            
+
         self.session.logger.info("saved to %s" % filename)
     
     def delete(self):
@@ -1595,8 +1647,21 @@ class JobTypeOption(QWidget):
         if self.do_geom_opt.checkState() == Qt.Checked:
             if self.use_contraints.checkState() == Qt.Checked:
                 constraints = self.getConstraints()
+            
+                new_constraints = {}
+                if "atoms" in constraints:
+                    new_constraints["atoms"] = [AtomSpec(atom.atomspec) for atom in constraints["atoms"]]
+                    for key in ["bonds", "angles", "torsions"]:
+                        if key in constraints:
+                            if key in constraints:
+                                new_constraints[key] = []
+                                for constraint in constraints[key]:
+                                    new_constraints[key].append([AtomSpec(atom.atomspec) for atom in constraint])
+
+                constraints = new_constraints
             else:
                 constraints = None
+
             
             job_types.append(OptimizationJob(transition_state=self.ts_opt.checkState() == Qt.Checked, 
                                              constraints=constraints)
@@ -2300,7 +2365,7 @@ class LayerWidget(QWidget):
         widget.multiplicity = multiplicity
         
         self.tabs.addTab(widget, "%s %i" % (self.tab_text, self.tabs.count() + 1))
-        self.tabs.setCurrentIndex(self.tabs.count()-1)
+        self.tabs.setCurrentIndex(self.tabs.count() - 1)
         
         if self.structure is not None:
             atoms = []
@@ -2317,7 +2382,7 @@ class LayerWidget(QWidget):
             self.layers.pop(-1)
 
         self.something_changed.emit()
-        
+
     def check_deleted_atoms(self, *args):
         for i, layer in enumerate(self.layers):
             table = self.tabs.widget(i)
@@ -2656,7 +2721,7 @@ class MethodOption(QWidget):
             else:
                 is_semiempirical = False
                 
-            return Method(method, is_semiempirical=is_semiempirical, sapt=False)
+            return Method(method, is_semiempirical=is_semiempirical)
         
         elif self.method_option.currentText() == "SAPT":
             
@@ -2674,7 +2739,7 @@ class MethodOption(QWidget):
             if update_settings:
                 self.settings.previous_method = method
             
-            return Method(method, is_semiempirical=False, sapt=True)
+            return SAPTMethod(method, is_semiempirical=False)
         
         elif self.method_option.currentText() == "other":
             if update_settings:
@@ -2702,7 +2767,7 @@ class MethodOption(QWidget):
                         row = self.previously_used_table.rowCount()
                         self.add_previously_used(row, method, not is_semiempirical)
 
-            return Method(method, is_semiempirical=is_semiempirical, sapt=False)
+            return Method(method, is_semiempirical=is_semiempirical)
 
     def getDispersion(self, update_settings=True):
         """returns EmpiricalDispersion corresponding to current settings"""
@@ -2832,7 +2897,7 @@ class BasisOption(QWidget):
     
     aux_available = True
     
-    basis_class = SEQCROW_Basis
+    basis_class = Basis
 
     def __init__(self, parent, settings, form):
         self.parent = parent
@@ -3379,7 +3444,7 @@ class ECPOption(BasisOption):
 
     aux_available = False
 
-    basis_class = SEQCROW_ECP
+    basis_class = ECP
 
     def update_tooltab(self):
         """renames the tab for this ecp"""
@@ -3645,7 +3710,7 @@ class BasisWidget(QWidget):
             basis.show_elements(not (len(self.basis_options) == 1 and len(self.ecp_options) == 0))
 
     def get_basis(self, update_settings=True):
-        """returns ([SEQCROW_Basis], [SEQCROW_ECP]) corresponding to the current settings"""
+        """returns ([Basis], [ECP]) corresponding to the current settings"""
         basis_set = []
         ecp = []
         for i, basis in enumerate(self.basis_options):
@@ -4796,6 +4861,8 @@ class KeywordOptions(QWidget):
         last_dict = {}
         for item in self.widgets.keys():
             if isinstance(self.widgets[item], TwoLayerKeyWordOption):
+                if not self.widgets[item].last_dict:
+                    continue
                 last_dict[self.items[item]] = self.widgets[item].last_dict
                 if update_settings:
                     for kw in self.widgets[item].last_dict:
@@ -4816,6 +4883,8 @@ class KeywordOptions(QWidget):
                                         self.widgets[item].add_item_to_previous_opt_table(opt)
             
             elif isinstance(self.widgets[item], OneLayerKeyWordOption):
+                if not self.widgets[item].last_list:
+                    continue
                 last_dict[self.items[item]] = self.widgets[item].last_list
                 if update_settings:
                     for kw in self.widgets[item].last_list:
@@ -4968,7 +5037,7 @@ class ORCAKeywordOptions(KeywordOptions):
 class Psi4KeywordOptions(KeywordOptions):
     items = {'settings': PSI4_SETTINGS, \
              'job': PSI4_JOB, \
-             'molecule': PSI4_COORDINATES, \
+             'molecule': PSI4_MOLECULE, \
              'before job': PSI4_BEFORE_JOB, \
              'after job': PSI4_AFTER_JOB, \
              'optking': PSI4_OPTKING, \

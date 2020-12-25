@@ -282,6 +282,8 @@ class JobManager(ProviderManager):
     
     def add_job(self, job):
         """add job (LocalJob instance) to the queue"""
+        if not self.initialized:
+            self.init_queue()
         if isinstance(job, LocalJob):
             self.local_jobs.append(job)
             self.triggers.activate_trigger(JOB_QUEUED, job)

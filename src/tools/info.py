@@ -43,6 +43,8 @@ nrg_infos = [
     "Induction sSAPT0",
     "Dispersion sSAPT0",
     "Total sSAPT0",
+    "Alpha Orbital Energies",
+    "Beta Orbital Energies",
 ]
     
 
@@ -326,7 +328,7 @@ class Info(ToolInstance):
                     elif self.settings.energy == "kJ/mol":
                         val *= 4.184 * UNIT.HART_TO_KCAL
 
-                    val = "%.9f" % val
+                    val = "%.6f" % val
 
                 self.table.setCellWidget(row, 0, QLabel(info_name))
                 

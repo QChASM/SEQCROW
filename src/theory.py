@@ -12,206 +12,16 @@ from chimerax.atomic import Atom as ChixAtom
 from SEQCROW.finders import AtomSpec
 
 class SEQCROW_Theory(Theory):
-    def write_gaussian_input(self, fname=None, **other_kw_dict):
-        geometry = self.geometry
-        warnings = []
-        header, header_warnings = self.make_header(geometry, 
-                                                   style='gaussian', 
-                                                   return_warnings=True, 
-                                                   **other_kw_dict)
-        
-        warnings.extend(header_warnings)
-
-        s = header
-
-        if geometry is not None:
-            if isinstance(geometry, Geometry):
-                for atom in geometry.atoms:
-                    s += "%-2s %13.6f %13.6f %13.6f\n" % (atom.element, *atom.coords)
-            elif isinstance(geometry, AtomicStructure):
-                for atom in geometry.atoms:
-                    s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element.name, *atom.coord)
-        else:
-            s += "None\n"
-
-        footer, footer_warnings = self.make_footer(geometry, 
-                                                   style='gaussian', 
-                                                   return_warnings=True, 
-                                                   **other_kw_dict)
-        warnings.extend(footer_warnings)
-        
-        s += footer
-        
-        if fname is not None:
-            with open(fname, "w") as f:
-                f.write(s)
-        
-        warnings = [warning for warning in warnings if warning is not None]
-
-        return s, warnings
-
-    def write_orca_input(self, fname=None, **other_kw_dict):
-        geometry = self.geometry
-        warnings = []
-        
-        header, header_warnings = self.make_header(geometry,
-                                                   style='orca', 
-                                                   return_warnings=True, 
-                                                   **other_kw_dict)
-        
-        warnings.extend(header_warnings)
-
-        s = header
-    
-        if geometry is not None:
-            if isinstance(geometry, AtomicStructure):
-                for atom in geometry.atoms:
-                    s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element.name, *atom.coord)
-
-            elif isinstance(geometry, Geometry):
-                for atom in geometry.atoms:
-                    s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element, *atom.coords)
-
-            s += "*\n"
-
-        if fname is not None:
-            with open(fname, "w") as f:
-                f.write(s)
-
-        warnings = [warning for warning in warnings if warning is not None]
-
-        return s, warnings
-
-    def write_psi4_input(self, fname=None, monomers=None, **other_kw_dict):
-        geometry = self.geometry
-        warnings = []
-        
-        header, use_bohr, header_warnings = self.make_header(geometry, 
-                                                             style='psi4', 
-                                                             return_warnings=True, 
-                                                             **other_kw_dict)
-        
-        warnings.extend(header_warnings)
-
-        s = header
-
-        if geometry is not None:
-            if self.method.sapt and sum(self.multiplicity[1:]) - len(self.multiplicity[1:]) + 1 > self.multiplicity[0]:
-                seps = []
-                for i, m1 in enumerate(monomers[:-1]):
-                    print(i)
-                    seps.append(0)
-                    for m2 in monomers[: i + 1]:
-                        print(len(m2))
-                        seps[-1] += len(m2)
-    
-                s += "    fragment_separators=%s,\n" % repr(seps)
-                if isinstance(self.geometry, AtomicStructure):
-                    s += "    elez=%s,\n" % repr([atom.element.number for monomer in monomers for atom in monomer])
-                else:
-                    s += "    elez=%s,\n" % repr([ELEMENTS.index(atom.element) for monomer in monomers for atom in monomer])
-
-                s += "    fragment_multiplicities=%s,\n" % repr(self.multiplicity[1:])
-                s += "    fragment_charges=%s,\n" % repr(self.charge[1:])
-                s += "    geom=["
-                i = 0
-
-                for monomer in monomers:
-                    s += "\n"
-                    for atom in monomer:
-                        if isinstance(self.geometry, AtomicStructure):
-                            coords = atom.coord
-                        else:
-                            coords = atom.coords
-                        
-                        if use_bohr:
-                            coords = [x / UNIT.A0_TO_BOHR for x in coords]
-                            
-                        s += "        %10.6f, %10.6f, %10.6f,\n" % tuple(coords)
-    
-                
-                s += "    ],\n"
-                s += ")\n\n"
-                s += "activate(mol)\n"
-            
-            elif self.method.sapt:
-                atoms_not_in_monomer = [a for a in geometry.atoms]
-                for monomer, charge, mult in zip(monomers, self.charge[1:], self.multiplicity[1:]):
-                    s += "--\n"
-                    s += "%2i %i\n" % (charge, mult)
-                    if isinstance(self.geometry, AtomicStructure):
-                        for atom in monomer:
-                            if atom in atoms_not_in_monomer:
-                                atoms_not_in_monomer.remove(atom)
-                            
-                            if use_bohr:
-                                #this is the angstrom-bohr conversion that psi4 uses
-                                coords = [x / UNIT.A0_TO_BOHR for x in atom.coord]
-                            else:
-                                coords = atom.coord
-                            s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element.name, *coords)
-                
-                    elif isinstance(self.geometry, Geometry):
-                        for atom in monomer:
-                            atoms_not_in_monomer.remove(atom)
-                            if isinstance(atom, ChixAtom):
-                                atom = self.geometry.find_exact(AtomSpec(atom.atomspec))[0]
-                            if use_bohr:
-                                coords = [x / UNIT.A0_TO_BOHR for x in atom.coords]
-                            else:
-                                coords = atom.coords
-                            s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element, *coords)
-                
-                if len(atoms_not_in_monomer) > 0:
-                    warnings.append("there are %i atoms not in a monomer" % len(atoms_not_in_monomer))
-                
-                s += "}\n"
-                
-            else:
-                if isinstance(self.geometry, AtomicStructure):
-                    for atom in self.geometry.atoms:
-                        if use_bohr:
-                            #this is the angstrom-bohr conversion that psi4 uses
-                            coords = [x / UNIT.A0_TO_BOHR for x in atom.coord]
-                        else:
-                            coords = atom.coord
-                        s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element.name, *coords)
-                
-                elif isinstance(self.geometry, Geometry):
-                    for atom in self.geometry.atoms:
-                        if use_bohr:
-                            coords = [x / UNIT.A0_TO_BOHR for x in atom.coords]
-                        else:
-                            coords = atom.coords
-                        s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element, *coords)
-                
-                s += "}\n"
-
-        footer, footer_warnings = self.make_footer(geometry,
-                                                   style='psi4', 
-                                                   return_warnings=True, 
-                                                   **other_kw_dict)
-        warnings.extend(footer_warnings)
-        
-        s += footer
-        
-        if fname is not None:
-            with open(fname, "w") as f:
-                f.write(s)
-        
-        warnings = [warning for warning in warnings if warning is not None]
-
-        return s, warnings
-
-    def get_gaussian_json(self, **other_kw_dict):
+    @staticmethod
+    def get_gaussian_json(theory, **other_kw_dict):
         out = {}
 
-        header = self.make_header(self.geometry,
+        header = theory.make_header(theory.geometry,
                                   style='gaussian', 
                                   return_warnings=False, 
                                   **other_kw_dict)
         
-        footer = self.make_footer(self.geometry,
+        footer = theory.make_footer(theory.geometry,
                                   style='gaussian', 
                                   return_warnings=False, 
                                   **other_kw_dict)
@@ -220,20 +30,21 @@ class SEQCROW_Theory(Theory):
         out['footer'] = footer
         
         atoms = []
-        for atom in self.geometry.atoms:
-            if isinstance(self.geometry, AtomicStructure):
+        for atom in theory.geometry.atoms:
+            if isinstance(theory.geometry, AtomicStructure):
                 atoms.append("%-2s %13.6f %13.6f %13.6f\n" % (atom.element.name, *atom.coord))
             
-            elif isinstance(self.geometry, Geometry):
+            elif isinstance(theory.geometry, Geometry):
                 atoms.append("%-2s %13.6f %13.6f %13.6f\n" % (atom.element, *atom.coords))
         
         out['geometry'] = atoms
 
         return out
 
-    def get_orca_json(self, **other_kw_dict):
+    @staticmethod
+    def get_orca_json(theory, **other_kw_dict):
         out = {}
-        header = self.make_header(self.geometry,
+        header = theory.make_header(theory.geometry,
                                   style='orca', 
                                   return_warnings=False, 
                                   **other_kw_dict)
@@ -241,26 +52,27 @@ class SEQCROW_Theory(Theory):
         out['header'] = header
         
         atoms = []
-        for atom in self.geometry.atoms:
-            if isinstance(self.geometry, AtomicStructure):
+        for atom in theory.geometry.atoms:
+            if isinstance(theory.geometry, AtomicStructure):
                 atoms.append("%-2s %13.6f %13.6f %13.6f\n" % (atom.element.name, *atom.coord))
             
-            elif isinstance(self.geometry, Geometry):
+            elif isinstance(theory.geometry, Geometry):
                 atoms.append("%-2s %13.6f %13.6f %13.6f\n" % (atom.element, *atom.coords))
         
         out['geometry'] = atoms
   
         return out
 
-    def get_psi4_json(self, **other_kw_dict):
+    @staticmethod
+    def get_psi4_json(theory, **other_kw_dict):
         out = {}
 
-        header, use_bohr = self.make_header(self.geometry,
+        header, use_bohr = theory.make_header(theory.geometry,
                                             style='psi4', 
                                             return_warnings=False, 
                                             **other_kw_dict)
         
-        footer = self.make_footer(self.geometry,
+        footer = theory.make_footer(theory.geometry,
                                   style='psi4', 
                                   return_warnings=False, 
                                   **other_kw_dict)
@@ -269,11 +81,11 @@ class SEQCROW_Theory(Theory):
         out['footer'] = footer
         
         atoms = []
-        for atom in self.geometry.atoms:
-            if isinstance(self.geometry, AtomicStructure):
+        for atom in theory.geometry.atoms:
+            if isinstance(theory.geometry, AtomicStructure):
                 coords = atom.coord
                 ele = atom.element.name
-            elif isinstance(self.geometry, Geometry):
+            elif isinstance(theory.geometry, Geometry):
                 coords = atom.coords
                 ele = atom.element
             
@@ -367,28 +179,3 @@ class SEQCROW_Theory(Theory):
                 f.write(s)
 
         return s
-
-
-class SEQCROW_Basis(Basis):
-    def refresh_elements(self, geometry):
-        if isinstance(geometry, Geometry):
-            super().refresh_elements(geometry)
-        elif geometry is not None:
-            self.elements = set([str(atom.element) for atom in geometry.atoms if str(atom.element) in self.ele_selection])
-
-
-class SEQCROW_ECP(SEQCROW_Basis, ECP):
-    def __init__(self, *args, **kwargs):
-        super(SEQCROW_Basis, self).__init__(*args, **kwargs)
-        super(ECP, self).__init__(*args, **kwargs)
-        
-        if not hasattr(self.ele_selection, "__iter__"):
-            self.ele_selection = [self.ele_selection]
-        
-    def refresh_elements(self, geometry):
-        if isinstance(geometry, Geometry):
-            super().refresh_elements(geometry)
-        elif geometry is not None:
-            self.elements = set([str(atom.element) for atom in geometry.atoms if str(atom.element) in self.ele_selection])
-
- 
