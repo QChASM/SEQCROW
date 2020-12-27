@@ -7,7 +7,6 @@ from AaronTools.const import TMETAL, VDW_RADII, MASS
 from AaronTools.geometry import Geometry
 from AaronTools.ring import Ring
 from AaronTools.finders import BondedTo
-from AaronTools.fileIO import FileReader
 
 from chimerax.atomic import AtomicStructure, Element
 from chimerax.atomic import Residue as ChimeraResidue
@@ -30,9 +29,14 @@ class _FauxAtomSelection:
 
 def fromChimAtom(atom=None, *args, serial_number=None, atomspec=None, **kwargs):
     """get AaronTools Atom object from ChimeraX Atom"""
-    aarontools_atom = Atom(*args, name=str(atom.serial_number), element=str(atom.element), coords=atom.coord, **kwargs)
+    aarontools_atom = Atom(
+        *args,
+        name=str(atom.serial_number),
+        element=atom.element.name,
+        coords=atom.coord,
+        **kwargs
+    )
     
-    aarontools_atom.add_tag(atom.atomspec)
     aarontools_atom.atomspec = atom.atomspec
     aarontools_atom.serial_number = atom.serial_number
     aarontools_atom.chix_atom = atom
@@ -57,7 +61,13 @@ class Residue(Geometry):
             self.chix_residue = geom
             
             self.atomspec = None
-            super().__init__(aaron_atoms, name=geom.name, refresh_connected=False, **kwargs)
+            super().__init__(
+                aaron_atoms,
+                name=geom.name,
+                refresh_connected=False,
+                refresh_ranks=False,
+                **kwargs
+            )
             if resnum is None:
                 self.resnum = geom.number
             else:
@@ -270,19 +280,22 @@ class ResidueCollection(Geometry):
             if convert_residues is None:
                 convert_residues = molecule.residues
             for i, residue in enumerate(convert_residues):  
-                new_res = Residue(residue, \
-                                  comment=molecule.comment if hasattr(molecule, "comment") else None, \
-                          )
+                new_res = Residue(
+                    residue,
+                    comment=molecule.comment if hasattr(molecule, "comment") else None,
+                )
                 
                 self.residues.append(new_res)
                 
                 all_atoms.extend(new_res.atoms)
             
-            super().__init__(all_atoms, 
-                             name=molecule.name, 
-                             comment=molecule.comment if hasattr(molecule, "comment") else "", 
-                             refresh_connected=False, 
-                             **kwargs,
+            super().__init__(
+                all_atoms, 
+                name=molecule.name, 
+                comment=molecule.comment if hasattr(molecule, "comment") else "", 
+                refresh_connected=False, 
+                refresh_ranks=bonds_matter,
+                **kwargs,
             )
         
             if not bonds_matter:

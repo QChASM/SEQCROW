@@ -31,6 +31,8 @@ from AaronTools.theory import *
 from AaronTools.theory.method import KNOWN_SEMI_EMPIRICAL
 from AaronTools.utils.utils import combine_dicts
 
+# import cProfile
+
 
 class _InputGeneratorSettings(Settings):
     EXPLICIT_SAVE = {
@@ -308,9 +310,9 @@ class _InputGeneratorSettings(Settings):
         'on_finished': Value('do nothing', StringArg), 
     }
     
-    #def save(self, *args, **kwargs):
-    #    print("saved qm input settings")
-    #    super().save(*args, **kwargs)
+    # def save(self, *args, **kwargs):
+    #     print("saved qm input settings")
+    #     super().save(*args, **kwargs)
 
 
 class BuildQM(ToolInstance):
@@ -359,7 +361,9 @@ class BuildQM(ToolInstance):
 
         global_triggers = get_triggers()
 
-        self._changes = global_triggers.add_handler("changes", self.update_preview)
+        self.changed = False
+        self._changes = global_triggers.add_handler("changes", self.check_changes)
+        self._changes_done = global_triggers.add_handler("changes done", self.struc_mod_update_preview)
         
         # this tool is big by default
         # unless the user has saved its position, make it small
@@ -608,7 +612,7 @@ class BuildQM(ToolInstance):
     
         self.update_preview()
         
-        self.session.logger.info("applied \"%s\" (%s)" % (preset_name, program))
+        self.session.logger.status("applied \"%s\" (%s)" % (preset_name, program))
         
         if self.preset_window is not None:
             self.preset_window.basis_elements.refresh_basis()
@@ -648,7 +652,7 @@ class BuildQM(ToolInstance):
     
                         self.presets[program][preset_name] = new_presets[program][preset_name]
     
-                        self.session.logger.info("imported %s preset \"%s\"" % (program, preset_name))
+                        self.session.logger.status("imported %s preset \"%s\"" % (program, preset_name))
     
                         if 'basis' in self.presets[program][preset_name]:
                             #print(any(file is not False for file in self.presets[program][preset_name]['basis']['file']))
@@ -774,11 +778,10 @@ class BuildQM(ToolInstance):
             self.preview_window = self.tool_window.create_child_window("Input Preview", window_class=InputPreview)
             self.update_preview()
 
-    def get_file_contents(self, update_settings=True):
+    def get_file_contents(self, update_settings=False):       
         self.update_theory(update_settings=update_settings)
-        
-        kw_dict = self.job_widget.getKWDict()
-        other_kw_dict = self.other_keywords_widget.getKWDict()
+        kw_dict = self.job_widget.getKWDict(update_settings=update_settings)
+        other_kw_dict = self.other_keywords_widget.getKWDict(update_settings=update_settings)
         if update_settings:
             self.settings.save()
 
@@ -811,22 +814,35 @@ class BuildQM(ToolInstance):
             warnings = header_warnings + mol_warnings + footer_warnings
             return contents, warnings
 
-    def update_preview(self, trigger_name=None, changes=None):
-        """whenever a setting is changed, this should be called to update the preview"""
+    def check_changes(self, trigger_name=None, changes=None):
         if changes is not None:
             mdl = self.model_selector.currentData()
-            if mdl not in changes.modified_atomic_structures():
-                return
+            if mdl in changes.modified_atomic_structures():
+                self.changed = True
 
+    def struc_mod_update_preview(self, *args, **kwargs):
+        """whenever a setting is changed, this should be called to update the preview"""
+        if self.changed:
+            self.update_preview()
+            self.changed = False
+
+    def update_preview(self):
+        """whenever a setting is changed, this should be called to update the preview"""
         model = self.model_selector.currentData()
         if not model:
             return
-
+        
+        # profile = cProfile.Profile()
+        # profile.enable()
+        
         self.check_elements()
         if self.preview_window is not None:
             contents, warnings = self.get_file_contents(update_settings=False)
             if contents is not None and warnings is not None:
                 self.preview_window.setPreview(contents, warnings)
+
+        # profile.disable()
+        # profile.print_stats()
 
     def change_file_type(self, *args):
         """change the file type
@@ -854,7 +870,7 @@ class BuildQM(ToolInstance):
         
         self.update_preview()
     
-    def update_theory(self, update_settings=True):
+    def update_theory(self, update_settings=False):
         """grabs the current settings and updates self.theory
         always called before creating an input file"""
         rescol = ResidueCollection(self.model_selector.currentData(), bonds_matter=False)
@@ -894,9 +910,6 @@ class BuildQM(ToolInstance):
         jobs = self.job_widget.getJobs() #job settings get updated during getKWDict
 
         solvent = self.job_widget.getSolvent(update_settings)
-
-        if update_settings:
-            self.settings.save()
         
         self.theory = Theory(
             charge=charge,
@@ -959,8 +972,8 @@ class BuildQM(ToolInstance):
         """run job"""
         self.update_theory()
 
-        kw_dict = self.job_widget.getKWDict()
-        other_kw_dict = self.other_keywords_widget.getKWDict()
+        kw_dict = self.job_widget.getKWDict(update_settings=True)
+        other_kw_dict = self.other_keywords_widget.getKWDict(update_settings=True)
         self.settings.save()
         
         combined_dict = combine_dicts(kw_dict, other_kw_dict)
@@ -975,7 +988,7 @@ class BuildQM(ToolInstance):
         elif program == "Psi4":
             job = Psi4Job(name, self.session, self.theory, combined_dict, auto_update=auto_update, auto_open=auto_open)
         
-        self.session.logger.info("adding %s to queue" % name)   
+        self.session.logger.status("adding %s to queue" % name)   
 
         self.session.seqcrow_job_manager.add_job(job)
 
@@ -994,7 +1007,7 @@ class BuildQM(ToolInstance):
     
         self.update_preview()
     
-        self.session.logger.info("copied to clipboard")
+        self.session.logger.status("copied to clipboard")
     
     def save_input(self):
         """save input to a file
@@ -1023,13 +1036,14 @@ class BuildQM(ToolInstance):
 
         self.update_preview()
 
-        self.session.logger.info("saved to %s" % filename)
+        self.session.logger.status("saved to %s" % filename)
     
     def delete(self):
         """deregister trigger handlers"""
         #overload delete to de-register handler
         global_triggers = get_triggers()
         global_triggers.remove_handler(self._changes)
+        global_triggers.remove_handler(self._changes_done)
         
         self.model_selector.deleteLater()
         
@@ -1040,7 +1054,8 @@ class BuildQM(ToolInstance):
         #overload delete to de-register handler
         global_triggers = get_triggers()
         global_triggers.remove_handler(self._changes)
-        
+        global_triggers.remove_handler(self._changes_done)
+
         self.model_selector.deleteLater()
         
         return super().close()
@@ -2118,7 +2133,7 @@ class JobTypeOption(QWidget):
                     'angles':self.constrained_angles, \
                     'torsions':self.constrained_torsions}
 
-    def getNProc(self, update_settings=True):
+    def getNProc(self, update_settings=False):
         """returns number of processors"""
         if update_settings:
             self.settings.last_nproc = self.nprocs.value()
@@ -2128,7 +2143,7 @@ class JobTypeOption(QWidget):
         else:
             return None
     
-    def getMem(self, update_settings=True):
+    def getMem(self, update_settings=False):
         """returns memory"""
         if update_settings:
             self.settings.last_mem = self.mem.value()
@@ -2138,7 +2153,7 @@ class JobTypeOption(QWidget):
         else:
             return None
     
-    def getKWDict(self, update_settings=True):
+    def getKWDict(self, update_settings=False):
         """returns dictiory specifying misc options for writing an input file"""
         if self.form == "Gaussian":
             route = {}
@@ -4844,7 +4859,6 @@ class KeywordOptions(QWidget):
                 
         self.settings.__setattr__(self.last_option_name, dumps(last_dict))
         self.settings.__setattr__(self.previous_option_name, dumps(previous_dict))
-        self.settings.save()
 
     def change_widget(self, name):
         """show only the widget for 'name' settings"""
@@ -4855,7 +4869,7 @@ class KeywordOptions(QWidget):
             else:
                 self.widgets[widget_name].setVisible(True)
 
-    def getKWDict(self, update_settings=True):
+    def getKWDict(self, update_settings=False):
         """returns a dict for things that are currently in option widgets
         keys are defined by the values in KeywordOptions.items"""
         last_dict = {}
@@ -5222,7 +5236,7 @@ class KeywordWidget(QWidget):
         elif self.form == "Psi4":
             self.psi4_widget.setKeywords(current_dict)
     
-    def getKWDict(self, update_settings=True):
+    def getKWDict(self, update_settings=False):
         if self.form == "Gaussian":
             last_dict = self.gaussian_widget.getKWDict(update_settings)
 
