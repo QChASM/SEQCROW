@@ -120,7 +120,7 @@ class FreqTableWidgetItem(QTableWidgetItem):
                 font.setItalic(False)
             
             self.setFont(font)
-            
+
     def __lt__(self, other):
         return self.data(Qt.UserRole) < other.data(Qt.UserRole)
 

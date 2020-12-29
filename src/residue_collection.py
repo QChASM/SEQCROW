@@ -317,8 +317,8 @@ class ResidueCollection(Geometry):
                     if self.convert_residues is not None and (atom1.residue not in self.convert_residues or atom2.residue not in self.convert_residues):
                         continue
                     
-                    aaron_atom1 = self.find(atom1.atomspec)[0]
-                    aaron_atom2 = self.find(atom2.atomspec)[0]
+                    aaron_atom1 = self.find(AtomSpec(atom1.atomspec))[0]
+                    aaron_atom2 = self.find(AtomSpec(atom2.atomspec))[0]
                     aaron_atom1.connected.add(aaron_atom2)
                     aaron_atom2.connected.add(aaron_atom1)
 
@@ -595,46 +595,41 @@ class ResidueCollection(Geometry):
             #is the last geometry in the log or xyz file
             xyzs = self.all_geom_coordsets(filereader)
             struc.add_coordsets(xyzs, replace=True)
-        
+            struc.active_coordset_id = len(xyzs)
+
         # if it's a frequency file, draw TS bonds for imaginary modes
-        # as far as I'm concerned, this is magic
-        # if it stops working, maybe just delete it
-        # - Tony from the past
         if filereader is not None and "frequency" in filereader.other:
             for mode in filereader.other["frequency"].data:
                 if mode.frequency < 0:
-                    max_ovl = None
-                    for i, vec1 in enumerate(mode.vector):
-                        for j, vec2 in enumerate(mode.vector[:i]):
-                            if self.atoms[i] in self.atoms[j].connected:
-                                continue
-                            
-                            if self.atoms[i].dist(self.atoms[j]) < VDW_RADII[self.atoms[i].element] + VDW_RADII[self.atoms[j].element]:
-                                b = self.atoms[i].bond(self.atoms[j])
-                                if abs(np.dot(b, vec1)) < 0.9 * (np.linalg.norm(b) * np.linalg.norm(vec1)):
-                                    continue
-                                ovl = np.dot(vec1, vec2) * np.sqrt(MASS[self.atoms[i].element]) * np.sqrt(MASS[self.atoms[j].element])
-                                if ovl > 0:
-                                    continue
-                                if max_ovl is None or abs(ovl) > max_ovl:
-                                    max_ovl = abs(ovl)
-                        
-                    if max_ovl is None:
-                        continue
-
-                    for i, vec1 in enumerate(mode.vector):
-                        for j, vec2 in enumerate(mode.vector[:i]):
-                            if self.atoms[i].dist(self.atoms[j]) < VDW_RADII[self.atoms[i].element] + VDW_RADII[self.atoms[j].element]:
-                                b = self.atoms[i].bond(self.atoms[j])
-                                if 0.5 * (abs(np.dot(b, vec1)) + abs(np.dot(b, vec2))) \
-                                   < 0.45 * (np.linalg.norm(b) * np.linalg.norm(vec1) + np.linalg.norm(b) * np.linalg.norm(vec2)):
-                                    continue
-                                ovl = np.dot(vec1, vec2) * np.sqrt(MASS[self.atoms[i].element]) * np.sqrt(MASS[self.atoms[j].element])
-                                if abs(ovl) < 0.1 or ovl > 0:
-                                    continue
-                                tol = 0.9
-                                if abs(ovl) > tol * (np.linalg.norm(vec1) * np.linalg.norm(vec2) * np.sqrt(MASS[self.atoms[i].element]) * np.sqrt(MASS[self.atoms[j].element])):
-                                    sel = _FauxAtomSelection(atoms=(struc.atoms[i], struc.atoms[j]))
-                                    tsbond(session, sel)
+                    max_disp = max(np.linalg.norm(x) for x in mode.vector)
+                    cur_coords = self.coords
+                    coord_forward = self.coords + (0.2 / max_disp) * mode.vector
+                    coord_reverse = self.coords - (0.2 / max_disp) * mode.vector
+                    forward_connectivity = np.zeros((len(self.atoms), len(self.atoms)))
+                    reverse_connectivity = np.zeros((len(self.atoms), len(self.atoms)))
+                    self.update_geometry(coord_forward)
+                    self.refresh_connected()
+                    for i, atom1 in enumerate(self.atoms):
+                        for j, atom2 in enumerate(self.atoms[:i]):
+                            if atom1 in atom2.connected:
+                                forward_connectivity[i,j] = 1
+                                forward_connectivity[j,i] = 1
+                    
+                    self.update_geometry(coord_reverse)
+                    self.refresh_connected()
+                    for i, atom1 in enumerate(self.atoms):
+                        for j, atom2 in enumerate(self.atoms[:i]):
+                            if atom1 in atom2.connected:
+                                reverse_connectivity[i,j] = 1
+                                reverse_connectivity[j,i] = 1
+                    
+                    changes = forward_connectivity - reverse_connectivity
+                    for i, atom1 in enumerate(self.atoms):
+                        for j, atom1 in enumerate(self.atoms[:i]):
+                            if changes[i,j] != 0:
+                                sel = _FauxAtomSelection(atoms=(struc.atoms[i], struc.atoms[j]))
+                                tsbond(session, sel)
+                    
+                    self.update_geometry(cur_coords)
 
         return struc

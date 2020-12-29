@@ -333,12 +333,18 @@ class _SEQCROW_API(BundleAPI):
 
     @staticmethod
     def register_selector_menus(session):
+        from PySide2.QtWidgets import QAction
+
         add_submenu = session.ui.main_window.add_select_submenu
         add_selector = session.ui.main_window.add_menu_selector
         substituent_menu = add_submenu(['Che&mistry'], 'Substituents')
         for sub in Substituent.list():
             if sub not in ELEMENTS and sub.isalnum():
                 add_selector(substituent_menu, sub, sub)
+        
+        mw = session.ui.main_window
+        structure_menu = add_submenu([], '&Structure')
+        structure_menu.addAction(QAction("Connected", mw))
 
     @staticmethod
     def get_class(name):

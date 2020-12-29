@@ -1,6 +1,6 @@
 import numpy as np
 
-from chimerax.atomic import AtomicStructure, Atoms, Atom
+from chimerax.atomic import AtomicStructure, Atoms, Atom, selected_atoms
 from chimerax.core.commands import register_selector
 
 from AaronTools.atoms import BondOrder
@@ -25,12 +25,20 @@ def register_selectors(logger, name):
         register_selector("tm", tm_selector, logger, desc="transition metals")
 
     elif any(name == sub for sub in Substituent.list()):
-        register_selector(name, 
-                          lambda sess, models, results, sub_name=name:
-                              substituent_selection(sess, sub_name, models, results),
-                          logger,
-                          desc="substituent %s" % name
+        register_selector(
+            name, 
+            lambda sess, models, results, sub_name=name: substituent_selection(
+                sess,
+                sub_name,
+                models,
+                results
+            ),
+            logger,
+            desc="substituent %s" % name
         )
+    
+    elif name == "connected":
+        register_selector("connected", all_connected_selector, logger, desc="fragment connected to selected atoms")
     
 def tm_selector(session, models, results):
     """select transition metals using AaronTools' TMETAL dictionary"""
@@ -145,7 +153,22 @@ def substituent_selection(session, sub_name, models, results):
     #session.logger.info("spent %f time ranking atoms" % rank_time)
     results.add_atoms(atoms)
 
-def get_fragment(start, stop, max_len):
+def all_connected_selector(session, models, results):
+    """select all atoms connected to the current selection"""
+    # TODO: right mouse mode for this
+    cur_sel = selected_atoms(session)
+    atoms = Atoms()
+    for atom in cur_sel:
+        if atom in atoms:
+            continue
+        elif atom.structure not in models:
+            continue
+        connected_atoms = get_fragment(atom, max_len=len(atom.structure.atoms))
+        atoms = atoms.merge(connected_atoms)
+
+    results.add_atoms(atoms)
+
+def get_fragment(start, stop=None, max_len=100000):
     """
     see AaronTools.geometry.Geometry.get_fragment
     """
