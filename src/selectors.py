@@ -1,6 +1,6 @@
 import numpy as np
 
-from chimerax.atomic import AtomicStructure, Atoms, Atom, selected_atoms
+from chimerax.atomic import AtomicStructure, Atoms, Atom, selected_atoms, selected_bonds
 from chimerax.core.commands import register_selector
 
 from AaronTools.atoms import BondOrder
@@ -157,6 +157,9 @@ def all_connected_selector(session, models, results):
     """select all atoms connected to the current selection"""
     # TODO: right mouse mode for this
     cur_sel = selected_atoms(session)
+    bond_sel = selected_bonds(session)
+    for bond in bond_sel:
+        cur_sel = cur_sel.merge(Atoms(bond.atoms))
     atoms = Atoms()
     for atom in cur_sel:
         if atom in atoms:
