@@ -115,12 +115,13 @@ class _SEQCROW_API(BundleAPI):
                 tool = Sterimol(session, ti.name)
                 return tool
         
-        elif any(ti.name == name for name in ["Structure Modification", \
-                                            "Change Substituents", \
-                                            "Swap Transition Metal Ligands", \
-                                            "Fuse Ring", \
-                                            "Change Element", \
-                                            ]):
+        elif any(ti.name == name for name in [
+                "Structure Modification",
+                "Change Substituents",
+                "Swap Transition Metal Ligands",
+                "Fuse Ring",
+                "Change Element",
+        ]):
             from .tools import EditStructure
             for tool in session.tools.list():
                 if isinstance(tool, EditStructure):

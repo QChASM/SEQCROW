@@ -11,5 +11,5 @@ from .aaron_input_builder import AARONInputBuilder
 from .sterimol import Sterimol
 from .bond_editor import BondEditor
 from .precision_rotate import PrecisionRotate
-# from .percent_Vbur import PercentVolumeBuried
+from .percent_Vbur import PercentVolumeBuried
 from .info import Info

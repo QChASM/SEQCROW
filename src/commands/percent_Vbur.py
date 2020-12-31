@@ -12,9 +12,7 @@ from AaronTools.utils.utils import rotation_matrix, fibonacci_sphere
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.finders import AtomSpec
 
-from scipy.spatial import distance_matrix
-
-import stripy
+from scipy.spatial import distance_matrix, ConvexHull
 
 
 vbur_description = CmdDesc(required=[("selection", ModelsArg)], \
@@ -344,7 +342,7 @@ def vbur_vis(
     
     atom_dist = distance_matrix(coords, coords)
     
-    sphere = fibonacci_sphere(n=n_grid, radius=radius)
+    sphere = fibonacci_sphere(num=n_grid, radius=radius)
     
     # add points right where spheres intersect
     # this makes the intersections look less pokey
@@ -450,7 +448,7 @@ def vbur_vis(
         # then, if we have to remove a triangle involving one of these points later,
         # it won't leave a gap
         n_atom_grid = int(radius_list[i]**2 * n_grid / radius**2)
-        atom_sphere = fibonacci_sphere(radius=radius_list[i], n=n_atom_grid)
+        atom_sphere = fibonacci_sphere(radius=radius_list[i], num=n_atom_grid)
         n_atom_grid = len(atom_sphere)
         if len(atom_added_points[i]) > 0:
             remove_ndx = []
@@ -468,15 +466,11 @@ def vbur_vis(
             atom_sphere = np.array(atom_sphere)
             n_atom_grid = len(atom_sphere)
             atom_sphere = np.concatenate((atom_sphere, np.array(atom_added_points[i]) - coords[i]))
-    
-        # triangulation uses longitude and latitude
-        lat = np.arcsin(atom_sphere[:,2] / radius_list[i])
-        lon = np.arctan2(atom_sphere[:,1], atom_sphere[:,0])
-        
+
+        atom_hull = ConvexHull(atom_sphere / radius_list[i])
+        tri = atom_hull.simplices
+
         atom_sphere += coords[i]
-        
-        atom_tri = stripy.sTriangulation(lons=lon, lats=lat)
-        tri = atom_tri.simplices
         
         remove_v = []
         new_ndx = np.zeros(len(atom_sphere), dtype=int)
@@ -529,7 +523,7 @@ def vbur_vis(
                 new_t[j][k] = new_ndx[v]
   
         atom_sphere = np.array(atom_sphere)
-        norms = (atom_sphere - coords[i]) / radius_list[i]
+        norms = -(atom_sphere - coords[i]) / radius_list[i]
         
         triangles.extend(new_t + len(vertices))
         vertices.extend(atom_sphere)
@@ -554,13 +548,9 @@ def vbur_vis(
     n_sphere = len(sphere)
     sphere = np.concatenate((sphere, np.array(center_added_points)))
     
-    lat = np.arcsin(sphere[:,2] / radius)
-    lon = np.arctan2(sphere[:,1], sphere[:,0])
-    
+    center_hull = ConvexHull(sphere / radius)
     sphere += center_coords
-    
-    sphere_tri = stripy.sTriangulation(lons=lon, lats=lat)
-    tri = sphere_tri.simplices
+    tri = center_hull.simplices
     
     remove_v = []
     new_ndx = np.zeros(len(sphere), dtype=int)
@@ -611,6 +601,17 @@ def vbur_vis(
     triangles.extend(new_t + len(vertices))
     vertices.extend(sphere)
     normals.extend(norms)
+    
+    # the triangles need to be reordered so the points are 
+    # clockwise (or counterclockwise? i don't remember)
+    for i in range(0, len(triangles)):
+        t = triangles[i]
+        v1 = vertices[t[1]] - vertices[t[0]]
+        v2 = vertices[t[2]] - vertices[t[0]]
+        c = np.cross(v1, v2)
+        if np.dot(c, normals[t[0]]) < 0:
+            triangles[i] = t[::-1]
+    
     model.set_geometry(np.array(vertices), np.array(normals), np.array(triangles))
     
     return model
