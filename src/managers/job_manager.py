@@ -235,22 +235,27 @@ class JobManager(ProviderManager):
                 if 'finished' not in fr.other or not fr.other['finished']:
                     job.error = True
 
-        if job.auto_update and (job.theory.geometry.chix_atomicstructure is not None and not job.theory.geometry.chix_atomicstructure.deleted):
+        if job.auto_update and (
+                job.theory.geometry.chix_atomicstructure is not None and
+                not job.theory.geometry.chix_atomicstructure.deleted
+        ):
             if os.path.exists(job.output_name):
                 finfo = job.output_name
-                if isinstance(job, GaussianJob):
-                    finfo = (job.output_name, "log", None)
-                elif isinstance(job, ORCAJob):
-                    finfo = (job.output_name, "out", None)
-                elif isinstance(job, Psi4Job):
-                    finfo = (job.output_name, "dat", None)
+                try:
+                    finfo = (job.output_name, job.format_name, None)
 
-                fr = FileReader(finfo, get_all=True, just_geom=False)
-                if len(fr.atoms) > 0:
-                    job.session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([job.theory.geometry.chix_atomicstructure], [fr]))
-    
-                    rescol = ResidueCollection(fr)
-                    rescol.update_chix(job.theory.geometry.chix_atomicstructure)
+                    fr = FileReader(finfo, get_all=True, just_geom=False)
+                    if len(fr.atoms) > 0:
+                        job.session.filereader_manager.triggers.activate_trigger(
+                            ADD_FILEREADER, 
+                            ([job.theory.geometry.chix_atomicstructure], [fr])
+                        )
+        
+                        rescol = ResidueCollection(fr)
+                        rescol.update_chix(job.theory.geometry.chix_atomicstructure)
+                
+                except:
+                    job.update_structure()
 
             if fr.all_geom is not None and len(fr.all_geom) > 1:
                 coordsets = rescol.all_geom_coordsets(fr)
@@ -263,18 +268,21 @@ class JobManager(ProviderManager):
                     
                     for atom, coord in zip(job.theory.geometry.chix_atomicstructure.atoms, coordset):
                         atom.coord = coord
-                
+
                 job.theory.geometry.chix_atomicstructure.active_coordset_id = job.theory.geometry.chix_atomicstructure.num_coordsets
 
         elif job.auto_open or job.auto_update:
             if hasattr(job, "output_name") and os.path.exists(job.output_name):
-                run(job.session, "open \"%s\" coordsets true" % job.output_name)
+                if job.format_name:
+                    run(job.session, "open \"%s\" coordsets true format %s" % (job.output_name, job.format_name))
+                else:
+                    run(job.session, "open \"%s\" coordsets true" % job.output_name)
             else:
                 self.session.logger.error("could not open output of %s" % repr(job))
-            
+
         self.triggers.activate_trigger(JOB_QUEUED, trigger_name)
         pass
-    
+
     def job_started(self, trigger_name, job):
         """prints 'job started' notification to log"""
         job.session.logger.info("%s: %s" % (trigger_name, job))

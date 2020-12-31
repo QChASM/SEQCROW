@@ -12,6 +12,8 @@ from AaronTools.theory import Theory
 from sys import platform
 
 class LocalJob(QThread):
+    format_name = None
+    """name of format for open command"""
     def __init__(self, name, session, theory, kw_dict={}, auto_update=False, auto_open=False):
         """base class of local ORCA, Gaussian, and Psi4 jobs
         name        str - name of job
@@ -58,6 +60,7 @@ class LocalJob(QThread):
 
 
 class ORCAJob(LocalJob):
+    format_name = "out"
     def __repr__(self):
         return "local ORCA job \"%s\"" % self.name
 
@@ -134,6 +137,7 @@ class ORCAJob(LocalJob):
 
 
 class GaussianJob(LocalJob):
+    format_name = "log"
     def __repr__(self):
         return "local Gaussian job \"%s\"" % self.name
 
@@ -207,6 +211,7 @@ class GaussianJob(LocalJob):
 
 
 class Psi4Job(LocalJob):
+    format_name = "dat"
     def __repr__(self):
         return "local Psi4 job \"%s\"" % self.name
 

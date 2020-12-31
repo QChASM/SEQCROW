@@ -6,6 +6,7 @@ from chimerax.atomic import OrderedAtomsArg
 from chimerax.core.commands import BoolArg, CmdDesc, StringArg, DynamicEnum, ListOf
 
 from SEQCROW.residue_collection import ResidueCollection, Residue
+from SEQCROW.finders import AtomSpec
 
 fuseRing_description = CmdDesc(required=[("selection", OrderedAtomsArg)], \
                                 keyword=[("rings", ListOf(DynamicEnum(Ring.list, \
@@ -117,7 +118,7 @@ def fuseRing(session, selection, rings, newName=None, modify=True):
 
                 rescol = ResidueCollection(model, convert_residues=convert)
 
-                target = rescol.find([atom1.atomspec, atom2.atomspec])
+                target = rescol.find([AtomSpec(atom1.atomspec), AtomSpec(atom2.atomspec)])
 
             elif modify and not first_pass:
                 raise RuntimeError("only the first model can be replaced")
@@ -132,8 +133,12 @@ def fuseRing(session, selection, rings, newName=None, modify=True):
 
                 rescol = ResidueCollection(model_copy, convert_residues=convert)
 
-                target = rescol.find([model_copy.atoms[model.atoms.index(atom1)].atomspec, \
-                                      model_copy.atoms[model.atoms.index(atom2)].atomspec])
+                target = rescol.find(
+                    [
+                        AtomSpec(model_copy.atoms[model.atoms.index(atom1)].atomspec),
+                        AtomSpec(model_copy.atoms[model.atoms.index(atom2)].atomspec)
+                    ]
+                )
 
             rescol.ring_substitute(target, ringname)
             

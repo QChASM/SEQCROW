@@ -222,22 +222,23 @@ class EditStructure(ToolInstance):
         changeelement_layout.addRow("element:", self.element)
         
         self.vsepr = QComboBox()
-        self.vsepr.addItems(["do not change",               # 0
-                             "linear (1 bond)",             # 1
-                             "linear (2 bonds)",            # 2 
-                             "trigonal planar (2 bonds)",   # 3
-                             "tetrahedral (2 bonds)",       # 4 
-                             "trigonal planar",             # 5
-                             "tetrahedral (3 bonds)",       # 6
-                             "T-shaped",                    # 7
-                             "tetrahedral",                 # 8
-                             "sawhorse",                    # 9
-                             "square planar",               #10
-                             "trigonal bipyramidal",        #11
-                             "square pyramidal",            #12
-                             "octahedral",                  #13
-                            ]
-        )
+        self.vsepr.addItems([
+            "do not change",               # 0
+            "linear (1 bond)",             # 1
+            "linear (2 bonds)",            # 2 
+            "trigonal planar (2 bonds)",   # 3
+            "tetrahedral (2 bonds)",       # 4 
+            "trigonal planar",             # 5
+            "tetrahedral (3 bonds)",       # 6
+            "T-shaped",                    # 7
+            "tetrahedral",                 # 8
+            "sawhorse",                    # 9
+            "square planar",               #10
+            "trigonal bipyramidal",        #11
+            "square pyramidal",            #12
+            "octahedral",                  #13
+            
+        ])
         
         self.vsepr.setCurrentIndex(8)
         
