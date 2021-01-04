@@ -129,6 +129,7 @@ class PrecisionRotate(ToolInstance):
         rotate_button = QPushButton("rotate selected atoms")
         rotate_button.clicked.connect(self.do_rotate)
         layout.addWidget(rotate_button, 4, 0, 1, 3, Qt.AlignTop)
+        self.rotate_button = rotate_button
 
         self.status_bar = QStatusBar()
         self.status_bar.setSizeGripEnabled(False)

@@ -108,6 +108,7 @@ class EditStructure(ToolInstance):
         substitute_button = QPushButton("substitute current selection")
         substitute_button.clicked.connect(self.do_substitute)
         substitute_layout.addWidget(substitute_button, 5, 0, 1, 3, Qt.AlignTop)
+        self.substitute_button = substitute_button
         
         substitute_layout.setRowStretch(0, 0)
         substitute_layout.setRowStretch(1, 0)
@@ -145,6 +146,7 @@ class EditStructure(ToolInstance):
         maplig_button = QPushButton("swap ligand with selected coordinating atoms")
         maplig_button.clicked.connect(self.do_maplig)
         maplig_layout.addWidget(maplig_button, 2, 0, 1, 3, Qt.AlignTop)
+        self.maplig_button = maplig_button
 
         start_structure_button = QPushButton("place in:")
         self.lig_model_selector = ModelComboBox(self.session, addNew=True)
@@ -193,6 +195,7 @@ class EditStructure(ToolInstance):
         closering_button = QPushButton("put a ring on current selection")
         closering_button.clicked.connect(self.do_fusering)
         closering_layout.addWidget(closering_button, 3, 0, 1, 3, Qt.AlignTop)
+        self.closering_button = closering_button
 
         start_structure_button = QPushButton("place in:")
         self.ring_model_selector = ModelComboBox(self.session, addNew=True)
@@ -258,6 +261,7 @@ class EditStructure(ToolInstance):
         change_element_button = QPushButton("change selected elements")
         change_element_button.clicked.connect(self.do_change_element)
         changeelement_layout.addRow(change_element_button)
+        self.change_element_button = change_element_button
 
         start_structure_button = QPushButton("place in:")
         self.model_selector = ModelComboBox(self.session, addNew=True)

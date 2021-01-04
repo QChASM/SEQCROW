@@ -430,6 +430,7 @@ class BuildQM(ToolInstance):
         shortcut = QKeySequence(QKeySequence.Copy)
         copy.setShortcut(shortcut)
         export.addAction(copy)
+        self.copy = copy
         
         save = QAction("&Save Input", self.tool_window.ui_area)
         save.triggered.connect(self.save_input)

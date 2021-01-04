@@ -79,10 +79,12 @@ class BondEditor(ToolInstance):
         draw_tsbonds = QPushButton("draw TS bonds on selected atoms/bonds")
         draw_tsbonds.clicked.connect(self.run_tsbond)
         ts_options.addRow(draw_tsbonds)
+        self.draw_tsbonds = draw_tsbonds
         
         erase_tsbonds = QPushButton("erase selected TS bonds")
         erase_tsbonds.clicked.connect(self.run_erase_tsbond)
         ts_options.addRow(erase_tsbonds)
+        self.erase_tsbonds = erase_tsbonds
         
         
         bond_tab = QWidget()
@@ -110,10 +112,12 @@ class BondEditor(ToolInstance):
         draw_tsbonds = QPushButton("draw bond between selected atoms")
         draw_tsbonds.clicked.connect(self.run_bond)
         bond_options.addRow(draw_tsbonds)
+        self.draw_tsbonds = draw_tsbonds
         
         erase_bonds = QPushButton("erase selected bonds")
         erase_bonds.clicked.connect(lambda *, ses=self.session: run(ses, "delete bonds sel"))
         bond_options.addRow(erase_bonds)
+        self.erase_bonds = erase_bonds
 
         
         hbond_tab = QWidget()
@@ -139,10 +143,12 @@ class BondEditor(ToolInstance):
         draw_hbonds = QPushButton("draw H-bonds")
         draw_hbonds.clicked.connect(self.run_hbond)
         hbond_options.addRow(draw_hbonds)
+        self.draw_hbonds = draw_hbonds
         
         erase_hbonds = QPushButton("erase all H-bonds")
         erase_hbonds.clicked.connect(lambda *, ses=self.session: run(ses, "~hbonds"))
         hbond_options.addRow(erase_hbonds)
+        self.erase_hbonds = erase_hbonds
 
 
         tm_bond_tab = QWidget()
@@ -168,10 +174,12 @@ class BondEditor(ToolInstance):
         draw_tm_bonds = QPushButton("draw metal coordination bonds")
         draw_tm_bonds.clicked.connect(self.run_tm_bond)
         tm_bond_options.addRow(draw_tm_bonds)
+        self.draw_tm_bonds = draw_tm_bonds
         
         erase_tm_bonds = QPushButton("erase all metal coordination bonds")
         erase_tm_bonds.clicked.connect(self.del_tm_bond)
         tm_bond_options.addRow(erase_tm_bonds)
+        self.erase_tm_bonds = erase_tm_bonds
         
         
         tabs.addTab(bond_tab, "covalent bonds")

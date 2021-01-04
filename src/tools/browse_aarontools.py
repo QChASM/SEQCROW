@@ -81,6 +81,7 @@ class AaronTools_Library(ToolInstance):
         openLigButton.setToolTip("ligands selected in the table will be loaded into ChimeraX")
         openLigButton.clicked.connect(self.open_ligands)
         self.ligand_layout.addWidget(openLigButton)
+        self.openLigButton = openLigButton
 
         #add a tab for substituents
         self.substituent_tab = QWidget()
@@ -103,6 +104,7 @@ class AaronTools_Library(ToolInstance):
         openSubButton.setToolTip("substituents selected in the table will be loaded into ChimeraX")
         openSubButton.clicked.connect(self.open_substituents)
         self.substituent_layout.addWidget(openSubButton)
+        self.openSubButton = openSubButton
         
         #add a tab for rings
         self.ring_tab = QWidget()
@@ -125,6 +127,7 @@ class AaronTools_Library(ToolInstance):
         openRingButton.setToolTip("rings selected in the table will be loaded into ChimeraX")
         openRingButton.clicked.connect(self.open_rings)
         self.ring_layout.addWidget(openRingButton)
+        self.openRingButton = openRingButton
         
         self.library_tabs.resize(300, 200)
         

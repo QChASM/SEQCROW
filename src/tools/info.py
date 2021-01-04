@@ -103,6 +103,7 @@ class Info(ToolInstance):
         shortcut = QKeySequence(Qt.CTRL + Qt.Key_C)
         copy.setShortcut(shortcut)
         export.addAction(copy)
+        self.copy = copy
         
         save = QAction("&Save CSV...", self.tool_window.ui_area)
         save.triggered.connect(self.save_csv)

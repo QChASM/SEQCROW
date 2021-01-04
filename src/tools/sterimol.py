@@ -65,10 +65,12 @@ class Sterimol(ToolInstance):
         calc_sterimol_button = QPushButton("calculate parameters for selected substituents")
         calc_sterimol_button.clicked.connect(self.calc_sterimol)
         layout.addRow(calc_sterimol_button)
+        self.calc_sterimol_button = calc_sterimol_button
         
         remove_sterimol_button = QPushButton("remove Sterimol visualizations")
         remove_sterimol_button.clicked.connect(self.del_sterimol)
         layout.addRow(remove_sterimol_button)
+        self.remove_sterimol_button = remove_sterimol_button
         
         self.table = QTableWidget()
         self.table.setColumnCount(5)

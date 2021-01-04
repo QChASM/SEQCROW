@@ -46,7 +46,7 @@ class FileReaderPanel(ToolInstance):
             lambda *args: self.fill_tree(*args))
         self._molname_change = self.session.triggers.add_handler(MODEL_NAME_CHANGED,
             lambda *args: self.fill_tree(*args))
-        
+
     def _build_ui(self):
         layout = QGridLayout()
 
@@ -77,7 +77,7 @@ class FileReaderPanel(ToolInstance):
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(placement="side")
-        
+
     def fill_tree(self, *args):        
         item_stack = [self.tree.invisibleRootItem()]
         

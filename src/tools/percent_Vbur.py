@@ -102,6 +102,7 @@ class PercentVolumeBuried(ToolInstance):
             "in the case of a single center, all atoms except the center is used"
         )
         calc_layout.addRow(set_ligand_atoms)
+        self.set_ligand_atoms = set_ligand_atoms
         
         self.radius = QDoubleSpinBox()
         self.radius.setValue(self.settings.center_radius)
@@ -285,6 +286,7 @@ class PercentVolumeBuried(ToolInstance):
         calc_vbur_button = QPushButton("calculate % buried volume for selected centers")
         calc_vbur_button.clicked.connect(self.calc_vbur)
         calc_layout.addRow(calc_vbur_button)
+        self.calc_vbur_button = calc_vbur_button
         
         remove_vbur_button = QPushButton("remove % buried volume visualizations")
         remove_vbur_button.clicked.connect(self.del_vbur)
@@ -309,6 +311,7 @@ class PercentVolumeBuried(ToolInstance):
         shortcut = QKeySequence(Qt.CTRL + Qt.Key_C)
         copy.setShortcut(shortcut)
         export.addAction(copy)
+        self.copy = copy
         
         save = QAction("&Save CSV...", self.tool_window.ui_area)
         save.triggered.connect(self.save_csv)
