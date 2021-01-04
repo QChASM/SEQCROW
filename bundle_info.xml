@@ -220,8 +220,7 @@
 	   </Classifiers>
     
     <AdditionalPackages>
-        <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools">
-        </Package>
+        <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools"/>
     </AdditionalPackages>
 
     <DataFiles package="AaronTools">
@@ -230,13 +229,11 @@
         <DataDir>Rings</DataDir>
         <DataDir>utils</DataDir>
         <DataDir>utils\quad_grids</DataDir>
-        <DataDir>test\test_files</DataDir>
-        <DataDir>test\ref_files</DataDir>
         <DataFile>bond_data.json</DataFile>
         <DataFile>calculated_bond_lengths.json</DataFile>
         <DataFile>config.ini</DataFile>
         <DataFile>README.md</DataFile>
         <DataFile>LICENSE</DataFile>
     </DataFiles>
-	
+    
 </BundleInfo>
