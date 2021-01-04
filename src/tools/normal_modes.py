@@ -199,10 +199,12 @@ class NormalModes(ToolInstance):
         show_vec_button = QPushButton("display selected mode")
         show_vec_button.clicked.connect(self.show_vec)
         vector_opts.addRow(show_vec_button)
+        self.show_vec_button = show_vec_button
 
         close_vec_button = QPushButton("remove selected mode vectors")
         close_vec_button.clicked.connect(self.close_vec)
         vector_opts.addRow(close_vec_button)
+        self.close_vec_button = close_vec_button
 
         stop_anim_button = QPushButton("reset coordinates")
         stop_anim_button.clicked.connect(self.stop_anim)
@@ -230,20 +232,24 @@ class NormalModes(ToolInstance):
         self.anim_fps = FPSSpinBox()
         self.anim_fps.setRange(1, 60)
         self.anim_fps.setValue(self.settings.anim_fps)
-        self.anim_fps.setToolTip("animation and recorded movie frames per second\n" +
-                                 "60 must be evenly divisible by this number\n" +
-                                 "animation speed in ChimeraX might be slower, depending on your hardware or graphics settings")
+        self.anim_fps.setToolTip(
+            "animation and recorded movie frames per second\n" +
+            "60 must be evenly divisible by this number\n" +
+            "animation speed in ChimeraX might be slower, depending on your hardware or graphics settings"
+        )
         anim_opts.addRow("animation FPS:", self.anim_fps)
 
         show_anim_button = QPushButton("animate selected mode")
         show_anim_button.clicked.connect(self.show_anim)
         anim_opts.addRow(show_anim_button)
+        self.show_anim_button = show_anim_button
 
         stop_anim_button = QPushButton("stop animation")
         stop_anim_button.clicked.connect(self.stop_anim)
         anim_opts.addRow(stop_anim_button)
+        self.stop_anim_button = stop_anim_button
 
-        
+        # IR plot options
         ir_tab = QWidget()
         ir_layout = QFormLayout(ir_tab)
         
