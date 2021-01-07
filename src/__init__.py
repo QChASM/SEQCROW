@@ -289,7 +289,16 @@ class _SEQCROW_API(BundleAPI):
                         return widget.options_string()
                         
                 return Info()
-
+        
+        elif mgr is session.test_manager:
+            if name == "substitute_command":
+                from .tests.substitute_command import SubstituteCmdTest
+                return SubstituteCmdTest
+            
+            elif name == "normal_modes":
+                from .tests.normal_modes import NormalModesToolTest
+                return NormalModesToolTest
+    
     @staticmethod
     def register_command(bundle_info, command_info, logger):
         if command_info.name == "rmsdAlign":

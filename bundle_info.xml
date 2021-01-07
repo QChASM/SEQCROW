@@ -135,6 +135,11 @@
                 <Provider name="XYZ file"/>
             </Providers>
             
+            <Providers manager="test_manager">
+                <Provider name="substitute_command"/>
+                <Provider name="normal_modes"/>
+            </Providers>
+
             <Classifiers>
                 <PythonClassifier>Development Status :: 2 - Pre-Alpha</PythonClassifier>
                 <PythonClassifier>License :: OSI Approved :: GNU General Public License v3 (GPLv3)</PythonClassifier>
@@ -221,6 +226,7 @@
     
     <AdditionalPackages>
         <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools"/>
+        <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
     </AdditionalPackages>
 
     <DataFiles package="AaronTools">
@@ -235,5 +241,9 @@
         <DataFile>README.md</DataFile>
         <DataFile>LICENSE</DataFile>
     </DataFiles>
-    
+	
+    <DataFiles package="AaronTools.test">
+        <DataDir>test_files</DataDir>
+        <DataDir>ref_files</DataDir>
+    </DataFiles>    
 </BundleInfo>
