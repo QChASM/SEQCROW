@@ -27,7 +27,7 @@ class NavigationToolbar(NavigationToolbar2QT):
 
     toolitems = list(NavigationToolbar2QT.toolitems)
     for i in range(0, len(toolitems)):
-        if toolitems[i][0] in ['Back', 'Forward', 'Subplots', 'Edit']:
+        if toolitems[i][0] in ['Back', 'Forward', 'Subplots']:
             toolitems[i] = None
     
     toolitems = tuple(ti for ti in toolitems if ti is not None and ti != (None, None, None, None))
@@ -98,8 +98,8 @@ class EnergyPlot(ToolInstance):
     
         self.nrg_plot = ax.plot(self.structure.coordset_ids, data, marker='o', c='gray', markersize=3)
         self.nrg_plot = self.nrg_plot[0]
-        ax.set_xlabel('iteration', fontfamily='Arial')
-        ax.set_ylabel(r'energy ($E_h$)', fontfamily='Arial')
+        ax.set_xlabel('iteration')
+        ax.set_ylabel(r'energy ($E_h$)')
         ax.set_ylim(bottom=(min(data) - se/10), top=(max(data) + se/10))
         
         minlocs = [self.structure.coordset_ids[i] for i in range(0, self.structure.num_coordsets) if data[i] == min(data)]
@@ -131,7 +131,7 @@ class EnergyPlot(ToolInstance):
         toolbar_widget = QWidget()
         toolbar = NavigationToolbar(self.canvas, toolbar_widget)
 
-        toolbar.setMaximumHeight(24)
+        toolbar.setMaximumHeight(32)
         self.toolbar = toolbar
         layout.addWidget(toolbar)
         

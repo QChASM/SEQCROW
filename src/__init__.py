@@ -198,7 +198,7 @@ class _SEQCROW_API(BundleAPI):
 
     @staticmethod
     def run_provider(session, name, mgr, **kw):
-        if mgr == session.open_command:
+        if mgr is session.open_command:
             from SEQCROW.io import open_aarontools
             
             if name == "Gaussian input file":
@@ -267,7 +267,7 @@ class _SEQCROW_API(BundleAPI):
                         
                 return Info()
                 
-        elif mgr == session.save_command:
+        elif mgr is session.save_command:
             from chimerax.save_command import SaverInfo
             from SEQCROW.io import save_aarontools
             
@@ -291,13 +291,21 @@ class _SEQCROW_API(BundleAPI):
                 return Info()
         
         elif mgr is session.test_manager:
-            if name == "substitute_command":
-                from .tests.substitute_command import SubstituteCmdTest
-                return SubstituteCmdTest
-            
+            if name == "fuseRing_command":
+                from .tests.fuseRing_command import FuseRingCmdTest
+                return FuseRingCmdTest
+                
             elif name == "normal_modes":
                 from .tests.normal_modes import NormalModesToolTest
                 return NormalModesToolTest
+
+            elif name == "substitute_command":
+                from .tests.substitute_command import SubstituteCmdTest
+                return SubstituteCmdTest
+    
+            elif name == "input_builder":
+                from .tests.input_builder import QMInputBuilderToolTest
+                return QMInputBuilderToolTest
     
     @staticmethod
     def register_command(bundle_info, command_info, logger):

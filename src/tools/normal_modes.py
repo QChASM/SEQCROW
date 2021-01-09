@@ -39,8 +39,6 @@ from SEQCROW.widgets import FilereaderComboBox
 #make double clicking something in the table visualize it
 
 
-matplotlib_rc('font',  **{'sans-serif' : 'Arial', 'family' : 'sans-serif'})
-
 class _NormalModeSettings(Settings):
     AUTO_SAVE = {
         'arrow_color': Value((0.0, 1.0, 0.0, 1.0), TupleOf(FloatArg, 4), iter2str),
@@ -50,7 +48,8 @@ class _NormalModeSettings(Settings):
         'anim_fps': Value(60, IntArg), 
         'fwhm': Value(5, FloatArg), 
         'peak_type': 'Gaussian', 
-        'plot_type': 'Absorbance', 
+        'plot_type': 'Absorbance',
+        'voigt_mix': 0.5,        
     }
 
 
@@ -260,7 +259,7 @@ class NormalModes(ToolInstance):
         ir_layout.addRow("plot type:", self.plot_type)
         
         self.peak_type = QComboBox()
-        self.peak_type.addItems(['Gaussian', 'Lorentzian', 'Delta'])
+        self.peak_type.addItems(['Gaussian', 'Lorentzian', 'pseudo-Voigt', 'Delta'])
         ndx = self.peak_type.findText(self.settings.peak_type, Qt.MatchExactly)
         self.peak_type.setCurrentIndex(ndx)
         ir_layout.addRow("peak type:", self.peak_type)
@@ -274,6 +273,17 @@ class NormalModes(ToolInstance):
         
         self.fwhm.setEnabled(self.peak_type.currentText() != "Delta")
         self.peak_type.currentTextChanged.connect(lambda text, widget=self.fwhm: widget.setEnabled(text != "Delta"))
+        
+        self.voigt_mix = QDoubleSpinBox()
+        self.voigt_mix.setSingleStep(0.005)
+        self.voigt_mix.setDecimals(3)
+        self.voigt_mix.setRange(0, 1)
+        self.voigt_mix.setValue(self.settings.voigt_mix)
+        self.voigt_mix.setToolTip("fraction of pseudo-Voigt function that is Gaussian")
+        ir_layout.addRow("Voigt mixing:", self.voigt_mix)
+        
+        self.voigt_mix.setEnabled(self.peak_type.currentText() == "pseudo-Voigt")
+        self.peak_type.currentTextChanged.connect(lambda text, widget=self.voigt_mix: widget.setEnabled(text == "pseudo-Voigt"))
         
         show_plot = QPushButton("show plot")
         show_plot.clicked.connect(self.show_ir_plot)
@@ -558,13 +568,13 @@ class IRPlot(ChildToolWindow):
 
         toolbar_widget = QWidget()
         self.toolbar = NavigationToolbar(self.canvas, toolbar_widget)
-        self.toolbar.setMaximumHeight(24)
+        self.toolbar.setMaximumHeight(32)
         layout.addWidget(self.toolbar, 1, 1, 1, 1)
         
         refresh_button = QPushButton()
         refresh_button.setIcon(QIcon(refresh_button.style().standardIcon(QStyle.SP_BrowserReload)))
         refresh_button.clicked.connect(self.refresh_plot)
-        layout.addWidget(refresh_button, 1, 0, 1, 1, Qt.AlignTop)
+        layout.addWidget(refresh_button, 1, 0, 1, 1, Qt.AlignVCenter)
         
         #menu bar for saving stuff
         menu = QMenuBar()
@@ -674,6 +684,8 @@ class IRPlot(ChildToolWindow):
         self.tool_instance.settings.fwhm = fwhm
         self.tool_instance.settings.peak_type = self.tool_instance.peak_type.currentText()
         self.tool_instance.settings.plot_type = self.tool_instance.plot_type.currentText()
+        eta = self.tool_instance.voigt_mix.value()
+        self.tool_instance.settings.voigt_mix = eta
         frequencies = [freq.frequency for freq in fr.other['frequency'].data if freq.frequency > 0]
         intensities = [freq.intensity for freq in fr.other['frequency'].data if freq.frequency > 0]
         
@@ -685,10 +697,13 @@ class IRPlot(ChildToolWindow):
                     #make sure to get x values near the peak
                     #this makes the peaks look hi res, but we can cheap out
                     #on areas where there's no peak
-                    x_values.extend(np.linspace(max(freq - (5 * fwhm), 0), 
-                                                freq + (5 * fwhm), 
-                                                num=100).tolist()
-                                    )
+                    x_values.extend(
+                        np.linspace(
+                            max(freq - (3.5 * fwhm), 0), 
+                            freq + (3.5 * fwhm), 
+                            num=20
+                        ).tolist()
+                    )
                     x_values.append(freq)
                     if self.tool_instance.peak_type.currentText() == "Gaussian":
                         functions.append(lambda x, x0=freq, inten=intensity, w=fwhm: \
@@ -697,6 +712,16 @@ class IRPlot(ChildToolWindow):
                     elif self.tool_instance.peak_type.currentText() == "Lorentzian":
                         functions.append(lambda x, x0=freq, inten=intensity, w=fwhm, : \
                                         inten * 0.5 * (0.5 * w / ((x - x0)**2 + (0.5 * w)**2)))
+                    
+                    elif self.tool_instance.peak_type.currentText() == "pseudo-Voigt":
+                        functions.append(
+                            lambda x, x0=freq, inten=intensity, w=fwhm, :
+                                inten * (
+                                    (1 - eta) * 0.5 * (0.5 * w / ((x - x0)**2 + (0.5 * w)**2)) + 
+                                    eta * np.exp(-4*np.log(2) * (x - x0)**2 / w**2)
+                                )
+                        )
+    
         
             x_values = list(set(x_values))
             #print(len(x_values), len(functions))
@@ -735,12 +760,12 @@ class IRPlot(ChildToolWindow):
             ax.plot(x_values, y_values, color='k', linewidth=0.5)
         else:
             if self.tool_instance.plot_type.currentText() == "Transmittance":
-                ax.vlines(x_values, y_values, [100 for y in y_values], linewidth=0.5)
-                ax.hlines(100, 0, max(4000, *frequencies), linewidth=0.5)
+                ax.vlines(x_values, y_values, [100 for y in y_values], linewidth=0.5, colors=['k' for x in x_values])
+                ax.hlines(100, 0, max(4000, *frequencies), linewidth=0.5, colors=['k' for y in y_values])
             
             else:
-                ax.vlines(x_values, [0 for y in y_values], y_values, linewidth=0.5)
-                ax.hlines(0, 0, max(4000, *frequencies), linewidth=0.5)
+                ax.vlines(x_values, [0 for y in y_values], y_values, linewidth=0.5, colors=['k' for x in x_values])
+                ax.hlines(0, 0, max(4000, *frequencies), linewidth=0.5, colors=['k' for y in y_values])
 
         x_lim = ax.get_xlim()
         ax.set_xlim(max(x_lim), min(x_lim))

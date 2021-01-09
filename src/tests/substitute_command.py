@@ -15,7 +15,6 @@ class SubstituteCmdTest(TestWithSession):
 
     def test_substitute_modify(self):
         ref = ResidueCollection(self.chlorobiphenyl)
-        run(self.session, "close")
         
         run(self.session, "open %s" % self.benzene)
         run(self.session, "substitute #1/a:1@H5 substituent Cl minimize false")
@@ -24,11 +23,10 @@ class SubstituteCmdTest(TestWithSession):
         rescol = ResidueCollection(mdl)
         
         self.assertTrue(validate(ref, rescol))
-
+    
     def test_substitute_copy(self):
         ref1 = ResidueCollection(self.chlorobenzene)
         ref2 = ResidueCollection(self.chlorobiphenyl)
-        run(self.session, "close")
         
         run(self.session, "open %s" % self.benzene)
         run(self.session, "substitute #1/a:1@H5 substituent Cl minimize false modify false")
@@ -40,4 +38,4 @@ class SubstituteCmdTest(TestWithSession):
         
         self.assertTrue(validate(ref1, rescol1))
         self.assertTrue(validate(ref2, rescol2))
-
+    

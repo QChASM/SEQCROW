@@ -136,8 +136,10 @@
             </Providers>
             
             <Providers manager="test_manager">
-                <Provider name="substitute_command"/>
+                <Provider name="fuseRing_command"/>
+                <Provider name="input_builder"/>
                 <Provider name="normal_modes"/>
+                <Provider name="substitute_command"/>
             </Providers>
 
             <Classifiers>

@@ -611,7 +611,7 @@ class StericMap(ChildToolWindow):
         if include_vbur:
             ax.hlines(0, -radius, radius, color='k')
             ax.vlines(0, -radius, radius, color='k')
-            
+
             ax.text( 0.7 * radius,  0.9 * radius, "%.1f%%" % vbur[0])
             ax.text(-0.9 * radius,  0.9 * radius, "%.1f%%" % vbur[1])
             ax.text(-0.9 * radius, -0.9 * radius, "%.1f%%" % vbur[2])
@@ -627,5 +627,5 @@ class StericMap(ChildToolWindow):
         
         toolbar_widget = QWidget()
         toolbar = NavigationToolbar(canvas, toolbar_widget)
-        toolbar.setMaximumHeight(24)
+        toolbar.setMaximumHeight(32)
         self.layout.addWidget(toolbar)

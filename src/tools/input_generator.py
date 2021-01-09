@@ -3910,7 +3910,7 @@ class CurrentKWTable(QTableWidget):
     def __init__(self, origin, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.origin = origin
-        
+
     def dropEvent(self, event):
         other_table = event.source()
         if not isinstance(other_table, QTableWidget):
@@ -3936,7 +3936,7 @@ class CurrentOptTable(QTableWidget):
     def __init__(self, origin, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.origin = origin
-        
+
     def dropEvent(self, event):
         other_table = event.source()
         if not isinstance(other_table, QTableWidget):
@@ -5262,7 +5262,7 @@ class KeywordWidget(QWidget):
 
             return last_dict
 
- 
+
 class InputPreview(ChildToolWindow):
     """window showing input file"""
     def __init__(self, tool_instance, title, **kwargs):
