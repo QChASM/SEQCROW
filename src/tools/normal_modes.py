@@ -688,10 +688,11 @@ class IRPlot(ChildToolWindow):
         self.tool_instance.settings.voigt_mix = eta
         frequencies = [freq.frequency for freq in fr.other['frequency'].data if freq.frequency > 0]
         intensities = [freq.intensity for freq in fr.other['frequency'].data if freq.frequency > 0]
+        e_factor = -4 * np.log(2) / fwhm**2
         
         if self.tool_instance.peak_type.currentText() != "Delta":
             functions = []
-            x_values = np.linspace(0, max(frequencies) - 10 * fwhm, num=200).tolist()
+            x_values = np.linspace(0, max(frequencies) - 10 * fwhm, num=100).tolist()
             for freq, intensity in zip(frequencies, intensities):
                 if intensity is not None:
                     #make sure to get x values near the peak
@@ -701,32 +702,32 @@ class IRPlot(ChildToolWindow):
                         np.linspace(
                             max(freq - (3.5 * fwhm), 0), 
                             freq + (3.5 * fwhm), 
-                            num=20
+                            num=50
                         ).tolist()
                     )
                     x_values.append(freq)
                     if self.tool_instance.peak_type.currentText() == "Gaussian":
-                        functions.append(lambda x, x0=freq, inten=intensity, w=fwhm: \
-                                        inten * np.exp(-4*np.log(2) * (x - x0)**2 / w**2))
+                        functions.append(lambda x, x0=freq, inten=intensity: \
+                                        inten * np.exp(e_factor * (x - x0)**2))
     
                     elif self.tool_instance.peak_type.currentText() == "Lorentzian":
-                        functions.append(lambda x, x0=freq, inten=intensity, w=fwhm, : \
-                                        inten * 0.5 * (0.5 * w / ((x - x0)**2 + (0.5 * w)**2)))
+                        functions.append(lambda x, x0=freq, inten=intensity, : \
+                                        inten * 0.5 * (0.5 * fwhm / ((x - x0)**2 + (0.5 * fwhm)**2)))
                     
                     elif self.tool_instance.peak_type.currentText() == "pseudo-Voigt":
                         functions.append(
-                            lambda x, x0=freq, inten=intensity, w=fwhm, :
+                            lambda x, x0=freq, inten=intensity:
                                 inten * (
-                                    (1 - eta) * 0.5 * (0.5 * w / ((x - x0)**2 + (0.5 * w)**2)) + 
-                                    eta * np.exp(-4*np.log(2) * (x - x0)**2 / w**2)
+                                    (1 - eta) * 0.5 * (0.5 * fwhm / ((x - x0)**2 + (0.5 * fwhm)**2)) + 
+                                    eta * np.exp(e_factor * (x - x0)**2)
                                 )
                         )
     
         
-            x_values = list(set(x_values))
+            x_values = np.array(list(set(x_values)))
             #print(len(x_values), len(functions))
             x_values.sort()
-            y_values = np.array([sum(f(x) for f in functions) for x in x_values])
+            y_values = np.sum([f(x_values) for f in functions], axis=0)
         
         else:
             x_values = []
@@ -750,7 +751,7 @@ class IRPlot(ChildToolWindow):
         self.highlighted_mode = None
 
         if self.tool_instance.plot_type.currentText() == "Transmittance":
-            y_values = np.array([10 ** (2 - 0.9*y) for y in y_values])
+            y_values = np.array([10 ** (2 - y) for y in y_values])
             ax.set_ylabel('transmittance (%)')
         else:
             ax.set_ylabel('absorbance (a.u.)')
