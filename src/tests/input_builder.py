@@ -4,7 +4,6 @@ from AaronTools.test import prefix, validate
 from AaronTools.theory import BasisSet, Basis
 from chimerax.core.commands import run
 from PySide2.QtCore import Qt
-from SEQCROW.tools import BuildQM
 from TestManager import TestWithSession
 
 
@@ -15,15 +14,9 @@ class QMInputBuilderToolTest(TestWithSession):
 
     def test_gaussian_opt(self):
         run(self.session, "open %s" % self.benzene)
-        run(self.session, "ui tool show \"Build QM Input\"")
         
-        for tool in self.session.tools.list():
-            if isinstance(tool, BuildQM):
-                qm_input_tool = tool
-                break
-        else:
-            # normal mode tool didn't open
-            self.assertTrue(False)
+        qm_input_tool = self.open_tool("Build QM Input")
+        self.assertTrue(bool(qm_input_tool))
         
         ndx = qm_input_tool.file_type.findText("Gaussian", Qt.MatchExactly)
         qm_input_tool.file_type.setCurrentIndex(ndx)
@@ -86,15 +79,9 @@ H     -2.52191    -3.27117     0.00170
 
     def test_gaussian_tm_sp(self):
         run(self.session, "open %s" % self.met_cat)
-        run(self.session, "ui tool show \"Build QM Input\"")
-        
-        for tool in self.session.tools.list():
-            if isinstance(tool, BuildQM):
-                qm_input_tool = tool
-                break
-        else:
-            # normal mode tool didn't open
-            self.assertTrue(False)
+
+        qm_input_tool = self.open_tool("Build QM Input")
+        self.assertTrue(bool(qm_input_tool))
         
         ndx = qm_input_tool.file_type.findText("Gaussian", Qt.MatchExactly)
         qm_input_tool.file_type.setCurrentIndex(ndx)
@@ -265,15 +252,9 @@ SDD
 
     def test_orca_opt(self):
         run(self.session, "open %s" % self.benzene)
-        run(self.session, "ui tool show \"Build QM Input\"")
-        
-        for tool in self.session.tools.list():
-            if isinstance(tool, BuildQM):
-                qm_input_tool = tool
-                break
-        else:
-            # normal mode tool didn't open
-            self.assertTrue(False)
+
+        qm_input_tool = self.open_tool("Build QM Input")
+        self.assertTrue(bool(qm_input_tool))
         
         ndx = qm_input_tool.file_type.findText("ORCA", Qt.MatchExactly)
         qm_input_tool.file_type.setCurrentIndex(ndx)
@@ -333,15 +314,9 @@ H    -2.521911  -3.271171   0.001704
 
     def test_orca_numfreq(self):
         run(self.session, "open %s" % self.benzene)
-        run(self.session, "ui tool show \"Build QM Input\"")
-        
-        for tool in self.session.tools.list():
-            if isinstance(tool, BuildQM):
-                qm_input_tool = tool
-                break
-        else:
-            # normal mode tool didn't open
-            self.assertTrue(False)
+
+        qm_input_tool = self.open_tool("Build QM Input")
+        self.assertTrue(bool(qm_input_tool))
         
         ndx = qm_input_tool.file_type.findText("ORCA", Qt.MatchExactly)
         qm_input_tool.file_type.setCurrentIndex(ndx)
@@ -406,15 +381,9 @@ H    -2.521911  -3.271171   0.001704
 
     def test_psi4_opt(self):
         run(self.session, "open %s" % self.benzene)
-        run(self.session, "ui tool show \"Build QM Input\"")
-        
-        for tool in self.session.tools.list():
-            if isinstance(tool, BuildQM):
-                qm_input_tool = tool
-                break
-        else:
-            # normal mode tool didn't open
-            self.assertTrue(False)
+
+        qm_input_tool = self.open_tool("Build QM Input")
+        self.assertTrue(bool(qm_input_tool))
         
         ndx = qm_input_tool.file_type.findText("Psi4", Qt.MatchExactly)
         qm_input_tool.file_type.setCurrentIndex(ndx)
@@ -476,15 +445,9 @@ nrg = optimize('HF')
 
     def test_psi4_sp(self):
         run(self.session, "open %s" % self.benzene)
-        run(self.session, "ui tool show \"Build QM Input\"")
-        
-        for tool in self.session.tools.list():
-            if isinstance(tool, BuildQM):
-                qm_input_tool = tool
-                break
-        else:
-            # normal mode tool didn't open
-            self.assertTrue(False)
+
+        qm_input_tool = self.open_tool("Build QM Input")
+        self.assertTrue(bool(qm_input_tool))
         
         ndx = qm_input_tool.file_type.findText("Psi4", Qt.MatchExactly)
         qm_input_tool.file_type.setCurrentIndex(ndx)

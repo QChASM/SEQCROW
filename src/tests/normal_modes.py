@@ -2,7 +2,6 @@ import os.path
 
 from AaronTools.test import prefix, validate
 from chimerax.core.commands import run
-from SEQCROW.tools import NormalModes
 from TestManager import TestWithSession
 
 
@@ -12,15 +11,9 @@ class NormalModesToolTest(TestWithSession):
 
     def test_show_vec(self):
         run(self.session, "open %s" % self.formaldehyde)
-        run(self.session, "ui tool show \"Visualize Normal Modes\"")
         
-        for tool in self.session.tools.list():
-            if isinstance(tool, NormalModes):
-                normal_mode_tool = tool
-                break
-        else:
-            # normal mode tool didn't open
-            self.assertTrue(False)
+        normal_mode_tool = self.open_tool("Visualize Normal Modes")
+        self.assertTrue(bool(normal_mode_tool))
         
         normal_mode_tool.show_vec_button.click()
         self.assertTrue(len(self.session.models.list()) == 2)
@@ -32,15 +25,9 @@ class NormalModesToolTest(TestWithSession):
 
     def test_show_anim(self):
         run(self.session, "open %s" % self.formaldehyde)
-        run(self.session, "ui tool show \"Visualize Normal Modes\"")
         
-        for tool in self.session.tools.list():
-            if isinstance(tool, NormalModes):
-                normal_mode_tool = tool
-                break
-        else:
-            # normal mode tool didn't open
-            self.assertTrue(False)
+        normal_mode_tool = self.open_tool("Visualize Normal Modes")
+        self.assertTrue(bool(normal_mode_tool))
         
         normal_mode_tool.show_anim_button.click()
         # no new models should be open

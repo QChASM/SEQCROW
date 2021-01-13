@@ -2,7 +2,7 @@ import numpy as np
 
 def apply_seqcrow_bse_lighting(session):
     view = session.main_view
-    view.set_background_color([1., 1., 1., 0])
+    # view.set_background_color([1., 1., 1., 0])
     view.silhouette.enabled = True
     
     lighting_profile = view.lighting
@@ -30,7 +30,7 @@ def seqcrow_bse(session, models=None, atoms=None):
     from chimerax.atomic import AtomicStructure, Atom, Bond
     from chimerax.atomic.colors import element_color
 
-    if atoms is None:
+    if models is None or atoms is None:
         apply_seqcrow_bse_lighting(session)
 
     if models is None:
@@ -85,9 +85,7 @@ def seqcrow_vdw(session, models=None, atoms=None):
     from chimerax.atomic import AtomicStructure, Atom
     from chimerax.atomic.colors import element_color
     
-
-
-    if atoms is None:
+    if models is None or atoms is None:
         apply_seqcrow_bse_lighting(session)
 
     if models is None:
@@ -157,7 +155,7 @@ def seqcrow_s(session, models=None, atoms=None):
     from chimerax.atomic import AtomicStructure, Atom, Bond
     from chimerax.atomic.colors import element_color
 
-    if atoms is None:
+    if models is None or atoms is None:
         apply_seqcrow_s_lighting(session)
 
     if models is None:
