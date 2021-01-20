@@ -135,7 +135,14 @@
             <Providers manager="save command">
                 <Provider name="XYZ file"/>
             </Providers>
-            
+
+            <Providers manager="test_manager">
+                <Provider name="fuseRing_command"/>
+                <Provider name="input_builder"/>
+                <Provider name="normal_modes"/>
+                <Provider name="substitute_command"/>
+            </Providers>
+
             <Classifiers>
                 <PythonClassifier>Development Status :: 2 - Pre-Alpha</PythonClassifier>
                 <PythonClassifier>License :: OSI Approved :: GNU General Public License v3 (GPLv3)</PythonClassifier>
@@ -222,8 +229,10 @@
 	   </Classifiers>
     
     <AdditionalPackages>
-        <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools">
-        </Package>
+        <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools"/>
+        <!--
+        <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
+        -->
     </AdditionalPackages>
 
     <DataFiles package="AaronTools">
@@ -238,5 +247,12 @@
         <DataFile>README.md</DataFile>
         <DataFile>LICENSE</DataFile>
     </DataFiles>
-	
+    
+    <!--
+    <DataFiles package="AaronTools.test">
+        <DataDir>test_files</DataDir>
+        <DataDir>ref_files</DataDir>
+    </DataFiles>
+    -->
+
 </BundleInfo>
