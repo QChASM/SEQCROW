@@ -37,10 +37,6 @@ class _SEQCROW_API(BundleAPI):
             os.environ['AARONLIB'] = seqcrow_settings.settings.AARONLIB
 
         session.seqcrow_settings = seqcrow_settings
-        
-        #XXX:
-        #initialize is called after init_manager 
-        session.seqcrow_job_manager.init_queue()
 
         #register selectors from the user's personal library
         for sub in Substituent.list():
@@ -58,9 +54,12 @@ class _SEQCROW_API(BundleAPI):
         open an AaronTools-readable structure (see AaronTools.fileIO.read_types)
         session     - chimerax Session 
         path        - str, path to file
-        format_name - str, file format (see setup.py)
-        coordsets   - bool, load as trajectory"""
+        format_name - str, file format
+        coordsets   - bool, load as trajectory
+        """
         from .io import open_aarontools
+        
+        session.logger.info("loading %s file" % format_name)
 
         return open_aarontools(session, path, format_name=format_name, coordsets=coordsets)
 
@@ -85,17 +84,17 @@ class _SEQCROW_API(BundleAPI):
             from .managers import FileReaderManager
             session.filereader_manager = FileReaderManager(session, name)
             return session.filereader_manager
-            
-        elif name == "seqcrow_ordered_selection_manager":
-            from SEQCROW.managers import OrderedSelectionManager
-            session.seqcrow_ordered_selection_manager = OrderedSelectionManager(session, name)
-            return session.seqcrow_ordered_selection_manager
-            
+
         elif name == "seqcrow_job_manager":
             from SEQCROW.managers import JobManager
             session.seqcrow_job_manager = JobManager(session, name)
             return session.seqcrow_job_manager
-            
+        
+        elif name == "seqcrow_ordered_selection_manager":
+            from SEQCROW.managers import OrderedSelectionManager
+            session.seqcrow_ordered_selection_manager = OrderedSelectionManager(session, name)
+            return session.seqcrow_ordered_selection_manager
+
         else:
             raise RuntimeError("manager named '%s' is unknown to SEQCROW" % name)
   
@@ -121,12 +120,13 @@ class _SEQCROW_API(BundleAPI):
                 tool = Sterimol(session, ti.name)
                 return tool
         
-        elif any(ti.name == name for name in ["Structure Modification", \
-                                            "Change Substituents", \
-                                            "Swap Transition Metal Ligands", \
-                                            "Fuse Ring", \
-                                            "Change Element", \
-                                            ]):
+        elif any(ti.name == name for name in [
+                "Structure Modification",
+                "Change Substituents",
+                "Swap Transition Metal Ligands",
+                "Fuse Ring",
+                "Change Element",
+        ]):
             from .tools import EditStructure
             for tool in session.tools.list():
                 if isinstance(tool, EditStructure):
@@ -203,10 +203,8 @@ class _SEQCROW_API(BundleAPI):
 
     @staticmethod
     def run_provider(session, name, mgr, **kw):
-        if mgr == session.open_command:
+        if mgr is session.open_command:
             from SEQCROW.io import open_aarontools
-            #TODO:
-            #make use of AaronTools' ability to read file-like objects
             
             if name == "Gaussian input file":
                 class Info(OpenerInfo):
@@ -229,7 +227,7 @@ class _SEQCROW_API(BundleAPI):
                         return {'coordsets': BoolArg}
                         
                 return Info()
-                            
+
             elif name == "ORCA output file":
                 class Info(OpenerInfo):
                     def open(self, session, data, file_name, **kw):
@@ -240,6 +238,7 @@ class _SEQCROW_API(BundleAPI):
                         return {'coordsets': BoolArg}
                         
                 return Info()
+                
             elif name == "Psi4 output file":
                 class Info(OpenerInfo):
                     def open(self, session, data, file_name, **kw):
@@ -250,7 +249,7 @@ class _SEQCROW_API(BundleAPI):
                         return {'coordsets': BoolArg}
                         
                 return Info()
-                                           
+
             elif name == "XYZ file":
                 class Info(OpenerInfo):
                     def open(self, session, data, file_name, **kw):
@@ -273,7 +272,7 @@ class _SEQCROW_API(BundleAPI):
                         
                 return Info()
                 
-        elif mgr == session.save_command:
+        elif mgr is session.save_command:
             from chimerax.save_command import SaverInfo
             from SEQCROW.io import save_aarontools
             
@@ -295,7 +294,24 @@ class _SEQCROW_API(BundleAPI):
                         return widget.options_string()
                         
                 return Info()
+        
+        elif mgr is session.test_manager:
+            if name == "fuseRing_command":
+                from .tests.fuseRing_command import FuseRingCmdTest
+                return FuseRingCmdTest
+                
+            elif name == "normal_modes":
+                from .tests.normal_modes import NormalModesToolTest
+                return NormalModesToolTest
 
+            elif name == "substitute_command":
+                from .tests.substitute_command import SubstituteCmdTest
+                return SubstituteCmdTest
+    
+            elif name == "input_builder":
+                from .tests.input_builder import QMInputBuilderToolTest
+                return QMInputBuilderToolTest
+    
     @staticmethod
     def register_command(bundle_info, command_info, logger):
         if command_info.name == "rmsdAlign":
@@ -340,12 +356,18 @@ class _SEQCROW_API(BundleAPI):
 
     @staticmethod
     def register_selector_menus(session):
+        from PyQt5.QtWidgets import QAction
+
         add_submenu = session.ui.main_window.add_select_submenu
         add_selector = session.ui.main_window.add_menu_selector
         substituent_menu = add_submenu(['Che&mistry'], 'Substituents')
         for sub in Substituent.list():
             if sub not in ELEMENTS and sub.isalnum():
                 add_selector(substituent_menu, sub, sub)
+        
+        mw = session.ui.main_window
+        structure_menu = add_submenu([], '&Structure')
+        structure_menu.addAction(QAction("Connected", mw))
 
     @staticmethod
     def get_class(name):
@@ -389,7 +411,6 @@ class _SEQCROW_API(BundleAPI):
     @staticmethod
     def finish(session, bundle_info):
         del session.filereader_manager
-        del session.seqcrow_ordered_selection_manager
         del session.seqcrow_job_manager
 
 bundle_api = _SEQCROW_API()

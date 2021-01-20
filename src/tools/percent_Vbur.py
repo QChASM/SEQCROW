@@ -44,6 +44,7 @@ class _VburSettings(Settings):
         "include_header": Value(True, BoolArg),
         "delimiter": "comma",
         "steric_map": False,
+        "use_scene": False,
         "num_pts": 100,
         "include_vbur": True,
         "map_shape": "circle", 
@@ -102,6 +103,7 @@ class PercentVolumeBuried(ToolInstance):
             "in the case of a single center, all atoms except the center is used"
         )
         calc_layout.addRow(set_ligand_atoms)
+        self.set_ligand_atoms = set_ligand_atoms
         
         self.radius = QDoubleSpinBox()
         self.radius.setValue(self.settings.center_radius)
@@ -178,6 +180,11 @@ class PercentVolumeBuried(ToolInstance):
         self.steric_map.setToolTip("produce a 2D projection of steric bulk\ncauses buried volume to be reported for individual quadrants")
         steric_map_layout.addRow("create steric map:", self.steric_map)
         
+        self.use_scene = QCheckBox()
+        self.use_scene.setChecked(self.settings.use_scene)
+        self.use_scene.setToolTip("steric map will use the orientation the molecule is displayed in")
+        steric_map_layout.addRow("use display orientation:", self.use_scene)
+        
         self.num_pts = QSpinBox()
         self.num_pts.setRange(25, 250)
         self.num_pts.setValue(self.settings.num_pts)
@@ -210,6 +217,9 @@ class PercentVolumeBuried(ToolInstance):
         self.map_max.setValue(self.settings.map_max)
         steric_map_layout.addRow("maximum value:", self.map_max)
         
+        self.use_scene.setEnabled(self.settings.steric_map)
+        self.steric_map.stateChanged.connect(lambda state, widget=self.use_scene: widget.setEnabled(state == Qt.Checked))
+
         self.num_pts.setEnabled(self.settings.steric_map)
         self.steric_map.stateChanged.connect(lambda state, widget=self.num_pts: widget.setEnabled(state == Qt.Checked))
         
@@ -285,6 +295,7 @@ class PercentVolumeBuried(ToolInstance):
         calc_vbur_button = QPushButton("calculate % buried volume for selected centers")
         calc_vbur_button.clicked.connect(self.calc_vbur)
         calc_layout.addRow(calc_vbur_button)
+        self.calc_vbur_button = calc_vbur_button
         
         remove_vbur_button = QPushButton("remove % buried volume visualizations")
         remove_vbur_button.clicked.connect(self.del_vbur)
@@ -309,6 +320,7 @@ class PercentVolumeBuried(ToolInstance):
         shortcut = QKeySequence(Qt.CTRL + Qt.Key_C)
         copy.setShortcut(shortcut)
         export.addAction(copy)
+        self.copy = copy
         
         save = QAction("&Save CSV...", self.tool_window.ui_area)
         save.triggered.connect(self.save_csv)
@@ -364,6 +376,7 @@ class PercentVolumeBuried(ToolInstance):
         semicolon.triggered.connect(lambda *args, action=space: action.setChecked(False))
 
         menu.setNativeMenuBar(False)
+        self._menu = menu
         layout.setMenuBar(menu)
         
         self.tool_window.ui_area.setLayout(layout)
@@ -407,6 +420,10 @@ class PercentVolumeBuried(ToolInstance):
         steric_map = self.steric_map.checkState() == Qt.Checked
         self.settings.steric_map = steric_map
         args["steric_map"] = steric_map
+        
+        use_scene = self.use_scene.checkState() == Qt.Checked
+        self.settings.use_scene = use_scene
+        args["use_scene"] = use_scene
         
         num_pts = self.num_pts.value()
         self.settings.num_pts = num_pts
@@ -607,7 +624,7 @@ class StericMap(ChildToolWindow):
         if include_vbur:
             ax.hlines(0, -radius, radius, color='k')
             ax.vlines(0, -radius, radius, color='k')
-            
+
             ax.text( 0.7 * radius,  0.9 * radius, "%.1f%%" % vbur[0])
             ax.text(-0.9 * radius,  0.9 * radius, "%.1f%%" % vbur[1])
             ax.text(-0.9 * radius, -0.9 * radius, "%.1f%%" % vbur[2])
@@ -623,5 +640,5 @@ class StericMap(ChildToolWindow):
         
         toolbar_widget = QWidget()
         toolbar = NavigationToolbar(canvas, toolbar_widget)
-        toolbar.setMaximumHeight(24)
+        toolbar.setMaximumHeight(32)
         self.layout.addWidget(toolbar)

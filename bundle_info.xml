@@ -1,10 +1,10 @@
-<BundleInfo name="SEQCROW" 
+<BundleInfo name="ChimeraX_SEQCROW" 
             customInit="true"
             minSessionVersion="3"
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="0.22a">
+            version="0.24b0">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -56,9 +56,11 @@
             <Dependencies>
                 <Dependency name="ChimeraX-Core" version="~=1.1"/>
                 <Dependency name="scipy"/>
-                <Dependency name="numpy"/>
                 <Dependency name="Send2Trash"/>
+				<!-- wait for numpy to fix fortran stuff in python 3.8
+                I've tried installing this with just gfortran on windows, but no luck
                 <Dependency name="stripy"/>
+				-->
             </Dependencies>
             
             <Categories>
@@ -202,6 +204,7 @@
                 <ChimeraXClassifier>ChimeraX :: Selector :: SiH3     :: Silyl substituent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: SuperMes :: Super Mesityl substituent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: tBu      :: tert-Butyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: connected :: fragment of current selection</ChimeraXClassifier>
 
                 <!--NOTE: this synopsis will not appear when `help <command>` is used-->
                 <ChimeraXClassifier>ChimeraX :: Command :: rmsdAlign           :: Structure Analysis :: Calculate RMSD between structures</ChimeraXClassifier>

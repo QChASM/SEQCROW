@@ -1,20 +1,61 @@
 from SEQCROW.widgets import FilereaderComboBox
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QRegularExpression
 from PyQt5.QtGui import QKeySequence, QClipboard
 from PyQt5.QtWidgets import QVBoxLayout, QTableWidget, QTableWidgetItem, \
                             QTabWidget, QHeaderView, QSizePolicy, QMenuBar, QAction, \
-                            QFileDialog, QApplication
+                            QFileDialog, QApplication, QLineEdit, QLabel
 
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.core.settings import Settings
 
+from AaronTools.theory import Theory
+from AaronTools.const import UNIT, PHYSICAL
+
+
+nrg_infos = [
+    "energy", 
+    "ZPVE", 
+    "enthalpy", 
+    "free_energy", 
+    "E_ZPVE",
+    "Electrostatics",
+    "Elst10,r",
+    "Exchange",
+    "Exch10",
+    "Exch10(S^2)",
+    "Induction",
+    "Ind20,r",
+    "Exch-Ind20,r",
+    "delta HF,r (2)",
+    "Dispersion",
+    "Disp20",
+    "Exch-Disp20",
+    "Disp20 (SS)",
+    "Disp20 (OS)",
+    "Exch-Disp20 (SS)",
+    "Exch-Disp20 (OS)",
+    "Total HF",
+    "Total SAPT0",
+    "Electrostatics sSAPT0",
+    "Exchange sSAPT0",
+    "Induction sSAPT0",
+    "Dispersion sSAPT0",
+    "Total sSAPT0",
+    "Alpha Orbital Energies",
+    "Beta Orbital Energies",
+]
+    
 
 class _InfoSettings(Settings):
     AUTO_SAVE = {
         "include_header": True,
         "delimiter": "tab",
+        "energy": "Hartree",
+        "mass": "kg",
+        "rot_const": "K",
+        "archive": False,
     }
    
    
@@ -48,6 +89,11 @@ class Info(ToolInstance):
         self.table.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
         layout.insertWidget(1, self.table, 1)
         
+        self.filter = QLineEdit()
+        self.filter.setPlaceholderText("filter data")
+        self.filter.textChanged.connect(self.apply_filter)
+        self.filter.setClearButtonEnabled(True)
+        layout.insertWidget(2, self.filter, 0)
         
         menu = QMenuBar()
         
@@ -57,6 +103,7 @@ class Info(ToolInstance):
         shortcut = QKeySequence(Qt.CTRL + Qt.Key_C)
         copy.setShortcut(shortcut)
         export.addAction(copy)
+        self.copy = copy
         
         save = QAction("&Save CSV...", self.tool_window.ui_area)
         save.triggered.connect(self.save_csv)
@@ -94,24 +141,78 @@ class Info(ToolInstance):
         add_header.setChecked(self.settings.include_header)
         add_header.triggered.connect(self.header_check)
         export.addAction(add_header)
-        
-        # comma.triggered.connect(lambda *args, action=tab: action.setChecked(False))
-        # comma.triggered.connect(lambda *args, action=space: action.setChecked(False))
-        # comma.triggered.connect(lambda *args, action=semicolon: action.setChecked(False))
-        
-        # tab.triggered.connect(lambda *args, action=comma: action.setChecked(False))
-        # tab.triggered.connect(lambda *args, action=space: action.setChecked(False))
+
         tab.triggered.connect(lambda *args, action=semicolon: action.setChecked(False))
-        
-        # space.triggered.connect(lambda *args, action=comma: action.setChecked(False))
-        # space.triggered.connect(lambda *args, action=tab: action.setChecked(False))
-        # space.triggered.connect(lambda *args, action=semicolon: action.setChecked(False))
-        
-        # semicolon.triggered.connect(lambda *args, action=comma: action.setChecked(False))
         semicolon.triggered.connect(lambda *args, action=tab: action.setChecked(False))
-        # semicolon.triggered.connect(lambda *args, action=space: action.setChecked(False))
+        
+        archive = QAction("Include archive if present", self.tool_window.ui_area, checkable=True)
+        archive.triggered.connect(lambda checked: setattr(self.settings, "archive", checked))
+        archive.triggered.connect(lambda *args: self.fill_table(self.file_selector.count() - 1))
+        archive.setChecked(self.settings.archive)
+        export.addAction(archive)
+        
+        unit = menu.addMenu("&Units")
+        
+        energy = unit.addMenu("energy")
+        hartree = QAction("Hartree", self.tool_window.ui_area, checkable=True)
+        hartree.setChecked(self.settings.energy == "Hartree")
+        kcal = QAction("kcal/mol", self.tool_window.ui_area, checkable=True)
+        kcal.setChecked(self.settings.energy == "kcal/mol")
+        kjoule = QAction("kJ/mol", self.tool_window.ui_area, checkable=True)
+        kjoule.setChecked(self.settings.energy == "kJ/mol")
+        energy.addAction(hartree)
+        energy.addAction(kcal)
+        energy.addAction(kjoule)
+
+        hartree.triggered.connect(lambda *args, val="Hartree": setattr(self.settings, "energy", val))
+        hartree.triggered.connect(lambda *args: self.fill_table(self.file_selector.count() - 1))
+        hartree.triggered.connect(lambda *args, action=kcal: action.setChecked(False))
+        hartree.triggered.connect(lambda *args, action=kjoule: action.setChecked(False))
+        
+        kcal.triggered.connect(lambda *args, val="kcal/mol": setattr(self.settings, "energy", val))
+        kcal.triggered.connect(lambda *args: self.fill_table(self.file_selector.count() - 1))
+        kcal.triggered.connect(lambda *args, action=hartree: action.setChecked(False))
+        kcal.triggered.connect(lambda *args, action=kjoule: action.setChecked(False))
+        
+        kjoule.triggered.connect(lambda *args, val="kJ/mol": setattr(self.settings, "energy", val))
+        kjoule.triggered.connect(lambda *args: self.fill_table(self.file_selector.count() - 1))
+        kjoule.triggered.connect(lambda *args, action=hartree: action.setChecked(False))
+        kjoule.triggered.connect(lambda *args, action=kcal: action.setChecked(False))
+
+        mass = unit.addMenu("mass")
+        kg = QAction("kg", self.tool_window.ui_area, checkable=True)
+        kg.setChecked(self.settings.mass == "kg")
+        amu = QAction("Da", self.tool_window.ui_area, checkable=True)
+        amu.setChecked(self.settings.mass == "Da")
+        mass.addAction(kg)
+        mass.addAction(amu)
+
+        kg.triggered.connect(lambda *args, val="kg": setattr(self.settings, "mass", val))
+        kg.triggered.connect(lambda *args: self.fill_table(self.file_selector.count() - 1))
+        kg.triggered.connect(lambda *args, action=amu: action.setChecked(False))
+
+        amu.triggered.connect(lambda *args, val="Da": setattr(self.settings, "mass", val))
+        amu.triggered.connect(lambda *args: self.fill_table(self.file_selector.count() - 1))
+        amu.triggered.connect(lambda *args, action=kg: action.setChecked(False))
+
+        rot_const = unit.addMenu("rotational constants")
+        temperature = QAction("K", self.tool_window.ui_area, checkable=True)
+        temperature.setChecked(self.settings.rot_const == "K")
+        hertz = QAction("GHz", self.tool_window.ui_area, checkable=True)
+        hertz.setChecked(self.settings.rot_const == "GHz")
+        rot_const.addAction(temperature)
+        rot_const.addAction(hertz)
+
+        temperature.triggered.connect(lambda *args, val="K": setattr(self.settings, "rot_const", val))
+        temperature.triggered.connect(lambda *args: self.fill_table(self.file_selector.count() - 1))
+        temperature.triggered.connect(lambda *args, action=hertz: action.setChecked(False))
+
+        hertz.triggered.connect(lambda *args, val="GHz": setattr(self.settings, "rot_const", val))
+        hertz.triggered.connect(lambda *args: self.fill_table(self.file_selector.count() - 1))
+        hertz.triggered.connect(lambda *args, action=temperature: action.setChecked(False))
 
         menu.setNativeMenuBar(False)
+        self._menu = menu
         layout.setMenuBar(menu)
 
 
@@ -146,7 +247,16 @@ class Info(ToolInstance):
             s = ""
         
         for i in range(0, self.table.rowCount()):
-            s += delim.join([item.data(Qt.DisplayRole) for item in [self.table.item(i, j) for j in range(0, 2)]])
+            if self.table.isRowHidden(i):
+                continue
+            s += delim.join(
+                [
+                    item.text().replace("<sub>", "").replace("</sub>", "") for item in [
+                        self.table.item(i, j) if self.table.item(i, j) is not None 
+                        else self.table.cellWidget(i, j) for j in range(0, 2)
+                    ]
+                ]
+            )
             s += "\n"
         
         return s
@@ -176,43 +286,159 @@ class Info(ToolInstance):
             return
         
         fr = self.file_selector.currentData()
+        item = QTableWidgetItem()
+        item.setData(Qt.DisplayRole, "name")
+        val = QTableWidgetItem()
+        val.setData(Qt.DisplayRole, fr.name)
+        self.table.insertRow(0)
+        self.table.setItem(0, 0, item)
+        self.table.setItem(0, 1, val)
         for info in fr.other.keys():
+            if info == "archive" and not self.settings.archive:
+                continue
+            
             if any(isinstance(fr.other[info], obj) for obj in [str, float, int]):
                 row = self.table.rowCount()
                 self.table.insertRow(row)
                 
                 item = QTableWidgetItem()
                 info_name = info.replace("_", " ")
+                val = fr.other[info]
                 if info == "mass":
-                    info_name += " (kg)"
+                    info_name += " (%s)" % self.settings.mass
+                    if self.settings.mass == "Da":
+                        val /= UNIT.AMU_TO_KG
+                
                 elif info == "temperature":
                     info_name += " (K)"
-                elif any(info == s for s in ["energy", "ZPVE", "enthalpy", "free_energy", "E_ZPVE"]):
-                    info_name += " (Hartree)"
-                item.setData(Qt.DisplayRole, info_name)
-                self.table.setItem(row, 0, item)
+                
+                elif (
+                        any(info == s for s in nrg_infos) or
+                        info.lower().endswith("energy") or
+                        info.startswith("E(")
+                ):
+                    if self.settings.energy == "Hartree":
+                        info_name += " (E<sub>h</sub>)"
+                    else:
+                        info_name += " (%s)" % self.settings.energy
+                    info_name = info_name.replace("orrelation", "orr.")
+                    info_name = info_name.replace("Same-spin", "SS")
+                    info_name = info_name.replace("Opposite-spin", "OS")
+                    if self.settings.energy == "kcal/mol":
+                        val *= UNIT.HART_TO_KCAL
+                    elif self.settings.energy == "kJ/mol":
+                        val *= 4.184 * UNIT.HART_TO_KCAL
+
+                    val = "%.6f" % val
+
+                self.table.setCellWidget(row, 0, QLabel(info_name))
                 
                 value = QTableWidgetItem()
-                val = str(fr.other[info])
+                val = str(val)
                 value.setData(Qt.DisplayRole, val)
                 self.table.setItem(row, 1, value)
             
+            elif isinstance(fr.other[info], Theory):
+                theory = fr.other[info]
+                if theory.method is not None:
+                    row = self.table.rowCount()
+                    self.table.insertRow(row)
+                    
+                    item = QTableWidgetItem()
+                    item.setData(Qt.DisplayRole, "method")
+                    self.table.setItem(row, 0, item)
+                    
+                    value = QTableWidgetItem()
+                    value.setData(Qt.DisplayRole, theory.method.name)
+                    self.table.setItem(row, 1, value)
+                
+                if theory.basis is not None:
+                    if theory.basis.basis:
+                        for basis in theory.basis.basis:
+                            row = self.table.rowCount()
+                            self.table.insertRow(row)
+                            
+                            item = QTableWidgetItem()
+                            if not basis.elements:
+                                item.setData(Qt.DisplayRole, "basis set")
+                            else:
+                                item.setData(Qt.DisplayRole, "basis for %s" % ", ".join(basis.elements))
+                            self.table.setItem(row, 0, item)
+                            
+                            value = QTableWidgetItem()
+                            value.setData(Qt.DisplayRole, basis.name)
+                            self.table.setItem(row, 1, value)
+
+                    if theory.basis.ecp:
+                        for ecp in theory.basis.ecp:
+                            row = self.table.rowCount()
+                            self.table.insertRow(row)
+                            
+                            item = QTableWidgetItem()
+                            if ecp.elements is None:
+                                item.setData(Qt.DisplayRole, "ECP")
+                            else:
+                                item.setData(Qt.DisplayRole, "ECP %s" % " ".join(ecp.elements))
+                            self.table.setItem(row, 0, item)
+                            
+                            value = QTableWidgetItem()
+                            value.setData(Qt.DisplayRole, ecp.name)
+                            self.table.setItem(row, 1, value)
+                    
             elif hasattr(fr.other[info], "__iter__") and all(isinstance(x, float) for x in fr.other[info]):
                 row = self.table.rowCount()
                 self.table.insertRow(row)
                 
                 item = QTableWidgetItem()
                 info_name = info.replace("_", " ")
+                vals = fr.other[info]
                 if info == "rotational_temperature":
-                    info_name += " (K)"
+                    info_name = "rotational constants (%s)" % self.settings.rot_const
+                    if self.settings.rot_const == "GHz":
+                        vals = [x * PHYSICAL.KB / (PHYSICAL.PLANCK * (10 ** 9)) for x in vals]
+                
                 item.setData(Qt.DisplayRole, info_name)
                 self.table.setItem(row, 0, item)
                 
                 value = QTableWidgetItem()
-                value.setData(Qt.DisplayRole, ", ".join(["%.4f" % x for x in fr.other[info]]))
+                value.setData(Qt.DisplayRole, ", ".join(["%.4f" % x for x in vals]))
                 self.table.setItem(row, 1, value)
+        
+        self.table.resizeColumnToContents(0)
+        self.table.resizeColumnToContents(1)
+        
+        self.apply_filter()
+    
+    def apply_filter(self, text=None):
+        if text is None:
+            text = self.filter.text()
+
+        if text:
+            text = text.replace("(", "\(")
+            text = text.replace(")", "\)")
+            m = QRegularExpression(text)
+            m.setPatternOptions(QRegularExpression.CaseInsensitiveOption)
+            if m.isValid():
+                m.optimize()
+                filter = lambda row_num: m.match(
+                    self.table.item(row_num, 0).text() if self.table.item(row_num, 0) is not None
+                    else self.table.cellWidget(row_num, 0).text().replace("<sub>", "").replace("</sub>", "")
+                ).hasMatch()
+            else:
+                return
+
+        else:
+            filter = lambda row: True
+            
+        for i in range(0, self.table.rowCount()):
+            self.table.setRowHidden(i, not filter(i))
     
     def delete(self):
         self.file_selector.deleteLater()
 
-        return super().delete()
+        return super().delete()    
+    
+    def close(self):
+        self.file_selector.deleteLater()
+
+        return super().close()

@@ -108,6 +108,7 @@ class EditStructure(ToolInstance):
         substitute_button = QPushButton("substitute current selection")
         substitute_button.clicked.connect(self.do_substitute)
         substitute_layout.addWidget(substitute_button, 5, 0, 1, 3, Qt.AlignTop)
+        self.substitute_button = substitute_button
         
         substitute_layout.setRowStretch(0, 0)
         substitute_layout.setRowStretch(1, 0)
@@ -145,6 +146,7 @@ class EditStructure(ToolInstance):
         maplig_button = QPushButton("swap ligand with selected coordinating atoms")
         maplig_button.clicked.connect(self.do_maplig)
         maplig_layout.addWidget(maplig_button, 2, 0, 1, 3, Qt.AlignTop)
+        self.maplig_button = maplig_button
 
         start_structure_button = QPushButton("place in:")
         self.lig_model_selector = ModelComboBox(self.session, addNew=True)
@@ -193,6 +195,7 @@ class EditStructure(ToolInstance):
         closering_button = QPushButton("put a ring on current selection")
         closering_button.clicked.connect(self.do_fusering)
         closering_layout.addWidget(closering_button, 3, 0, 1, 3, Qt.AlignTop)
+        self.closering_button = closering_button
 
         start_structure_button = QPushButton("place in:")
         self.ring_model_selector = ModelComboBox(self.session, addNew=True)
@@ -222,22 +225,23 @@ class EditStructure(ToolInstance):
         changeelement_layout.addRow("element:", self.element)
         
         self.vsepr = QComboBox()
-        self.vsepr.addItems(["do not change",               # 0
-                             "linear (1 bond)",             # 1
-                             "linear (2 bonds)",            # 2 
-                             "trigonal planar (2 bonds)",   # 3
-                             "tetrahedral (2 bonds)",       # 4 
-                             "trigonal planar",             # 5
-                             "tetrahedral (3 bonds)",       # 6
-                             "T-shaped",                    # 7
-                             "tetrahedral",                 # 8
-                             "sawhorse",                    # 9
-                             "square planar",               #10
-                             "trigonal bipyramidal",        #11
-                             "square pyramidal",            #12
-                             "octahedral",                  #13
-                            ]
-        )
+        self.vsepr.addItems([
+            "do not change",               # 0
+            "linear (1 bond)",             # 1
+            "linear (2 bonds)",            # 2 
+            "trigonal planar (2 bonds)",   # 3
+            "tetrahedral (2 bonds)",       # 4 
+            "trigonal planar",             # 5
+            "tetrahedral (3 bonds)",       # 6
+            "T-shaped",                    # 7
+            "tetrahedral",                 # 8
+            "sawhorse",                    # 9
+            "square planar",               #10
+            "trigonal bipyramidal",        #11
+            "square pyramidal",            #12
+            "octahedral",                  #13
+            
+        ])
         
         self.vsepr.setCurrentIndex(8)
         
@@ -257,6 +261,7 @@ class EditStructure(ToolInstance):
         change_element_button = QPushButton("change selected elements")
         change_element_button.clicked.connect(self.do_change_element)
         changeelement_layout.addRow(change_element_button)
+        self.change_element_button = change_element_button
 
         start_structure_button = QPushButton("place in:")
         self.model_selector = ModelComboBox(self.session, addNew=True)
@@ -323,10 +328,7 @@ class EditStructure(ToolInstance):
 
     def do_maplig(self):
         lignames = self.ligname.text()
-        selection = self.session.seqcrow_ordered_selection_manager.selection
-        sel = selected_atoms(self.session)
-        if len(sel) != len(selection) or not all(a in selection for a in sel) or not all(a in sel for a in selection):
-            selection = sel
+        selection = selected_atoms(self.session)
         
         if len(selection) < 1:
             raise RuntimeWarning("nothing selected")
@@ -619,7 +621,14 @@ class EditStructure(ToolInstance):
         self.lig_model_selector.deleteLater()
         self.model_selector.deleteLater()
 
-        return super().delete()
+        return super().delete()    
+    
+    def close(self):
+        self.ring_model_selector.deleteLater()
+        self.lig_model_selector.deleteLater()
+        self.model_selector.deleteLater()
+
+        return super().close()
     
 class SubstituentSelection(ChildToolWindow):
     def __init__(self, tool_instance, title, textBox=None, **kwargs):

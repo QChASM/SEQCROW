@@ -34,6 +34,7 @@ class JobManager(ProviderManager):
         self.unknown_status_jobs = []
         self.paused = False
         self._thread = None
+        self.initialized = False
         self.queue_dict = {}
 
         self.triggers = TriggerSet()
@@ -44,7 +45,6 @@ class JobManager(ProviderManager):
         self.triggers.add_trigger(JOB_QUEUED)
         self.triggers.add_handler(JOB_QUEUED, self.check_queue)
         self.triggers.add_handler(JOB_QUEUED, self.write_json)
-        # self.session.triggers.add_handler('app quit', self.write_json)
 
     def __setattr__(self, attr, val):
         if attr == "paused":
@@ -176,6 +176,8 @@ class JobManager(ProviderManager):
             if self.paused:
                 self.session.logger.warning("SEQCROW's queue has been paused because a local job was running when ChimeraX was closed. The queue can be resumed with SEQCROW's job manager tool")
 
+        self.initialized = True
+
     def write_json(self, *args, **kwargs):
         """updates the list of cached jobs"""
         d = {'finished':[], 'queued':[], 'check':[], 'error':[], 'killed':[]}
@@ -199,6 +201,9 @@ class JobManager(ProviderManager):
                 d['killed'].append(job.get_json())
 
         d['job_running'] = job_running
+
+        if not self.initialized:
+            self.init_queue()
 
         #check if SEQCROW scratch directory exists before trying to write json
         if not os.path.exists(os.path.dirname(self.jobs_list_filename)):
@@ -230,22 +235,27 @@ class JobManager(ProviderManager):
                 if 'finished' not in fr.other or not fr.other['finished']:
                     job.error = True
 
-        if job.auto_update and (job.theory.geometry.chix_atomicstructure is not None and not job.theory.geometry.chix_atomicstructure.deleted):
+        if job.auto_update and (
+                job.theory.geometry.chix_atomicstructure is not None and
+                not job.theory.geometry.chix_atomicstructure.deleted
+        ):
             if os.path.exists(job.output_name):
                 finfo = job.output_name
-                if isinstance(job, GaussianJob):
-                    finfo = (job.output_name, "log", None)
-                elif isinstance(job, ORCAJob):
-                    finfo = (job.output_name, "out", None)
-                elif isinstance(job, Psi4Job):
-                    finfo = (job.output_name, "dat", None)
+                try:
+                    finfo = (job.output_name, job.format_name, None)
 
-                fr = FileReader(finfo, get_all=True, just_geom=False)
-                if len(fr.atoms) > 0:
-                    job.session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([job.theory.geometry.chix_atomicstructure], [fr]))
-    
-                    rescol = ResidueCollection(fr)
-                    rescol.update_chix(job.theory.geometry.chix_atomicstructure)
+                    fr = FileReader(finfo, get_all=True, just_geom=False)
+                    if len(fr.atoms) > 0:
+                        job.session.filereader_manager.triggers.activate_trigger(
+                            ADD_FILEREADER, 
+                            ([job.theory.geometry.chix_atomicstructure], [fr])
+                        )
+        
+                        rescol = ResidueCollection(fr)
+                        rescol.update_chix(job.theory.geometry.chix_atomicstructure)
+                
+                except:
+                    job.update_structure()
 
             if fr.all_geom is not None and len(fr.all_geom) > 1:
                 coordsets = rescol.all_geom_coordsets(fr)
@@ -258,18 +268,21 @@ class JobManager(ProviderManager):
                     
                     for atom, coord in zip(job.theory.geometry.chix_atomicstructure.atoms, coordset):
                         atom.coord = coord
-                
+
                 job.theory.geometry.chix_atomicstructure.active_coordset_id = job.theory.geometry.chix_atomicstructure.num_coordsets
 
         elif job.auto_open or job.auto_update:
             if hasattr(job, "output_name") and os.path.exists(job.output_name):
-                run(job.session, "open \"%s\" coordsets true" % job.output_name)
+                if job.format_name:
+                    run(job.session, "open \"%s\" coordsets true format %s" % (job.output_name, job.format_name))
+                else:
+                    run(job.session, "open \"%s\" coordsets true" % job.output_name)
             else:
                 self.session.logger.error("could not open output of %s" % repr(job))
-            
+
         self.triggers.activate_trigger(JOB_QUEUED, trigger_name)
         pass
-    
+
     def job_started(self, trigger_name, job):
         """prints 'job started' notification to log"""
         job.session.logger.info("%s: %s" % (trigger_name, job))
@@ -277,6 +290,8 @@ class JobManager(ProviderManager):
     
     def add_job(self, job):
         """add job (LocalJob instance) to the queue"""
+        if not self.initialized:
+            self.init_queue()
         if isinstance(job, LocalJob):
             self.local_jobs.append(job)
             self.triggers.activate_trigger(JOB_QUEUED, job)

@@ -1,15 +1,19 @@
 import os
 import subprocess
-
-from PyQt5.QtCore import QThread, pyqtSignal
-
 from time import asctime, localtime
 
+from PyQt5.QtCore import QThread
+
 from SEQCROW.theory import SEQCROW_Theory
+
+from AaronTools.theory import Theory
+
 
 from sys import platform
 
 class LocalJob(QThread):
+    format_name = None
+    """name of format for open command"""
     def __init__(self, name, session, theory, kw_dict={}, auto_update=False, auto_open=False):
         """base class of local ORCA, Gaussian, and Psi4 jobs
         name        str - name of job
@@ -56,6 +60,7 @@ class LocalJob(QThread):
 
 
 class ORCAJob(LocalJob):
+    format_name = "out"
     def __repr__(self):
         return "local ORCA job \"%s\"" % self.name
 
@@ -63,9 +68,9 @@ class ORCAJob(LocalJob):
         self.start_time = asctime(localtime())
 
         self.scratch_dir = os.path.join(
-                        os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
-                        "%s %s" % (self.name, self.start_time.replace(':', '.')), \
-                    )
+            os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR),
+            "%s %s" % (self.name, self.start_time.replace(':', '.')),
+        )
 
         cwd = os.getcwd()
 
@@ -74,10 +79,11 @@ class ORCAJob(LocalJob):
 
         infile = self.name + '.inp'
         infile = infile.replace(' ', '_')
-        if isinstance(self.theory, SEQCROW_Theory):
-            self.theory.write_orca_input(fname=os.path.join(self.scratch_dir, infile), **self.kw_dict)
+        infile_path = os.path.join(self.scratch_dir, infile)
+        if isinstance(self.theory, Theory):
+            self.theory.geometry.write(theory=self.theory, outfile=infile_path, style="orca")
         else:
-            SEQCROW_Theory.orca_input_from_dict(self.theory, os.path.join(self.scratch_dir, infile))
+            SEQCROW_Theory.orca_input_from_dict(self.theory, infile_path)
 
         executable = os.path.abspath(self.session.seqcrow_settings.settings.ORCA_EXE)
         if not os.path.exists(executable):
@@ -110,8 +116,8 @@ class ORCAJob(LocalJob):
     def get_json(self):
         if self.start_time is None:
             #we don't need to keep the theory stuff around if the job has started
-            if isinstance(self.theory, SEQCROW_Theory):
-                d = self.theory.get_orca_json(**self.kw_dict)
+            if isinstance(self.theory, Theory):
+                d = SEQCROW_Theory.get_orca_json(self.theory, **self.kw_dict)
             else:
                 d = self.theory.copy()
         else:
@@ -131,6 +137,7 @@ class ORCAJob(LocalJob):
 
 
 class GaussianJob(LocalJob):
+    format_name = "log"
     def __repr__(self):
         return "local Gaussian job \"%s\"" % self.name
 
@@ -147,11 +154,16 @@ class GaussianJob(LocalJob):
         if not os.path.exists(self.scratch_dir):
             os.makedirs(self.scratch_dir)
 
-        infile = self.name + '.gjf'
-        if isinstance(self.theory, SEQCROW_Theory):
-            self.theory.write_gaussian_input(fname=os.path.join(self.scratch_dir, infile), **self.kw_dict)
+        if platform == "win32":
+            infile = self.name + '.gjf'
         else:
-            SEQCROW_Theory.gaussian_input_from_dict(self.theory, os.path.join(self.scratch_dir, infile))
+            infile = self.name + '.com'
+
+        infile_path = os.path.join(self.scratch_dir, infile)
+        if isinstance(self.theory, Theory):
+            self.theory.geometry.write(theory=self.theory, outfile=infile_path, style="gaussian")
+        else:
+            SEQCROW_Theory.gaussian_input_from_dict(self.theory, infile_path)
             
         executable = os.path.abspath(self.session.seqcrow_settings.settings.GAUSSIAN_EXE)
         if not os.path.exists(executable):
@@ -177,8 +189,8 @@ class GaussianJob(LocalJob):
     def get_json(self):
         if self.start_time is None:
             #we don't need to keep the theory stuff around if the job has started
-            if isinstance(self.theory, SEQCROW_Theory):
-                d = self.theory.get_gaussian_json(**self.kw_dict)
+            if isinstance(self.theory, Theory):
+                d = SEQCROW_Theory.get_gaussian_json(self.theory, **self.kw_dict)
             else:
                 d = self.theory.copy()
 
@@ -199,6 +211,7 @@ class GaussianJob(LocalJob):
 
 
 class Psi4Job(LocalJob):
+    format_name = "dat"
     def __repr__(self):
         return "local Psi4 job \"%s\"" % self.name
 
@@ -216,16 +229,17 @@ class Psi4Job(LocalJob):
             os.makedirs(self.scratch_dir)
 
         infile = self.name + '.in'
-        if isinstance(self.theory, SEQCROW_Theory):
-            self.theory.write_psi4_input(fname=os.path.join(self.scratch_dir, infile), **self.kw_dict)
+        infile_path = os.path.join(self.scratch_dir, infile)
+        if isinstance(self.theory, Theory):
+            self.theory.geometry.write(theory=self.theory, outfile=infile_path, style="psi4")
         else:
-            SEQCROW_Theory.psi4_input_from_dict(self.theory, os.path.join(self.scratch_dir, infile))
+            SEQCROW_Theory.psi4_input_from_dict(self.theory, infile_path)
 
         executable = os.path.abspath(self.session.seqcrow_settings.settings.PSI4_EXE)
         if not os.path.exists(executable):
             executable = self.session.seqcrow_settings.settings.PSI4_EXE
 
-        self.output_name = os.path.join(self.scratch_dir, self.name + '.dat')
+        self.output_name = os.path.join(self.scratch_dir, self.name + '.out')
 
         args = [executable, infile, self.output_name]
 
@@ -245,8 +259,8 @@ class Psi4Job(LocalJob):
     def get_json(self):
         if self.start_time is None:
             #we don't need to keep the theory stuff around if the job has started
-            if isinstance(self.theory, SEQCROW_Theory):
-                d = self.theory.get_psi4_json(**self.kw_dict)
+            if isinstance(self.theory, Theory):
+                d = SEQCROW_Theory.get_psi4_json(self.theory, **self.kw_dict)
             else:
                 d = self.theory.copy()
 

@@ -12,64 +12,68 @@ from AaronTools.utils.utils import rotation_matrix, fibonacci_sphere
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.finders import AtomSpec
 
-from scipy.spatial import distance_matrix
-
-import stripy
+from scipy.spatial import distance_matrix, ConvexHull
 
 
-vbur_description = CmdDesc(required=[("selection", ModelsArg)], \
-                               keyword=[("radii", EnumOf(["UMN", "Bondi"], 
-                                                         case_sensitive=False,
-                                                  ),
-                                        ),
-                                        ("radius", FloatArg), 
-                                        ("scale", FloatArg), 
-                                        ("method", EnumOf(["leb", "mc"], ["Lebedev", "Monte-Carlo"], 
-                                                         case_sensitive=False,
-                                                  ),
-                                        ),
-                                        ("radialPoints", EnumOf(["20", "32", "64", "75", "99", "127"])),                                        
-                                        ("angularPoints", EnumOf(["110", "194", "302", "590", "974", "1454", "2030", "2702", "5810"])),                                        
-                                        ("minimumIterations", IntArg), 
-                                        ("scale", FloatArg), 
-                                        ("onlyAtoms", AtomsArg), 
-                                        ("center", Or(AtomsArg, TupleOf(FloatArg, 3))), 
-                                        ("useCentroid", BoolArg), 
-                                        ("displaySphere", EnumOf(["free", "buried"])), 
-                                        ("pointSpacing", FloatArg), 
-                                        ("intersectionScale", FloatArg), 
-                                        ("palette", StringArg), 
-                                        
-                               ],
-                               synopsis="calculate volume buried by ligands around a center",
-                               url="https://github.com/QChASM/SEQCROW/wiki/Commands#percentVolumeBuried",
-                       )
+vbur_description = CmdDesc(
+    required=[("selection", ModelsArg)], \
+    keyword=[
+        (
+            "radii",
+            EnumOf(["UMN", "Bondi"], case_sensitive=False),
+        ),
+        ("radius", FloatArg), 
+        ("scale", FloatArg), 
+        (
+            "method", 
+            EnumOf(["leb", "mc"], ["Lebedev", "Monte-Carlo"], case_sensitive=False),
+        ),
+        ("radialPoints", EnumOf(["20", "32", "64", "75", "99", "127"])),                                        
+        ("angularPoints", EnumOf(["110", "194", "302", "590", "974", "1454", "2030", "2702", "5810"])),                                        
+        ("minimumIterations", IntArg), 
+        ("scale", FloatArg), 
+        ("onlyAtoms", AtomsArg), 
+        ("center", Or(AtomsArg, TupleOf(FloatArg, 3))), 
+        ("useCentroid", BoolArg), 
+        ("displaySphere", EnumOf(["free", "buried"])), 
+        ("pointSpacing", FloatArg), 
+        ("intersectionScale", FloatArg), 
+        ("palette", StringArg), 
+    ],
+    synopsis="calculate volume buried by ligands around a center",
+    url="https://github.com/QChASM/SEQCROW/wiki/Commands#percentVolumeBuried",
+)
 
-def percent_vbur(session, 
-                 selection, 
-                 radii="UMN", 
-                 radius=3.5, 
-                 scale=1.17, 
-                 method="Lebedev", 
-                 radialPoints=20, 
-                 angularPoints=1454, 
-                 minimumIterations=25,
-                 onlyAtoms=None,
-                 center=None,
-                 useCentroid=True,
-                 displaySphere=None,
-                 pointSpacing=0.075,
-                 intersectionScale=2,
-                 palette="rainbow",
-                 return_values=False,
-                 steric_map=False,
-                 num_pts=100,
-                 shape="circle",
+def percent_vbur(
+        session, 
+        selection, 
+        radii="UMN", 
+        radius=3.5, 
+        scale=1.17, 
+        method="Lebedev", 
+        radialPoints=20, 
+        angularPoints=1454, 
+        minimumIterations=25,
+        onlyAtoms=None,
+        center=None,
+        useCentroid=True,
+        displaySphere=None,
+        pointSpacing=0.075,
+        intersectionScale=2,
+        palette="rainbow",
+        return_values=False,
+        steric_map=False,
+        use_scene=False,
+        num_pts=100,
+        shape="circle",
 ):
     
     out = []
     
-    models = {model:[atom for atom in model.atoms if onlyAtoms is not None and atom in onlyAtoms] for model in selection if isinstance(model, AtomicStructure)}
+    models = {
+        model:[atom for atom in model.atoms if onlyAtoms is not None and atom in onlyAtoms]
+        for model in selection if isinstance(model, AtomicStructure)
+    }
     
     s = "<pre>model\tcenter\t%Vbur\n"
     
@@ -89,6 +93,14 @@ def percent_vbur(session,
             mdl_center = []
         
         rescol = ResidueCollection(model)
+        
+        if use_scene:
+            oop_vector = session.view.camera.get_position().axes()[2]
+            ip_vector = session.view.camera.get_position().axes()[1]
+        
+        else:
+            oop_vector = None
+            ip_vector = None
         
         if len(mdl_center) == 0:
             rescol.detect_components()
@@ -112,6 +124,8 @@ def percent_vbur(session,
                         center=c,
                         key_atoms=key_atoms,
                         radii=radii,
+                        oop_vector=oop_vector,
+                        ip_vector=ip_vector,
                         radius=radius,
                         return_basis=True,
                         num_pts=num_pts,
@@ -166,6 +180,7 @@ def percent_vbur(session,
                     model.add([mdl])
                     atomspec = mdl.atomspec
                     center_coords = rescol.COM(c)
+                    #XXX: the center will be wrong if the models are tiled
                     args = [
                         "color", "radial", atomspec,
                         "center", ",".join(["%.4f" % x for x in center_coords]),
@@ -191,6 +206,8 @@ def percent_vbur(session,
                     key_atoms=key_atoms,
                     radius=radius,
                     radii=radii,
+                    oop_vector=oop_vector,
+                    ip_vector=ip_vector,
                     return_basis=True,
                     num_pts=num_pts,
                     shape=shape,
@@ -253,6 +270,7 @@ def percent_vbur(session,
                     center_coords = rescol.COM(mdl_center)
                 else:
                     center_coords = mdl_center
+                #XXX: the center will be wrong if the models are tiled
                 args = [
                     "color", "radial", atomspec,
                     "center", ",".join(["%.4f" % x for x in center_coords]),
@@ -344,7 +362,7 @@ def vbur_vis(
     
     atom_dist = distance_matrix(coords, coords)
     
-    sphere = fibonacci_sphere(n=n_grid, radius=radius)
+    sphere = fibonacci_sphere(num=n_grid, radius=radius)
     
     # add points right where spheres intersect
     # this makes the intersections look less pokey
@@ -450,7 +468,7 @@ def vbur_vis(
         # then, if we have to remove a triangle involving one of these points later,
         # it won't leave a gap
         n_atom_grid = int(radius_list[i]**2 * n_grid / radius**2)
-        atom_sphere = fibonacci_sphere(radius=radius_list[i], n=n_atom_grid)
+        atom_sphere = fibonacci_sphere(radius=radius_list[i], num=n_atom_grid)
         n_atom_grid = len(atom_sphere)
         if len(atom_added_points[i]) > 0:
             remove_ndx = []
@@ -468,15 +486,11 @@ def vbur_vis(
             atom_sphere = np.array(atom_sphere)
             n_atom_grid = len(atom_sphere)
             atom_sphere = np.concatenate((atom_sphere, np.array(atom_added_points[i]) - coords[i]))
-    
-        # triangulation uses longitude and latitude
-        lat = np.arcsin(atom_sphere[:,2] / radius_list[i])
-        lon = np.arctan2(atom_sphere[:,1], atom_sphere[:,0])
-        
+
+        atom_hull = ConvexHull(atom_sphere / radius_list[i])
+        tri = atom_hull.simplices
+
         atom_sphere += coords[i]
-        
-        atom_tri = stripy.sTriangulation(lons=lon, lats=lat)
-        tri = atom_tri.simplices
         
         remove_v = []
         new_ndx = np.zeros(len(atom_sphere), dtype=int)
@@ -529,7 +543,7 @@ def vbur_vis(
                 new_t[j][k] = new_ndx[v]
   
         atom_sphere = np.array(atom_sphere)
-        norms = (atom_sphere - coords[i]) / radius_list[i]
+        norms = -(atom_sphere - coords[i]) / radius_list[i]
         
         triangles.extend(new_t + len(vertices))
         vertices.extend(atom_sphere)
@@ -554,13 +568,9 @@ def vbur_vis(
     n_sphere = len(sphere)
     sphere = np.concatenate((sphere, np.array(center_added_points)))
     
-    lat = np.arcsin(sphere[:,2] / radius)
-    lon = np.arctan2(sphere[:,1], sphere[:,0])
-    
+    center_hull = ConvexHull(sphere / radius)
     sphere += center_coords
-    
-    sphere_tri = stripy.sTriangulation(lons=lon, lats=lat)
-    tri = sphere_tri.simplices
+    tri = center_hull.simplices
     
     remove_v = []
     new_ndx = np.zeros(len(sphere), dtype=int)
@@ -611,6 +621,17 @@ def vbur_vis(
     triangles.extend(new_t + len(vertices))
     vertices.extend(sphere)
     normals.extend(norms)
+    
+    # the triangles need to be reordered so the points are 
+    # clockwise (or counterclockwise? i don't remember)
+    for i in range(0, len(triangles)):
+        t = triangles[i]
+        v1 = vertices[t[1]] - vertices[t[0]]
+        v2 = vertices[t[2]] - vertices[t[0]]
+        c = np.cross(v1, v2)
+        if np.dot(c, normals[t[0]]) < 0:
+            triangles[i] = t[::-1]
+    
     model.set_geometry(np.array(vertices), np.array(normals), np.array(triangles))
     
     return model
