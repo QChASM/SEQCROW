@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="0.24a0">
+            version="0.24">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -163,7 +163,7 @@
                 <ChimeraXClassifier>ChimeraX :: Tool :: Change Substituents            :: Structure Editing  :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Swap Transition Metal Ligands  :: Structure Editing  :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Fuse Ring                      :: Structure Editing  :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Browse AaronTools Libraries    :: AaronTools         :: Browse the AaronTools ligand, substituent, and ring libraries"</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Browse AaronTools Libraries    :: AaronTools         :: Browse the AaronTools ligand, substituent, and ring libraries</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Process QM Thermochemistry     :: AaronTools         :: Compute the free energy of a molecule with frequency data</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Managed Models                 :: SEQCROW            :: see models managed by SEQCROW</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Add to Personal Library        :: AaronTools         :: Add to your personal ligand, substituent, and ring libraries</ChimeraXClassifier>

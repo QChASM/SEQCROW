@@ -27,13 +27,17 @@ class _FauxAtomSelection:
         self.bonds = bonds
 
 
-def fromChimAtom(atom=None, *args, serial_number=None, atomspec=None, **kwargs):
+def fromChimAtom(atom=None, *args, use_scene=False, serial_number=None, atomspec=None, **kwargs):
     """get AaronTools Atom object from ChimeraX Atom"""
+    if use_scene:
+        coords = atom.scene_coord
+    else:
+        coords = atom.coord
     aarontools_atom = Atom(
         *args,
         name=str(atom.serial_number),
         element=atom.element.name,
-        coords=atom.coord,
+        coords=coords,
         **kwargs
     )
     
@@ -50,12 +54,21 @@ class Residue(Geometry):
     resnum      - same as chimerax Residue.number
     name        - same as chimerax Residue.name
     """
-    def __init__(self, geom, resnum=None, atomspec=None, chain_id=None, name=None, **kwargs):      
+    def __init__(
+            self,
+            geom,
+            resnum=None,
+            atomspec=None,
+            chain_id=None,
+            name=None,
+            use_scene=False,
+            **kwargs
+    ):      
         if isinstance(geom, ChimeraResidue):
             aaron_atoms = []
             for atom in geom.atoms:
                 if not atom.deleted:                      
-                    aaron_atom = fromChimAtom(atom=atom)
+                    aaron_atom = fromChimAtom(atom=atom, use_scene=use_scene)
                     aaron_atoms.append(aaron_atom)
             
             self.chix_residue = geom
@@ -262,7 +275,7 @@ class Residue(Geometry):
 
 class ResidueCollection(Geometry):
     """geometry object used for SEQCROW to easily convert to AaronTools but keep residue info"""
-    def __init__(self, molecule, convert_residues=None, bonds_matter=True, **kwargs):
+    def __init__(self, molecule, convert_residues=None, bonds_matter=True, use_scene=False, **kwargs):
         """molecule       - chimerax AtomicStructure or AaronTools Geometry (for easy compatibility stuff)
         convert_residues  - None to convert everything or [chimerax.atomic.Residue] to convert only specific residues
                             this only applies to chimerax AtomicStructures
@@ -283,6 +296,7 @@ class ResidueCollection(Geometry):
                 new_res = Residue(
                     residue,
                     comment=molecule.comment if hasattr(molecule, "comment") else None,
+                    use_scene=use_scene,
                 )
                 
                 self.residues.append(new_res)

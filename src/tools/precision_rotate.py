@@ -66,7 +66,7 @@ class PrecisionRotate(ToolInstance):
         layout.addWidget(QLabel("rotation vector:"), 1, 0, 1, 1, Qt.AlignLeft | Qt.AlignVCenter)
         
         self.vector_option = QComboBox()
-        self.vector_option.addItems(["axis", "bond", "perpendicular to plane", "centroid of atoms", "custom"])
+        self.vector_option.addItems(["axis", "view axis", "bond", "perpendicular to plane", "centroid of atoms", "custom"])
         layout.addWidget(self.vector_option, 1, 1, 1, 1, Qt.AlignVCenter)
         
         vector = QWidget()
@@ -87,6 +87,12 @@ class PrecisionRotate(ToolInstance):
         layout.addWidget(vector, 1, 2, 1, 1, Qt.AlignTop)
         vector.setVisible(self.vector_option.currentText() == "custom")
         self.vector_option.currentTextChanged.connect(lambda text, widget=vector: widget.setVisible(text == "custom"))
+        
+        self.view_axis = QComboBox()
+        self.view_axis.addItems(["z", "y", "x"])
+        layout.addWidget(self.view_axis, 1, 2, 1, 1, Qt.AlignTop)
+        self.view_axis.setVisible(self.vector_option.currentText() == "view axis")
+        self.vector_option.currentTextChanged.connect(lambda text, widget=self.view_axis: widget.setVisible(text == "view axis"))
         
         self.axis = QComboBox()
         self.axis.addItems(["z", "y", "x"])
@@ -142,6 +148,7 @@ class PrecisionRotate(ToolInstance):
         self.set_cor_selection.clicked.connect(self.show_rot_vec)
         self.vector_option.currentIndexChanged.connect(self.show_rot_vec)
         self.axis.currentIndexChanged.connect(self.show_rot_vec)
+        self.view_axis.currentIndexChanged.connect(self.show_rot_vec)
         self.bond_button.clicked.connect(self.show_rot_vec)
         self.perp_button.clicked.connect(self.show_rot_vec)
         self.group_button.clicked.connect(self.show_rot_vec)
@@ -187,7 +194,7 @@ class PrecisionRotate(ToolInstance):
                 self.status_bar.showMessage("center set to centroid of rotating atoms")
 
         elif self.cor_button.currentText() == "select atoms":
-            self.status_bar.showMessage("center set to centroid of selected atoms")
+            self.status_bar.showMessage("center set to centroid of specified atoms")
         
         else:
             self.status_bar.showMessage("center set to view's center of rotation")
@@ -272,6 +279,14 @@ class PrecisionRotate(ToolInstance):
                 vector = np.array([0., 1., 0.])            
             elif self.axis.currentText() == "x":
                 vector = np.array([1., 0., 0.])
+        
+        elif self.vector_option.currentText() == "view axis":
+            if self.view_axis.currentText() == "z":
+                vector = self.session.view.camera.get_position().axes()[2]
+            elif self.view_axis.currentText() == "y":
+                vector = self.session.view.camera.get_position().axes()[1]       
+            elif self.view_axis.currentText() == "x":
+                vector = self.session.view.camera.get_position().axes()[0]
         
         elif self.vector_option.currentText() == "bond":
             vector = self.bonds
@@ -379,6 +394,14 @@ class PrecisionRotate(ToolInstance):
             elif self.axis.currentText() == "x":
                 vector = np.array([1., 0., 0.])
         
+        elif self.vector_option.currentText() == "view axis":
+            if self.view_axis.currentText() == "z":
+                vector = self.session.view.camera.get_position().axes()[2]
+            elif self.view_axis.currentText() == "y":
+                vector = self.session.view.camera.get_position().axes()[1]       
+            elif self.view_axis.currentText() == "x":
+                vector = self.session.view.camera.get_position().axes()[0]
+
         elif self.vector_option.currentText() == "bond":
             vector = self.bonds
         

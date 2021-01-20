@@ -126,7 +126,7 @@ def seqcrow_vdw(session, models=None, atoms=None):
 
 def apply_seqcrow_s_lighting(session):
     view = session.main_view
-    view.set_background_color([1., 1., 1., 0])
+    # view.set_background_color([1., 1., 1., 0])
     view.silhouette.enabled = True
 
     lighting_profile = view.lighting

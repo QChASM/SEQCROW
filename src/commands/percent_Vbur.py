@@ -15,59 +15,65 @@ from SEQCROW.finders import AtomSpec
 from scipy.spatial import distance_matrix, ConvexHull
 
 
-vbur_description = CmdDesc(required=[("selection", ModelsArg)], \
-                               keyword=[("radii", EnumOf(["UMN", "Bondi"], 
-                                                         case_sensitive=False,
-                                                  ),
-                                        ),
-                                        ("radius", FloatArg), 
-                                        ("scale", FloatArg), 
-                                        ("method", EnumOf(["leb", "mc"], ["Lebedev", "Monte-Carlo"], 
-                                                         case_sensitive=False,
-                                                  ),
-                                        ),
-                                        ("radialPoints", EnumOf(["20", "32", "64", "75", "99", "127"])),                                        
-                                        ("angularPoints", EnumOf(["110", "194", "302", "590", "974", "1454", "2030", "2702", "5810"])),                                        
-                                        ("minimumIterations", IntArg), 
-                                        ("scale", FloatArg), 
-                                        ("onlyAtoms", AtomsArg), 
-                                        ("center", Or(AtomsArg, TupleOf(FloatArg, 3))), 
-                                        ("useCentroid", BoolArg), 
-                                        ("displaySphere", EnumOf(["free", "buried"])), 
-                                        ("pointSpacing", FloatArg), 
-                                        ("intersectionScale", FloatArg), 
-                                        ("palette", StringArg), 
-                                        
-                               ],
-                               synopsis="calculate volume buried by ligands around a center",
-                               url="https://github.com/QChASM/SEQCROW/wiki/Commands#percentVolumeBuried",
-                       )
+vbur_description = CmdDesc(
+    required=[("selection", ModelsArg)], \
+    keyword=[
+        (
+            "radii",
+            EnumOf(["UMN", "Bondi"], case_sensitive=False),
+        ),
+        ("radius", FloatArg), 
+        ("scale", FloatArg), 
+        (
+            "method", 
+            EnumOf(["leb", "mc"], ["Lebedev", "Monte-Carlo"], case_sensitive=False),
+        ),
+        ("radialPoints", EnumOf(["20", "32", "64", "75", "99", "127"])),                                        
+        ("angularPoints", EnumOf(["110", "194", "302", "590", "974", "1454", "2030", "2702", "5810"])),                                        
+        ("minimumIterations", IntArg), 
+        ("scale", FloatArg), 
+        ("onlyAtoms", AtomsArg), 
+        ("center", Or(AtomsArg, TupleOf(FloatArg, 3))), 
+        ("useCentroid", BoolArg), 
+        ("displaySphere", EnumOf(["free", "buried"])), 
+        ("pointSpacing", FloatArg), 
+        ("intersectionScale", FloatArg), 
+        ("palette", StringArg), 
+    ],
+    synopsis="calculate volume buried by ligands around a center",
+    url="https://github.com/QChASM/SEQCROW/wiki/Commands#percentVolumeBuried",
+)
 
-def percent_vbur(session, 
-                 selection, 
-                 radii="UMN", 
-                 radius=3.5, 
-                 scale=1.17, 
-                 method="Lebedev", 
-                 radialPoints=20, 
-                 angularPoints=1454, 
-                 minimumIterations=25,
-                 onlyAtoms=None,
-                 center=None,
-                 useCentroid=True,
-                 displaySphere=None,
-                 pointSpacing=0.075,
-                 intersectionScale=2,
-                 palette="rainbow",
-                 return_values=False,
-                 steric_map=False,
-                 num_pts=100,
-                 shape="circle",
+def percent_vbur(
+        session, 
+        selection, 
+        radii="UMN", 
+        radius=3.5, 
+        scale=1.17, 
+        method="Lebedev", 
+        radialPoints=20, 
+        angularPoints=1454, 
+        minimumIterations=25,
+        onlyAtoms=None,
+        center=None,
+        useCentroid=True,
+        displaySphere=None,
+        pointSpacing=0.075,
+        intersectionScale=2,
+        palette="rainbow",
+        return_values=False,
+        steric_map=False,
+        use_scene=False,
+        num_pts=100,
+        shape="circle",
 ):
     
     out = []
     
-    models = {model:[atom for atom in model.atoms if onlyAtoms is not None and atom in onlyAtoms] for model in selection if isinstance(model, AtomicStructure)}
+    models = {
+        model:[atom for atom in model.atoms if onlyAtoms is not None and atom in onlyAtoms]
+        for model in selection if isinstance(model, AtomicStructure)
+    }
     
     s = "<pre>model\tcenter\t%Vbur\n"
     
@@ -87,6 +93,14 @@ def percent_vbur(session,
             mdl_center = []
         
         rescol = ResidueCollection(model)
+        
+        if use_scene:
+            oop_vector = session.view.camera.get_position().axes()[2]
+            ip_vector = session.view.camera.get_position().axes()[1]
+        
+        else:
+            oop_vector = None
+            ip_vector = None
         
         if len(mdl_center) == 0:
             rescol.detect_components()
@@ -110,6 +124,8 @@ def percent_vbur(session,
                         center=c,
                         key_atoms=key_atoms,
                         radii=radii,
+                        oop_vector=oop_vector,
+                        ip_vector=ip_vector,
                         radius=radius,
                         return_basis=True,
                         num_pts=num_pts,
@@ -164,6 +180,7 @@ def percent_vbur(session,
                     model.add([mdl])
                     atomspec = mdl.atomspec
                     center_coords = rescol.COM(c)
+                    #XXX: the center will be wrong if the models are tiled
                     args = [
                         "color", "radial", atomspec,
                         "center", ",".join(["%.4f" % x for x in center_coords]),
@@ -189,6 +206,8 @@ def percent_vbur(session,
                     key_atoms=key_atoms,
                     radius=radius,
                     radii=radii,
+                    oop_vector=oop_vector,
+                    ip_vector=ip_vector,
                     return_basis=True,
                     num_pts=num_pts,
                     shape=shape,
@@ -251,6 +270,7 @@ def percent_vbur(session,
                     center_coords = rescol.COM(mdl_center)
                 else:
                     center_coords = mdl_center
+                #XXX: the center will be wrong if the models are tiled
                 args = [
                     "color", "radial", atomspec,
                     "center", ",".join(["%.4f" % x for x in center_coords]),
