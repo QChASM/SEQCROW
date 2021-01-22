@@ -13,6 +13,15 @@ More information about SEQCROW features can be found on the [GitHub wiki](https:
 4. Restart ChimeraX
 5. If you have a personal AaronTools library already, you can specify the path to it in the SEQCROW settings. Open ChimeraX and go Favorites &rarr; Settings... &rarr; SEQCROW. You will have to restart ChimeraX if you change this setting. 
 
+
+## Citation
+If you use SEQCROW, please cite the following:
+
+1. "QChASM: Quantum Chemistry Automation and Structure Manipulation" <a href="http://dx.doi.org/10.1002/wcms.1510" target="_blank"><i>WIREs Comp. Mol. Sci.</i> (in press, 2021)</a>
+
+2. SEQCROW, Anthony J. Schaefer and Steven E. Wheeler, University of Georgia (2020).
+
+
 ## Other Versions
 This is a plug-in for ChimeraX.
 
