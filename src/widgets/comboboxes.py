@@ -1,8 +1,8 @@
 from chimerax.core.models import ADD_MODELS, REMOVE_MODELS
 from chimerax.atomic import AtomicStructure
 
-from PySide2.QtCore import Qt
-from PySide2.QtWidgets import QComboBox
+from Qt.QtCore import Qt
+from Qt.QtWidgets import QComboBox
 
 from SEQCROW.managers import FILEREADER_REMOVED, FILEREADER_ADDED
 

@@ -9,9 +9,9 @@ from chimerax.core.commands.cli import FloatArg, BoolArg, StringArg, IntArg
 
 from numpy import isclose
 
-from PySide2.QtCore import Qt, QSize, Signal
-from PySide2.QtGui import QKeySequence, QClipboard, QIcon
-from PySide2.QtWidgets import QLabel, QGridLayout, QComboBox, QSplitter, QLineEdit, QDoubleSpinBox, \
+from Qt.QtCore import Qt, QSize, Signal
+from Qt.QtGui import QKeySequence, QClipboard, QIcon
+from Qt.QtWidgets import QLabel, QGridLayout, QComboBox, QSplitter, QLineEdit, QDoubleSpinBox, \
                             QMenuBar, QFileDialog, QAction, QApplication, QWidget, QGroupBox, QStatusBar, \
                             QTabWidget, QTreeWidget, QSizePolicy, QPushButton, QHeaderView, QHBoxLayout, \
                             QTreeWidgetItem, QStyle

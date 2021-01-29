@@ -8,8 +8,8 @@ from chimerax.core.settings import Settings
 from chimerax.core.generic3d import Generic3DModel 
 from chimerax.core.selection import SELECTION_CHANGED
 
-from PySide2.QtCore import Qt
-from PySide2.QtWidgets import QGridLayout, QFormLayout, QCheckBox, QPushButton, \
+from Qt.QtCore import Qt
+from Qt.QtWidgets import QGridLayout, QFormLayout, QCheckBox, QPushButton, \
                             QDoubleSpinBox, QWidget, QLabel, QStatusBar, QComboBox, \
                             QHBoxLayout
 

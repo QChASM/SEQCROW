@@ -3,7 +3,7 @@ import os.path
 from AaronTools.test import prefix, validate
 from AaronTools.theory import BasisSet, Basis
 from chimerax.core.commands import run
-from PySide2.QtCore import Qt
+from Qt.QtCore import Qt
 from TestManager import TestWithSession
 
 

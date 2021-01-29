@@ -12,8 +12,8 @@ from chimerax.core.commands import BoolArg, run
 
 from io import BytesIO
 
-from PySide2.QtCore import Qt
-from PySide2.QtWidgets import QLabel, QLineEdit, QGridLayout, QPushButton, QTabWidget, QComboBox, \
+from Qt.QtCore import Qt
+from Qt.QtWidgets import QLabel, QLineEdit, QGridLayout, QPushButton, QTabWidget, QComboBox, \
                             QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, \
                             QFormLayout, QCheckBox, QCompleter
 

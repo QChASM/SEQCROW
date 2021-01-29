@@ -8,8 +8,8 @@ from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
 from chimerax.core.commands import run, BoolArg, ColorArg, FloatArg, IntArg, TupleOf
 
-from PySide2.QtCore import Qt
-from PySide2.QtWidgets import QGridLayout, QFormLayout, QCheckBox, QTabWidget, QPushButton, \
+from Qt.QtCore import Qt
+from Qt.QtWidgets import QGridLayout, QFormLayout, QCheckBox, QTabWidget, QPushButton, \
                             QSpinBox, QDoubleSpinBox, QWidget
 
 from SEQCROW.utils import iter2str

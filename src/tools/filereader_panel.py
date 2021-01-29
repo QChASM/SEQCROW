@@ -9,8 +9,8 @@ from chimerax.std_commands.coordset_gui import CoordinateSetSlider
 
 from io import BytesIO
 
-from PySide2.QtCore import Qt
-from PySide2.QtWidgets import QLabel, QGridLayout, QPushButton, QTreeWidget, QWidget, QVBoxLayout, QTreeWidgetItem, QCheckBox
+from Qt.QtCore import Qt
+from Qt.QtWidgets import QLabel, QGridLayout, QPushButton, QTreeWidget, QWidget, QVBoxLayout, QTreeWidgetItem, QCheckBox
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.managers.filereader_manager import FILEREADER_CHANGE 

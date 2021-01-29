@@ -351,7 +351,7 @@ class _SEQCROW_API(BundleAPI):
 
     @staticmethod
     def register_selector_menus(session):
-        from PySide2.QtWidgets import QAction
+        from Qt.QtWidgets import QAction
 
         add_submenu = session.ui.main_window.add_select_submenu
         add_selector = session.ui.main_window.add_menu_selector

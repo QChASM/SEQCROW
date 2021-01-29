@@ -7,9 +7,9 @@ from chimerax.core.commands.cli import BoolArg
 from chimerax.core.settings import Settings
 from chimerax.core.generic3d import Generic3DModel 
 
-from PySide2.QtCore import Qt
-from PySide2.QtGui import QKeySequence, QClipboard
-from PySide2.QtWidgets import QPushButton, QFormLayout, QComboBox, QLineEdit, QLabel, QCheckBox, QMenuBar, QAction, \
+from Qt.QtCore import Qt
+from Qt.QtGui import QKeySequence, QClipboard
+from Qt.QtWidgets import QPushButton, QFormLayout, QComboBox, QLineEdit, QLabel, QCheckBox, QMenuBar, QAction, \
                             QFileDialog, QApplication, QTableWidget, QTableWidgetItem, QHeaderView
 
 from AaronTools.const import VDW_RADII, BONDI_RADII

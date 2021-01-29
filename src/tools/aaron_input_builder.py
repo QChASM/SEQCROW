@@ -9,9 +9,9 @@ from chimerax.core.models import ADD_MODELS, REMOVE_MODELS
 
 from json import dumps, loads, dump, load
 
-from PySide2.QtCore import Qt, QRegularExpression, Signal
-from PySide2.QtGui import QKeySequence, QFontMetrics, QFontDatabase, QClipboard, QIcon
-from PySide2.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, \
+from Qt.QtCore import Qt, QRegularExpression, Signal
+from Qt.QtGui import QKeySequence, QFontMetrics, QFontDatabase, QClipboard, QIcon
+from Qt.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, \
                             QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, \
                             QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, \
                             QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView, QTextBrowser, \

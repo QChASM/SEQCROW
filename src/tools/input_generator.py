@@ -10,14 +10,14 @@ from json import dumps, loads, dump, load
 
 from configparser import ConfigParser
 
-from PySide2.QtCore import Qt, QRegularExpression, Signal
-from PySide2.QtGui import QKeySequence, QFontMetrics, QFontDatabase, QClipboard, QIcon
-from PySide2.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, \
-                            QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, \
-                            QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, \
-                            QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView, QTextBrowser, \
-                            QStatusBar, QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem, QSizePolicy, \
-                            QToolBox, QStyle 
+from Qt.QtCore import Qt, QRegularExpression, Signal
+from Qt.QtGui import QKeySequence, QFontMetrics, QFontDatabase, QClipboard, QIcon
+from Qt.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, \
+                         QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, \
+                         QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, \
+                         QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView, QTextBrowser, \
+                         QStatusBar, QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem, QSizePolicy, \
+                         QStyle 
 
 from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.utils import iter2str
@@ -489,7 +489,7 @@ class BuildQM(ToolInstance):
         #run.addAction(remotely)
         
         menu.setNativeMenuBar(False)
-        # need to keep a reference to menu for PySide2 reasons...
+        # need to keep a reference to menu for Qt reasons...
         self._menu = menu
         layout.setMenuBar(menu)
 
@@ -5323,7 +5323,6 @@ class SavePreset(ChildToolWindow):
             self.tool_instance = tool_instance
 
             layout = QGridLayout(self)
-            #self.basis_box = QToolBox()
             self.basis_box = QTabWidget()
             layout.setContentsMargins(0, 0, 0, 0)
             layout.addWidget(self.basis_box)

@@ -9,8 +9,8 @@ from chimerax.core.commands.cli import FloatArg, TupleOf
 
 from io import BytesIO
 
-from PySide2 import QtWidgets, QtCore
-from PySide2.QtWidgets import QGridLayout, QPushButton, QCheckBox, QTabWidget, QWidget, QVBoxLayout
+from Qt import QtWidgets, QtCore
+from Qt.QtWidgets import QGridLayout, QPushButton, QCheckBox, QTabWidget, QWidget, QVBoxLayout
 
 from AaronTools.component import Component
 from AaronTools.ring import Ring

@@ -2,7 +2,7 @@ import os
 import subprocess
 from time import asctime, localtime
 
-from PySide2.QtCore import QThread, Signal
+from Qt.QtCore import QThread, Signal
 
 from SEQCROW.theory import SEQCROW_Theory
 

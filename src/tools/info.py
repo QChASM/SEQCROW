@@ -1,8 +1,8 @@
 from SEQCROW.widgets import FilereaderComboBox
 
-from PySide2.QtCore import Qt, QRegularExpression
-from PySide2.QtGui import QKeySequence, QClipboard
-from PySide2.QtWidgets import QVBoxLayout, QTableWidget, QTableWidgetItem, \
+from Qt.QtCore import Qt, QRegularExpression
+from Qt.QtGui import QKeySequence, QClipboard
+from Qt.QtWidgets import QVBoxLayout, QTableWidget, QTableWidgetItem, \
                             QTabWidget, QHeaderView, QSizePolicy, QMenuBar, QAction, \
                             QFileDialog, QApplication, QLineEdit, QLabel
 
