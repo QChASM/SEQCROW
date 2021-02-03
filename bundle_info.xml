@@ -140,6 +140,7 @@
                 <Provider name="input_builder"/>
                 <Provider name="normal_modes"/>
                 <Provider name="substitute_command"/>
+                <Provider name="buried_volume"/>
             </Providers>
 
             <Classifiers>

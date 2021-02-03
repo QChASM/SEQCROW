@@ -331,7 +331,12 @@ class Info(ToolInstance):
 
                     val = "%.6f" % val
 
-                self.table.setCellWidget(row, 0, QLabel(info_name))
+                if "<sub>" in info_name:
+                    self.table.setCellWidget(row, 0, QLabel(info_name))
+                else:
+                    item = QTableWidgetItem()
+                    item.setData(Qt.DisplayRole, info_name)
+                    self.table.setItem(row, 0, item)
                 
                 value = QTableWidgetItem()
                 val = str(val)

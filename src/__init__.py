@@ -306,6 +306,10 @@ class _SEQCROW_API(BundleAPI):
             elif name == "input_builder":
                 from .tests.input_builder import QMInputBuilderToolTest
                 return QMInputBuilderToolTest
+            
+            elif name == "buried_volume":
+                from .tests.buried_volume import BuriedVolumeToolTest
+                return BuriedVolumeToolTest
     
     @staticmethod
     def register_command(bundle_info, command_info, logger):
