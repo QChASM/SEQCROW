@@ -15,6 +15,7 @@ from AaronTools.const import AARONLIB
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.tools import key_atom_highlight, ghost_connection_highlight, show_walk_highlight
 from SEQCROW.selectors import register_selectors
+from SEQCROW.finders import AtomSpec
 
 from warnings import warn
 
@@ -145,7 +146,7 @@ class LibAdd(ToolInstance):
                         key_atoms.add(atom)
                         
         else:
-            key_atoms = rescol.find(",".join([atom.atomspec for atom in key_chix_atoms]))
+            key_atoms = rescol.find([AtomSpec(atom.atomspec) for atom in key_chix_atoms])
                         
         if len(key_atoms) < 1:
             raise RuntimeError("no key atoms could be determined")
@@ -190,8 +191,8 @@ class LibAdd(ToolInstance):
             raise RuntimeError("selected atoms must be on the same model")
           
         rescol = ResidueCollection(selection[0].structure)
-        walk_atoms = rescol.find(",".join([atom.atomspec for atom in selection]))
-                        
+        walk_atoms = rescol.find([AtomSpec(atom.atomspec) for atom in selection])
+
         if len(walk_atoms) < 1:
             raise RuntimeError("no walk direction could be determined")
         

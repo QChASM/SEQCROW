@@ -113,22 +113,12 @@ class _InputGeneratorSettings(Settings):
             ),
             StringArg
         ),
-        # just the blocks that are used by the tool
         'last_orca_options': Value(dumps({}), StringArg),
         'previous_psi4_options': Value(
             dumps(
                 {
                     PSI4_SETTINGS:{
                         'reference': ['rhf', 'rohf', 'uhf', 'cuhf', 'rks', 'uks'],
-                        'diag_method': [
-                            'rsp',
-                            'olsen',
-                            'mitrushenkov',
-                            'davidson',
-                            'sem'
-                        ],
-                        'ex_level': ['1', '2', '3'],
-                        'fci': ['true', 'false'],
                         'cubeprop_tasks': ["frontier_orbitals"],
                     },
                     PSI4_BEFORE_GEOM: [],
@@ -263,47 +253,6 @@ class _InputGeneratorSettings(Settings):
                             'elements':[]
                         },
                         "other": {},
-                    },
-                    "custom dft":{
-                        "opt":False,
-                        "ts":False,
-                        "freq":False,
-                        "semi-empirical":False,
-                        "method":'SCF',
-                        "grid":None,
-                        "disp":None,
-                        "basis": {
-                            'name':['def2-SVP'],
-                            'auxiliary':[None],
-                            'file':[False],
-                            'elements':['all']
-                        },
-                        "ecp": {
-                            'name':[],
-                            'file':[],
-                            'elements':[]
-                        },
-                        "other":{
-                            PSI4_BEFORE_GEOM: [ \
-                                "lol_idk = {\n" +
-                                #this is included as an example; it is not a tested DFT method
-                                "   \"name\": \"seqcrow_example\",\n" +
-                                "   \"x_methods\": {\"GGA_X_B88\": {\"alpha\": 0.580}},\n" +
-                                "   \"x_hf\": {\"alpha\": 0.420},\n" +
-                                "   \"c_methods\": {\"GGA_C_LYP\": {\"alpha\": 0.678}},\n" +
-                                "   \"dispersion\": {\n" +
-                                "       \"type\": \"d3bj\",\n" +
-                                "       \"params\": {\n" +
-                                "           \"s6\":  1.0000,\n" +
-                                "           \"s8\":  0.1337,\n" +
-                                "           \"a1\": -0.0789,\n" +
-                                "           \"a2\":  0.0091,\n" +
-                                "       }\n" +
-                                "   }\n" +
-                                "}\n",
-                            ],
-                            PSI4_JOB: {'energy':['dft_method=lol_idk']},
-                        },
                     },
                 }
             ),
