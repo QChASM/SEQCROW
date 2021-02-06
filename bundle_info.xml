@@ -173,7 +173,7 @@
                 <ChimeraXClassifier>ChimeraX :: Tool :: Substituent Sterimol           :: Structure Analysis :: Calculate L, B1, and B5 Sterimol parameters for a substituent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Bond Editor                    :: Structure Editing  :: Draw or erase bonds</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Change Element                 :: Structure Editing  :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Rotate                         :: Structure Editing  :: Rotate all or part of a molecular structure</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Rotate Atoms                   :: Structure Editing  :: Rotate all or part of a molecular structure</ChimeraXClassifier>
 				<ChimeraXClassifier>ChimeraX :: Tool :: Buried Volume                  :: Structure Analysis :: Calculate percent buried volume</ChimeraXClassifier>
 				<ChimeraXClassifier>ChimeraX :: Tool :: File Info                      :: AaronTools         :: Miscellaneous file data</ChimeraXClassifier>
                 <!--ChimeraXClassifier>ChimeraX :: Tool :: AARON Input Builder :: AARON :: Build AARON input file</ChimeraXClassifier-->

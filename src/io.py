@@ -24,7 +24,20 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
     if hasattr(stream, "close") and callable(stream.close):
         stream.close()
 
-    geom = ResidueCollection(fr)
+    if fr.file_type == "dat":
+        format_name = "Psi4 output file"
+    elif fr.file_type == "out":
+        format_name = "ORCA output file"
+
+    try:
+        geom = ResidueCollection(fr)
+    except:
+        s = "could not open %s" % file_name
+        if "error" in fr.other and fr.other["error"]:
+            s += "\n%s contains an error (%s):\n%s" % (format_name, fr.other["error"], fr.other["error_msg"])
+        
+        session.logger.error(s)
+        return [], "SEQCROW failed to open %s" % file_name
 
     structure = geom.get_chimera(session, coordsets=(fr.all_geom is not None and len(fr.all_geom) > 1), filereader=fr)
     #associate the AaronTools FileReader with each structure
@@ -46,11 +59,6 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
         structure.active_coordset_id = len(fr.all_geom)
         if coordsets:
             slider.set_slider(len(fr.all_geom))
-
-    if fr.file_type == "dat":
-        format_name = "Psi4 output file"
-    elif fr.file_type == "out":
-        format_name = "ORCA output file"
 
     if format_name == "Gaussian input file":
         a_or_an = "a"

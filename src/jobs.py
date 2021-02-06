@@ -81,7 +81,7 @@ class ORCAJob(LocalJob):
         infile = infile.replace(' ', '_')
         infile_path = os.path.join(self.scratch_dir, infile)
         if isinstance(self.theory, Theory):
-            self.theory.geometry.write(theory=self.theory, outfile=infile_path, style="orca")
+            self.theory.geometry.write(theory=self.theory, outfile=infile_path, style="orca", **self.kw_dict)
         else:
             SEQCROW_Theory.orca_input_from_dict(self.theory, infile_path)
 
@@ -161,7 +161,7 @@ class GaussianJob(LocalJob):
 
         infile_path = os.path.join(self.scratch_dir, infile)
         if isinstance(self.theory, Theory):
-            self.theory.geometry.write(theory=self.theory, outfile=infile_path, style="gaussian")
+            self.theory.geometry.write(theory=self.theory, outfile=infile_path, style="gaussian", **self.kw_dict)
         else:
             SEQCROW_Theory.gaussian_input_from_dict(self.theory, infile_path)
             
@@ -231,7 +231,7 @@ class Psi4Job(LocalJob):
         infile = self.name + '.in'
         infile_path = os.path.join(self.scratch_dir, infile)
         if isinstance(self.theory, Theory):
-            self.theory.geometry.write(theory=self.theory, outfile=infile_path, style="psi4")
+            self.theory.geometry.write(theory=self.theory, outfile=infile_path, style="psi4", **self.kw_dict)
         else:
             SEQCROW_Theory.psi4_input_from_dict(self.theory, infile_path)
 

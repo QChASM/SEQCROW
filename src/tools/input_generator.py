@@ -1375,9 +1375,18 @@ class JobTypeOption(QWidget):
             self.do_freq.setChecked(not self.do_freq.checkState() == Qt.Checked)
 
     def open_chk_save(self):
-        """open file dialog to locate chk file"""
-        if self.form == "Gaussian":
+        """open file dialog to locate chk/gbs/hess file"""
+        if self.form == "Gaussian" and self.use_checkpoint.checkState() == Qt.Checked:
+            filename, _ = QFileDialog.getOpenFileName(filter="Gaussian checkpoint files (*.chk)")
+        
+        elif self.form == "Gaussian" and self.use_checkpoint.checkState() == Qt.Unchecked:
             filename, _ = QFileDialog.getSaveFileName(filter="Gaussian checkpoint files (*.chk)")
+
+        elif self.form == "ORCA":
+            filename, _ = QFileDialog.getOpenFileName(
+                filter="ORCA orbital files (*.gbw);;" +
+                "ORCA Hessian files (*.hess)"
+            )
 
         if filename:
             self.chk_file_path.setText(filename)
@@ -1432,9 +1441,9 @@ class JobTypeOption(QWidget):
                 self.solvent_option.setCurrentIndex(ndx)
             self.solvent_name.setText(self.settings.previous_solvent_name)
             self.job_type_opts.setTabEnabled(3, True)
-            self.use_checkpoint.setEnabled(False)
-            self.chk_file_path.setEnabled(False)
-            self.chk_browse_button.setEnabled(False)
+            self.use_checkpoint.setEnabled(True)
+            self.chk_file_path.setEnabled(True)
+            self.chk_browse_button.setEnabled(True)
 
         elif program == "Psi4":
             self.solvent_option.addItems(["None"])
@@ -2162,6 +2171,20 @@ class JobTypeOption(QWidget):
                 self.settings.last_freq = self.do_freq.checkState() == Qt.Checked
                 self.settings.last_num_freq = self.num_freq.checkState() == Qt.Checked
                 self.settings.last_raman = self.raman.checkState() == Qt.Checked
+            
+            if self.use_checkpoint.checkState() == Qt.Checked:
+                fname = self.chk_file_path.text()
+                if fname.lower().endswith("gbw"):
+                    blocks["scf"] = [
+                        "guess MORead",
+                        "MOInp \"%s\"" % fname,
+                    ]
+                
+                elif fname.lower().endswith("hess"):
+                    blocks["geom"] = [
+                        "inHess Read",
+                        "inHessName \"%s\"" % fname,
+                    ]
 
             return {ORCA_ROUTE:route, ORCA_BLOCKS:blocks}
 
@@ -2848,8 +2871,8 @@ class BasisOption(QWidget):
     basisChanged = Signal()
 
     #for psi4, ECP's are included in basis set definitions
-    options = ["def2-SVP", "def2-TZVP", "aug-cc-pVDZ", "aug-cc-pVTZ", "6-311+G**", "SDD", "LANL2DZ", "other"]
-    psi4_options = ["def2-SVP", "def2-TZVP", "aug-cc-pVDZ", "aug-cc-pVTZ", "6-311+G**", "other"]
+    options = ["def2-SVP", "def2-TZVP", "cc-pVDZ", "cc-pVTZ", "aug-cc-pVDZ", "aug-cc-pVTZ", "6-311+G**", "SDD", "LANL2DZ", "other"]
+    psi4_options = ["def2-SVP", "def2-TZVP", "cc-pVDZ", "cc-pVTZ", "aug-cc-pVDZ", "aug-cc-pVTZ", "6-311+G**", "other"]
 
     name_setting = "previous_basis_names"
     path_setting = "previous_basis_paths"

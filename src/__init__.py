@@ -15,7 +15,6 @@ class _SEQCROW_API(BundleAPI):
     
     @staticmethod
     def initialize(session, bundle_info):
-        #TODO set AaronTools environment variables
         from SEQCROW import settings as seqcrow_settings
         seqcrow_settings.settings = settings._SEQCROWSettings(session, "SEQCROW")
         if session.ui.is_gui:
@@ -181,7 +180,7 @@ class _SEQCROW_API(BundleAPI):
             from .tools import BondEditor
             return BondEditor(session, ti.name)
                 
-        elif ti.name == "Rotate":
+        elif ti.name == "Rotate Atoms":
             from .tools import PrecisionRotate
             return PrecisionRotate(session, ti.name)
         
@@ -324,15 +323,7 @@ class _SEQCROW_API(BundleAPI):
         elif command_info.name == "fuseRing":
             from .commands.fuseRing import fuseRing, fuseRing_description
             register("fuseRing", fuseRing_description, fuseRing)
-        
-        elif command_info.name == "angle":
-            from .commands.angle import angle, angle_description
-            register("angle", angle_description, angle)
-        
-        elif command_info.name == "dihedral":
-            from .commands.dihedral import dihedral, dihedral_description
-            register("dihedral", dihedral_description, dihedral)
-        
+
         elif command_info.name == "tsbond":
             from .commands.tsbond import tsbond, tsbond_description
             register("tsbond", tsbond_description, tsbond)        
