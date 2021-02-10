@@ -5,10 +5,6 @@ from chimerax.core.toolshed.info import SelectorInfo
 from chimerax.open_command import OpenerInfo
 from chimerax.core.commands import BoolArg, ModelsArg, StringArg, register
 
-from AaronTools.const import ELEMENTS
-from AaronTools.substituent import Substituent
-
-
 class _SEQCROW_API(BundleAPI):
 
     api_version = 1
@@ -36,6 +32,9 @@ class _SEQCROW_API(BundleAPI):
             os.environ['AARONLIB'] = seqcrow_settings.settings.AARONLIB
 
         session.seqcrow_settings = seqcrow_settings
+
+        from AaronTools.const import ELEMENTS
+        from AaronTools.substituent import Substituent
 
         #register selectors from the user's personal library
         for sub in Substituent.list():
@@ -355,6 +354,9 @@ class _SEQCROW_API(BundleAPI):
     @staticmethod
     def register_selector_menus(session):
         from Qt.QtWidgets import QAction
+
+        from AaronTools.const import ELEMENTS
+        from AaronTools.substituent import Substituent
 
         add_submenu = session.ui.main_window.add_select_submenu
         add_selector = session.ui.main_window.add_menu_selector

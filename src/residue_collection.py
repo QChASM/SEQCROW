@@ -35,12 +35,13 @@ def fromChimAtom(atom=None, *args, use_scene=False, serial_number=None, atomspec
         coords = atom.coord
     aarontools_atom = Atom(
         *args,
-        name=atom.name,
+        name=str(atom.serial_number),
         element=atom.element.name,
         coords=coords,
         **kwargs
     )
     
+    aarontools_atom.chix_name = atom.name
     aarontools_atom.atomspec = atom.atomspec
     aarontools_atom.serial_number = atom.serial_number
     aarontools_atom.chix_atom = atom
@@ -157,8 +158,14 @@ class Residue(Geometry):
                 
                 #print("new chix atom for", atom)
                 
-                atom_name = atom.name
-                if "." in atom.name or len(atom.name) > 4:
+                if hasattr(atom, "chix_name"):
+                    atom_name = atom.chix_name
+                    # print("atom has chix name:", atom_name)
+                else:
+                    atom_name = atom.name
+                    # print("atom does not have chix name:", atom_name)
+                if "." in atom_name or len(atom_name) > 4:
+                    # print("previous atom name was illegal, using", atom.element)
                     atom_name = atom.element
                 
                 new_atom = chix_residue.structure.new_atom(atom_name, atom.element)
@@ -458,7 +465,7 @@ class ResidueCollection(Geometry):
             ]
             
             start_atom = sub.end
-            start = start_atom.name[len(start_atom.element):]
+            start = start_atom.chix_name[len(start_atom.element):]
             if any(letter == start for letter in alphabet):
                 ndx = alphabet.index(start) + 1
             else:
@@ -471,32 +478,34 @@ class ResidueCollection(Geometry):
                 if not atoms:
                     break
                 for i, atom in enumerate(atoms):
-                    atom.name = "%s%s" % (atom.element, alphabet[ndx])
+                    atom.chix_name = "%s%s" % (atom.element, alphabet[ndx])
                     
                     if len([a for a in atoms if a.element == atom.element]) > 1:
                         neighbors = sub.find(BondedTo(atom), prev_atoms, NotAny("H"))
                         for neighbor in neighbors:
-                            match = re.search("(\d+)", neighbor.name)
+                            if not hasattr(neighbor, "chix_name"):
+                                continue
+                            match = re.search("(\d+)", neighbor.chix_name)
                             if match:
                                 i = int(match.group(1)) - 1
                                 break
                         
-                        atom.name += "%i" % (i + 1)
+                        atom.chix_name += "%i" % (i + 1)
                     
                     h_atoms = sub.find("H", BondedTo(atom))
                     
                     for j, h_atom in enumerate(h_atoms):
                         if len([a for a in atoms if a.element == atom.element]) == 1 and len(h_atoms) > 1:
-                            h_atom.name = "%s%s%i" % ("H", alphabet[ndx], j + 1)
+                            h_atom.chix_name = "%s%s%i" % ("H", alphabet[ndx], j + 1)
                         elif len(h_atoms) > 1:
-                            h_atom.name = "%s%s%i%i" % ("H", alphabet[ndx], i + 1, j + 1)
+                            h_atom.chix_name = "%s%s%i%i" % ("H", alphabet[ndx], i + 1, j + 1)
                         elif (
                                 len([a for a in atoms if a.element == atom.element]) > 1 and
                                 len(self.find("H", BondsFrom(start_atom, dist + 1))) > 1
                         ):
-                            h_atom.name = "%s%s%i" % ("H", alphabet[ndx], i + 1)
+                            h_atom.chix_name = "%s%s%i" % ("H", alphabet[ndx], i + 1)
                         else:
-                            h_atom.name = "%s%s" % ("H", alphabet[ndx])
+                            h_atom.chix_name = "%s%s" % ("H", alphabet[ndx])
 
                 prev_atoms = atoms
 

@@ -524,7 +524,6 @@ class EditStructure(ToolInstance):
                                 other_atom = pbond.other_atom(target)
                                 if other_atom.residue not in conv_res:
                                     conv_res.append(other_atom.residue)
-                    
             
             rescol = ResidueCollection(model, convert_residues=conv_res)
             for res in models[model]:
