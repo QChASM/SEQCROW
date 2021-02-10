@@ -922,7 +922,7 @@ class BuildQM(ToolInstance):
 
     def run_local_job(self, *args, name="local_job", auto_update=False, auto_open=False):
         """run job"""
-        self.update_theory()
+        self.update_theory(update_settings=True)
 
         kw_dict = self.job_widget.getKWDict(update_settings=True)
         other_kw_dict = self.other_keywords_widget.getKWDict(update_settings=True)

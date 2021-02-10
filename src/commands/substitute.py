@@ -9,19 +9,28 @@ from SEQCROW.finders import AtomSpec
 from SEQCROW.residue_collection import ResidueCollection, Residue
 
 
-substitute_description = CmdDesc(required=[("selection", AtomsArg)], \
-                                 keyword=[("substituents", ListOf(DynamicEnum(Substituent.list, \
-                                                                  name="substituent", \
-                                                                  case_sensitive=True, \
-                                                                  url="http://catalysttrends.wheelergroupresearch.com/AaronTools/substituents.php")
-                                                           )), 
-                                          ("newName", ListOf(StringArg)), 
-                                          ("guessAttachment", BoolArg),
-                                          ("modify", BoolArg),
-                                          ("minimize", BoolArg),
-                                         ], \
-                                 required_arguments=['substituents'], 
-                                 synopsis="modify substituents")
+substitute_description = CmdDesc(
+    required=[("selection", AtomsArg)], \
+    keyword=[
+        (
+            "substituents",
+            ListOf(
+                DynamicEnum(
+                    Substituent.list, \
+                    name="substituent", \
+                    case_sensitive=True, \
+                    url="http://catalysttrends.wheelergroupresearch.com/AaronTools/substituents.php")
+            )
+        ), 
+        ("newName", ListOf(StringArg)), 
+        ("guessAttachment", BoolArg),
+        ("modify", BoolArg),
+        ("minimize", BoolArg),
+        ("useRemoteness", BoolArg),
+    ],
+    required_arguments=['substituents'], 
+    synopsis="modify substituents"
+)
 
 
 def guessAttachmentTargets(selection, session, allow_adjacent=True):
@@ -80,7 +89,16 @@ def avoidTargets(selection):
     
     return models, attached
 
-def substitute(session, selection, substituents, newName=None, guessAttachment=True, modify=True, minimize=False):
+def substitute(
+        session,
+        selection,
+        substituents,
+        newName=None,
+        guessAttachment=True,
+        modify=True,
+        minimize=False,
+        useRemoteness=False
+    ):
     attached = {}
     
     if newName is None:
@@ -138,7 +156,13 @@ def substitute(session, selection, substituents, newName=None, guessAttachment=T
 
                         # call substitute on the ResidueCollection b/c we need to see
                         # the other residues if minimize=True
-                        rescol.substitute(sub.copy(), AtomSpec(target.atomspec), attached_to=end, minimize=minimize)
+                        rescol.substitute(
+                            sub.copy(),
+                            AtomSpec(target.atomspec),
+                            attached_to=end,
+                            minimize=minimize,
+                            use_greek=useRemoteness
+                        )
 
                     residue.update_chix(res)
 
@@ -182,10 +206,12 @@ def substitute(session, selection, substituents, newName=None, guessAttachment=T
                         else:
                             end = None
 
-                        rescol.substitute(sub.copy(), 
-                                           AtomSpec(model_copy.atoms[model.atoms.index(target)].atomspec), 
-                                           attached_to=end, 
-                                           minimize=minimize,
+                        rescol.substitute(
+                            sub.copy(), 
+                            AtomSpec(model_copy.atoms[model.atoms.index(target)].atomspec), 
+                            attached_to=end, 
+                            minimize=minimize,
+                            use_greek=useRemoteness,
                         )
 
                     residue.update_chix(res_copy)

@@ -33,6 +33,8 @@ class _EditStructureSettings(Settings):
                  'guess': Value(True, BoolArg),
                  'minimize': Value(False, BoolArg), 
                  'change_bonds': Value(True, BoolArg), 
+                 'use_greek': Value(False, BoolArg),
+                 'minimize_ring': Value(False, BoolArg),
                 }
 
 
@@ -98,16 +100,23 @@ class EditStructure(ToolInstance):
         self.guess_old.stateChanged.connect(lambda state, settings=self.settings: settings.__setattr__("guess", True if state == Qt.Checked else False))
         substitute_layout.addWidget(self.guess_old, 3, 1, 1, 2, Qt.AlignTop)
         
-        substitute_layout.addWidget(QLabel("new residue name:"), 4, 0, 1, 1, Qt.AlignVCenter)
+        substitute_layout.addWidget(QLabel("use distance names:"), 4, 0, 1, 1, Qt.AlignVCenter)
+        
+        self.use_greek = QCheckBox()
+        self.use_greek.setChecked(self.settings.use_greek)
+        self.use_greek.setToolTip("indicate distance from point of attachment with atom name")
+        substitute_layout.addWidget(self.use_greek, 4, 1, 1, 1, Qt.AlignTop)
+
+        substitute_layout.addWidget(QLabel("new residue name:"), 5, 0, 1, 1, Qt.AlignVCenter)
         
         self.new_sub_name = QLineEdit()
         self.new_sub_name.setToolTip("change name of modified residues")
         self.new_sub_name.setPlaceholderText("leave blank to keep current")
-        substitute_layout.addWidget(self.new_sub_name, 4, 1, 1, 2, Qt.AlignTop)
-        
+        substitute_layout.addWidget(self.new_sub_name, 5, 1, 1, 2, Qt.AlignTop)
+
         substitute_button = QPushButton("substitute current selection")
         substitute_button.clicked.connect(self.do_substitute)
-        substitute_layout.addWidget(substitute_button, 5, 0, 1, 3, Qt.AlignTop)
+        substitute_layout.addWidget(substitute_button, 6, 0, 1, 3, Qt.AlignTop)
         self.substitute_button = substitute_button
         
         substitute_layout.setRowStretch(0, 0)
@@ -115,7 +124,8 @@ class EditStructure(ToolInstance):
         substitute_layout.setRowStretch(2, 0)
         substitute_layout.setRowStretch(3, 0)
         substitute_layout.setRowStretch(4, 0)
-        substitute_layout.setRowStretch(5, 1)
+        substitute_layout.setRowStretch(5, 0)
+        substitute_layout.setRowStretch(6, 1)
         
         
         #map ligand
@@ -185,29 +195,37 @@ class EditStructure(ToolInstance):
         self.close_previous_ring.stateChanged.connect(self.close_previous_change)
         closering_layout.addWidget(self.close_previous_ring, 1, 1, 1, 2, Qt.AlignTop)
 
-        closering_layout.addWidget(QLabel("new residue name:"), 2, 0, 1, 1, Qt.AlignVCenter)
+        closering_layout.addWidget(QLabel("try multiple:"), 2, 0, 1, 1, Qt.AlignVCenter)
+
+        self.minimize_ring = QCheckBox()
+        self.minimize_ring.setToolTip("try to use other versions of this ring in the library to find the one that fits best")
+        self.minimize_ring.setChecked(self.settings.minimize_ring)
+        closering_layout.addWidget(self.minimize_ring, 2, 1, 1, 2, Qt.AlignTop)
+
+        closering_layout.addWidget(QLabel("new residue name:"), 3, 0, 1, 1, Qt.AlignVCenter)
         
         self.new_ring_name = QLineEdit()
         self.new_ring_name.setToolTip("change name of modified residues")
         self.new_ring_name.setPlaceholderText("leave blank to keep current")
-        closering_layout.addWidget(self.new_ring_name, 2, 1, 1, 2, Qt.AlignTop)
+        closering_layout.addWidget(self.new_ring_name, 3, 1, 1, 2, Qt.AlignTop)
 
         closering_button = QPushButton("put a ring on current selection")
         closering_button.clicked.connect(self.do_fusering)
-        closering_layout.addWidget(closering_button, 3, 0, 1, 3, Qt.AlignTop)
+        closering_layout.addWidget(closering_button, 4, 0, 1, 3, Qt.AlignTop)
         self.closering_button = closering_button
 
         start_structure_button = QPushButton("place in:")
         self.ring_model_selector = ModelComboBox(self.session, addNew=True)
         start_structure_button.clicked.connect(self.do_new_ring)
-        closering_layout.addWidget(start_structure_button, 4, 0, 1, 1, Qt.AlignTop)
-        closering_layout.addWidget(self.ring_model_selector, 4, 1, 1, 2, Qt.AlignTop)
+        closering_layout.addWidget(start_structure_button, 5, 0, 1, 1, Qt.AlignTop)
+        closering_layout.addWidget(self.ring_model_selector, 5, 1, 1, 2, Qt.AlignTop)
 
         closering_layout.setRowStretch(0, 0)
         closering_layout.setRowStretch(1, 0)
         closering_layout.setRowStretch(2, 0)
         closering_layout.setRowStretch(3, 0)
-        closering_layout.setRowStretch(4, 1)
+        closering_layout.setRowStretch(4, 0)
+        closering_layout.setRowStretch(5, 1)
 
 
         #change element
@@ -304,24 +322,37 @@ class EditStructure(ToolInstance):
         
         minimize = self.minimize.isChecked()
         
+        use_greek = self.use_greek.isChecked()
+        
         self.settings.minimize = minimize
+        self.settings.use_greek = use_greek
 
         if len(new_name.strip()) > 0:
-            run(self.session, "substitute sel substituents %s newName %s guessAttachment %s modify %s minimize %s" %
-                              (subnames, \
-                               new_name, \
-                               not use_attached, \
-                               self.close_previous_bool, \
-                               minimize)
+            run(
+                self.session, 
+                "substitute sel substituents %s newName %s guessAttachment %s modify %s minimize %s useRemoteness %s" %
+                (
+                    subnames,
+                    new_name,
+                    not use_attached,
+                    self.close_previous_bool,
+                    minimize,
+                    use_greek,
                 )
+            )
 
         else:
-            run(self.session, "substitute sel substituents %s guessAttachment %s modify %s minimize %s" %
-                              (subnames, \
-                               not use_attached, \
-                               self.close_previous_bool, \
-                               minimize)
+            run(
+                self.session,
+                "substitute sel substituents %s guessAttachment %s modify %s minimize %s useRemoteness %s" %
+                (
+                    subnames,
+                    not use_attached,
+                    self.close_previous_bool,
+                    minimize,
+                    use_greek,
                 )
+            )
 
     def open_sub_selector(self):
         self.tool_window.create_child_window("select substituents", window_class=SubstituentSelection, textBox=self.subname)
@@ -400,18 +431,29 @@ class EditStructure(ToolInstance):
         
         new_name = self.new_ring_name.text()
 
+        minimize_ring = self.minimize_ring.isChecked()
+        self.settings.minimize_ring = minimize_ring
+
         if len(new_name.strip()) > 0:
-            run(self.session, "fuseRing sel rings %s newName %s modify %s" %
-                              (ring_names, \
-                               new_name, \
-                               self.close_previous_bool)
+            run(
+                self.session,
+                "fuseRing sel rings %s newName %s modify %s minimize %s" % (
+                    ring_names,
+                    new_name,
+                    self.close_previous_bool,
+                    minimize_ring,
                 )
+            )
 
         else:
-            run(self.session, "fuseRing sel rings %s modify %s" %
-                              (ring_names, \
-                               self.close_previous_bool)
+            run(
+                self.session,
+                "fuseRing sel rings %s modify %s minimize %s" % (
+                    ring_names,
+                    self.close_previous_bool,
+                    minimize_ring,
                 )
+            )
 
     def open_ring_selector(self):
         self.tool_window.create_child_window("select rings", window_class=RingSelection, textBox=self.ringname)
