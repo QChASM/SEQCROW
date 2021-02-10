@@ -24,8 +24,8 @@ fuseRing_description = CmdDesc(
             )
         ),
         ("newName", ListOf(StringArg)), 
-        ("modify", BoolArg)
-        ("minimize", BoolArg)
+        ("modify", BoolArg),
+        ("minimize", BoolArg),
     ],
     required_arguments=["rings"],
     synopsis="fuse a ring",

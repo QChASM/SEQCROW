@@ -39,7 +39,15 @@ class _SEQCROW_API(BundleAPI):
 
         #register selectors from the user's personal library
         for sub in Substituent.list():
-            if sub not in ELEMENTS and sub.isalnum():
+                if sub in ELEMENTS:
+                    # print(sub, "in ELEMENTS")
+                    continue
+                if not sub[0].isalpha():
+                    # print(sub, "startswith non-alpha")
+                    continue
+                if len(sub) > 1 and any(not (c.isalnum() or c in "+-") for c in sub[1:]):
+                    # print(sub, "contains non-alphanumeric character")
+                    continue
                 if not any([selector.name == sub for selector in bundle_info.selectors]):
                     si = SelectorInfo(sub, atomic=True, synopsis="%s substituent" % sub)
                     bundle_info.selectors.append(si)
@@ -352,8 +360,16 @@ class _SEQCROW_API(BundleAPI):
         add_selector = session.ui.main_window.add_menu_selector
         substituent_menu = add_submenu(['Che&mistry'], 'Substituents')
         for sub in Substituent.list():
-            if sub not in ELEMENTS and sub.isalnum():
-                add_selector(substituent_menu, sub, sub)
+            if sub in ELEMENTS:
+                # print(sub, "in ELEMENTS")
+                continue
+            if not sub[0].isalpha():
+                # print(sub, "startswith non-alpha")
+                continue
+            if len(sub) > 1 and any(not (c.isalnum() or c in "+-") for c in sub[1:]):
+                # print(sub, "contains non-alphanumeric character")
+                continue
+            add_selector(substituent_menu, sub, sub)
         
         mw = session.ui.main_window
         structure_menu = add_submenu([], '&Structure')

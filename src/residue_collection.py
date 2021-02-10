@@ -183,11 +183,14 @@ class Residue(Geometry):
                 atom.delete()
         
         for atom in new_atoms:
+            # print("starting name:", atom.name)
             if (
-                    [a.name for a in self.atoms].count(atom.name) == 1 and
+                    [a.name for a in known_atoms].count(atom.name) == 1 and
                     atom.name.startswith(atom.element.name) and
+                    atom.name != atom.element.name and
                     "." not in atom.name
             ):
+                # print("skipping", atom.name, atom.serial_number, atom.atomspec)
                 continue
             if not atom.name.startswith(atom.element.name):
                 atom.name = atom.element.name
@@ -207,7 +210,7 @@ class Residue(Geometry):
             if atom.serial_number == -1:
                 atom.serial_number = atom.structure.atoms.index(atom) + 1
         
-        apply_seqcrow_preset(chix_residue.structure, atoms=new_atoms, fallback="Ball-Stick-Endcap")
+        apply_seqcrow_preset(chix_residue.structure, atoms=new_atoms)
 
     def refresh_chix_connected(self, chix_residue):
         known_bonds = []
@@ -483,9 +486,14 @@ class ResidueCollection(Geometry):
                     h_atoms = sub.find("H", BondedTo(atom))
                     
                     for j, h_atom in enumerate(h_atoms):
-                        if len(h_atoms) > 1:
+                        if len([a for a in atoms if a.element == atom.element]) == 1 and len(h_atoms) > 1:
+                            h_atom.name = "%s%s%i" % ("H", alphabet[ndx], j + 1)
+                        elif len(h_atoms) > 1:
                             h_atom.name = "%s%s%i%i" % ("H", alphabet[ndx], i + 1, j + 1)
-                        elif len([a for a in atoms if a.element == atom.element]) > 1:
+                        elif (
+                                len([a for a in atoms if a.element == atom.element]) > 1 and
+                                len(self.find("H", BondsFrom(start_atom, dist + 1))) > 1
+                        ):
                             h_atom.name = "%s%s%i" % ("H", alphabet[ndx], i + 1)
                         else:
                             h_atom.name = "%s%s" % ("H", alphabet[ndx])
