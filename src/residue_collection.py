@@ -204,11 +204,24 @@ class Residue(Geometry):
 
             atom_name = "%s1" % atom.name
             k = 1
-            while any([chix_atom.name == atom_name for chix_atom in known_atoms]):
-                k += 1
+            while k == 1 or any([chix_atom.name == atom_name for chix_atom in known_atoms]):
                 atom_name = "%s%i" % (atom.name, k)
+                k += 1
+                if len(atom_name) > 4:
+                    if atom.name == atom.element.name:
+                        print("breaking:", k, atom.name)
+                        break
+                    atom.name = atom.element.name
+                    k = 1
             
-            atom.name = atom_name
+            # print("name:", atom_name)
+            
+            if len(atom_name) <= 4:
+                atom.name = atom_name
+            else:
+                atom.name = str(atom.serial_number)
+
+            # print("final name:", atom.name)
 
         if refresh_connected:
             self.refresh_chix_connected(chix_residue)
@@ -470,7 +483,7 @@ class ResidueCollection(Geometry):
                 ndx = alphabet.index(start) + 1
             else:
                 ndx = 0
-            
+
             dist = 1
             prev_atoms = []
             while ndx < len(alphabet):
@@ -479,7 +492,6 @@ class ResidueCollection(Geometry):
                     break
                 for i, atom in enumerate(atoms):
                     atom.chix_name = "%s%s" % (atom.element, alphabet[ndx])
-                    
                     if len([a for a in atoms if a.element == atom.element]) > 1:
                         neighbors = sub.find(BondedTo(atom), prev_atoms, NotAny("H"))
                         for neighbor in neighbors:
@@ -491,7 +503,7 @@ class ResidueCollection(Geometry):
                                 break
                         
                         atom.chix_name += "%i" % (i + 1)
-                    
+
                     h_atoms = sub.find("H", BondedTo(atom))
                     
                     for j, h_atom in enumerate(h_atoms):

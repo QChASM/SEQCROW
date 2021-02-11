@@ -238,7 +238,15 @@ class EditStructure(ToolInstance):
         self.element.setMinimumHeight(int(1.5*self.element.fontMetrics().boundingRect("QQ").height()))
         self.element.setMaximumHeight(int(1.5*self.element.fontMetrics().boundingRect("QQ").height()))
         ele_color = tuple(list(element_color(ELEMENTS.index("C")))[:-1])
-        self.element.setStyleSheet("QPushButton { background: rgb(%i, %i, %i); color: %s; font-weight: bold; }" % (*ele_color, 'white' if sum(int(x < 150) - int(x > 250) for x in ele_color) - int(ele_color[1] > 200) + int(ele_color[2] > 200) >= 2 else 'black'))
+        self.element.setStyleSheet(
+            "QPushButton { background: rgb(%i, %i, %i); color: %s; font-weight: bold; }" % (
+                *ele_color,
+                'white' if sum(
+                    int(x < 130) - int(x > 225) for x in ele_color
+                ) - int(ele_color[1] > 225) +
+                int(ele_color[2] > 200) >= 2 else 'black'
+            )
+        )
         self.element.clicked.connect(self.open_ptable)
         changeelement_layout.addRow("element:", self.element)
         
@@ -787,8 +795,15 @@ class PTable(ChildToolWindow):
             element = elements[0]
             self.button.setText(element)
             ele_color = tuple(list(element_color(ELEMENTS.index(element)))[:-1])
-            self.button.setStyleSheet("QPushButton { background: rgb(%i, %i, %i); color: %s; font-weight: bold; }" % (*ele_color, 'white' if sum(int(x < 150) - int(x > 250) for x in ele_color) - int(ele_color[1] > 200) + int(ele_color[2] > 200) >= 2 else 'black'))
-
+            self.button.setStyleSheet(
+                "QPushButton { background: rgb(%i, %i, %i); color: %s; font-weight: bold; }" % (
+                    *ele_color,
+                    'white' if sum(
+                        int(x < 130) - int(x > 225) for x in ele_color
+                    ) - int(ele_color[1] > 225) +
+                    int(ele_color[2] > 200) >= 2 else 'black'
+                )
+            )
 
 class NameCompleter(QCompleter):
     def __init__(self, name_list, parent=None):

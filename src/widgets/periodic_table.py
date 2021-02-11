@@ -43,7 +43,15 @@ class ElementButton(QPushButton):
         elif self.state == self.Checked:
             #weird function to decide if text color is white or black based on jmol color
             #it's harder to see white on green, but easier to see white on blue
-            self.setStyleSheet("QPushButton { background: rgb(%i, %i, %i); color: %s; font-weight: bold; }" % (*self.ele_color, 'white' if sum(int(x < 150) - int(x > 250) for x in self.ele_color) - int(self.ele_color[1] > 200) + int(self.ele_color[2] > 200) >= 2 else 'black'))
+            self.setStyleSheet(
+                "QPushButton { background: rgb(%i, %i, %i); color: %s; font-weight: bold; }" % (
+                    *self.ele_color,
+                    'white' if sum(
+                        int(x < 130) - int(x > 225) for x in self.ele_color
+                    ) - int(self.ele_color[1] > 225) +
+                    int(self.ele_color[2] > 200) >= 2 else 'black'
+                )
+            )
         elif self.state == self.Excluded:
             self.setStyleSheet("QPushButton { background: black; color: gray; font-weight: normal; }")
         
