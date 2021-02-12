@@ -1,7 +1,7 @@
 from chimerax.atomic.colors import element_color
 
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtWidgets import QPushButton, QGridLayout, QWidget, QStyle
+from Qt.QtCore import Qt, Signal
+from Qt.QtWidgets import QPushButton, QGridLayout, QWidget, QStyle
 
 from AaronTools.const import ELEMENTS, TMETAL
 
@@ -11,7 +11,7 @@ class ElementButton(QPushButton):
     Checked = 1
     Excluded = 2
     
-    stateChanged = pyqtSignal([int])
+    stateChanged = Signal([int])
     
     def __init__(self, element, *args, **kwargs):
         super().__init__(element, *args, **kwargs)
@@ -39,11 +39,19 @@ class ElementButton(QPushButton):
             self.state = state
 
         if self.state == self.Unchecked:
-            self.setStyleSheet("QPushButton { background: ghostwhite; color: lightgray; font-weight: normal; }")
+            self.setStyleSheet("QPushButton { background: whitesmoke; color: dimgray; font-weight: normal; }")
         elif self.state == self.Checked:
             #weird function to decide if text color is white or black based on jmol color
             #it's harder to see white on green, but easier to see white on blue
-            self.setStyleSheet("QPushButton { background: rgb(%i, %i, %i); color: %s; font-weight: bold; }" % (*self.ele_color, 'white' if sum(int(x < 150) - int(x > 250) for x in self.ele_color) - int(self.ele_color[1] > 200) + int(self.ele_color[2] > 200) >= 2 else 'black'))
+            self.setStyleSheet(
+                "QPushButton { background: rgb(%i, %i, %i); color: %s; font-weight: bold; }" % (
+                    *self.ele_color,
+                    'white' if sum(
+                        int(x < 130) - int(x > 225) for x in self.ele_color
+                    ) - int(self.ele_color[1] > 225) +
+                    int(self.ele_color[2] > 200) >= 2 else 'black'
+                )
+            )
         elif self.state == self.Excluded:
             self.setStyleSheet("QPushButton { background: black; color: gray; font-weight: normal; }")
         
@@ -56,7 +64,7 @@ class ElementButton(QPushButton):
         self._tristate = b
 
 class PeriodicTable(QWidget):
-    elementSelectionChanged = pyqtSignal()
+    elementSelectionChanged = Signal()
     
     def __init__(self, *args, initial_elements=[], select_multiple=True, **kwargs):
         super().__init__(*args, **kwargs)

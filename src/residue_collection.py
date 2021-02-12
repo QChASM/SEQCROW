@@ -41,6 +41,7 @@ def fromChimAtom(atom=None, *args, use_scene=False, serial_number=None, atomspec
         **kwargs
     )
     
+    aarontools_atom.chix_name = atom.name
     aarontools_atom.atomspec = atom.atomspec
     aarontools_atom.serial_number = atom.serial_number
     aarontools_atom.chix_atom = atom
@@ -157,7 +158,15 @@ class Residue(Geometry):
                 
                 #print("new chix atom for", atom)
                 
-                atom_name = "new"
+                if hasattr(atom, "chix_name"):
+                    atom_name = atom.chix_name
+                    # print("atom has chix name:", atom_name)
+                else:
+                    atom_name = atom.name
+                    # print("atom does not have chix name:", atom_name)
+                if "." in atom_name or len(atom_name) > 4:
+                    # print("previous atom name was illegal, using", atom.element)
+                    atom_name = atom.element
                 
                 new_atom = chix_residue.structure.new_atom(atom_name, atom.element)
                 new_atom.coord = atom.coords
@@ -181,13 +190,38 @@ class Residue(Geometry):
                 atom.delete()
         
         for atom in new_atoms:
-            atom_name = "%s1" % atom.element.name
+            # print("starting name:", atom.name)
+            if (
+                    [a.name for a in known_atoms].count(atom.name) == 1 and
+                    atom.name.startswith(atom.element.name) and
+                    atom.name != atom.element.name and
+                    "." not in atom.name
+            ):
+                # print("skipping", atom.name, atom.serial_number, atom.atomspec)
+                continue
+            if not atom.name.startswith(atom.element.name):
+                atom.name = atom.element.name
+
+            atom_name = "%s1" % atom.name
             k = 1
-            while any([chix_atom.name == atom_name for chix_atom in known_atoms]):
+            while k == 1 or any([chix_atom.name == atom_name for chix_atom in known_atoms]):
+                atom_name = "%s%i" % (atom.name, k)
                 k += 1
-                atom_name = "%s%i" % (atom.element.name, k)
+                if len(atom_name) > 4:
+                    if atom.name == atom.element.name:
+                        print("breaking:", k, atom.name)
+                        break
+                    atom.name = atom.element.name
+                    k = 1
             
-            atom.name = atom_name
+            # print("name:", atom_name)
+            
+            if len(atom_name) <= 4:
+                atom.name = atom_name
+            else:
+                atom.name = atom.element.name
+
+            # print("final name:", atom.name)
 
         if refresh_connected:
             self.refresh_chix_connected(chix_residue)
@@ -196,7 +230,7 @@ class Residue(Geometry):
             if atom.serial_number == -1:
                 atom.serial_number = atom.structure.atoms.index(atom) + 1
         
-        apply_seqcrow_preset(chix_residue.structure, atoms=new_atoms, fallback="Ball-Stick-Endcap")
+        apply_seqcrow_preset(chix_residue.structure, atoms=new_atoms)
 
     def refresh_chix_connected(self, chix_residue):
         known_bonds = []
@@ -386,8 +420,8 @@ class ResidueCollection(Geometry):
         
         new_lig = Residue(atoms_not_in_residue, name="LIG", resnum=len([res for res in self.residues if len(res.atoms) > 0])+1)
         self.residues.append(new_lig)
-        
-    def substitute(self, sub, target, *args, minimize=False, **kwargs):
+
+    def substitute(self, sub, target, *args, minimize=False, use_greek=False, **kwargs):
         """find the residue that target is on and substitute it for sub"""
         target = self.find(target)
         if len(target) != 1:
@@ -410,11 +444,85 @@ class ResidueCollection(Geometry):
         if minimize:
             sub_start = sub.find_exact(BondedTo(sub.end))[0]
             shift = sub_start.coords.copy()
-            self.minimize_torsion(sub.atoms, 
-                                  sub_start.bond(sub.end), 
-                                  shift,
-                                  increment=10,
+            self.minimize_torsion(
+                sub.atoms, 
+                sub_start.bond(sub.end), 
+                shift,
+                increment=10,
             )
+
+        if use_greek:
+            from AaronTools.finders import BondsFrom, NotAny
+            alphabet = [
+                "A",
+                "B",
+                "G",
+                "D",
+                "E",
+                "Z",
+                "H",
+                "Q",
+                "I",
+                "K",
+                "L",
+                "M",
+                "N",
+                "X",
+                "R",
+                "T",
+                "U",
+                "F",
+                "C",
+                "Y",
+                "W",
+            ]
+            
+            start_atom = sub.end
+            start = start_atom.chix_name[len(start_atom.element):]
+            if any(letter == start for letter in alphabet):
+                ndx = alphabet.index(start) + 1
+            else:
+                ndx = 0
+
+            dist = 1
+            prev_atoms = []
+            while ndx < len(alphabet):
+                atoms = self.find(BondsFrom(start_atom, dist), sub.atoms, NotAny("H"))
+                if not atoms:
+                    break
+                for i, atom in enumerate(atoms):
+                    atom.chix_name = "%s%s" % (atom.element, alphabet[ndx])
+                    if len([a for a in atoms if a.element == atom.element]) > 1:
+                        neighbors = sub.find(BondedTo(atom), prev_atoms, NotAny("H"))
+                        for neighbor in neighbors:
+                            if not hasattr(neighbor, "chix_name"):
+                                continue
+                            match = re.search("(\d+)", neighbor.chix_name)
+                            if match:
+                                i = int(match.group(1)) - 1
+                                break
+                        
+                        atom.chix_name += "%i" % (i + 1)
+
+                    h_atoms = sub.find("H", BondedTo(atom))
+                    
+                    for j, h_atom in enumerate(h_atoms):
+                        if len([a for a in atoms if a.element == atom.element]) == 1 and len(h_atoms) > 1:
+                            h_atom.chix_name = "%s%s%i" % ("H", alphabet[ndx], j + 1)
+                        elif len(h_atoms) > 1:
+                            h_atom.chix_name = "%s%s%i%i" % ("H", alphabet[ndx], i + 1, j + 1)
+                        elif (
+                                len([a for a in atoms if a.element == atom.element]) > 1 and
+                                len(self.find("H", BondsFrom(start_atom, dist + 1))) > 1
+                        ):
+                            h_atom.chix_name = "%s%s%i" % ("H", alphabet[ndx], i + 1)
+                        else:
+                            h_atom.chix_name = "%s%s" % ("H", alphabet[ndx])
+
+                prev_atoms = atoms
+
+                ndx += 1
+                dist += 1
 
         return sub
 
@@ -425,7 +533,7 @@ class ResidueCollection(Geometry):
 
         residue = self.find_residue(target[0])[0]
         
-        super().ring_substitute(target, ring)
+        super().ring_substitute(target, ring, *args, **kwargs)
 
         new_atoms = [atom for atom in self.atoms if not hasattr(atom, "chix_atom")]
         residue.atoms.extend(new_atoms)

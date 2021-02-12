@@ -4,9 +4,9 @@ from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.core.tools import ToolInstance
 from chimerax.core.commands import run
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFontDatabase, QIcon
-from PyQt5.QtWidgets import QGridLayout, QTextBrowser, QPushButton, QTreeWidget, QTreeWidgetItem, \
+from Qt.QtCore import Qt
+from Qt.QtGui import QFontDatabase, QIcon
+from Qt.QtWidgets import QGridLayout, QTextBrowser, QPushButton, QTreeWidget, QTreeWidgetItem, \
                             QWidget, QMessageBox, QFileDialog, QToolButton, QSizePolicy, QStyle
 
 from send2trash import send2trash
@@ -32,6 +32,9 @@ class JobQueue(ToolInstance):
         self.display_name = "Job Queue"
         
         self.tool_window = MainToolWindow(self)        
+
+        if not self.session.seqcrow_job_manager.initialized:
+            self.session.seqcrow_job_manager.init_queue()
 
         self._build_ui()
         
@@ -335,6 +338,13 @@ class JobQueue(ToolInstance):
         self.session.seqcrow_job_manager.triggers.remove_handler(self._job_started)
         self.session.seqcrow_job_manager.triggers.remove_handler(self._job_finished)
         super().delete()
+    
+    def close(self):
+        """overload close"""
+        self.session.seqcrow_job_manager.triggers.remove_handler(self._job_queued)
+        self.session.seqcrow_job_manager.triggers.remove_handler(self._job_started)
+        self.session.seqcrow_job_manager.triggers.remove_handler(self._job_finished)
+        super().close()
 
 
 class JobLog(ChildToolWindow):

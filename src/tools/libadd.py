@@ -3,18 +3,20 @@ import numpy as np
 
 from chimerax.core.tools import ToolInstance
 from chimerax.atomic import selected_atoms
+from chimerax.core.commands import run
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QGridLayout, QPushButton, QTabWidget, QWidget, QVBoxLayout, QLineEdit, QLabel, QSpinBox, QFormLayout, QMessageBox
+from Qt.QtCore import Qt
+from Qt.QtWidgets import QGridLayout, QPushButton, QTabWidget, QWidget, QVBoxLayout, QLineEdit, QLabel, QSpinBox, QFormLayout, QMessageBox
 
 from AaronTools.component import Component
 from AaronTools.ring import Ring
 from AaronTools.substituent import Substituent
-from AaronTools.const import AARONLIB
+from AaronTools.const import AARONLIB, ELEMENTS
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.tools import key_atom_highlight, ghost_connection_highlight, show_walk_highlight
 from SEQCROW.selectors import register_selectors
+from SEQCROW.finders import AtomSpec
 
 from warnings import warn
 
@@ -44,74 +46,77 @@ class LibAdd(ToolInstance):
         
         #ligand tab
         ligand_tab = QWidget()
-        ligand_layout = QGridLayout(ligand_tab)
+        ligand_layout = QFormLayout(ligand_tab)
         
-        ligand_name_label = QLabel("ligand name:")
-        ligand_layout.addWidget(ligand_name_label, 0, 0)
         self.ligand_name = QLineEdit()
         self.ligand_name.setText("")
+        self.ligand_name.setPlaceholderText("leave blank to preview")
         self.ligand_name.setToolTip("name of ligand you are adding to your ligand library\nleave blank to open a new model with just the ligand")
-        ligand_layout.addWidget(self.ligand_name, 0, 1)
+        ligand_layout.addRow("ligand name:", self.ligand_name)
         
         ligand_key_atoms = QPushButton("set key atoms to current selection")
         ligand_key_atoms.clicked.connect(self.update_key_atoms)
         ligand_key_atoms.setToolTip("the current selection will be the key atoms for the ligand\nleave blank to automatically determine key atoms")
-        ligand_layout.addWidget(ligand_key_atoms, 1, 0, 1, 2)
+        ligand_layout.addRow(ligand_key_atoms)
         
         libadd_ligand = QPushButton("add current selection to library")
         libadd_ligand.clicked.connect(self.libadd_ligand)
-        ligand_layout.addWidget(libadd_ligand, 2, 0, 1, 2)  
+        ligand_layout.addRow(libadd_ligand)  
 
         
         #substituent tab
         sub_tab = QWidget()
-        sub_layout = QGridLayout(sub_tab)
+        sub_layout = QFormLayout(sub_tab)
 
-        sub_info_form = QWidget()
-        sub_info = QFormLayout(sub_info_form)
-        
         self.sub_name = QLineEdit()
         self.sub_name.setText("")
+        self.sub_name.setPlaceholderText("leave blank to preview")
         self.sub_name.setToolTip("name of substituent you are adding to your substituent library\nleave blank to open a new model with just the substituent")
-        sub_info.addRow("substituent name:", self.sub_name)
+        sub_layout.addRow("substituent name:", self.sub_name)
         
         self.sub_confs = QSpinBox()
         self.sub_confs.setMinimum(1)
-        sub_info.addRow("number of conformers:", self.sub_confs)
+        sub_layout.addRow("number of conformers:", self.sub_confs)
         
         self.sub_angle = QSpinBox()
         self.sub_angle.setRange(0, 180)
         self.sub_angle.setSingleStep(30)
-        sub_info.addRow("angle between conformers:", self.sub_angle)
-        
-        sub_layout.addWidget(sub_info_form)
-        
+        sub_layout.addRow("angle between conformers:", self.sub_angle)
+
         libadd_sub = QPushButton("add current selection to library")
         libadd_sub.clicked.connect(self.libadd_substituent)
-        sub_layout.addWidget(libadd_sub)
-
+        sub_layout.addRow(libadd_sub)
+        
         #ring tab
         ring_tab = QWidget()
-        ring_layout = QGridLayout(ring_tab)
-        
-        ring_name_label = QLabel("ring name:")
-        ring_layout.addWidget(ring_name_label, 0, 0)
+        ring_layout = QFormLayout(ring_tab)
+
         self.ring_name = QLineEdit()
         self.ring_name.setText("")
+        self.ring_name.setPlaceholderText("leave blank to preview")
         self.ring_name.setToolTip("name of ring you are adding to your ring library\nleave blank to open a new model with just the ring")
-        ring_layout.addWidget(self.ring_name, 0, 1)
+        ring_layout.addRow("ring name:", self.ring_name)
         
         libadd_ring = QPushButton("add ring with selected walk to library")
         libadd_ring.clicked.connect(self.libadd_ring)
-        ring_layout.addWidget(libadd_ring, 1, 0, 1, 2)
+        ring_layout.addRow(libadd_ring)
         
         
         library_tabs.addTab(sub_tab, "substituent")
         library_tabs.addTab(ring_tab, "ring")
         library_tabs.addTab(ligand_tab, "ligand")
-        
+        self.library_tabs = library_tabs
 
         layout.addWidget(library_tabs)
+
+        whats_this = QLabel()
+        whats_this.setText("<a href=\"req\" style=\"text-decoration: none;\">what's this?</a>")
+        whats_this.setTextFormat(Qt.RichText)
+        whats_this.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        whats_this.linkActivated.connect(self.open_link)
+        whats_this.setToolTip("click for more information about AaronTools libraries")
+        layout.addWidget(whats_this)
+
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(None)
@@ -145,7 +150,7 @@ class LibAdd(ToolInstance):
                         key_atoms.add(atom)
                         
         else:
-            key_atoms = rescol.find(",".join([atom.atomspec for atom in key_chix_atoms]))
+            key_atoms = rescol.find([AtomSpec(atom.atomspec) for atom in key_chix_atoms])
                         
         if len(key_atoms) < 1:
             raise RuntimeError("no key atoms could be determined")
@@ -184,14 +189,14 @@ class LibAdd(ToolInstance):
 
     def libadd_ring(self):
         """add ring to library or open it in a new model"""
-        selection = self.session.seqcrow_ordered_selection_manager.selection
+        selection = selected_atoms(self.session)
         
         if not selection.single_structure:
             raise RuntimeError("selected atoms must be on the same model")
           
         rescol = ResidueCollection(selection[0].structure)
-        walk_atoms = rescol.find(",".join([atom.atomspec for atom in selection]))
-                        
+        walk_atoms = rescol.find([AtomSpec(atom.atomspec) for atom in selection])
+
         if len(walk_atoms) < 1:
             raise RuntimeError("no walk direction could be determined")
         
@@ -314,7 +319,11 @@ class LibAdd(ToolInstance):
             self.tool_window.status("%s added to substituent library" % sub_name)
             register_selectors(self.session.logger, sub_name)
             if self.session.ui.is_gui:
-                if sub_name.isalnum():
+                if (
+                        sub_name not in ELEMENTS and
+                        sub_name[0].isalpha() and
+                        (len(sub_name) > 1 and not any(not (c.isalnum() or c in "+-") for c in sub_name[1:]))
+                ):
                     add_submenu = self.session.ui.main_window.add_select_submenu
                     add_selector = self.session.ui.main_window.add_menu_selector
                     substituent_menu = add_submenu(['Che&mistry'], 'Substituents')
@@ -325,7 +334,18 @@ class LibAdd(ToolInstance):
         from chimerax.core.commands import run
         run(self.session,
             'open %s' % self.help if self.help is not None else "")
-    
+
+    def open_link(self, *args):
+        if self.library_tabs.currentIndex() == 0:
+            link = "https://github.com/QChASM/AaronTools.py/wiki/AaronTools-Libraries#substituents"
+        elif self.library_tabs.currentIndex() == 1:
+            link = "https://github.com/QChASM/AaronTools.py/wiki/AaronTools-Libraries#rings"
+        elif self.library_tabs.currentIndex() == 2:
+            link = "https://github.com/QChASM/AaronTools.py/wiki/AaronTools-Libraries#ligands"
+
+        run(self.session, "open %s" % link)
+
+
 def check_aaronlib_dir():
     aaronlib = os.getenv("AARONLIB", False)
     if not aaronlib:

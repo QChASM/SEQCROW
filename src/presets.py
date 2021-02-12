@@ -2,7 +2,7 @@ import numpy as np
 
 def apply_seqcrow_bse_lighting(session):
     view = session.main_view
-    view.set_background_color([1., 1., 1., 0])
+    # view.set_background_color([1., 1., 1., 0])
     view.silhouette.enabled = True
     
     lighting_profile = view.lighting
@@ -30,7 +30,7 @@ def seqcrow_bse(session, models=None, atoms=None):
     from chimerax.atomic import AtomicStructure, Atom, Bond
     from chimerax.atomic.colors import element_color
 
-    if atoms is None:
+    if models is None or atoms is None:
         apply_seqcrow_bse_lighting(session)
 
     if models is None:
@@ -59,10 +59,9 @@ def seqcrow_bse(session, models=None, atoms=None):
         for atom in atom_list:
             ele = atom.element.name
             color = element_color(atom.element.number)
-            if hasattr(atom, "ghost"):
-                color = tuple(*color, atom.color[-1])
-                
+
             atom.color = color
+            atom.display = True
 
             if ele in RADII:
                 #AaronTools has bonding radii, maybe I should use vdw?
@@ -85,9 +84,7 @@ def seqcrow_vdw(session, models=None, atoms=None):
     from chimerax.atomic import AtomicStructure, Atom
     from chimerax.atomic.colors import element_color
     
-
-
-    if atoms is None:
+    if models is None or atoms is None:
         apply_seqcrow_bse_lighting(session)
 
     if models is None:
@@ -116,10 +113,9 @@ def seqcrow_vdw(session, models=None, atoms=None):
         for atom in atom_list:
             ele = atom.element.name
             color = element_color(atom.element.number)
-            if hasattr(atom, "ghost"):
-                color = tuple(*color, atom.color[-1])
-                
+
             atom.color = color
+            atom.display = True
             
             if ele in VDW_RADII:
                 atom.radius = VDW_RADII[ele]
@@ -128,7 +124,7 @@ def seqcrow_vdw(session, models=None, atoms=None):
 
 def apply_seqcrow_s_lighting(session):
     view = session.main_view
-    view.set_background_color([1., 1., 1., 0])
+    # view.set_background_color([1., 1., 1., 0])
     view.silhouette.enabled = True
 
     lighting_profile = view.lighting
@@ -153,11 +149,11 @@ def seqcrow_s(session, models=None, atoms=None):
     """atoms are represented with sticks
     atoms colored by Jmol colors"""
 
-    from AaronTools.const import RADII
+    from AaronTools.const import RADII, VDW_RADII, TMETAL
     from chimerax.atomic import AtomicStructure, Atom, Bond
     from chimerax.atomic.colors import element_color
 
-    if atoms is None:
+    if models is None or atoms is None:
         apply_seqcrow_s_lighting(session)
 
     if models is None:
@@ -176,7 +172,7 @@ def seqcrow_s(session, models=None, atoms=None):
             atom_list = m.atoms
         else:
             atom_list = [atom for atom in atoms if atom.structure is m]
-        
+
         for bond in m.bonds:
             if any(a in atom_list for a in bond.atoms):
                 bond.halfbond = True
@@ -186,18 +182,25 @@ def seqcrow_s(session, models=None, atoms=None):
         for atom in atom_list:
             ele = atom.element.name
             color = element_color(atom.element.number)
-            if hasattr(atom, "ghost"):
-                color = tuple(*color, atom.color[-1])
-             
+
             atom.color = color
             
-            if len(atom.neighbors) == 0:
+            if not atom.neighbors:
                 atom.draw_mode = Atom.BALL_STYLE
                 if ele in RADII:
                     atom.radius = RADII[ele]
             
             else:
                 atom.draw_mode = Atom.STICK_STYLE
+            
+            if atom.element.name == "H":
+                display = len(atom.neighbors) != 1
+                for bonded_atom in atom.neighbors:
+                    if any(x == bonded_atom.element.name for x in ["N", "O", "F", "Cl", "Br"] + list(TMETAL.keys())):
+                        display = True
+                        break
+                
+                atom.display = display
 
 def indexLabel(session, models=None):
     from chimerax.core.objects import Objects

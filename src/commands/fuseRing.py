@@ -8,18 +8,29 @@ from chimerax.core.commands import BoolArg, CmdDesc, StringArg, DynamicEnum, Lis
 from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.finders import AtomSpec
 
-fuseRing_description = CmdDesc(required=[("selection", OrderedAtomsArg)], \
-                                keyword=[("rings", ListOf(DynamicEnum(Ring.list, \
-                                                          name="ring", \
-                                                          case_sensitive=True, \
-                                                          #we don't have a page for these
-                                                          #url="http://catalysttrends.wheelergroupresearch.com/AaronTools/rings.php"
-                                                          )
-                                                    )),
-                                         ("newName", ListOf(StringArg)), 
-                                         ("modify", BoolArg)], \
-                                required_arguments=["rings"], \
-                                synopsis="fuse a ring")
+
+fuseRing_description = CmdDesc(
+    required=[("selection", OrderedAtomsArg)], \
+    keyword=[
+        (
+            "rings",
+            ListOf(
+                DynamicEnum(
+                    Ring.list,
+                    name="ring",
+                    case_sensitive=True,
+                    #we don't have a page for these
+                    #url="http://catalysttrends.wheelergroupresearch.com/AaronTools/rings.php"
+                )
+            )
+        ),
+        ("newName", ListOf(StringArg)), 
+        ("modify", BoolArg),
+        ("minimize", BoolArg),
+    ],
+    required_arguments=["rings"],
+    synopsis="fuse a ring",
+)
 
 def minimal_ring_convert(atomic_structure, atom1, atom2, avoid=None):
     tm_bonds = atomic_structure.pseudobond_group(atomic_structure.PBG_METAL_COORDINATION, create_type=None)
@@ -79,7 +90,8 @@ def minimal_ring_convert(atomic_structure, atom1, atom2, avoid=None):
 
     return residues
 
-def fuseRing(session, selection, rings, newName=None, modify=True):
+
+def fuseRing(session, selection, rings, newName=None, modify=True, minimize=False):
     if newName is None:
         pass
     elif any(len(name.strip()) > 4 for name in newName):
@@ -140,7 +152,7 @@ def fuseRing(session, selection, rings, newName=None, modify=True):
                     ]
                 )
 
-            rescol.ring_substitute(target, ringname)
+            rescol.ring_substitute(target, ringname, minimize=minimize)
             
             if modify:                    
                 rescol.update_chix(model)

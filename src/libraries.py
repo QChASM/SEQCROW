@@ -1,70 +1,12 @@
-from PyQt5.QtWidgets import QTableWidgetItem
-from PyQt5.QtCore import Qt, QSortFilterProxyModel, QRegularExpression
-from PyQt5.QtWidgets import QWidget, QTableWidget, QGridLayout, QLineEdit, QComboBox, QLabel, QHeaderView
+import re
+import os
 
-from glob import glob
+from Qt.QtWidgets import QTableWidgetItem
+from Qt.QtCore import Qt, QSortFilterProxyModel, QRegularExpression
+from Qt.QtWidgets import QWidget, QTableWidget, QGridLayout, QLineEdit, QComboBox, QLabel, QHeaderView
 
-
-class _PseudoGeometry:
-    """it would take a long ling to create the library dialogs if we actually had to read
-    the entire file for all of the ligands, figure out their key atoms, then read all of the substituents,
-    figure out their conformer info, then read all of the ring fragments...
-    PseudoGeometry speeds up this process by only reading the relevant info from the file and 
-    storing the method we should use to create the AaronTools Geometry (i.e. Component, Substituent, Ring)"""
-    def __init__(self, filename, method):
-        """filename - path to file containing a structure
-        method - Substituent, Component, or Ring classes from AaronTools"""
-        import os
-        import re
-
-        from linecache import getline, clearcache
-        from AaronTools.substituent import Substituent
-        from AaronTools.ring import Ring
-        from AaronTools.component import Component
-        
-        self.name = os.path.split(filename)[-1].replace('.xyz', '')
-        self.filename = filename
-        self.method = method
-        
-        #TODO: use AaronTools to parse comment lines
-        
-        if method == Component:
-            self.key_atoms = []
-            self.key_elements = []
-            line1 = getline(filename, 2)
-            #figure out which atoms are key atoms
-            key_info = re.search("K:([0-9,;]+)", line1)
-            if key_info is not None:
-                key_info = key_info.group(1).split(';')
-                for m in key_info:
-                    if m == "":
-                        continue
-                    
-                    m = m.split(',')
-                    for i in m:
-                        if i == "":
-                            continue
-                        self.key_atoms.append(int(i.strip(';')))   
-                
-            #read only the lines with key atoms and grab the element of each key atom
-            for atom in self.key_atoms:
-                atom_info = getline(filename, atom+2)
-                self.key_elements.append(atom_info.split()[0])
-                
-            clearcache()
-                
-        if method == Substituent:
-            line1 = getline(filename, 2)
-            #read conformer info
-            conf_info = re.search("CF:(\d+),(\d+)", line1)
-            if conf_info is not None:
-                self.conf_num = int(conf_info.group(1))
-                self.conf_angle = int(conf_info.group(2))
-            else:
-                self.conf_num = -1
-                self.conf_angle = -1
-            
-            clearcache()
+from AaronTools.geometry import Geometry
+from AaronTools.fileIO import read_types
 
 
 class LigandTable(QWidget):
@@ -126,21 +68,47 @@ class LigandTable(QWidget):
     def add_ligands(self):
         from AaronTools.component import Component
 
-        lig_list = [_PseudoGeometry(lig, Component) for lig in glob(Component.AARON_LIBS) + glob(Component.BUILTIN)]
+        names = []
         
-        for lig in lig_list:
-            row = self.table.rowCount()
-            self.table.insertRow(row)
-            self.table.setItem(row, 0, QTableWidgetItem(lig.name))
+        for lib in [Component.AARON_LIBS, Component.BUILTIN]:
+            for lig in os.listdir(lib):
+                name, ext = os.path.splitext(lig)
+                if not any(".%s" % x == ext for x in read_types):
+                    continue
+                
+                if name in names:
+                    continue
+                
+                names.append(name)
             
-            #this is an integer, so I need to initialize it then set the data
-            denticity = QTableWidgetItem()
-            denticity.setData(Qt.DisplayRole, len(lig.key_elements))
-            self.table.setItem(row, 1, denticity)
+                geom = Geometry(
+                    os.path.join(lib, lig),
+                    refresh_connected=False,
+                    refresh_ranks=False,
+                )
             
-            self.table.setItem(row, 2, QTableWidgetItem(", ".join(sorted(lig.key_elements))))
+                key_atoms = [geom.atoms[i] for i in geom.other["key_atoms"]]
+            
+                row = self.table.rowCount()
+                self.table.insertRow(row)
+                self.table.setItem(row, 0, QTableWidgetItem(name))
+                
+                #this is an integer, so I need to initialize it then set the data
+                denticity = QTableWidgetItem()
+                denticity.setData(Qt.DisplayRole, len(key_atoms))
+                self.table.setItem(row, 1, denticity)
+                
+                self.table.setItem(
+                    row,
+                    2,
+                    QTableWidgetItem(
+                        ", ".join(
+                            sorted([atom.element for atom in key_atoms])
+                        )
+                    )
+                )
     
-        self.ligand_list = lig_list
+        self.ligand_list = names
 
     def change_filter_method(self, text):
         if text == "coordinating elements":
@@ -304,24 +272,42 @@ class SubstituentTable(QWidget):
 
     def add_subs(self):
         from AaronTools.substituent import Substituent
-
-        sub_list = [_PseudoGeometry(sub, Substituent) for sub in glob(Substituent.AARON_LIBS) + glob(Substituent.BUILTIN)]
         
-        for sub in sub_list:
-            row = self.table.rowCount()
-            self.table.insertRow(row)
-            self.table.setItem(row, 0, QTableWidgetItem(sub.name))
+        names = []
+        
+        for lib in [Substituent.AARON_LIBS, Substituent.BUILTIN]:
+            for ring in os.listdir(lib):
+                name, ext = os.path.splitext(ring)
+                if not any(".%s" % x == ext for x in read_types):
+                    continue
+                
+                if name in names:
+                    continue
+                
+                names.append(name)
             
-            #the next two items are integers - need to initialize then setData so they sort and display correctly
-            conf_num = QTableWidgetItem()
-            conf_num.setData(Qt.DisplayRole, sub.conf_num)
-            self.table.setItem(row, 1, conf_num)
+                geom = Geometry(
+                    os.path.join(lib, ring),
+                    refresh_connected=False,
+                    refresh_ranks=False,
+                )
             
-            conf_angle = QTableWidgetItem()
-            conf_angle.setData(Qt.DisplayRole, sub.conf_angle)
-            self.table.setItem(row, 2, conf_angle)
+                conf_info = re.search(r"CF:(\d+),(\d+)", geom.comment)
+            
+                row = self.table.rowCount()
+                self.table.insertRow(row)
+                self.table.setItem(row, 0, QTableWidgetItem(name))
+                
+                #the next two items are integers - need to initialize then setData so they sort and display correctly
+                conf_num = QTableWidgetItem()
+                conf_num.setData(Qt.DisplayRole, conf_info.group(1))
+                self.table.setItem(row, 1, conf_num)
+                
+                conf_angle = QTableWidgetItem()
+                conf_angle.setData(Qt.DisplayRole, conf_info.group(2))
+                self.table.setItem(row, 2, conf_angle)
 
-        self.substituent_list = sub_list
+        self.substituent_list = names
 
 
 class RingTable(QWidget):
@@ -398,12 +384,20 @@ class RingTable(QWidget):
     def add_rings(self):
         from AaronTools.ring import Ring
         
-        rings = [_PseudoGeometry(ring, Ring) for ring in glob(Ring.AARON_LIBS) + glob(Ring.BUILTIN)]
-        
-        for ring in rings:
-            row = self.table.rowCount()
-            self.table.insertRow(row)
-            self.table.setItem(row, 0, QTableWidgetItem(ring.name))
-            
-        self.ring_list = rings
-        
+        names = []
+        for lib in [Ring.AARON_LIBS, Ring.BUILTIN]:
+            for ring in os.listdir(lib):
+                name, ext = os.path.splitext(ring)
+                if not any(".%s" % x == ext for x in read_types):
+                    continue
+                
+                if name in names:
+                    continue
+                
+                names.append(name)
+
+                row = self.table.rowCount()
+                self.table.insertRow(row)
+                self.table.setItem(row, 0, QTableWidgetItem(name))
+                
+        self.ring_list = names

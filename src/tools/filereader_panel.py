@@ -9,8 +9,8 @@ from chimerax.std_commands.coordset_gui import CoordinateSetSlider
 
 from io import BytesIO
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QLabel, QGridLayout, QPushButton, QTreeWidget, QWidget, QVBoxLayout, QTreeWidgetItem, QCheckBox
+from Qt.QtCore import Qt
+from Qt.QtWidgets import QLabel, QGridLayout, QPushButton, QTreeWidget, QWidget, QVBoxLayout, QTreeWidgetItem, QCheckBox
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.managers.filereader_manager import FILEREADER_CHANGE 
@@ -46,7 +46,7 @@ class FileReaderPanel(ToolInstance):
             lambda *args: self.fill_tree(*args))
         self._molname_change = self.session.triggers.add_handler(MODEL_NAME_CHANGED,
             lambda *args: self.fill_tree(*args))
-        
+
     def _build_ui(self):
         layout = QGridLayout()
 
@@ -77,7 +77,7 @@ class FileReaderPanel(ToolInstance):
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(placement="side")
-        
+
     def fill_tree(self, *args):        
         item_stack = [self.tree.invisibleRootItem()]
         
@@ -210,3 +210,11 @@ class FileReaderPanel(ToolInstance):
         self.session.triggers.remove_handler(self._molid_change)
         self.session.triggers.remove_handler(self._molname_change)
         super().delete()
+    
+    def close(self):
+        """overload close"""
+        self.session.filereader_manager.triggers.remove_handler(self._fr_change)
+        self.session.triggers.remove_handler(self._add_models)
+        self.session.triggers.remove_handler(self._molid_change)
+        self.session.triggers.remove_handler(self._molname_change)
+        super().close()

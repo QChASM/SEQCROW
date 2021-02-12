@@ -8,8 +8,8 @@ from chimerax.core.settings import Settings
 from chimerax.core.generic3d import Generic3DModel 
 from chimerax.core.selection import SELECTION_CHANGED
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QGridLayout, QFormLayout, QCheckBox, QPushButton, \
+from Qt.QtCore import Qt
+from Qt.QtWidgets import QGridLayout, QFormLayout, QCheckBox, QPushButton, \
                             QDoubleSpinBox, QWidget, QLabel, QStatusBar, QComboBox, \
                             QHBoxLayout
 
@@ -66,7 +66,7 @@ class PrecisionRotate(ToolInstance):
         layout.addWidget(QLabel("rotation vector:"), 1, 0, 1, 1, Qt.AlignLeft | Qt.AlignVCenter)
         
         self.vector_option = QComboBox()
-        self.vector_option.addItems(["axis", "bond", "perpendicular to plane", "centroid of atoms", "custom"])
+        self.vector_option.addItems(["axis", "view axis", "bond", "perpendicular to plane", "centroid of atoms", "custom"])
         layout.addWidget(self.vector_option, 1, 1, 1, 1, Qt.AlignVCenter)
         
         vector = QWidget()
@@ -87,6 +87,12 @@ class PrecisionRotate(ToolInstance):
         layout.addWidget(vector, 1, 2, 1, 1, Qt.AlignTop)
         vector.setVisible(self.vector_option.currentText() == "custom")
         self.vector_option.currentTextChanged.connect(lambda text, widget=vector: widget.setVisible(text == "custom"))
+        
+        self.view_axis = QComboBox()
+        self.view_axis.addItems(["z", "y", "x"])
+        layout.addWidget(self.view_axis, 1, 2, 1, 1, Qt.AlignTop)
+        self.view_axis.setVisible(self.vector_option.currentText() == "view axis")
+        self.vector_option.currentTextChanged.connect(lambda text, widget=self.view_axis: widget.setVisible(text == "view axis"))
         
         self.axis = QComboBox()
         self.axis.addItems(["z", "y", "x"])
@@ -129,6 +135,7 @@ class PrecisionRotate(ToolInstance):
         rotate_button = QPushButton("rotate selected atoms")
         rotate_button.clicked.connect(self.do_rotate)
         layout.addWidget(rotate_button, 4, 0, 1, 3, Qt.AlignTop)
+        self.rotate_button = rotate_button
 
         self.status_bar = QStatusBar()
         self.status_bar.setSizeGripEnabled(False)
@@ -141,6 +148,7 @@ class PrecisionRotate(ToolInstance):
         self.set_cor_selection.clicked.connect(self.show_rot_vec)
         self.vector_option.currentIndexChanged.connect(self.show_rot_vec)
         self.axis.currentIndexChanged.connect(self.show_rot_vec)
+        self.view_axis.currentIndexChanged.connect(self.show_rot_vec)
         self.bond_button.clicked.connect(self.show_rot_vec)
         self.perp_button.clicked.connect(self.show_rot_vec)
         self.group_button.clicked.connect(self.show_rot_vec)
@@ -186,7 +194,7 @@ class PrecisionRotate(ToolInstance):
                 self.status_bar.showMessage("center set to centroid of rotating atoms")
 
         elif self.cor_button.currentText() == "select atoms":
-            self.status_bar.showMessage("center set to centroid of selected atoms")
+            self.status_bar.showMessage("center set to centroid of specified atoms")
         
         else:
             self.status_bar.showMessage("center set to view's center of rotation")
@@ -271,6 +279,14 @@ class PrecisionRotate(ToolInstance):
                 vector = np.array([0., 1., 0.])            
             elif self.axis.currentText() == "x":
                 vector = np.array([1., 0., 0.])
+        
+        elif self.vector_option.currentText() == "view axis":
+            if self.view_axis.currentText() == "z":
+                vector = self.session.view.camera.get_position().axes()[2]
+            elif self.view_axis.currentText() == "y":
+                vector = self.session.view.camera.get_position().axes()[1]       
+            elif self.view_axis.currentText() == "x":
+                vector = self.session.view.camera.get_position().axes()[0]
         
         elif self.vector_option.currentText() == "bond":
             vector = self.bonds
@@ -378,6 +394,14 @@ class PrecisionRotate(ToolInstance):
             elif self.axis.currentText() == "x":
                 vector = np.array([1., 0., 0.])
         
+        elif self.vector_option.currentText() == "view axis":
+            if self.view_axis.currentText() == "z":
+                vector = self.session.view.camera.get_position().axes()[2]
+            elif self.view_axis.currentText() == "y":
+                vector = self.session.view.camera.get_position().axes()[1]       
+            elif self.view_axis.currentText() == "x":
+                vector = self.session.view.camera.get_position().axes()[0]
+
         elif self.vector_option.currentText() == "bond":
             vector = self.bonds
         
@@ -464,3 +488,14 @@ class PrecisionRotate(ToolInstance):
                 model.delete()
         
         return super().delete()
+
+    def close(self):
+        self.session.triggers.remove_handler(self._show_rot_vec)
+        global_triggers = get_triggers()
+        global_triggers.remove_handler(self._changes)
+        
+        for model in self.session.models.list(type=Generic3DModel):
+            if model.name == "rotation vector":
+                model.delete()
+        
+        return super().close()

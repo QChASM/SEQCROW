@@ -9,16 +9,17 @@ from chimerax.core.commands.cli import FloatArg, TupleOf
 
 from io import BytesIO
 
-from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtWidgets import QGridLayout, QPushButton, QCheckBox, QTabWidget, QWidget, QVBoxLayout
+from Qt import QtWidgets, QtCore
+from Qt.QtWidgets import QGridLayout, QPushButton, QCheckBox, QTabWidget, QWidget, QVBoxLayout
 
 from AaronTools.component import Component
 from AaronTools.ring import Ring
 from AaronTools.substituent import Substituent
 
-from ..libraries import LigandTable, SubstituentTable, RingTable
-from ..residue_collection import ResidueCollection
+from SEQCROW.libraries import LigandTable, SubstituentTable, RingTable
+from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.utils import iter2str
+from SEQCROW.managers.filereader_manager import apply_seqcrow_preset
 
 # TODO: change decorations to use ChimeraX atom/bond defaults
 class _BrowseLibSettings(Settings):
@@ -81,6 +82,7 @@ class AaronTools_Library(ToolInstance):
         openLigButton.setToolTip("ligands selected in the table will be loaded into ChimeraX")
         openLigButton.clicked.connect(self.open_ligands)
         self.ligand_layout.addWidget(openLigButton)
+        self.openLigButton = openLigButton
 
         #add a tab for substituents
         self.substituent_tab = QWidget()
@@ -103,6 +105,7 @@ class AaronTools_Library(ToolInstance):
         openSubButton.setToolTip("substituents selected in the table will be loaded into ChimeraX")
         openSubButton.clicked.connect(self.open_substituents)
         self.substituent_layout.addWidget(openSubButton)
+        self.openSubButton = openSubButton
         
         #add a tab for rings
         self.ring_tab = QWidget()
@@ -125,6 +128,7 @@ class AaronTools_Library(ToolInstance):
         openRingButton.setToolTip("rings selected in the table will be loaded into ChimeraX")
         openRingButton.clicked.connect(self.open_rings)
         self.ring_layout.addWidget(openRingButton)
+        self.openRingButton = openRingButton
         
         self.library_tabs.resize(300, 200)
         
@@ -154,6 +158,7 @@ class AaronTools_Library(ToolInstance):
             chimera_ligand = ResidueCollection(ligand, name=lig_name).get_chimera(self.session)
 
             self.session.models.add([chimera_ligand])
+            apply_seqcrow_preset(chimera_ligand, fallback="Ball-Stick-Endcap")
 
             if self.showLigKeyBool:
                 color = self.lig_color.get_color()
@@ -182,6 +187,7 @@ class AaronTools_Library(ToolInstance):
             chimera_substituent = ResidueCollection(substituent).get_chimera(self.session)
 
             self.session.models.add([chimera_substituent])
+            apply_seqcrow_preset(chimera_substituent, fallback="Ball-Stick-Endcap")
 
             if self.showSubGhostBool:
                 color = self.sub_color.get_color()
@@ -193,7 +199,7 @@ class AaronTools_Library(ToolInstance):
                 bild_obj = ghost_connection_highlight(substituent, color, self.session)
             
                 self.session.models.add(bild_obj, parent=chimera_substituent)
-        
+
     def showRingWalk(self, state):
         if state == QtCore.Qt.Checked:
             self.showRingWalkBool = True
@@ -210,6 +216,7 @@ class AaronTools_Library(ToolInstance):
             chimera_ring = ResidueCollection(ring.copy()).get_chimera(self.session)
 
             self.session.models.add([chimera_ring])
+            apply_seqcrow_preset(chimera_ring, fallback="Ball-Stick-Endcap")
 
             if self.showRingWalkBool:
                 color = self.ring_color.get_color()
@@ -230,7 +237,8 @@ class AaronTools_Library(ToolInstance):
     
 def key_atom_highlight(ligand, color, session):
     """returns a bild object with spheres on top on ligand's key atoms"""
-    s = ".color %f %f %f\n" % tuple(color[:-1])
+    s = ".note coordinating atoms\n"
+    s += ".color %f %f %f\n" % tuple(color[:-1])
     s += ".transparency %f\n" % (1. - color[-1])
     for atom in ligand.key_atoms:
         if hasattr(atom, "_radii"):
@@ -252,7 +260,8 @@ def key_atom_highlight(ligand, color, session):
 def ghost_connection_highlight(substituent, color, session):            
     """returns a bild object with a cylinder pointing along the 
     x axis towards the substituent and a sphere at the origin"""
-    s = ".color %f %f %f\n" % tuple(color[:-1])
+    s = ".note connection to molecule\n"
+    s += ".color %f %f %f\n" % tuple(color[:-1])
     s += ".transparency %f\n" % (1. - color[-1])
     s += ".sphere 0 0 0  %f\n" % 0.15
     s += ".cylinder 0 0 0   %f 0 0   %f open\n" % (substituent.atoms[0].coords[0], 0.15)
@@ -266,7 +275,8 @@ def show_walk_highlight(ring, chimera_ring, color, session):
     """returns a bild sphere on the walk atom if there is only one walk atom
     returns a set of bild arrows showing the walk direction if there are multiple walk atoms
         will also hide any bonds on chimera_ring that are under/over the arrows"""
-    s = ".color %f %f %f\n" % tuple(color[:-1])
+    s = ".note direction to walk around ring\n"
+    s += ".color %f %f %f\n" % tuple(color[:-1])
     s += ".transparency %f\n" % (1. - color[-1])
     if len(ring.end) == 1:
         if hasattr(ring.end[0], "_radii"):

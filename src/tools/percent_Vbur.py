@@ -8,9 +8,9 @@ from chimerax.core.settings import Settings
 from chimerax.core.models import Surface
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QKeySequence, QClipboard
-from PyQt5.QtWidgets import QPushButton, QFormLayout, QComboBox, QCheckBox, QMenuBar, QAction, \
+from Qt.QtCore import Qt
+from Qt.QtGui import QKeySequence, QClipboard
+from Qt.QtWidgets import QPushButton, QFormLayout, QComboBox, QCheckBox, QMenuBar, QAction, \
                             QFileDialog, QApplication, QTableWidget, QTableWidgetItem, \
                             QHeaderView, QSpinBox, QWidget, QGridLayout, \
                             QTabWidget, QGroupBox, QDoubleSpinBox
@@ -206,13 +206,15 @@ class PercentVolumeBuried(ToolInstance):
         steric_map_layout.addRow("automatic min. and max.:", self.auto_minmax)
         
         self.map_min = QDoubleSpinBox()
-        self.map_min.setRange(-15., 3.5)
+        self.map_min.setRange(-15., 0.)
+        self.map_min.setSuffix(" \u212B")
         self.map_min.setSingleStep(0.1)
         self.map_min.setValue(self.settings.map_min)
         steric_map_layout.addRow("minimum value:", self.map_min)    
         
         self.map_max = QDoubleSpinBox()
-        self.map_max.setRange(-3.5, 15.)
+        self.map_max.setRange(0., 15.)
+        self.map_max.setSuffix(" \u212B")
         self.map_max.setSingleStep(0.1)
         self.map_max.setValue(self.settings.map_max)
         steric_map_layout.addRow("maximum value:", self.map_max)

@@ -5,17 +5,12 @@ from chimerax.core.toolshed.info import SelectorInfo
 from chimerax.open_command import OpenerInfo
 from chimerax.core.commands import BoolArg, ModelsArg, StringArg, register
 
-from AaronTools.const import ELEMENTS
-from AaronTools.substituent import Substituent
-
-
 class _SEQCROW_API(BundleAPI):
 
     api_version = 1
     
     @staticmethod
     def initialize(session, bundle_info):
-        #TODO set AaronTools environment variables
         from SEQCROW import settings as seqcrow_settings
         seqcrow_settings.settings = settings._SEQCROWSettings(session, "SEQCROW")
         if session.ui.is_gui:
@@ -38,9 +33,20 @@ class _SEQCROW_API(BundleAPI):
 
         session.seqcrow_settings = seqcrow_settings
 
+        from AaronTools.const import ELEMENTS
+        from AaronTools.substituent import Substituent
+
         #register selectors from the user's personal library
         for sub in Substituent.list():
-            if sub not in ELEMENTS and sub.isalnum():
+                if sub in ELEMENTS:
+                    # print(sub, "in ELEMENTS")
+                    continue
+                if not sub[0].isalpha():
+                    # print(sub, "startswith non-alpha")
+                    continue
+                if len(sub) > 1 and any(not (c.isalnum() or c in "+-") for c in sub[1:]):
+                    # print(sub, "contains non-alphanumeric character")
+                    continue
                 if not any([selector.name == sub for selector in bundle_info.selectors]):
                     si = SelectorInfo(sub, atomic=True, synopsis="%s substituent" % sub)
                     bundle_info.selectors.append(si)
@@ -186,7 +192,7 @@ class _SEQCROW_API(BundleAPI):
             from .tools import BondEditor
             return BondEditor(session, ti.name)
                 
-        elif ti.name == "Rotate":
+        elif ti.name == "Rotate Atoms":
             from .tools import PrecisionRotate
             return PrecisionRotate(session, ti.name)
         
@@ -311,6 +317,10 @@ class _SEQCROW_API(BundleAPI):
             elif name == "input_builder":
                 from .tests.input_builder import QMInputBuilderToolTest
                 return QMInputBuilderToolTest
+  
+            elif name == "buried_volume":
+                from .tests.buried_volume import BuriedVolumeToolTest
+                return BuriedVolumeToolTest
     
     @staticmethod
     def register_command(bundle_info, command_info, logger):
@@ -325,15 +335,7 @@ class _SEQCROW_API(BundleAPI):
         elif command_info.name == "fuseRing":
             from .commands.fuseRing import fuseRing, fuseRing_description
             register("fuseRing", fuseRing_description, fuseRing)
-        
-        elif command_info.name == "angle":
-            from .commands.angle import angle, angle_description
-            register("angle", angle_description, angle)
-        
-        elif command_info.name == "dihedral":
-            from .commands.dihedral import dihedral, dihedral_description
-            register("dihedral", dihedral_description, dihedral)
-        
+
         elif command_info.name == "tsbond":
             from .commands.tsbond import tsbond, tsbond_description
             register("tsbond", tsbond_description, tsbond)        
@@ -357,13 +359,24 @@ class _SEQCROW_API(BundleAPI):
     @staticmethod
     def register_selector_menus(session):
         from PyQt5.QtWidgets import QAction
+        from AaronTools.const import ELEMENTS
+        from AaronTools.substituent import Substituent
 
         add_submenu = session.ui.main_window.add_select_submenu
         add_selector = session.ui.main_window.add_menu_selector
         substituent_menu = add_submenu(['Che&mistry'], 'Substituents')
         for sub in Substituent.list():
-            if sub not in ELEMENTS and sub.isalnum():
-                add_selector(substituent_menu, sub, sub)
+
+            if sub in ELEMENTS:
+                # print(sub, "in ELEMENTS")
+                continue
+            if not sub[0].isalpha():
+                # print(sub, "startswith non-alpha")
+                continue
+            if len(sub) > 1 and any(not (c.isalnum() or c in "+-") for c in sub[1:]):
+                # print(sub, "contains non-alphanumeric character")
+                continue
+            add_selector(substituent_menu, sub, sub)
         
         mw = session.ui.main_window
         structure_menu = add_submenu([], '&Structure')

@@ -7,9 +7,9 @@ from chimerax.core.commands.cli import BoolArg
 from chimerax.core.settings import Settings
 from chimerax.core.generic3d import Generic3DModel 
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QKeySequence, QClipboard
-from PyQt5.QtWidgets import QPushButton, QFormLayout, QComboBox, QLineEdit, QLabel, QCheckBox, QMenuBar, QAction, \
+from Qt.QtCore import Qt
+from Qt.QtGui import QKeySequence, QClipboard
+from Qt.QtWidgets import QPushButton, QFormLayout, QComboBox, QLineEdit, QLabel, QCheckBox, QMenuBar, QAction, \
                             QFileDialog, QApplication, QTableWidget, QTableWidgetItem, QHeaderView
 
 from AaronTools.const import VDW_RADII, BONDI_RADII
@@ -65,10 +65,12 @@ class Sterimol(ToolInstance):
         calc_sterimol_button = QPushButton("calculate parameters for selected substituents")
         calc_sterimol_button.clicked.connect(self.calc_sterimol)
         layout.addRow(calc_sterimol_button)
+        self.calc_sterimol_button = calc_sterimol_button
         
         remove_sterimol_button = QPushButton("remove Sterimol visualizations")
         remove_sterimol_button.clicked.connect(self.del_sterimol)
         layout.addRow(remove_sterimol_button)
+        self.remove_sterimol_button = remove_sterimol_button
         
         self.table = QTableWidget()
         self.table.setColumnCount(5)
@@ -148,6 +150,7 @@ class Sterimol(ToolInstance):
         semicolon.triggered.connect(lambda *args, action=space: action.setChecked(False))
 
         menu.setNativeMenuBar(False)
+        self._menu = menu
         layout.setMenuBar(menu)
         
         self.tool_window.ui_area.setLayout(layout)

@@ -25,9 +25,9 @@ from matplotlib.backend_bases import MouseEvent
 from matplotlib.figure import Figure
 from matplotlib import rc as matplotlib_rc
 
-from PyQt5.QtCore import Qt, QRect, QItemSelectionModel 
-from PyQt5.QtGui import QValidator, QFont, QIcon
-from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, QTabWidget, QComboBox, \
+from Qt.QtCore import Qt, QRect, QItemSelectionModel 
+from Qt.QtGui import QValidator, QFont, QIcon
+from Qt.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, QTabWidget, QComboBox, \
                             QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, \
                             QFormLayout, QCheckBox, QHeaderView, QMenuBar, QAction, QFileDialog, QStyle
 

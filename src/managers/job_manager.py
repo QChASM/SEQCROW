@@ -8,7 +8,7 @@ from chimerax.core.commands import run
 
 from json import load, dump
 
-from PyQt5.QtWidgets import QMessageBox, QApplication
+from Qt.QtWidgets import QMessageBox, QApplication
 
 from SEQCROW.jobs import LocalJob, GaussianJob, ORCAJob, Psi4Job
 from SEQCROW.managers import ADD_FILEREADER

@@ -50,7 +50,7 @@ class FileOption(InputFolderOption):
 
 
     def _launch_browser(self, *args):
-        from PyQt5.QtWidgets import QFileDialog
+        from Qt.QtWidgets import QFileDialog
         import os
         if self.start_folder is None or not os.path.exists(self.start_folder):
             start_folder = os.getcwd()
@@ -126,10 +126,17 @@ from that file type
                 os.environ[setting] = val
                 warn("Environment variable has been set for ChimeraX. Please restart ChimeraX for changes to take effect.")
             
-        opt = opt_class(opt_name, getattr(settings, setting), _opt_cb,
-            attr_name=setting, settings=settings, balloon=balloon, auto_set_attr=False)
+        opt = opt_class(
+            opt_name,
+            getattr(settings, setting),
+            _opt_cb,
+            attr_name=setting,
+            settings=settings,
+            balloon=balloon,
+            auto_set_attr=False,
+        )
         
-        session.ui.main_window.add_settings_option("SEQCROW", opt)    
+        session.ui.main_window.add_settings_option("SEQCROW", opt)
     
     for setting, setting_info in job_settings_info.items():
         opt_name, opt_class, balloon = setting_info
