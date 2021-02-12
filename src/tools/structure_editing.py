@@ -467,7 +467,7 @@ class EditStructure(ToolInstance):
         self.tool_window.create_child_window("select rings", window_class=RingSelection, textBox=self.ringname)
 
     def open_ptable(self):
-        self.tool_window.create_child_window("select element", window_class=PTable, button=self.element)
+        self.tool_window.create_child_window("select element", window_class=_PTable, button=self.element)
     
     def display_help(self):
         """Show the help for this tool in the help viewer."""
@@ -804,6 +804,14 @@ class PTable(ChildToolWindow):
                     int(ele_color[2] > 200) >= 2 else 'black'
                 )
             )
+
+
+class _PTable(PTable):
+    def element_changed(self, *args):
+        super().element_changed(*args)
+        
+        self.destroy()
+
 
 class NameCompleter(QCompleter):
     def __init__(self, name_list, parent=None):

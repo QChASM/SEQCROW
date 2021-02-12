@@ -1,6 +1,6 @@
 import numpy as np
 
-from chimerax.atomic import selected_atoms, selected_bonds, AtomicStructure
+from chimerax.atomic import selected_atoms, selected_bonds, selected_pseudobonds, AtomicStructure
 from chimerax.atomic.colors import element_color
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
@@ -12,7 +12,7 @@ from chimerax.core.commands import run, BoolArg, ColorArg, FloatArg, IntArg, Tup
 from Qt.QtCore import Qt
 from Qt.QtWidgets import QGridLayout, QFormLayout, QCheckBox, QTabWidget, QPushButton, \
                          QSpinBox, QDoubleSpinBox, QWidget, QLabel, QStatusBar, QSizePolicy, \
-                         QGroupBox   
+                         QGroupBox, QComboBox
 
 from SEQCROW.utils import iter2str
 from SEQCROW.residue_collection import ResidueCollection
@@ -219,6 +219,10 @@ class BondEditor(ToolInstance):
         self.bond_distance.setSingleStep(0.05)
         self.bond_distance.setValue(1.51)
         bond_length_layout.addRow("bond length:", self.bond_distance)
+        
+        self.move_fragment = QComboBox()
+        self.move_fragment.addItems(["both", "smaller", "larger"])
+        bond_length_layout.addRow("move side:", self.move_fragment)
         
         bond_lookup = QGroupBox("lookup bond length:")
         bond_lookup_layout = QGridLayout(bond_lookup)
@@ -429,42 +433,50 @@ class BondEditor(ToolInstance):
     def change_bond_length(self, *args):
         dist = self.bond_distance.value()
         
+        atom_pairs = []
+        
         sel = selected_atoms(self.session)
         if len(sel) == 2 and sel[0].structure is sel[1].structure:
-            frag1 = get_fragment(sel[0], stop=sel[1], max_len=sel[0].structure.num_atoms)
-            if sel[1] in frag1:
-                raise RuntimeError("cannot change the bond distance of atoms in a ring")
+            atom_pairs.append(sel)
             
-            frag2 = get_fragment(sel[1], stop=sel[0], max_len=sel[0].structure.num_atoms)
+        for bond in selected_bonds(self.session):
+            if not all(atom in sel for atom in bond.atoms):
+                atom_pairs.append(bond.atoms)
+        
+        for bond in selected_pseudobonds(self.session):
+            if not all(atom in sel for atom in bond.atoms):
+                atom_pairs.append(bond.atoms)
+        
+        for pair in atom_pairs:
+            atom1, atom2 = pair
+            frag1 = get_fragment(atom1, stop=atom2, max_len=atom1.structure.num_atoms)
+            frag2 = get_fragment(atom2, stop=atom1, max_len=atom1.structure.num_atoms)
             
-            v = sel[1].coord - sel[0].coord
+            v = atom2.coord - atom1.coord
             
             cur_dist = np.linalg.norm(v)
+            change = dist - cur_dist
             
-            change = 0.5 * (dist - cur_dist)
-            frag1.coords -= change * v / cur_dist 
-            frag2.coords += change * v / cur_dist 
-        
-        for bond in selected_bonds(self.session):
-            
-            if not all(atom in sel for atom in bond.atoms):
-                atom1, atom2 = bond.atoms
-                frag1 = get_fragment(atom1, stop=atom2, max_len=atom1.structure.num_atoms)
-                if atom2 in frag1:
-                    self.session.logger.error("cannot change the bond distance of atoms in a ring")
-                    continue
-                
-                frag2 = get_fragment(atom2, stop=atom1, max_len=atom1.structure.num_atoms)
-                
-                v = atom2.coord - atom1.coord
-                
-                cur_dist = np.linalg.norm(v)
-                
-                change = 0.5 * (dist - cur_dist)
+            if self.move_fragment.currentText() == "both":
+                change = 0.5 * change
                 frag1.coords -= change * v / cur_dist 
                 frag2.coords += change * v / cur_dist 
-            
-            
+            elif self.move_fragment.currentText() == "smaller":
+                if len(frag1) < len(frag2) or (
+                    len(frag1) == len(frag2) and sum(frag1.elements.masses) < sum(frag2.elements.masses)
+                ):
+                    frag1.coords -= change * v / cur_dist
+                else:
+                    frag2.coords += change * v / cur_dist
+            elif self.move_fragment.currentText() == "larger":
+                if len(frag1) > len(frag2) or (
+                    len(frag1) == len(frag2) and sum(frag1.elements.masses) > sum(frag2.elements.masses)
+                ):
+                    frag1.coords -= change * v / cur_dist
+                else:
+                    frag2.coords += change * v / cur_dist
+
+
 class PTable2(PTable):
     def __init__(self, tool_instance, title, callback, *args,**kwargs):
         self.callback = callback
@@ -474,3 +486,5 @@ class PTable2(PTable):
         super().element_changed(*args, **kwargs)
         
         self.callback()
+        
+        self.destroy()

@@ -75,6 +75,8 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
         
     status = "Opened %s as %s %s %s" % (file_name, a_or_an, format_name, "movie" if coordsets else "")
 
+    structure.filename = file_name
+
     return [structure], status
 
 def save_aarontools(session, path, format_name, **kwargs):

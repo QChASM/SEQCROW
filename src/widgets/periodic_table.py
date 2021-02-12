@@ -39,7 +39,7 @@ class ElementButton(QPushButton):
             self.state = state
 
         if self.state == self.Unchecked:
-            self.setStyleSheet("QPushButton { background: ghostwhite; color: gray; font-weight: normal; }")
+            self.setStyleSheet("QPushButton { background: whitesmoke; color: dimgray; font-weight: normal; }")
         elif self.state == self.Checked:
             #weird function to decide if text color is white or black based on jmol color
             #it's harder to see white on green, but easier to see white on blue
