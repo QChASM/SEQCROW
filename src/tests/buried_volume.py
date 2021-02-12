@@ -3,7 +3,7 @@ import os.path
 from AaronTools.test import prefix, validate
 from chimerax.core.commands import run
 from TestManager import TestWithSession
-from Qt.QtCore import Qt
+from PyQt5.QtCore import Qt
 
 
 class BuriedVolumeToolTest(TestWithSession):

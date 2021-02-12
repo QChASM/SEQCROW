@@ -4,9 +4,9 @@ from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.core.tools import ToolInstance
 from chimerax.core.commands import run
 
-from Qt.QtCore import Qt
-from Qt.QtGui import QFontDatabase, QIcon
-from Qt.QtWidgets import QGridLayout, QTextBrowser, QPushButton, QTreeWidget, QTreeWidgetItem, \
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFontDatabase, QIcon
+from PyQt5.QtWidgets import QGridLayout, QTextBrowser, QPushButton, QTreeWidget, QTreeWidgetItem, \
                             QWidget, QMessageBox, QFileDialog, QToolButton, QSizePolicy, QStyle
 
 from send2trash import send2trash

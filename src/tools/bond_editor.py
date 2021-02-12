@@ -9,8 +9,8 @@ from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
 from chimerax.core.commands import run, BoolArg, ColorArg, FloatArg, IntArg, TupleOf
 
-from Qt.QtCore import Qt
-from Qt.QtWidgets import QGridLayout, QFormLayout, QCheckBox, QTabWidget, QPushButton, \
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QGridLayout, QFormLayout, QCheckBox, QTabWidget, QPushButton, \
                          QSpinBox, QDoubleSpinBox, QWidget, QLabel, QStatusBar, QSizePolicy, \
                          QGroupBox, QComboBox
 

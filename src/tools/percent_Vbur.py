@@ -8,9 +8,9 @@ from chimerax.core.settings import Settings
 from chimerax.core.models import Surface
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 
-from Qt.QtCore import Qt
-from Qt.QtGui import QKeySequence, QClipboard
-from Qt.QtWidgets import QPushButton, QFormLayout, QComboBox, QCheckBox, QMenuBar, QAction, \
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QKeySequence, QClipboard
+from PyQt5.QtWidgets import QPushButton, QFormLayout, QComboBox, QCheckBox, QMenuBar, QAction, \
                             QFileDialog, QApplication, QTableWidget, QTableWidgetItem, \
                             QHeaderView, QSpinBox, QWidget, QGridLayout, \
                             QTabWidget, QGroupBox, QDoubleSpinBox

@@ -1,7 +1,7 @@
 from chimerax.atomic.colors import element_color
 
-from Qt.QtCore import Qt, Signal
-from Qt.QtWidgets import QPushButton, QGridLayout, QWidget, QStyle
+from PyQt5.QtCore import Qt, Signal
+from PyQt5.QtWidgets import QPushButton, QGridLayout, QWidget, QStyle
 
 from AaronTools.const import ELEMENTS, TMETAL
 

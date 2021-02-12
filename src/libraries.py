@@ -1,9 +1,9 @@
 import re
 import os
 
-from Qt.QtWidgets import QTableWidgetItem
-from Qt.QtCore import Qt, QSortFilterProxyModel, QRegularExpression
-from Qt.QtWidgets import QWidget, QTableWidget, QGridLayout, QLineEdit, QComboBox, QLabel, QHeaderView
+from PyQt5.QtWidgets import QTableWidgetItem
+from PyQt5.QtCore import Qt, QSortFilterProxyModel, QRegularExpression
+from PyQt5.QtWidgets import QWidget, QTableWidget, QGridLayout, QLineEdit, QComboBox, QLabel, QHeaderView
 
 from AaronTools.geometry import Geometry
 from AaronTools.fileIO import read_types
