@@ -168,7 +168,7 @@
                 <ChimeraXClassifier>ChimeraX :: Tool :: Process QM Thermochemistry     :: AaronTools         :: Compute the free energy of a molecule with frequency data</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Managed Models                 :: SEQCROW            :: see models managed by SEQCROW</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Add to Personal Library        :: AaronTools         :: Add to your personal ligand, substituent, and ring libraries</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Visualize Normal Modes         :: AaronTools         :: Visualize normal modes from a Gaussian output file as displacement vectors or as an animation</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Visualize Normal Modes         :: AaronTools         :: Visualize normal modes from a frequency output file as displacement vectors or as an animation</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Job Queue                      :: SEQCROW            :: View status of jobs</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Substituent Sterimol           :: Structure Analysis :: Calculate L, B1, and B5 Sterimol parameters for a substituent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Bond Editor                    :: Structure Editing  :: Draw or erase bonds</ChimeraXClassifier>

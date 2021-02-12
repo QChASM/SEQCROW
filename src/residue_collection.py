@@ -219,7 +219,7 @@ class Residue(Geometry):
             if len(atom_name) <= 4:
                 atom.name = atom_name
             else:
-                atom.name = str(atom.serial_number)
+                atom.name = atom.element.name
 
             # print("final name:", atom.name)
 

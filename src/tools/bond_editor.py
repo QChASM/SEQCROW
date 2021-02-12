@@ -1,6 +1,7 @@
 import numpy as np
 
 from chimerax.atomic import selected_atoms, selected_bonds, AtomicStructure
+from chimerax.atomic.colors import element_color
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.ui.widgets import ColorButton
@@ -10,12 +11,40 @@ from chimerax.core.commands import run, BoolArg, ColorArg, FloatArg, IntArg, Tup
 
 from Qt.QtCore import Qt
 from Qt.QtWidgets import QGridLayout, QFormLayout, QCheckBox, QTabWidget, QPushButton, \
-                            QSpinBox, QDoubleSpinBox, QWidget
+                         QSpinBox, QDoubleSpinBox, QWidget, QLabel, QStatusBar, QSizePolicy, \
+                         QGroupBox   
 
 from SEQCROW.utils import iter2str
 from SEQCROW.residue_collection import ResidueCollection
+from SEQCROW.selectors import get_fragment
+from SEQCROW.widgets import PeriodicTable
+from SEQCROW.tools.structure_editing import PTable
 
 from AaronTools.finders import AnyTransitionMetal
+from AaronTools.atoms import BondOrder
+from AaronTools.const import ELEMENTS
+
+ORDER_BOND_ORDER = BondOrder()
+
+
+class BondOrderSpinBox(QDoubleSpinBox):
+    def stepBy(self, step):
+        val = self.value()
+        if step > 0:
+            if val < 1.5:
+                self.setValue(1.5)
+            elif val < 2.0:
+                self.setValue(2.0)
+            elif val <= 3.0:
+                self.setValue(3.0)
+        
+        elif step < 0:
+            if val <= 1.5:
+                self.setValue(1.0)
+            elif val <= 2.0:
+                self.setValue(1.5)
+            elif val <= 3.0:
+                self.setValue(2.0)
 
 
 class _BondEditorSettings(Settings):
@@ -182,10 +211,94 @@ class BondEditor(ToolInstance):
         self.erase_tm_bonds = erase_tm_bonds
         
         
+        bond_length_tab = QWidget()
+        bond_length_layout = QFormLayout(bond_length_tab)
+        
+        self.bond_distance = QDoubleSpinBox()
+        self.bond_distance.setRange(0.5, 10.0)
+        self.bond_distance.setSingleStep(0.05)
+        self.bond_distance.setValue(1.51)
+        bond_length_layout.addRow("bond length:", self.bond_distance)
+        
+        bond_lookup = QGroupBox("lookup bond length:")
+        bond_lookup_layout = QGridLayout(bond_lookup)
+        
+        bond_lookup_layout.addWidget(
+            QLabel("elements:"),
+            0, 0,
+        )
+        
+        self.ele1 = QPushButton("C")
+        self.ele1.setMinimumWidth(int(1.3*self.ele1.fontMetrics().boundingRect("QQ").width()))
+        self.ele1.setMaximumWidth(int(1.3*self.ele1.fontMetrics().boundingRect("QQ").width()))
+        self.ele1.setMinimumHeight(int(1.5*self.ele1.fontMetrics().boundingRect("QQ").height()))
+        self.ele1.setMaximumHeight(int(1.5*self.ele1.fontMetrics().boundingRect("QQ").height()))
+        self.ele1.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
+        ele_color = tuple(list(element_color(ELEMENTS.index("C")))[:-1])
+        self.ele1.setStyleSheet(
+            "QPushButton { background: rgb(%i, %i, %i); color: %s; font-weight: bold; }" % (
+                *ele_color,
+                'white' if sum(
+                    int(x < 130) - int(x > 225) for x in ele_color
+                ) - int(ele_color[1] > 225) +
+                int(ele_color[2] > 200) >= 2 else 'black'
+            )
+        )
+        self.ele1.clicked.connect(lambda *args, button=self.ele1: self.open_ptable(button))
+        bond_lookup_layout.addWidget(self.ele1, 0, 1, Qt.AlignRight | Qt.AlignTop)
+        
+        bond_lookup_layout.addWidget(QLabel("-"), 0, 2, Qt.AlignHCenter | Qt.AlignVCenter)
+        
+        self.ele2 = QPushButton("C")
+        self.ele2.setMinimumWidth(int(1.3*self.ele2.fontMetrics().boundingRect("QQ").width()))
+        self.ele2.setMaximumWidth(int(1.3*self.ele2.fontMetrics().boundingRect("QQ").width()))
+        self.ele2.setMinimumHeight(int(1.5*self.ele2.fontMetrics().boundingRect("QQ").height()))
+        self.ele2.setMaximumHeight(int(1.5*self.ele2.fontMetrics().boundingRect("QQ").height()))
+        self.ele2.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
+        ele_color = tuple(list(element_color(ELEMENTS.index("C")))[:-1])
+        self.ele2.setStyleSheet(
+            "QPushButton { background: rgb(%i, %i, %i); color: %s; font-weight: bold; }" % (
+                *ele_color,
+                'white' if sum(
+                    int(x < 130) - int(x > 225) for x in ele_color
+                ) - int(ele_color[1] > 225) +
+                int(ele_color[2] > 200) >= 2 else 'black'
+            )
+        )
+        self.ele2.clicked.connect(lambda *args, button=self.ele2: self.open_ptable(button))
+        bond_lookup_layout.addWidget(self.ele2, 0, 3, Qt.AlignLeft | Qt.AlignTop)
+        
+        bond_lookup_layout.addWidget(QLabel("bond order:"), 1, 0)
+        
+        self.bond_order = BondOrderSpinBox()
+        self.bond_order.setRange(1., 3.)
+        self.bond_order.setValue(1)
+        self.bond_order.setSingleStep(0.5)
+        self.bond_order.setDecimals(1)
+        self.bond_order.valueChanged.connect(self.check_bond_lengths)
+        bond_lookup_layout.addWidget(self.bond_order, 1, 1, 1, 3)
+        
+        bond_lookup_layout.setColumnStretch(0, 0)
+        bond_lookup_layout.setColumnStretch(1, 0)
+        bond_lookup_layout.setColumnStretch(2, 0)
+        bond_lookup_layout.setColumnStretch(3, 1)
+        
+        bond_length_layout.addRow(bond_lookup)
+        
+        self.status = QStatusBar()
+        self.status.setSizeGripEnabled(False)
+        bond_lookup_layout.addWidget(self.status, 2, 0, 1, 4)
+        
+        self.do_bond_change = QPushButton("change selected bond lengths")
+        self.do_bond_change.clicked.connect(self.change_bond_length)
+        bond_length_layout.addRow(self.do_bond_change)
+        
+        
         tabs.addTab(bond_tab, "covalent bonds")
         tabs.addTab(ts_bond_tab, "TS bonds")
         tabs.addTab(hbond_tab, "H-bonds")
         tabs.addTab(tm_bond_tab, "coordination bonds")
+        tabs.addTab(bond_length_tab, "bond length")
         
         self.tool_window.ui_area.setLayout(layout)
         
@@ -297,3 +410,67 @@ class BondEditor(ToolInstance):
             pbg = model.pseudobond_group(model.PBG_METAL_COORDINATION, create_type=None)
             if pbg is not None:
                 pbg.delete()
+
+    def open_ptable(self, button):
+        self.tool_window.create_child_window("select element", window_class=PTable2, button=button, callback=self.check_bond_lengths)
+
+    def check_bond_lengths(self, *args):
+        ele1 = self.ele1.text()
+        ele2 = self.ele2.text()
+        key = ORDER_BOND_ORDER.key(ele1, ele2)
+        
+        order = "%.1f" % self.bond_order.value()
+        if key in ORDER_BOND_ORDER.bonds and order in ORDER_BOND_ORDER.bonds[key]:
+            self.bond_distance.setValue(ORDER_BOND_ORDER.bonds[key][order])
+            self.status.showMessage("")
+        else:
+            self.status.showMessage("no bond data for %s-%s %sx bonds" % (ele1, ele2, order))
+
+    def change_bond_length(self, *args):
+        dist = self.bond_distance.value()
+        
+        sel = selected_atoms(self.session)
+        if len(sel) == 2 and sel[0].structure is sel[1].structure:
+            frag1 = get_fragment(sel[0], stop=sel[1], max_len=sel[0].structure.num_atoms)
+            if sel[1] in frag1:
+                raise RuntimeError("cannot change the bond distance of atoms in a ring")
+            
+            frag2 = get_fragment(sel[1], stop=sel[0], max_len=sel[0].structure.num_atoms)
+            
+            v = sel[1].coord - sel[0].coord
+            
+            cur_dist = np.linalg.norm(v)
+            
+            change = 0.5 * (dist - cur_dist)
+            frag1.coords -= change * v / cur_dist 
+            frag2.coords += change * v / cur_dist 
+        
+        for bond in selected_bonds(self.session):
+            
+            if not all(atom in sel for atom in bond.atoms):
+                atom1, atom2 = bond.atoms
+                frag1 = get_fragment(atom1, stop=atom2, max_len=atom1.structure.num_atoms)
+                if atom2 in frag1:
+                    self.session.logger.error("cannot change the bond distance of atoms in a ring")
+                    continue
+                
+                frag2 = get_fragment(atom2, stop=atom1, max_len=atom1.structure.num_atoms)
+                
+                v = atom2.coord - atom1.coord
+                
+                cur_dist = np.linalg.norm(v)
+                
+                change = 0.5 * (dist - cur_dist)
+                frag1.coords -= change * v / cur_dist 
+                frag2.coords += change * v / cur_dist 
+            
+            
+class PTable2(PTable):
+    def __init__(self, tool_instance, title, callback, *args,**kwargs):
+        self.callback = callback
+        super().__init__(tool_instance, title, *args, **kwargs)
+    
+    def element_changed(self, *args, **kwargs):
+        super().element_changed(*args, **kwargs)
+        
+        self.callback()

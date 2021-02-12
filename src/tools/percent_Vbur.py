@@ -206,13 +206,15 @@ class PercentVolumeBuried(ToolInstance):
         steric_map_layout.addRow("automatic min. and max.:", self.auto_minmax)
         
         self.map_min = QDoubleSpinBox()
-        self.map_min.setRange(-15., 3.5)
+        self.map_min.setRange(-15., 0.)
+        self.map_min.setSuffix(" \u212B")
         self.map_min.setSingleStep(0.1)
         self.map_min.setValue(self.settings.map_min)
         steric_map_layout.addRow("minimum value:", self.map_min)    
         
         self.map_max = QDoubleSpinBox()
-        self.map_max.setRange(-3.5, 15.)
+        self.map_max.setRange(0., 15.)
+        self.map_max.setSuffix(" \u212B")
         self.map_max.setSingleStep(0.1)
         self.map_max.setValue(self.settings.map_max)
         steric_map_layout.addRow("maximum value:", self.map_max)

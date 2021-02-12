@@ -11,7 +11,7 @@ from Qt.QtWidgets import QGridLayout, QPushButton, QTabWidget, QWidget, QVBoxLay
 from AaronTools.component import Component
 from AaronTools.ring import Ring
 from AaronTools.substituent import Substituent
-from AaronTools.const import AARONLIB
+from AaronTools.const import AARONLIB, ELEMENTS
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.tools import key_atom_highlight, ghost_connection_highlight, show_walk_highlight
@@ -319,7 +319,11 @@ class LibAdd(ToolInstance):
             self.tool_window.status("%s added to substituent library" % sub_name)
             register_selectors(self.session.logger, sub_name)
             if self.session.ui.is_gui:
-                if sub_name.isalnum():
+                if (
+                        sub_name not in ELEMENTS and
+                        sub_name[0].isalpha() and
+                        (len(sub_name) > 1 and not any(not (c.isalnum() or c in "+-") for c in sub_name[1:]))
+                ):
                     add_submenu = self.session.ui.main_window.add_select_submenu
                     add_selector = self.session.ui.main_window.add_menu_selector
                     substituent_menu = add_submenu(['Che&mistry'], 'Substituents')
