@@ -71,6 +71,7 @@
             
             <Managers>
                 <Manager name="filereader_manager" uiOnly="false"/>
+                <Manager name="seqcrow_ordered_selection_manager" uiOnly="false"/>
                 <Manager name="seqcrow_job_manager" uiOnly="false"/>
             </Managers>
             

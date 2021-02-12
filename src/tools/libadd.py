@@ -189,11 +189,11 @@ class LibAdd(ToolInstance):
 
     def libadd_ring(self):
         """add ring to library or open it in a new model"""
-        selection = selected_atoms(self.session)
+        selection = self.session.seqcrow_ordered_selection_manager.selection
         
         if not selection.single_structure:
             raise RuntimeError("selected atoms must be on the same model")
-          
+
         rescol = ResidueCollection(selection[0].structure)
         walk_atoms = rescol.find([AtomSpec(atom.atomspec) for atom in selection])
 
