@@ -7,7 +7,7 @@ These tools enable users to rapidly modify several structures simultaneously, pr
 More information about SEQCROW features can be found on the [GitHub wiki](https://github.com/QChASM/SEQCROW/wiki).
 
 ## Installation
-1. Download <a href="https://github.com/QChASM/SEQCROW/raw/dev/dist/ChimeraX_SEQCROW-0.25b1-py3-none-any.whl">SEQCROW-0.25b1-py3-none-any.whl</a>
+1. Download <a href="https://github.com/QChASM/SEQCROW/raw/dev/dist/SEQCROW-0.25b1-py3-none-any.whl">SEQCROW-0.25b1-py3-none-any.whl</a>
 2. Open ChimeraX
 3. On the ChimeraX command line, enter `toolshed install /path/to/SEQCROW-0.25b1-py3-none-any.whl`
 4. Restart ChimeraX
