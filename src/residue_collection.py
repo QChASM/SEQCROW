@@ -2,7 +2,7 @@ import numpy as np
 
 import re
 
-from AaronTools.atoms import Atom
+from AaronTools.atoms import Atom as AaronToolsAtom
 from AaronTools.const import TMETAL, VDW_RADII, MASS
 from AaronTools.geometry import Geometry
 from AaronTools.ring import Ring
@@ -25,6 +25,18 @@ class _FauxAtomSelection:
     def __init__(self, atoms=[], bonds=[]):
         self.atoms = atoms
         self.bonds = bonds
+
+
+class Atom(AaronToolsAtom):
+    def __repr__(self):
+        s = ""
+        s += "{:>3s} ".format(self.element)
+        for c in self.coords:
+            s += " {: 13.8f}".format(c)
+        s += "  {: 2d}".format(-1 if self.flag else 0)
+        s += " {:>4s}".format(self.name)
+        s += " ({:s})".format(self.atomspec) if self.atomspec is not None else "None"
+        return s
 
 
 def fromChimAtom(atom=None, *args, use_scene=False, serial_number=None, atomspec=None, **kwargs):
@@ -485,14 +497,15 @@ class ResidueCollection(Geometry):
                 ndx = 0
 
             dist = 1
-            prev_atoms = []
+            cur_atoms = sub.find(list(start_atom.connected), BondedTo(sub.end))
+            prev_atoms = [start_atom]
+            stop = [start_atom]
             while ndx < len(alphabet):
-                atoms = self.find(BondsFrom(start_atom, dist), sub.atoms, NotAny("H"))
-                if not atoms:
+                if not cur_atoms:
                     break
-                for i, atom in enumerate(atoms):
+                for i, atom in enumerate(cur_atoms):
                     atom.chix_name = "%s%s" % (atom.element, alphabet[ndx])
-                    if len([a for a in atoms if a.element == atom.element]) > 1:
+                    if len([a for a in cur_atoms if a.element == atom.element]) > 1:
                         neighbors = sub.find(BondedTo(atom), prev_atoms, NotAny("H"))
                         for neighbor in neighbors:
                             if not hasattr(neighbor, "chix_name"):
@@ -507,19 +520,25 @@ class ResidueCollection(Geometry):
                     h_atoms = sub.find("H", BondedTo(atom))
                     
                     for j, h_atom in enumerate(h_atoms):
-                        if len([a for a in atoms if a.element == atom.element]) == 1 and len(h_atoms) > 1:
+                        if len([a for a in cur_atoms if a.element == atom.element]) == 1 and len(h_atoms) > 1:
                             h_atom.chix_name = "%s%s%i" % ("H", alphabet[ndx], j + 1)
                         elif len(h_atoms) > 1:
                             h_atom.chix_name = "%s%s%i%i" % ("H", alphabet[ndx], i + 1, j + 1)
                         elif (
-                                len([a for a in atoms if a.element == atom.element]) > 1 and
-                                len(self.find("H", BondsFrom(start_atom, dist + 1))) > 1
+                                len([a for a in cur_atoms if a.element == atom.element]) > 1 and
+                                len(sub.find("H", [BondedTo(a) for a in cur_atoms])) > 1
                         ):
                             h_atom.chix_name = "%s%s%i" % ("H", alphabet[ndx], i + 1)
                         else:
                             h_atom.chix_name = "%s%s" % ("H", alphabet[ndx])
 
-                prev_atoms = atoms
+                prev_atoms = cur_atoms
+                stop.extend(cur_atoms)
+                cur_atoms = self.find(
+                    [BondedTo(atom) for atom in prev_atoms],
+                    NotAny(stop),
+                    NotAny("H"),
+                )
 
                 ndx += 1
                 dist += 1

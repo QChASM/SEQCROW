@@ -99,6 +99,7 @@ def substitute(
         minimize=False,
         useRemoteness=False
     ):
+
     attached = {}
     
     if newName is None:
@@ -120,11 +121,23 @@ def substitute(
     for ndx, subname in enumerate(substituents):
         subname = subname.strip()
         sub = Substituent(subname)
+        
+        # when minimizing, we only want to deal with residues that are close to the substituent
+        # determine the size of the new substituent to limit this
+        if minimize:
+            size = 5
+            for atom in sub.atoms:
+                d = np.linalg.norm(atom.coords)
+                if d > size:
+                    size = d
+
         for model in models:
             if modify and first_pass:
                 conv_res = []
                 for res in models[model]:
-                    conv_res.append(res)
+                    if res not in conv_res:
+                        conv_res.append(res)
+
                     if minimize:
                         for chix_res in model.residues:
                             if chix_res in conv_res:
@@ -134,7 +147,7 @@ def substitute(
                             for atom in chix_res.atoms:
                                 for target in models[model][res]:
                                     d = np.linalg.norm(atom.coord - target.coord)
-                                    if d < 5:
+                                    if d < (size + 3):
                                         conv_res.append(chix_res)
                                         added_res = True
                                         break
@@ -144,10 +157,6 @@ def substitute(
 
                 rescol = ResidueCollection(model, convert_residues=conv_res)
                 for res in models[model]:
-                    residue = [resi for resi in rescol.residues if resi.chix_residue is res][0]
-                    if newName is not None:
-                        residue.name = newName[ndx]
-
                     for target in models[model][res]:
                         if attached is not None:
                             end = AtomSpec(attached[target].atomspec)
@@ -164,6 +173,10 @@ def substitute(
                             use_greek=useRemoteness
                         )
 
+                for res in models[model]:
+                    residue = [resi for resi in rescol.residues if resi.chix_residue is res][0]
+                    if newName is not None:
+                        residue.name = newName[ndx]
                     residue.update_chix(res)
 
             elif modify and not first_pass:
@@ -172,6 +185,7 @@ def substitute(
                 model_copy = model.copy()
 
                 conv_res = [model_copy.residues[i] for i in [model.residues.index(res) for res in models[model]]]
+                modifying_residues = [r for r in conv_res]
 
                 if minimize:
                     for chix_res in model_copy.residues:
@@ -183,42 +197,42 @@ def substitute(
                             for target in models[model][res]:
                                 for atom in chix_res.atoms:
                                     d = np.linalg.norm(atom.coord - target.coord)
-                                    if d < 5:
+                                    if d < (size + 3):
                                         conv_res.append(chix_res)
                                         added_res = True
                                         break
                                 
                                 if added_res:
                                     break
-                            
+
                             if added_res:
                                 break
 
                 rescol = ResidueCollection(model_copy, convert_residues=conv_res)
-                for residue, res in zip(rescol.residues, models[model]):                        
-                    res_copy = residue.chix_residue
-                    if newName is not None:
-                        residue.name = newName[ndx]
-
-                    for target in models[model][res]:
+                for residue, res in zip(modifying_residues, models[model]):                        
+                     for target in models[model][res]:
                         if attached is not None:
                             end = AtomSpec(model_copy.atoms[model.atoms.index(attached[target])].atomspec)
                         else:
                             end = None
 
                         rescol.substitute(
-                            sub.copy(), 
-                            AtomSpec(model_copy.atoms[model.atoms.index(target)].atomspec), 
-                            attached_to=end, 
+                            sub.copy(),
+                            AtomSpec(model_copy.atoms[model.atoms.index(target)].atomspec),
+                            attached_to=end,
                             minimize=minimize,
                             use_greek=useRemoteness,
                         )
 
-                    residue.update_chix(res_copy)
+                for residue in modifying_residues:
+                    res_copy = [r for r in rescol.residues if r.chix_residue is residue][0]
+                    if newName is not None:
+                        res_copy.name = newName[ndx]
+                    res_copy.update_chix(residue)
 
                 new_structures.append(model_copy)
 
         first_pass = False
-
+    
     if not modify:
         session.models.add(new_structures)
