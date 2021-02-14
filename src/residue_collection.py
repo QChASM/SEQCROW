@@ -539,6 +539,9 @@ class ResidueCollection(Geometry):
                     NotAny(stop),
                     NotAny("H"),
                 )
+                for atom in cur_atoms[::-1]:
+                    if cur_atoms.count(atom) > 1:
+                        cur_atoms.remove(atom)
 
                 ndx += 1
                 dist += 1
