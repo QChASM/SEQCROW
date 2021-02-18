@@ -71,6 +71,8 @@ class LigandTable(QWidget):
         names = []
         
         for lib in [Component.AARON_LIBS, Component.BUILTIN]:
+            if not os.path.exists(lib):
+                continue
             for lig in os.listdir(lib):
                 name, ext = os.path.splitext(lig)
                 if not any(".%s" % x == ext for x in read_types):
@@ -276,6 +278,8 @@ class SubstituentTable(QWidget):
         names = []
         
         for lib in [Substituent.AARON_LIBS, Substituent.BUILTIN]:
+            if not os.path.exists(lib):
+                continue
             for ring in os.listdir(lib):
                 name, ext = os.path.splitext(ring)
                 if not any(".%s" % x == ext for x in read_types):
@@ -386,6 +390,8 @@ class RingTable(QWidget):
         
         names = []
         for lib in [Ring.AARON_LIBS, Ring.BUILTIN]:
+            if not os.path.exists(lib):
+                continue
             for ring in os.listdir(lib):
                 name, ext = os.path.splitext(ring)
                 if not any(".%s" % x == ext for x in read_types):
