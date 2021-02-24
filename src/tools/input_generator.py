@@ -475,7 +475,7 @@ class BuildQM(ToolInstance):
         if self.preset_window is None:
             self.preset_window = self.tool_window.create_child_window("New Preset", window_class=SavePreset)
         else:
-            self.preset_window.display(True)
+            self.preset_window.shown = True
 
     def apply_preset(self, program, preset_name):
         """apply preset named 'preset_name' for 'program'"""
@@ -573,11 +573,15 @@ class BuildQM(ToolInstance):
         """shows the child window to remove a preset"""
         if self.remove_preset_window is None:
             self.remove_preset_window = self.tool_window.create_child_window("Remove Presets", window_class=RemovePreset)
+        else:
+            self.remove_preset_window.shown = True
 
     def show_export_preset(self):
         """shows child window to export preset json"""
         if self.export_preset_window is None:
             self.export_preset_window = self.tool_window.create_child_window("Export Presets", window_class=ExportPreset)
+        else:
+            self.export_preset_window.shown = True
 
     def import_preset_file(self):
         """open file browser, select file, and import presets"""
@@ -729,6 +733,8 @@ class BuildQM(ToolInstance):
         if self.preview_window is None:
             self.preview_window = self.tool_window.create_child_window("Input Preview", window_class=InputPreview)
             self.update_preview()
+        else:
+            self.preview_window.shown = True
 
     def get_file_contents(self, update_settings=False):
         self.update_theory(update_settings=update_settings)
