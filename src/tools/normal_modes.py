@@ -50,7 +50,8 @@ class _NormalModeSettings(Settings):
         'fwhm': Value(5, FloatArg), 
         'peak_type': 'Gaussian', 
         'plot_type': 'Absorbance',
-        'voigt_mix': 0.5,        
+        'voigt_mix': 0.5,
+        'exp_color': Value((0.0, 0.0, 1.0), TupleOf(FloatArg, 3), iter2str),
     }
 
 
@@ -1496,13 +1497,28 @@ class IRPlot(ChildToolWindow):
         
         toolbox.addTab(plot_widget, "plot")
 
-
-
-        options_widget = QWidget()
-        options_layout = QGridLayout(options_widget)
+        
+        # plot experimental data alongside computed
+        experimental_widget = QWidget()
+        experimental_layout = QFormLayout(experimental_widget)
+        
+        browse_button = QPushButton("browse...")
+        browse_button.clicked.connect(self.load_data)
+        experimental_layout.addRow("load CSV data:", browse_button)
+        
+        self.line_color = ColorButton(has_alpha_channel=False, max_size=(16, 16))
+        self.line_color.set_color(self.tool_instance.settings.exp_color)
+        experimental_layout.addRow("line color:", self.line_color)
+        
+        clear_button = QPushButton("clear experimental data")
+        clear_button.clicked.connect(self.clear_data)
+        experimental_layout.addRow(clear_button)
+        
+        toolbox.addTab(experimental_widget, "plot experimental data")
+        
         
         # frequency scaling
-        scaling_group = QGroupBox("frequency scaling")
+        scaling_group = QWidget()
         scaling_layout = QFormLayout(scaling_group)
         
         desc = QLabel("")
@@ -1533,7 +1549,7 @@ class IRPlot(ChildToolWindow):
         scaling_layout.addRow(set_zero)
         
         
-        lookup_scale = QGroupBox("lookup scale factor")
+        lookup_scale = QGroupBox("scale factor lookup")
         scaling_layout.addRow(lookup_scale)
         lookup_layout = QFormLayout(lookup_scale)
         
@@ -1550,7 +1566,7 @@ class IRPlot(ChildToolWindow):
         lookup_layout.addRow("basis set:", self.basis)
         
         desc = QLabel("")
-        desc.setText("view library data online <a href=\"test\" style=\"text-decoration: none;\">here</a>")
+        desc.setText("view database online <a href=\"test\" style=\"text-decoration: none;\">here</a>")
         desc.setTextFormat(Qt.RichText)
         desc.setTextInteractionFlags(Qt.TextBrowserInteraction)
         desc.linkActivated.connect(self.open_scale_library_link)
@@ -1560,11 +1576,9 @@ class IRPlot(ChildToolWindow):
         self.library.currentTextChanged.connect(self.change_scale_lib)
         self.method.currentTextChanged.connect(self.change_method)
         self.basis.currentTextChanged.connect(self.change_basis)
-        
-        options_layout.addWidget(scaling_group)
-        
-        toolbox.addTab(options_widget, "advanced options")
 
+        toolbox.addTab(scaling_group, "frequency scaling")
+        
 
         toolbox.currentChanged.connect(lambda ndx: self.refresh_plot() if not ndx else None)
         # toolbox.setMinimumWidth(int(1.1 * plot_widget.size().width()))
@@ -1649,7 +1663,7 @@ class IRPlot(ChildToolWindow):
             scale = SCALE_LIBS[self.library.currentText()][1][method]
             self.linear.setValue(1 - scale)
             self.quadratic.setValue(0.)
-        
+
     def change_basis(self, basis):
         scale = SCALE_LIBS[self.library.currentText()][1][self.method.currentText()][basis]
         self.linear.setValue(1 - scale)
@@ -1770,7 +1784,6 @@ class IRPlot(ChildToolWindow):
     
         
             x_values = np.array(list(set(x_values)))
-            #print(len(x_values), len(functions))
             x_values.sort()
             y_values = np.sum([f(x_values) for f in functions], axis=0)
         
@@ -1792,8 +1805,18 @@ class IRPlot(ChildToolWindow):
         y_values /= np.amax(y_values)
 
         ax = self.figure.gca()
-        ax.clear()
-        self.highlighted_mode = None
+        for line in ax.get_lines():
+            label = line.get_label()
+            if label == "computed":
+                ax.lines.remove(line)
+
+        if self.highlighted_mode is not None and self.highlighted_mode in ax.collections:
+            ax.collections.remove(self.highlighted_mode)
+            self.highlighted_mode = None
+        
+        for line in ax.collections[::-1]:
+            if line.get_label() == "computed":
+                ax.collections.remove(line)
 
         if self.tool_instance.plot_type.currentText() == "Transmittance":
             y_values = np.array([10 ** (2 - y) for y in y_values])
@@ -1803,15 +1826,15 @@ class IRPlot(ChildToolWindow):
        
         ax.set_xlabel(r'wavenumber (cm$^{-1}$)')
         if self.tool_instance.peak_type.currentText() != "Delta":
-            ax.plot(x_values, y_values, color='k', linewidth=0.5)
+            ax.plot(x_values, y_values, color='k', linewidth=0.5, label="computed")
         else:
             if self.tool_instance.plot_type.currentText() == "Transmittance":
-                ax.vlines(x_values, y_values, [100 for y in y_values], linewidth=0.5, colors=['k' for x in x_values])
-                ax.hlines(100, 0, max(4000, *frequencies), linewidth=0.5, colors=['k' for y in y_values])
+                ax.vlines(x_values, y_values, [100 for y in y_values], linewidth=0.5, colors=['k' for x in x_values], label="computed")
+                ax.hlines(100, 0, max(4000, *frequencies), linewidth=0.5, colors=['k' for y in y_values], label="computed")
             
             else:
-                ax.vlines(x_values, [0 for y in y_values], y_values, linewidth=0.5, colors=['k' for x in x_values])
-                ax.hlines(0, 0, max(4000, *frequencies), linewidth=0.5, colors=['k' for y in y_values])
+                ax.vlines(x_values, [0 for y in y_values], y_values, linewidth=0.5, colors=['k' for x in x_values], label="computed")
+                ax.hlines(0, 0, max(4000, *frequencies), linewidth=0.5, colors=['k' for y in y_values], label="computed")
 
         x_lim = ax.get_xlim()
         ax.set_xlim(max(x_lim), min(x_lim))
@@ -1850,7 +1873,35 @@ class IRPlot(ChildToolWindow):
         else:
             y_vals = (0, 1)
             
-        self.highlighted_mode = ax.vlines(frequency, *y_vals, color='r', zorder=-1)
+        self.highlighted_mode = ax.vlines(frequency, *y_vals, color='r', zorder=-1, label="highlight")
+        
+        self.canvas.draw()
+
+    def load_data(self, *args):
+        filename, _ = QFileDialog.getOpenFileName(filter="comma-separated values file (*.csv)")
+
+        data = np.loadtxt(filename, delimiter=",")
+
+        color = self.line_color.get_color()
+        self.tool_instance.settings.exp_color = tuple([c / 255. for c in color[:-1]])
+        
+        hex_code = "#"
+        for x in color[:-1]:
+            channel = str(hex(x))[2:]
+            if len(channel) == 1:
+                channel = "0" + channel
+            hex_code += channel
+
+        ax = self.figure.gca()
+        ax.plot(data[:,0], data[:,1], linewidth=0.5, zorder=-1, color=hex_code, label="experimental")
+        
+        self.canvas.draw()
+
+    def clear_data(self, *args):
+        ax = self.figure.gca()
+        for line in ax.get_lines():
+            if line.get_label() == "experimental":
+                ax.lines.remove(line)
         
         self.canvas.draw()
 

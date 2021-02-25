@@ -225,7 +225,7 @@ class BondEditor(ToolInstance):
         self.move_fragment.addItems(["both", "smaller", "larger"])
         bond_length_layout.addRow("move side:", self.move_fragment)
         
-        bond_lookup = QGroupBox("lookup bond length:")
+        bond_lookup = QGroupBox("bond length lookup:")
         bond_lookup_layout = QGridLayout(bond_lookup)
         
         bond_lookup_layout.addWidget(
