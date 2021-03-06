@@ -2,15 +2,15 @@ import numpy as np
 
 from AaronTools.substituent import Substituent
 
-from chimerax.atomic import AtomsArg
-from chimerax.core.commands import BoolArg, CmdDesc, StringArg, DynamicEnum, ListOf
+from chimerax.atomic import AtomsArg, selected_atoms
+from chimerax.core.commands import BoolArg, CmdDesc, StringArg, DynamicEnum, ListOf, NoArg, Or, EmptyArg
 
 from SEQCROW.finders import AtomSpec
 from SEQCROW.residue_collection import ResidueCollection, Residue
 
 
 substitute_description = CmdDesc(
-    required=[("selection", AtomsArg)], \
+    required=[("selection", Or(AtomsArg, EmptyArg))], \
     keyword=[
         (
             "substituents",
@@ -27,8 +27,8 @@ substitute_description = CmdDesc(
         ("modify", BoolArg),
         ("minimize", BoolArg),
         ("useRemoteness", BoolArg),
+        ("available", NoArg),
     ],
-    required_arguments=['substituents'], 
     synopsis="modify substituents"
 )
 
@@ -91,14 +91,26 @@ def avoidTargets(selection):
 
 def substitute(
         session,
-        selection,
-        substituents,
+        selection=None,
+        substituents=None,
         newName=None,
         guessAttachment=True,
         modify=True,
         minimize=False,
-        useRemoteness=False
+        useRemoteness=False,
+        available=False,
     ):
+
+    if available:
+        substitute_list(session)
+        return
+    
+    if not selection:
+        selection = selected_atoms(session)
+
+    if not substituents:
+        session.logger.error("missing required \"substituents\" argument")
+        return
 
     attached = {}
     
@@ -106,7 +118,7 @@ def substitute(
         pass
     elif any(len(name.strip()) > 4 for name in newName):
         raise RuntimeError("residue names must be 4 characters or less")
-    elif any(x in "".join(newName) for x in "!@#$%^&*()\\/.<><;':\"[]{}|-=_+"):
+    elif not all(name.isalnum() for name in newName):
         raise RuntimeError("invalid residue name: %s" % " ".join(newName))
     elif len(substituents) != len(newName):
         raise RuntimeError("number of substituents is not the same as the number of new names")
@@ -236,3 +248,11 @@ def substitute(
     
     if not modify:
         session.models.add(new_structures)
+
+
+def substitute_list(session):
+    s = ""
+    for subname in Substituent.list():
+        s += "%s\n" % subname
+    
+    session.logger.info(s.strip())
