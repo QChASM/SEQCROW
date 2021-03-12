@@ -966,7 +966,6 @@ SCALE_LIBS = {
 }
 
 
-
 class FPSSpinBox(QSpinBox):
     """spinbox that makes sure the value goes evenly into 60"""
     def validate(self, text, pos):
@@ -1049,6 +1048,7 @@ class NormalModes(ToolInstance):
         
         self.vec_mw_bool = False
         self.ir_plot = None
+        self.match_peaks = None
         
         self.settings = _NormalModeSettings(session, name)
         
@@ -1233,9 +1233,7 @@ class NormalModes(ToolInstance):
         fr = self.model_selector.currentData()
         if fr is None:
             return 
-            
-        model = self.session.filereader_manager.get_model(fr)
-        
+
         freq_data = fr.other['frequency'].data
         
         for i, mode in enumerate(freq_data):
@@ -1532,14 +1530,14 @@ class IRPlot(ChildToolWindow):
         self.linear = QDoubleSpinBox()
         self.linear.setDecimals(6)
         self.linear.setRange(-.2, .2)
-        self.linear.setSingleStep(0.0001)
+        self.linear.setSingleStep(0.001)
         self.linear.setValue(0.)
         scaling_layout.addRow("c<sub>1</sub> =", self.linear)
 
         self.quadratic = QDoubleSpinBox()
         self.quadratic.setDecimals(9)
         self.quadratic.setRange(-.2, .2)
-        self.quadratic.setSingleStep(0.0000001)
+        self.quadratic.setSingleStep(0.000001)
         self.quadratic.setValue(0.)
         scaling_layout.addRow("c<sub>2</sub> =", self.quadratic)
         
@@ -1576,6 +1574,20 @@ class IRPlot(ChildToolWindow):
         self.library.currentTextChanged.connect(self.change_scale_lib)
         self.method.currentTextChanged.connect(self.change_method)
         self.basis.currentTextChanged.connect(self.change_basis)
+
+        fit_scale = QGroupBox("linear least squares fitting")
+        scaling_layout.addRow(fit_scale)
+        fit_layout = QFormLayout(fit_scale)
+        
+        self.fit_c1 = QCheckBox()
+        fit_layout.addRow("fit c1:", self.fit_c1)
+        
+        self.fit_c2 = QCheckBox()
+        fit_layout.addRow("fit c2:", self.fit_c2)
+        
+        match_peaks = QPushButton("match peaks...")
+        match_peaks.clicked.connect(self.show_match_peaks)
+        fit_layout.addRow(match_peaks)
 
         toolbox.addTab(scaling_group, "frequency scaling")
         
@@ -1880,6 +1892,9 @@ class IRPlot(ChildToolWindow):
     def load_data(self, *args):
         filename, _ = QFileDialog.getOpenFileName(filter="comma-separated values file (*.csv)")
 
+        if not filename:
+            return
+
         data = np.loadtxt(filename, delimiter=",")
 
         color = self.line_color.get_color()
@@ -1905,8 +1920,115 @@ class IRPlot(ChildToolWindow):
         
         self.canvas.draw()
 
+    def show_match_peaks(self, *args):
+        if self.tool_instance.match_peaks is None:
+            self.tool_instance.match_peaks = self.tool_instance.tool_window.create_child_window("match peaks", window_class=MatchPeaks)
+
     def cleanup(self):
         self.tool_instance.ir_plot = None
         
         super().cleanup()
 
+
+class MatchPeaks(ChildToolWindow):
+    def __init__(self, tool_instance, title, *args, **kwargs):
+        super().__init__(tool_instance, title, *args, **kwargs)
+        
+        self._build_ui()
+    
+    def _build_ui(self):
+        layout = QFormLayout()
+        
+        table = QTableWidget()
+        table.setColumnCount(2)
+        table.setHorizontalHeaderLabels(["comp. freq. (cm\u207b\u00b9)", "obs. freq. (cm\u207b\u00b9)"])
+        for i in range(0, 2):
+            table.resizeColumnToContents(i)
+        
+        table.horizontalHeader().setStretchLastSection(False)            
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)        
+        
+        fr = self.tool_instance.model_selector.currentData()
+        if fr:
+            freq_data = fr.other['frequency'].data
+            
+            for i, mode in enumerate(freq_data):
+                if mode.frequency < 0:
+                    continue
+                row = table.rowCount()
+                table.insertRow(row)
+                
+                freq = FreqTableWidgetItem()
+                freq.setData(Qt.DisplayRole, "%.2f" % mode.frequency)
+                freq.setData(Qt.UserRole, mode.frequency)
+                table.setItem(row, 0, freq)
+                
+                exp_freq = QDoubleSpinBox()
+                exp_freq.setRange(0, 4500)
+                exp_freq.setDecimals(2)
+                exp_freq.setToolTip("observed frequency\nleave at 0 to not use this in fitting")
+                table.setCellWidget(row, 1, exp_freq)
+        
+        layout.addRow(table)
+        self.table = table
+        
+        do_fit_button = QPushButton("do least squares")
+        do_fit_button.clicked.connect(self.do_fit)
+        layout.addRow(do_fit_button)
+        
+        self.ui_area.setLayout(layout)
+        self.manage(None)
+    
+    def do_fit(self, *args):
+        if not self.tool_instance.ir_plot:
+            raise RuntimeError("plot window must be open during fitting")
+        comp_freqs = []
+        exp_freqs = []
+        
+        for i in range(0, self.table.rowCount()):
+            spinbox = self.table.cellWidget(i, 1)
+            if spinbox.value() != 0:
+                exp_freqs.append(spinbox.value())
+                comp_freqs.append(self.table.item(i, 0).data(Qt.UserRole))
+        
+        comp_freqs = np.array(comp_freqs)
+        exp_freqs = np.array(exp_freqs)
+        
+        fit_c1 = self.tool_instance.ir_plot.fit_c1.checkState() == Qt.Checked
+        fit_c2 = self.tool_instance.ir_plot.fit_c2.checkState() == Qt.Checked
+        
+        params = int(fit_c1) + int(fit_c2)
+        
+        if len(comp_freqs) < params:
+            raise RuntimeError("must specify enough data for %i parameter(s)" % params)
+        
+        if fit_c1 and fit_c2:
+            mat = np.array([comp_freqs, comp_freqs**2]).T
+
+            c_vals, res, _, _ = np.linalg.lstsq(mat, comp_freqs - exp_freqs)
+            self.tool_instance.ir_plot.linear.setValue(c_vals[0])
+            self.tool_instance.ir_plot.quadratic.setValue(c_vals[1])
+            if abs(c_vals[0]) > 0.2:
+                self.tool_instance.session.logger.warning("c1 value %f is outside the bounds of the spinbox widget, check your input" % c_vals[0])
+            if abs(c_vals[1]) > 0.2:
+                self.tool_instance.session.logger.warning("c2 value %f is outside the bounds of the spinbox widget, check your input" % c_vals[1])
+        elif fit_c1:
+            l = np.dot(exp_freqs, comp_freqs) / np.dot(comp_freqs, comp_freqs)
+            self.tool_instance.ir_plot.linear.setValue(1 - l)
+            self.tool_instance.ir_plot.quadratic.setValue(0.)
+            if abs(1 - l) > 0.2:
+                self.tool_instance.session.logger.warning("c1 value %f is outside the bounds of the spinbox widget, check your input" % (1 - l))
+        elif fit_c2:
+            l = np.dot(comp_freqs - exp_freqs, comp_freqs ** 2) / np.dot(comp_freqs ** 2, comp_freqs ** 2)
+            self.tool_instance.ir_plot.linear.setValue(0.)
+            self.tool_instance.ir_plot.quadratic.setValue(l)
+            if abs(l) > 0.2:
+                self.tool_instance.session.logger.warning("c2 value %f is outside the bounds of the spinbox widget, check your input" % l)
+        else:
+            self.tool_instance.session.logger.error("no fit parameters selected on plot tool window")
+
+    def cleanup(self):
+        self.tool_instance.match_peaks = None
+        
+        super().cleanup()

@@ -76,7 +76,8 @@ class Residue(Geometry):
             name=None,
             use_scene=False,
             **kwargs
-    ):      
+    ):
+        object.__setattr__(self, "_hashed", False)
         if isinstance(geom, ChimeraResidue):
             aaron_atoms = []
             for atom in geom.atoms:
@@ -327,6 +328,7 @@ class ResidueCollection(Geometry):
                             this only applies to chimerax AtomicStructures
         bonds_matter      - False to skip adding bonds/determining connectivity based on ChimeraX AtomicStructure
         """
+        object.__setattr__(self, "_hashed", False)
         self.convert_residues = convert_residues
         
         if isinstance(molecule, AtomicStructure):
