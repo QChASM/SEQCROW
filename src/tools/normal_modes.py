@@ -48,10 +48,11 @@ class _NormalModeSettings(Settings):
         'anim_duration': Value(60, IntArg),
         'anim_fps': Value(60, IntArg), 
         'fwhm': Value(5, FloatArg), 
-        'peak_type': 'Gaussian', 
+        'peak_type': 'pseudo-Voigt', 
         'plot_type': 'Absorbance',
         'voigt_mix': 0.5,
         'exp_color': Value((0.0, 0.0, 1.0), TupleOf(FloatArg, 3), iter2str),
+        'reverse_x': True,
     }
 
 
@@ -1169,34 +1170,13 @@ class NormalModes(ToolInstance):
         self.plot_type.addItems(['Absorbance', 'Transmittance'])
         ndx = self.plot_type.findText(self.settings.plot_type, Qt.MatchExactly)
         self.plot_type.setCurrentIndex(ndx)
+        self.plot_type.currentIndexChanged.connect(lambda *args: self.show_ir_plot(create=False))
         ir_layout.addRow("plot type:", self.plot_type)
         
-        self.peak_type = QComboBox()
-        self.peak_type.addItems(['Gaussian', 'Lorentzian', 'pseudo-Voigt', 'Delta'])
-        ndx = self.peak_type.findText(self.settings.peak_type, Qt.MatchExactly)
-        self.peak_type.setCurrentIndex(ndx)
-        ir_layout.addRow("peak type:", self.peak_type)
-        
-        self.fwhm = QDoubleSpinBox()
-        self.fwhm.setSingleStep(5)
-        self.fwhm.setRange(0.01, 200.0)
-        self.fwhm.setValue(self.settings.fwhm)
-        self.fwhm.setToolTip("width of peaks at half of their maximum value")
-        ir_layout.addRow("FWHM:", self.fwhm)
-        
-        self.fwhm.setEnabled(self.peak_type.currentText() != "Delta")
-        self.peak_type.currentTextChanged.connect(lambda text, widget=self.fwhm: widget.setEnabled(text != "Delta"))
-        
-        self.voigt_mix = QDoubleSpinBox()
-        self.voigt_mix.setSingleStep(0.005)
-        self.voigt_mix.setDecimals(3)
-        self.voigt_mix.setRange(0, 1)
-        self.voigt_mix.setValue(self.settings.voigt_mix)
-        self.voigt_mix.setToolTip("fraction of pseudo-Voigt function that is Gaussian")
-        ir_layout.addRow("Voigt mixing:", self.voigt_mix)
-        
-        self.voigt_mix.setEnabled(self.peak_type.currentText() == "pseudo-Voigt")
-        self.peak_type.currentTextChanged.connect(lambda text, widget=self.voigt_mix: widget.setEnabled(text == "pseudo-Voigt"))
+        self.reverse_x = QCheckBox()
+        self.reverse_x.setCheckState(Qt.Checked if self.settings.reverse_x else Qt.Unchecked)
+        self.reverse_x.stateChanged.connect(lambda *args: self.show_ir_plot(create=False))
+        ir_layout.addRow("reverse x-axis:", self.reverse_x)
         
         show_plot = QPushButton("show plot")
         show_plot.clicked.connect(self.show_ir_plot)
@@ -1421,8 +1401,8 @@ class NormalModes(ToolInstance):
         run(self.session,
             'open %s' % self.help if self.help is not None else "")
     
-    def show_ir_plot(self):
-        if self.ir_plot is None:
+    def show_ir_plot(self, *args, create=True, **kwargs):
+        if self.ir_plot is None and create:
             self.ir_plot = self.tool_window.create_child_window("IR Plot", window_class=IRPlot)
         else:
             self.ir_plot.refresh_plot()
@@ -1495,10 +1475,46 @@ class IRPlot(ChildToolWindow):
         
         toolbox.addTab(plot_widget, "plot")
 
+        # peak style
+        peak_widget = QWidget()
+        peak_layout = QFormLayout(peak_widget)
+
+        self.peak_type = QComboBox()
+        self.peak_type.addItems(['Gaussian', 'Lorentzian', 'pseudo-Voigt', 'Delta'])
+        ndx = self.peak_type.findText(self.tool_instance.settings.peak_type, Qt.MatchExactly)
+        self.peak_type.setCurrentIndex(ndx)
+        peak_layout.addRow("peak type:", self.peak_type)
+        
+        self.fwhm = QDoubleSpinBox()
+        self.fwhm.setSingleStep(5)
+        self.fwhm.setRange(0.01, 200.0)
+        self.fwhm.setValue(self.tool_instance.settings.fwhm)
+        self.fwhm.setToolTip("width of peaks at half of their maximum value")
+        peak_layout.addRow("FWHM:", self.fwhm)
+        
+        self.fwhm.setEnabled(self.peak_type.currentText() != "Delta")
+        self.peak_type.currentTextChanged.connect(lambda text, widget=self.fwhm: widget.setEnabled(text != "Delta"))
+        
+        self.voigt_mix = QDoubleSpinBox()
+        self.voigt_mix.setSingleStep(0.005)
+        self.voigt_mix.setDecimals(3)
+        self.voigt_mix.setRange(0, 1)
+        self.voigt_mix.setValue(self.tool_instance.settings.voigt_mix)
+        self.voigt_mix.setToolTip("fraction of pseudo-Voigt function that is Gaussian")
+        peak_layout.addRow("Voigt mixing:", self.voigt_mix)
+        
+        self.voigt_mix.setEnabled(self.peak_type.currentText() == "pseudo-Voigt")
+        self.peak_type.currentTextChanged.connect(lambda text, widget=self.voigt_mix: widget.setEnabled(text == "pseudo-Voigt"))
+        
+        toolbox.addTab(peak_widget, "peak settings")
         
         # plot experimental data alongside computed
         experimental_widget = QWidget()
         experimental_layout = QFormLayout(experimental_widget)
+        
+        self.skip_lines = QSpinBox()
+        self.skip_lines.setRange(0, 15)
+        experimental_layout.addRow("skip first lines:", self.skip_lines)
         
         browse_button = QPushButton("browse...")
         browse_button.clicked.connect(self.load_data)
@@ -1580,10 +1596,10 @@ class IRPlot(ChildToolWindow):
         fit_layout = QFormLayout(fit_scale)
         
         self.fit_c1 = QCheckBox()
-        fit_layout.addRow("fit c1:", self.fit_c1)
+        fit_layout.addRow("fit c<sub>1</sub>:", self.fit_c1)
         
         self.fit_c2 = QCheckBox()
-        fit_layout.addRow("fit c2:", self.fit_c2)
+        fit_layout.addRow("fit c<sub>2</sub>:", self.fit_c2)
         
         match_peaks = QPushButton("match peaks...")
         match_peaks.clicked.connect(self.show_match_peaks)
@@ -1746,11 +1762,12 @@ class IRPlot(ChildToolWindow):
         if fr is None:
             return 
 
-        fwhm = self.tool_instance.fwhm.value()
+        fwhm = self.fwhm.value()
         self.tool_instance.settings.fwhm = fwhm
-        self.tool_instance.settings.peak_type = self.tool_instance.peak_type.currentText()
+        self.tool_instance.settings.peak_type = self.peak_type.currentText()
         self.tool_instance.settings.plot_type = self.tool_instance.plot_type.currentText()
-        eta = self.tool_instance.voigt_mix.value()
+        self.tool_instance.settings.reverse_x = self.tool_instance.reverse_x.checkState() == Qt.Checked
+        eta = self.voigt_mix.value()
         self.tool_instance.settings.voigt_mix = eta
         
         frequencies = np.array([freq.frequency for freq in fr.other['frequency'].data if freq.frequency > 0])
@@ -1761,7 +1778,7 @@ class IRPlot(ChildToolWindow):
         intensities = [freq.intensity for freq in fr.other['frequency'].data if freq.frequency > 0]
         e_factor = -4 * np.log(2) / fwhm**2
         
-        if self.tool_instance.peak_type.currentText() != "Delta":
+        if self.peak_type.currentText() != "Delta":
             functions = []
             x_values = np.linspace(0, max(frequencies) - 10 * fwhm, num=100).tolist()
             for freq, intensity in zip(frequencies, intensities):
@@ -1777,15 +1794,15 @@ class IRPlot(ChildToolWindow):
                         ).tolist()
                     )
                     x_values.append(freq)
-                    if self.tool_instance.peak_type.currentText() == "Gaussian":
+                    if self.peak_type.currentText() == "Gaussian":
                         functions.append(lambda x, x0=freq, inten=intensity: \
                                         inten * np.exp(e_factor * (x - x0)**2))
     
-                    elif self.tool_instance.peak_type.currentText() == "Lorentzian":
+                    elif self.peak_type.currentText() == "Lorentzian":
                         functions.append(lambda x, x0=freq, inten=intensity, : \
                                         inten * 0.5 * (0.5 * fwhm / ((x - x0)**2 + (0.5 * fwhm)**2)))
                     
-                    elif self.tool_instance.peak_type.currentText() == "pseudo-Voigt":
+                    elif self.peak_type.currentText() == "pseudo-Voigt":
                         functions.append(
                             lambda x, x0=freq, inten=intensity:
                                 inten * (
@@ -1831,25 +1848,30 @@ class IRPlot(ChildToolWindow):
                 ax.collections.remove(line)
 
         if self.tool_instance.plot_type.currentText() == "Transmittance":
-            y_values = np.array([10 ** (2 - y) for y in y_values])
-            ax.set_ylabel('transmittance (%)')
+            y_values = np.array([10 ** (-y) for y in y_values])
+            ax.set_ylabel('transmittance (arb.)')
         else:
-            ax.set_ylabel('absorbance (a.u.)')
+            ax.set_ylabel('absorbance (arb.)')
        
         ax.set_xlabel(r'wavenumber (cm$^{-1}$)')
-        if self.tool_instance.peak_type.currentText() != "Delta":
+        if self.peak_type.currentText() != "Delta":
             ax.plot(x_values, y_values, color='k', linewidth=0.5, label="computed")
         else:
             if self.tool_instance.plot_type.currentText() == "Transmittance":
-                ax.vlines(x_values, y_values, [100 for y in y_values], linewidth=0.5, colors=['k' for x in x_values], label="computed")
-                ax.hlines(100, 0, max(4000, *frequencies), linewidth=0.5, colors=['k' for y in y_values], label="computed")
+                ax.vlines(x_values, y_values, [1 for y in y_values], linewidth=0.5, colors=['k' for x in x_values], label="computed")
+                ax.hlines(1, 0, max(4000, *frequencies), linewidth=0.5, colors=['k' for y in y_values], label="computed")
             
             else:
                 ax.vlines(x_values, [0 for y in y_values], y_values, linewidth=0.5, colors=['k' for x in x_values], label="computed")
                 ax.hlines(0, 0, max(4000, *frequencies), linewidth=0.5, colors=['k' for y in y_values], label="computed")
 
         x_lim = ax.get_xlim()
-        ax.set_xlim(max(x_lim), min(x_lim))
+        if self.tool_instance.reverse_x.checkState() == Qt.Checked:
+            ax.set_xlim(max(x_lim), min(x_lim))
+        else:
+            ax.set_xlim(min(x_lim), max(x_lim))
+        
+        ax.autoscale_view()
         
         self.canvas.draw()
 
@@ -1895,11 +1917,15 @@ class IRPlot(ChildToolWindow):
         if not filename:
             return
 
-        data = np.loadtxt(filename, delimiter=",")
+        data = np.loadtxt(filename, delimiter=",", skiprows=self.skip_lines.value())
 
         color = self.line_color.get_color()
         self.tool_instance.settings.exp_color = tuple([c / 255. for c in color[:-1]])
         
+        # figure out hex code for specified color 
+        # color is RGBA tuple with values from 0 to 255
+        # python's hex turns that to base 16 (0 to ff)
+        # if value is < 16, there will only be one digit, so pad with 0
         hex_code = "#"
         for x in color[:-1]:
             channel = str(hex(x))[2:]
