@@ -228,8 +228,12 @@
 	   </Classifiers>
     
     <AdditionalPackages>
-        <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools"/>
-        <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
+        <Package name="AaronTools" folder="/home/tony/Documents/QChASM/AaronTools"/>
+        <Package name="AaronTools.test" folder="/home/tony/Documents/QChASM/AaronTools/test"/>
+        <!--
+            <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools"/>
+            <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
+        -->
     </AdditionalPackages>
 
     <DataFiles package="AaronTools">

@@ -67,35 +67,31 @@ class SEQCROW_Theory(Theory):
     def get_psi4_json(theory, **other_kw_dict):
         out = {}
 
-        header, use_bohr = theory.make_header(theory.geometry,
-                                            style='psi4', 
-                                            return_warnings=False, 
-                                            **other_kw_dict)
+        header = theory.make_header(
+            theory.geometry,
+            style='psi4', 
+            return_warnings=False, 
+            **other_kw_dict
+        )
         
-        footer = theory.make_footer(theory.geometry,
-                                  style='psi4', 
-                                  return_warnings=False, 
-                                  **other_kw_dict)
+        mol = theory.make_molecule(
+            theory.geometry,
+            style='psi4', 
+            return_warnings=False, 
+            **other_kw_dict
+        )
+        
+        footer = theory.make_footer(
+            theory.geometry,
+            style='psi4', 
+            return_warnings=False, 
+            **other_kw_dict
+        )
         
         out['header'] = header
+        out['geometry'] = mol
         out['footer'] = footer
         
-        atoms = []
-        for atom in theory.geometry.atoms:
-            if isinstance(theory.geometry, AtomicStructure):
-                coords = atom.coord
-                ele = atom.element.name
-            elif isinstance(theory.geometry, Geometry):
-                coords = atom.coords
-                ele = atom.element
-            
-            if use_bohr:
-                coords /= UNIT.A0_TO_BOHR
-            
-            atoms.append("%-2s %13.6f %13.6f %13.6f\n" % (ele, *coords))
-        
-        out['geometry'] = atoms
-
         return out
 
     @classmethod
@@ -157,21 +153,7 @@ class SEQCROW_Theory(Theory):
         s = ""
         
         s += json_dict['header']
-
-        atoms = []
-        for atom in json_dict['geometry']:
-            atom_info = atom.split()
-            atoms.append(Atom(element=atom_info[0], coords=[float(x) for x in atom_info[1:]]))
-        
-        geometry = Geometry(atoms)
-
-        for atom in geometry.atoms:
-            if use_bohr:
-                coords = [x / 0.52917720859 for x in atom.coords]
-            else:
-                coords = atom.coords
-            s += "%-2s %12.6f %12.6f %12.6f\n" % (atom.element, *coords)
-
+        s += json_dict['geometry']
         s += json_dict['footer']
 
         if fname is not None:

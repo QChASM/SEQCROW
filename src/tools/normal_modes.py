@@ -1067,18 +1067,19 @@ class NormalModes(ToolInstance):
         
         #table that lists frequencies
         table = QTableWidget()
-        table.setColumnCount(2)
-        table.setHorizontalHeaderLabels(['Frequency (cm\u207b\u00b9)', 'IR intensity'])
+        table.setColumnCount(3)
+        table.setHorizontalHeaderLabels(["Frequency (cm\u207b\u00b9)", "symmetry", "IR intensity"])
         table.setSortingEnabled(True)
         table.setSelectionBehavior(QTableView.SelectRows)
         table.setSelectionMode(QTableView.SingleSelection)
         table.setEditTriggers(QTableWidget.NoEditTriggers)
-        for i in range(0, 2):
+        for i in range(0, 3):
             table.resizeColumnToContents(i)
         
         table.horizontalHeader().setStretchLastSection(False)            
         table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
-        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)        
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)        
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)        
         
         layout.addWidget(table)
         self.table = table
@@ -1225,10 +1226,15 @@ class NormalModes(ToolInstance):
             freq.setData(Qt.UserRole, i)
             self.table.setItem(row, 0, freq)
             
+            symmetry = QTableWidgetItem()
+            if mode.symmetry:
+                symmetry.setData(Qt.DisplayRole, mode.symmetry)
+            self.table.setItem(row, 1, symmetry)
+
             intensity = QTableWidgetItem()
             if mode.intensity is not None:
                 intensity.setData(Qt.DisplayRole, round(mode.intensity, 2))
-            self.table.setItem(row, 1, intensity)
+            self.table.setItem(row, 2, intensity)
         
         self.table.setSelection(QRect(0, 0, 2, 1), QItemSelectionModel.Select)
     
