@@ -1,3 +1,7 @@
+from io import BytesIO
+from os.path import basename
+import re
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -15,10 +19,6 @@ from AaronTools.atoms import Atom
 from AaronTools.const import PHYSICAL
 from AaronTools.geometry import Geometry
 from AaronTools.pathway import Pathway
-
-from io import BytesIO
-
-from os.path import basename
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.backend_bases import MouseEvent
@@ -1226,10 +1226,22 @@ class NormalModes(ToolInstance):
             freq.setData(Qt.UserRole, i)
             self.table.setItem(row, 0, freq)
             
-            symmetry = QTableWidgetItem()
             if mode.symmetry:
-                symmetry.setData(Qt.DisplayRole, mode.symmetry)
-            self.table.setItem(row, 1, symmetry)
+                text = mode.symmetry
+                if re.search("\d", text):
+                    text = re.sub(r"(\d+)", r"<sub>\1</sub>", text)
+                if text.startswith("SG"):
+                    text = "Σ" + text[2:]
+                elif text.startswith("PI"):
+                    text = "Π" + text[2:]
+                elif text.startswith("DLT"):
+                    text = "Δ" + text[3:]
+                if any(text.endswith(char) for char in "vhdugVHDUG"):
+                    text = text[:-1] + "<sub>" + text[-1].lower() + "</sub>"
+
+                label = QLabel(text)
+                label.setAlignment(Qt.AlignCenter)
+                self.table.setCellWidget(row, 1, label)
 
             intensity = QTableWidgetItem()
             if mode.intensity is not None:

@@ -230,7 +230,7 @@ class JobQueue(ToolInstance):
                 
                 item.setText(self.SERVER_COL, "local")
 
-                if hasattr(job, "scratch_dir") and os.path.exists(job.scratch_dir):
+                if job.scratch_dir and os.path.exists(job.scratch_dir):
                     browse_widget = QWidget()
                     browse_layout = QGridLayout(browse_widget)
                     browse = QPushButton()

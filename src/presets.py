@@ -196,7 +196,8 @@ def seqcrow_s(session, models=None, atoms=None):
             if atom.element.name == "H":
                 display = len(atom.neighbors) != 1
                 for bonded_atom in atom.neighbors:
-                    if any(x == bonded_atom.element.name for x in ["N", "O", "F", "Cl", "Br"] + list(TMETAL.keys())):
+                    # do not display H's on C unless it's a terminus
+                    if "C" != bonded_atom.element.name or (bonded_atom.element.name == "C" and [a.element.name for a in bonded_atom.neighbors].count("H") >= bonded_atom.num_bonds - 1): 
                         display = True
                         break
                 

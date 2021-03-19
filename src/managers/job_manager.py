@@ -1,6 +1,7 @@
 import os
 
 from AaronTools.fileIO import FileReader
+from AaronTools.json_extension import ATDecoder, ATEncoder
 
 from chimerax.core.toolshed import ProviderManager
 from chimerax.core.triggerset import TriggerSet
@@ -24,10 +25,7 @@ class JobManager(ProviderManager):
     def __init__(self, session, *args, **kwargs):
         # 1.2 adds an __init__ to ProviderManager that uses the manager name for things
         # this is not the case in 1.1
-        params = signature(super().__init__).parameters
-        if any("name" in param for param in params):
-            super().__init__(*args, **kwargs)
-            
+
         self.session = session
         self.local_jobs = []
         self.remote_jobs = []
@@ -36,6 +34,7 @@ class JobManager(ProviderManager):
         self._thread = None
         self.initialized = False
         self.queue_dict = {}
+        self.formats = {}
 
         self.triggers = TriggerSet()
         self.triggers.add_trigger(JOB_FINISHED)
@@ -45,6 +44,10 @@ class JobManager(ProviderManager):
         self.triggers.add_trigger(JOB_QUEUED)
         self.triggers.add_handler(JOB_QUEUED, self.check_queue)
         self.triggers.add_handler(JOB_QUEUED, self.write_json)
+        
+        params = signature(super().__init__).parameters
+        if any("name" in param for param in params):
+            super().__init__(*args, **kwargs)
 
     def __setattr__(self, attr, val):
         if attr == "paused":
@@ -63,110 +66,86 @@ class JobManager(ProviderManager):
     def has_job_running(self):
         return any([job.isRunning() for job in self.local_jobs])
 
-    def add_provider(self, *args, **kwargs):
-        self._thread = None
+    def add_provider(self, bundle_info, name):
+        print("adding %s format" % name)
+        if name in self.formats:
+            self.session.logger.warning(
+                "local job type %s from %s supplanted that from %s" % (
+                    name, bundle_info.name, self.formats[name].name
+                )
+            )
+        self.formats[name] = bundle_info
 
     def init_queue(self):
         """reads cached job list to fill in the queue"""
         scr_dir = os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR)
-        self.jobs_list_filename = os.path.join(scr_dir, "job_list-2.json")
+        self.jobs_list_filename = os.path.join(scr_dir, "job_list-3.json")
         if os.path.exists(self.jobs_list_filename):
             with open(self.jobs_list_filename, 'r') as f:
-                queue_dict = load(f)
+                queue_dict = load(f, cls=ATDecoder)
 
-            if 'check' in queue_dict:
-                for job in queue_dict['check']:
+            for section in ["check", "queued", "finished", "error", "killed"]:
+                if section not in queue_dict:
+                    continue
+                for job in queue_dict[section]:
                     if job['server'] == 'local':
-                        if job['format'] == 'Psi4':
-                            local_job = Psi4Job(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
-
-                        elif job['format'] == 'ORCA':
-                            local_job = ORCAJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
-
-                        elif job['format'] == 'Gaussian':
-                            local_job = GaussianJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
-
-                        if 'output' in job and os.path.exists(job['output']):
-                            fr = FileReader(job['output'], just_geom=False)
-                            if 'finished' in fr.other and fr.other['finished']:
-                                local_job.isFinished = lambda *args, **kwargs: True
-                            else:
-                                local_job.isRunning = lambda *args, **kwargs: True
-                                self.unknown_status_jobs.append(local_job)
-
-                            local_job.output_name = job['output']
-                            local_job.scratch_dir = job['scratch']
-
-                        self.local_jobs.append(local_job)
-
-            for job in queue_dict['queued']:
-                if job['server'] == 'local':
-                    if job['format'] == 'Psi4':
-                        local_job = Psi4Job(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
-                    
-                    elif job['format'] == 'ORCA':
-                        local_job = ORCAJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
-                    
-                    elif job['format'] == 'Gaussian':
-                        local_job = GaussianJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
-                
-                    self.local_jobs.append(local_job)
-                    self.session.logger.info("added %s (%s job) from previous session" % (job['name'], job['format']))
-
-            for job in queue_dict['finished']:
-                if job['server'] == 'local':
-                    if job['format'] == 'Psi4':
-                        local_job = Psi4Job(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
-                        
-                    elif job['format'] == 'ORCA':
-                        local_job = ORCAJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
-                    
-                    elif job['format'] == 'Gaussian':
-                        local_job = GaussianJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
-                
-                    #shh it's finished
-                    local_job.isFinished = lambda *args, **kwargs: True
-                    local_job.output_name = job['output']
-                    local_job.scratch_dir = job['scratch']
-                    self.local_jobs.append(local_job)
-
-            if 'error' in queue_dict:
-                for job in queue_dict['error']:
-                    if job['server'] == 'local':
-                        if job['format'] == 'Psi4':
-                            local_job = Psi4Job(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
-                            
-                        elif job['format'] == 'ORCA':
-                            local_job = ORCAJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
-                        
-                        elif job['format'] == 'Gaussian':
-                            local_job = GaussianJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
-                    
-                        #shh it's finished
-                        local_job.isFinished = lambda *args, **kwargs: True
-                        local_job.error = True
-                        local_job.output_name = job['output']
-                        local_job.scratch_dir = job['scratch']
-                        self.local_jobs.append(local_job)
-
-            if 'killed' in queue_dict:
-                for job in queue_dict['killed']:
-                    if job['server'] == 'local':
-                        if job['format'] == 'Psi4':
-                            local_job = Psi4Job(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
-
-                        elif job['format'] == 'ORCA':
-                            local_job = ORCAJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
-
-                        elif job['format'] == 'Gaussian':
-                            local_job = GaussianJob(job['name'], self.session, job, auto_update=job['auto_update'], auto_open=job['auto_open'])
-
-                        #shh it's finished
-                        local_job.isFinished = lambda *args, **kwargs: True
-                        local_job.killed = True
-                        local_job.output_name = job['output']
-                        local_job.scratch_dir = job['scratch']
-                        self.local_jobs.append(local_job)
+                        for name, bi in self.formats.items():
+                            if name == job["format"]:
+                                job_cls = bi.run_provider(
+                                    self.session,
+                                    name,
+                                    self
+                                )
+                                local_job = job_cls(
+                                    job['name'],
+                                    self.session,
+                                    job['theory'],
+                                    geometry=job['geometry'],
+                                    auto_update=job['auto_update'],
+                                    auto_open=job['auto_open'],
+                                )
+                                
+                                if section == "check":
+                                    if 'output' in job and os.path.exists(job['output']):
+                                        fr = FileReader(job['output'], just_geom=False)
+                                        if 'finished' in fr.other and fr.other['finished']:
+                                            local_job.isFinished = lambda *args, **kwargs: True
+                                        else:
+                                            local_job.isRunning = lambda *args, **kwargs: True
+                                            self.unknown_status_jobs.append(local_job)
+    
+                                elif section == "finished":
+                                    #shh it's finished
+                                    local_job.isFinished = lambda *args, **kwargs: True
+                                    local_job.output_name = job['output']
+                                    local_job.scratch_dir = job['scratch']
+                                
+                                elif section == "error":
+                                    #shh it's finished
+                                    local_job.isFinished = lambda *args, **kwargs: True
+                                    local_job.error = True
+                                    local_job.output_name = job['output']
+                                    local_job.scratch_dir = job['scratch']
+                                
+                                elif section == "killed":
+                                    local_job.isFinished = lambda *args, **kwargs: True
+                                    local_job.killed = True
+                                    local_job.output_name = job['output']
+                                    local_job.scratch_dir = job['scratch']
+    
+                                local_job.output_name = job['output']
+                                local_job.scratch_dir = job['scratch']
+                                
+                                self.local_jobs.append(local_job)
+                                self.session.logger.info("added %s (%s job) from previous session" % (job['name'], job['format']))
+                                break
+                        else:
+                            self.session.logger.warning(
+                                "local job provider for %s jobs is no longer installed," % job["format"] +
+                                "job named '%s' will be removed from the queue" % job["name"]
+                            )
+    
+                            self.local_jobs.append(local_job)
 
             self.paused = queue_dict['job_running']
 
@@ -210,7 +189,7 @@ class JobManager(ProviderManager):
             os.makedirs(os.path.dirname(self.jobs_list_filename))
 
         with open(self.jobs_list_filename, 'w') as f:
-            dump(d, f)
+            dump(d, f, cls=ATEncoder, indent=4)
 
     def job_finished(self, trigger_name, job):
         """when a job is finished, open or update the structure as requested"""

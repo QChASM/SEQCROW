@@ -1,3 +1,5 @@
+import re
+
 from SEQCROW.widgets import FilereaderComboBox
 
 from Qt.QtCore import Qt, QRegularExpression
@@ -47,6 +49,14 @@ nrg_infos = [
     "Beta Orbital Energies",
 ]
     
+pg_infos = [
+    "full_point_group",
+    "abelian_subgroup",
+    "concise_abelian_subgroup",
+    "full_point_group",
+    "molecular_point_group",
+]
+
 
 class _InfoSettings(Settings):
     AUTO_SAVE = {
@@ -296,7 +306,7 @@ class Info(ToolInstance):
         for info in fr.other.keys():
             if info == "archive" and not self.settings.archive:
                 continue
-            
+
             if any(isinstance(fr.other[info], obj) for obj in [str, float, int]):
                 row = self.table.rowCount()
                 self.table.insertRow(row)
@@ -331,6 +341,17 @@ class Info(ToolInstance):
 
                     val = "%.6f" % val
 
+                elif any(info == x for x in pg_infos):
+                    info_name = info.replace("_", " ")
+                    if re.search("\d", val):
+                        val = re.sub(r"(\d+)", r"<sub>\1</sub>", val)
+                    # gaussian uses * for infinity
+                    val = val.replace("*", "<sub>∞</sub>")
+                    # psi4 uses _inf_
+                    val = val.replace("_inf_", "<sub>∞</sub>")
+                    if any(val.endswith(char) for char in "vhdsiVHDSI"):
+                        val = val[:-1] + "<sub>" + val[-1].lower() + "</sub>"
+
                 if "<sub>" in info_name:
                     self.table.setCellWidget(row, 0, QLabel(info_name))
                 else:
@@ -340,9 +361,12 @@ class Info(ToolInstance):
                 
                 value = QTableWidgetItem()
                 val = str(val)
-                value.setData(Qt.DisplayRole, val)
-                self.table.setItem(row, 1, value)
-            
+                if "<sub>" in val:
+                    self.table.setCellWidget(row, 1, QLabel(val))
+                else:
+                    value.setData(Qt.DisplayRole, val)
+                    self.table.setItem(row, 1, value)
+
             elif isinstance(fr.other[info], Theory):
                 theory = fr.other[info]
                 if theory.method is not None:
@@ -389,7 +413,7 @@ class Info(ToolInstance):
                             value = QTableWidgetItem()
                             value.setData(Qt.DisplayRole, ecp.name)
                             self.table.setItem(row, 1, value)
-                    
+
             elif hasattr(fr.other[info], "__iter__") and all(isinstance(x, float) for x in fr.other[info]):
                 row = self.table.rowCount()
                 self.table.insertRow(row)
@@ -408,7 +432,10 @@ class Info(ToolInstance):
                 value = QTableWidgetItem()
                 value.setData(Qt.DisplayRole, ", ".join(["%.4f" % x for x in vals]))
                 self.table.setItem(row, 1, value)
-        
+
+            
+                
+
         self.table.resizeColumnToContents(0)
         self.table.resizeColumnToContents(1)
         
