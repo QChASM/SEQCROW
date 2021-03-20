@@ -24,7 +24,7 @@ from SEQCROW.utils import iter2str
 from SEQCROW.widgets import PeriodicTable, ModelComboBox
 from SEQCROW.finders import AtomSpec
 
-from AaronTools.config import Config, SECTIONS
+from AaronTools.config import Config
 from AaronTools.const import TMETAL
 from AaronTools.theory import *
 from AaronTools.theory.method import KNOWN_SEMI_EMPIRICAL
@@ -711,10 +711,6 @@ class BuildQM(ToolInstance):
             config = Config(filename, quiet=True)
 
             for section in config.sections():
-                if any(section == x for x in SECTIONS):
-                    self.session.logger.info("skipping AaronTools standard section: %s" % section)
-                    continue
-
                 new_preset = {}
 
                 program = config.get(section, "exec_type", fallback=False)
@@ -974,6 +970,14 @@ class BuildQM(ToolInstance):
         """copies input file to the clipboard"""
         output, warnings = self.get_file_contents(update_settings=True)
 
+        if isinstance(output, dict):
+            s = ""
+            for key, item in output.items():
+                s += "<<- %s\n" % key
+                s += item
+                s += "%s\n\n\n" % key
+            output = s
+
         for warning in warnings:
             self.session.logger.warning(warning)
 
@@ -998,8 +1002,18 @@ class BuildQM(ToolInstance):
             return
 
         contents, warnings = self.get_file_contents(update_settings=True)
-        with open(filename, "w") as f:
-            f.write(contents)
+
+        if isinstance(contents, dict):
+            for key, item in contents.items():
+                if "%" in key:
+                    fname = key % filename
+                else:
+                    fname = filename
+                with open(fname, "w") as f:
+                    f.write(item)
+        else:
+            with open(filename, "w") as f:
+                f.write(contents)
 
         for warning in warnings:
             self.session.logger.warning(warning)
@@ -1097,11 +1111,9 @@ class JobTypeOption(QWidget):
         job_type_layout.addRow("multiplicity:", self.multiplicity)
 
         self.do_geom_opt = QCheckBox()
-        self.do_geom_opt.stateChanged.connect(self.change_job_type)
         job_type_layout.addRow("geometry optimization:", self.do_geom_opt)
 
         self.do_freq = QCheckBox()
-        self.do_freq.stateChanged.connect(self.change_job_type)
         job_type_layout.addRow("frequency calculation:", self.do_freq)
 
         self.job_type_opts = QTabWidget()
@@ -1134,6 +1146,7 @@ class JobTypeOption(QWidget):
 
         self.use_checkpoint = QCheckBox()
         self.use_checkpoint.stateChanged.connect(self.something_changed)
+        self.use_checkpoint.stateChanged.connect(self.chk_state_changed)
         runtime_layout.addRow("read checkpoint:", self.use_checkpoint)
 
         runtime_outer_shell_layout.addWidget(runtime_form, 0, 0, 1, 1, Qt.AlignTop)
@@ -1145,7 +1158,7 @@ class JobTypeOption(QWidget):
         file_browse_layout.setContentsMargins(*new_margins)
         self.chk_file_path = QLineEdit()
         self.chk_file_path.textChanged.connect(self.something_changed)
-        self.chk_browse_button = QPushButton("browse")
+        self.chk_browse_button = QPushButton("browse...")
         self.chk_browse_button.clicked.connect(self.open_chk_save)
         label = QLabel("checkpoint path:")
         file_browse_layout.addWidget(label, 0, 0, Qt.AlignVCenter)
@@ -1353,6 +1366,8 @@ class JobTypeOption(QWidget):
 
         self.do_geom_opt.stateChanged.connect(self.opt_checked)
         self.do_freq.stateChanged.connect(self.freq_checked)
+        self.do_geom_opt.stateChanged.connect(self.change_job_type)
+        self.do_freq.stateChanged.connect(self.change_job_type)
 
         self.constrained_atom_table.resizeColumnToContents(1)
         self.constrained_atom_table.horizontalHeader().setStretchLastSection(False)
@@ -1391,17 +1406,19 @@ class JobTypeOption(QWidget):
 
     def open_chk_save(self):
         """open file dialog to locate chk/gbs/hess file"""
-        if self.form == "Gaussian" and self.use_checkpoint.checkState() == Qt.Checked:
-            filename, _ = QFileDialog.getOpenFileName(filter="Gaussian checkpoint files (*.chk)")
+        if self.use_checkpoint.checkState() == Qt.Unchecked and not self.form.save_checkpoint_filter and self.form.read_checkpoint_filter:
+            self.use_checkpoint.setCheckState(Qt.Checked)
         
-        elif self.form == "Gaussian" and self.use_checkpoint.checkState() == Qt.Unchecked:
-            filename, _ = QFileDialog.getSaveFileName(filter="Gaussian checkpoint files (*.chk)")
-
-        elif self.form == "ORCA":
-            filename, _ = QFileDialog.getOpenFileName(
-                filter="ORCA orbital files (*.gbw);;" +
-                "ORCA Hessian files (*.hess)"
-            )
+        elif self.use_checkpoint.checkState() == Qt.Checked and not self.form.read_checkpoint_filter and self.form.save_checkpoint_filter:
+            self.use_checkpoint.setCheckState(Qt.Unchecked)
+            
+        if self.use_checkpoint.checkState() == Qt.Checked and self.form.read_checkpoint_filter:
+            filename, _ = QFileDialog.getOpenFileName(filter=self.form.read_checkpoint_filter)
+        
+        elif self.use_checkpoint.checkState() == Qt.Unchecked and self.form.save_checkpoint_filter:
+            filename, _ = QFileDialog.getSaveFileName(filter=self.form.save_checkpoint_filter)
+        else:
+            return
 
         if filename:
             self.chk_file_path.setText(filename)
@@ -1414,11 +1431,23 @@ class JobTypeOption(QWidget):
         """when optimization is checked, switch the tab widget to show optimization settings"""
         if state == Qt.Checked:
             self.job_type_opts.setCurrentIndex(1)
+        elif self.job_type_opts.currentIndex() == 1:
+            self.job_type_opts.setCurrentIndex(0)
 
     def freq_checked(self, state):
         """when frequency is checked, switch the tab widget to show freq settings"""
         if state == Qt.Checked:
             self.job_type_opts.setCurrentIndex(2)
+        elif self.job_type_opts.currentIndex() == 2:
+            self.job_type_opts.setCurrentIndex(0)
+
+    def chk_state_changed(self, state):
+        if state == Qt.Checked:
+            self.chk_file_path.setEnabled(bool(self.form.read_checkpoint_filter))
+            self.chk_browse_button.setEnabled(bool(self.form.read_checkpoint_filter))
+        else:
+            self.chk_file_path.setEnabled(bool(self.form.save_checkpoint_filter))
+            self.chk_browse_button.setEnabled(bool(self.form.save_checkpoint_filter))
 
     def setOptions(self, file_info):
         """change all options to show the ones available for 'program'"""
@@ -1441,14 +1470,18 @@ class JobTypeOption(QWidget):
                 self.solvent_names.addItems(file_info.solvents)
             self.solvent_name.setText(self.settings.previous_solvent_name)
         self.job_type_opts.setTabEnabled(3, bool(file_info.solvent_models))
+        if not file_info.read_checkpoint_filter:
+            self.use_checkpoint.setCheckState(Qt.Unchecked)
         self.use_checkpoint.setEnabled(
-            bool(file_info.read_checkpoint_filter) or bool(file_info.save_checkpoint_filter)
+            bool(file_info.read_checkpoint_filter)
         )
         self.chk_file_path.setEnabled(
-            bool(file_info.read_checkpoint_filter) or bool(file_info.save_checkpoint_filter)
+            (self.use_checkpoint.checkState() == Qt.Checked and bool(file_info.read_checkpoint_filter)) or 
+            (self.use_checkpoint.checkState() == Qt.Unchecked and bool(file_info.save_checkpoint_filter))
         )
         self.chk_browse_button.setEnabled(
-            bool(file_info.read_checkpoint_filter) or bool(file_info.save_checkpoint_filter)
+            (self.use_checkpoint.checkState() == Qt.Checked and bool(file_info.read_checkpoint_filter)) or 
+            (self.use_checkpoint.checkState() == Qt.Unchecked and bool(file_info.save_checkpoint_filter))
         )
 
         self.solvent_names.sortItems()
@@ -2550,7 +2583,7 @@ class MethodOption(QWidget):
             self.grid.addItems(file_info.grids)
 
         ndx = self.method_option.findText(current_func, Qt.MatchExactly)
-        if ndx == -1 and current_func:
+        if ndx == -1:
             ndx = self.method_option.count() - 1
             self.method_kw.setText(current_func)
         self.method_option.setCurrentIndex(ndx)
@@ -2885,17 +2918,13 @@ class BasisOption(QWidget):
         """display options that are available in the specified program"""
         self.blockSignals(True)
         self.form = file_info
-        basis = self.basis_option.currentText()
+        basis = self.currentBasis()
+        basis.elements = []
         aux = self.aux_type.currentText()
         self.basis_option.clear()
 
         self.basis_option.addItems(getattr(file_info, self.info_attribute))
         self.basis_option.addItem("other")
-        ndx = self.basis_option.findText(basis, Qt.MatchExactly)
-        if ndx >= 0:
-            self.basis_option.setCurrentIndex(ndx)
-        else:
-            self.basis_option.setCurrentIndex(self.basis_option.count() - 1)
         
         if not file_info.aux_options and self.getAuxType() != "no":
             self.destruct()
@@ -2903,6 +2932,9 @@ class BasisOption(QWidget):
         elif self.aux_available:
             for opt in self.aux_options:
                 opt.setVisible(bool(file_info.aux_options))
+        else:
+            for opt in self.aux_options:
+                opt.setVisible(False)
         
         self.aux_type.clear()
         self.aux_type.addItem("no")
@@ -2910,6 +2942,7 @@ class BasisOption(QWidget):
             self.aux_type.addItems(file_info.aux_options)
 
         self.setAux(aux)
+        self.setBasis(basis.name)
 
         self.blockSignals(False)
 
@@ -3663,15 +3696,14 @@ class BasisWidget(QWidget):
             basis.setOptions(file_info)
             basis.setSelectedElements(elements)
 
-        for basis in self.ecp_options:
-            basis.setOptions(file_info)
-
         if not file_info.ecps:
             self.ecp_widget.setVisible(False)
             for ecp in self.ecp_options:
                 self.remove_basis(ecp)
         else:
             self.ecp_widget.setVisible(True)
+            for ecp in self.ecp_options:
+                ecp.setOptions(file_info)
 
     def setElements(self, element_list):
         """sets the available elements in all child BasisOptions
@@ -4874,6 +4906,13 @@ class InputPreview(ChildToolWindow):
 
     def setPreview(self, text, warnings_list):
         """sets preview to 'text' and shows warnings in the status bar"""
+        if isinstance(text, dict):
+            s = ""
+            for key, item in text.items():
+                s += "<<- %s\n" % key
+                s += item
+                s += "%s\n\n\n" % key
+            text = s
         self.preview.setText(text)
         if len(warnings_list) > 0:
             self.status.setVisible(True)

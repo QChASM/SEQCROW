@@ -587,11 +587,14 @@ class GaussianFileInfo(QMInputFileInfo):
         #XXX: Move to AaronTools theory
         if read_checkpoint:
             for kw in route:
-                if "CalcFC" in route[kw]:
-                    if kw == "opt" or kw == "irc" :
-                        #apparently, IRC can only read cartesian force constants and not interal coords
-                        #opt can do ReadFC and ReadCartesianFC, but I'm just going to pick ReadCartesianFC
-                        route[kw].append("ReadCartesianFC")
+                if kw == "opt":
+                    route[kw].append("ReadFC")
+                elif kw == "irc" :
+                    #apparently, IRC can only read cartesian force constants and not interal coords
+                    #opt can do ReadFC and ReadCartesianFC, but I'm just going to pick ReadCartesianFC
+                    route[kw].append("ReadCartesianFC")
+
+            route["guess"] = ["read"]
 
         if checkpoint_file:
             link0["chk"] = [checkpoint_file]
@@ -715,17 +718,19 @@ class ORCAFileInfo(QMInputFileInfo):
                 blocks['elprop'] = ['Polar 1']
 
         if read_checkpoint:
-            if checkpoint_file:
-                blocks["scf"] = [
-                    "guess MORead",
-                    "MOInp \"%s\"" % checkpoint_file,
-                ]
-            
-            elif checkpoint_file:
-                blocks["geom"] = [
-                    "inHess Read",
-                    "inHessName \"%s\"" % checkpoint_file,
-                ]
+            for chk_file in checkpoint_file.split(";"):
+                chk_file = chk_file.strip()
+                if chk_file and chk_file.endswith("gbw"):
+                    blocks["scf"] = [
+                        "guess MORead",
+                        "MOInp \"%s\"" % chk_file,
+                    ]
+                
+                elif chk_file and chk_file.endswith("hess"):
+                    blocks["geom"] = [
+                        "inHess Read",
+                        "inHessName \"%s\"" % chk_file,
+                    ]
 
         return {ORCA_ROUTE:route, ORCA_BLOCKS:blocks}
 
