@@ -322,7 +322,7 @@ class Residue(Geometry):
 
 class ResidueCollection(Geometry):
     """geometry object used for SEQCROW to easily convert to AaronTools but keep residue info"""
-    def __init__(self, molecule, convert_residues=None, bonds_matter=True, use_scene=False, **kwargs):
+    def __init__(self, molecule, name="new", convert_residues=None, bonds_matter=True, use_scene=False, **kwargs):
         """molecule       - chimerax AtomicStructure or AaronTools Geometry (for easy compatibility stuff)
         convert_residues  - None to convert everything or [chimerax.atomic.Residue] to convert only specific residues
                             this only applies to chimerax AtomicStructures
@@ -386,15 +386,15 @@ class ResidueCollection(Geometry):
 
         else:
             #assume whatever we got is something AaronTools can turn into a Geometry
-            super().__init__(molecule, **kwargs)
+            super().__init__(molecule, name=name, **kwargs)
             self.chix_atomicstructure = None
             self.atomspec = None
             if "comment" in kwargs:
-                self.residues = [Residue(molecule, resnum=1, name="UNK", comment=kwargs['comment'])]
+                self.residues = [Residue(molecule, resnum=1, name="UNK", **kwargs)]
             elif hasattr(molecule, "comment"):
-                self.residues = [Residue(molecule, resnum=1, name="UNK", comment=molecule.comment)]
+                self.residues = [Residue(molecule, resnum=1, name="UNK", comment=molecule.comment, **kwargs)]
             else:
-                self.residues = [Residue(molecule, resnum=1, name="UNK")]
+                self.residues = [Residue(molecule, resnum=1, name="UNK", **kwargs)]
 
             return
 

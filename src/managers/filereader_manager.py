@@ -115,7 +115,7 @@ class FileReaderManager(ProviderManager):
     def frequency_models(self):
         """returns a list of models with frequency data"""
         return [model for model in self.filereader_dict.keys() if any('frequency' in fr.other for fr in self.filereader_dict[model])]
-        
+
     @property
     def energy_models(self):
         """returns a list of models with frequency data"""

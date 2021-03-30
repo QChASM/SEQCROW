@@ -1360,14 +1360,15 @@ class JobTypeOption(QWidget):
 
         self.change_job_type()
 
-        self.do_geom_opt.setCheckState(Qt.Checked if self.settings.last_opt else Qt.Unchecked)
-        self.ts_opt.setCheckState(Qt.Checked if self.settings.last_ts else Qt.Unchecked)
-        self.do_freq.setCheckState(Qt.Checked if self.settings.last_freq else Qt.Unchecked)
-
         self.do_geom_opt.stateChanged.connect(self.opt_checked)
         self.do_freq.stateChanged.connect(self.freq_checked)
         self.do_geom_opt.stateChanged.connect(self.change_job_type)
         self.do_freq.stateChanged.connect(self.change_job_type)
+
+        self.do_geom_opt.setCheckState(Qt.Checked if self.settings.last_opt else Qt.Unchecked)
+        self.ts_opt.setCheckState(Qt.Checked if self.settings.last_ts else Qt.Unchecked)
+        self.do_freq.setCheckState(Qt.Checked if self.settings.last_freq else Qt.Unchecked)
+        self.job_type_opts.setCurrentIndex(0)
 
         self.constrained_atom_table.resizeColumnToContents(1)
         self.constrained_atom_table.horizontalHeader().setStretchLastSection(False)
@@ -3462,7 +3463,7 @@ class BasisWidget(QWidget):
             #must set auxiliary before selected elements
             #otherwise elements will be deselected on non-auxiliary basis
             #if they are selected on a new auxiliary basis
-            if self.form != "Gaussian":
+            if self.form.aux_options:
                 aux = self.settings.last_basis_aux[use_saved]
                 new_basis.setAux(aux)
 

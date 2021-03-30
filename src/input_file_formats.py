@@ -655,7 +655,7 @@ class ORCAFileInfo(QMInputFileInfo):
         "M06-2X",
         "ωB97X-D3",
         "B3PW91",
-        "B97-D2",
+        "B97-D3",
         "BP86",
         "PBE0",
         "HF-3c",

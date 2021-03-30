@@ -17,7 +17,7 @@ from Qt.QtWidgets import QLabel, QLineEdit, QGridLayout, QPushButton, QTabWidget
                             QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, \
                             QFormLayout, QCheckBox, QCompleter
 
-from AaronTools.const import ELEMENTS
+from AaronTools.const import ELEMENTS, RADII
 from AaronTools.atoms import Atom
 
 from SEQCROW.residue_collection import ResidueCollection, Residue
@@ -252,33 +252,72 @@ class EditStructure(ToolInstance):
         
         self.vsepr = QComboBox()
         self.vsepr.addItems([
-            "do not change",               # 0
-            "linear (1 bond)",             # 1
-            "linear (2 bonds)",            # 2 
-            "trigonal planar (2 bonds)",   # 3
-            "tetrahedral (2 bonds)",       # 4 
-            "trigonal planar",             # 5
-            "tetrahedral (3 bonds)",       # 6
-            "T-shaped",                    # 7
-            "tetrahedral",                 # 8
-            "sawhorse",                    # 9
-            "square planar",               #10
-            "trigonal bipyramidal",        #11
-            "square pyramidal",            #12
-            "octahedral",                  #13
+            "do not change",                  # 0
             
+            "linear (1 bond)",                # 1
+            
+            "linear (2 bonds)",               # 2 
+            "trigonal planar (2 bonds)",      # 3
+            "tetrahedral (2 bonds)",          # 4 
+            
+            "trigonal planar",                # 5
+            "tetrahedral (3 bonds)",          # 6
+            "T-shaped",                       # 7
+            
+            "trigonal pyramidal",             # 8
+            "tetrahedral",                    # 9
+            "sawhorse",                       #10
+            "square planar",                  #11
+            
+            "trigonal bipyramidal",           #12
+            "square pyramidal",               #13
+            "pentagonal",                     #14
+            
+            "octahedral",                     #15
+            "hexagonal",                      #16
+            "trigonal prismatic",             #17
+            "pentagonal pyramidal",           #18
+            
+            "capped octahedral",              #19
+            "capped trigonal prismatic",      #20
+            "heptagonal",                     #21
+            "hexagonal pyramidal",            #22
+            "pentagonal bipyramidal",         #23
+            
+            "biaugmented trigonal prismatic", #24
+            "cubic",                          #25
+            "elongated trigonal bipyramidal", #26
+            "hexagonal bipyramidal",          #27
+            "heptagonal pyramidal",           #28
+            "octagonal",                      #29
+            "square antiprismatic",           #30
+            "trigonal dodecahedral",          #31
+            
+            "capped cube",                    #32
+            "capped square antiprismatic",    #33
+            "enneagonal",                     #34
+            "heptagonal bipyramidal",         #35
+            "hula-hoop",                      #36
+            "triangular cupola",              #37
+            "tridiminished icosahedral",      #38
+            "muffin",                         #39
+            "octagonal pyramidal",            #40
+            "tricapped trigonal prismatic",   #41
         ])
         
-        self.vsepr.setCurrentIndex(8)
+        self.vsepr.setCurrentIndex(9)
         
-        self.vsepr.insertSeparator(13)
-        self.vsepr.insertSeparator(11)
+        self.vsepr.insertSeparator(32)
+        self.vsepr.insertSeparator(24)
+        self.vsepr.insertSeparator(19)
+        self.vsepr.insertSeparator(15)
+        self.vsepr.insertSeparator(12)
         self.vsepr.insertSeparator(8)
         self.vsepr.insertSeparator(5)
         self.vsepr.insertSeparator(2)
         self.vsepr.insertSeparator(1)
         self.vsepr.insertSeparator(0)
-        changeelement_layout.addRow("VSEPR:", self.vsepr)
+        changeelement_layout.addRow("geometry:", self.vsepr)
         
         self.change_bonds = QCheckBox()
         self.change_bonds.setChecked(self.settings.change_bonds)
@@ -515,6 +554,8 @@ class EditStructure(ToolInstance):
             goal = 5
         elif vsepr == "octahedral":
             goal = 6
+        else:
+            goal = len(Atom.get_shape(vsepr)) - 1
         
         sel = selected_atoms(self.session)
         models, _ = guessAttachmentTargets(sel, self.session, allow_adjacent=False)
@@ -603,51 +644,34 @@ class EditStructure(ToolInstance):
             vsepr = False
         elif vsepr == "linear (1 bond)":
             vsepr = "linear 1"
-            goal = 1
         elif vsepr == "linear (2 bonds)":
             vsepr = "linear 2"
-            goal = 2
         elif vsepr == "trigonal planar (2 bonds)":
             vsepr = "bent 2 planar"
-            goal = 2
         elif vsepr == "tetrahedral (2 bonds)":
             vsepr = "bent 2 tetrahedral"
-            goal = 2
-        elif vsepr == "trigonal planar":
-            goal = 3
         elif vsepr == "tetrahedral (3 bonds)":
             vsepr = "bent 3 tetrahedral"
-            goal = 3
-        elif vsepr == "T-shaped":
-            vsepr = "t shaped"
-            goal = 3
-        elif vsepr == "tetrahedral":
-            goal = 4
-        elif vsepr == "sawhorse":
-            goal = 4
-        elif vsepr == "square planar":
-            goal = 4
-        elif vsepr == "trigonal bipyramidal":
-            goal = 5
-        elif vsepr == "square pyramidal":
-            goal = 5
-        elif vsepr == "octahedral":
-            goal = 6
         
-        atom = Atom(element=element, coords=[0., 0., 0.])
-        rescol = ResidueCollection([atom], name="new")
-        
-        adjust_hydrogens = vsepr
-        if vsepr is not False:
-            change_Hs = goal
-            adjust_hydrogens = (change_Hs, vsepr)
-        
-        rescol.change_element(atom, 
-                              element, 
-                              adjust_bonds=adjust_bonds, 
-                              adjust_hydrogens=adjust_hydrogens,
-        )
-        
+        if vsepr:
+            atoms = Atom.get_shape(vsepr)
+            atoms[0].element = element
+            for atom in atoms[1:]:
+                atom.element = "H"
+            if adjust_bonds:
+                # this works b/c all atoms are 1 angstrom from the center
+                # just multiply by the distance we want
+                expected_dist = RADII[element] + RADII["H"]
+                for atom in atoms[1:]:
+                    atom.coords *= expected_dist
+            for atom in atoms[1:]:
+                atoms[0].connected.add(atom)
+                atom.connected.add(atoms[0])
+        else:
+            atoms = [Atom(element=element, coords=np.zeros(3))]
+
+        rescol = ResidueCollection(atoms, name="new", refresh_connected=False)
+
         model = self.model_selector.currentData()
         if model is None:
             chix = rescol.get_chimera(self.session)
@@ -678,7 +702,8 @@ class EditStructure(ToolInstance):
         self.model_selector.deleteLater()
 
         return super().close()
-    
+  
+  
 class SubstituentSelection(ChildToolWindow):
     def __init__(self, tool_instance, title, textBox=None, **kwargs):
         super().__init__(tool_instance, title, **kwargs)
