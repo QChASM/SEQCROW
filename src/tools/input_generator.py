@@ -113,6 +113,7 @@ class BuildQM(ToolInstance):
 
         self.tool_window = MainToolWindow(self)
         self.preview_window = None
+        self.warning_window = None
         self.preset_window = None
         self.job_local_prep = None
         self.remove_preset_window = None
@@ -228,9 +229,15 @@ class BuildQM(ToolInstance):
         export.addAction(save)
 
         view = menu.addMenu("&View")
+        
         preview = QAction("&Preview", self.tool_window.ui_area)
         preview.triggered.connect(self.show_preview)
         view.addAction(preview)
+
+        warnings = QAction("&Warnings", self.tool_window.ui_area)
+        warnings.triggered.connect(self.show_warnings)
+        view.addAction(warnings)
+        
         queue = QAction("&Queue", self.tool_window.ui_area)
         queue.triggered.connect(self.show_queue)
         view.addAction(queue)
@@ -767,6 +774,14 @@ class BuildQM(ToolInstance):
         else:
             self.preview_window.shown = True
 
+    def show_warnings(self):
+        """open child tool that showns contents of input file"""
+        if self.warning_window is None:
+            self.warning_window = self.tool_window.create_child_window("Warnings", window_class=WarningPreview)
+            self.update_preview()
+        else:
+            self.warning_window.shown = True
+
     def get_file_contents(self, update_settings=False):
         self.update_theory(update_settings=update_settings)
 
@@ -796,10 +811,13 @@ class BuildQM(ToolInstance):
         # profile.enable()
 
         self.check_elements()
-        if self.preview_window is not None:
+        if self.preview_window is not None or self.warning_window is not None:
             contents, warnings = self.get_file_contents(update_settings=False)
             if contents is not None and warnings is not None:
-                self.preview_window.setPreview(contents, warnings)
+                if self.preview_window is not None:
+                    self.preview_window.setPreview(contents, warnings)
+                if self.warning_window is not None:
+                    self.warning_window.setWarnings(warnings)
 
         # profile.disable()
         # profile.print_stats()
@@ -4882,24 +4900,31 @@ class InputPreview(ChildToolWindow):
         self.preview = QTextBrowser()
         font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
         self.preview.setFont(font)
-        layout.addWidget(self.preview, 0, 0, 1, 2)
+        layout.addWidget(self.preview, 0, 0, 1, 3)
 
         #chimera toolwindows can have a statusbar, but the message goes away after a few seconds
         #I'll just use a Qt statusbar
         self.status = QStatusBar()
         self.status.setSizeGripEnabled(False)
         self.status.setStyleSheet("color: red")
-        layout.addWidget(self.status, 1, 1, 1, 1)
+        layout.addWidget(self.status, 1, 2, 1, 1)
 
         refresh_button = QPushButton()
         refresh_button.setIcon(QIcon(refresh_button.style().standardIcon(QStyle.SP_BrowserReload)))
         refresh_button.clicked.connect(self.tool_instance.update_preview)
         layout.addWidget(refresh_button, 1, 0, 1, 1, Qt.AlignLeft)
 
+        self.warning_button = QPushButton()
+        self.warning_button.setIcon(QIcon(self.warning_button.style().standardIcon(QStyle.SP_MessageBoxWarning)))
+        self.warning_button.clicked.connect(self.tool_instance.show_warnings)
+        self.warning_button.setToolTip("click to view warnings in a separate window")
+        layout.addWidget(self.warning_button, 1, 1, 1, 1, Qt.AlignLeft)
+
         layout.setRowStretch(0, 1)
         layout.setRowStretch(1, 0)
         layout.setColumnStretch(0, 0)
-        layout.setColumnStretch(1, 1)
+        layout.setColumnStretch(1, 0)
+        layout.setColumnStretch(2, 1)
 
         self.ui_area.setLayout(layout)
 
@@ -4917,12 +4942,55 @@ class InputPreview(ChildToolWindow):
         self.preview.setText(text)
         if len(warnings_list) > 0:
             self.status.setVisible(True)
+            self.warning_button.setVisible(True)
             self.status.showMessage("; ".join(warnings_list))
         else:
             self.status.setVisible(False)
+            self.warning_button.setVisible(False)
 
     def cleanup(self):
         self.tool_instance.preview_window = None
+
+        super().cleanup()
+
+
+class WarningPreview(ChildToolWindow):
+    def __init__(self, tool_instance, title, **kwargs):
+        super().__init__(tool_instance, title, statusbar=False, **kwargs)
+
+        self._build_ui()
+
+    def _build_ui(self):
+        layout = QGridLayout()
+
+        self.preview = QTextBrowser()
+        font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
+        self.preview.setFont(font)
+        layout.addWidget(self.preview, 0, 0, 1, 2)
+
+        refresh_button = QPushButton()
+        refresh_button.setIcon(QIcon(refresh_button.style().standardIcon(QStyle.SP_BrowserReload)))
+        refresh_button.clicked.connect(self.tool_instance.update_preview)
+        layout.addWidget(refresh_button, 1, 0, 1, 1, Qt.AlignLeft)
+
+        layout.setRowStretch(0, 1)
+        layout.setRowStretch(1, 0)
+        layout.setColumnStretch(0, 0)
+        layout.setColumnStretch(1, 1)
+
+        self.ui_area.setLayout(layout)
+
+        self.manage(None)
+
+    def setWarnings(self, warnings_list):
+        """display the listed warnings"""
+        if warnings_list:
+            self.preview.setText("\n---------\n".join(warnings_list))
+        else:
+            self.preview.setText("looks fine")
+
+    def cleanup(self):
+        self.tool_instance.warning_window = None
 
         super().cleanup()
 
