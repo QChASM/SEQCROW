@@ -267,51 +267,52 @@ class EditStructure(ToolInstance):
             "trigonal pyramidal",             # 8
             "tetrahedral",                    # 9
             "sawhorse",                       #10
-            "square planar",                  #11
+            "seesaw",                         #11
+            "square planar",                  #12
             
-            "trigonal bipyramidal",           #12
-            "square pyramidal",               #13
-            "pentagonal",                     #14
+            "trigonal bipyramidal",           #13
+            "square pyramidal",               #14
+            "pentagonal",                     #15
             
-            "octahedral",                     #15
-            "hexagonal",                      #16
-            "trigonal prismatic",             #17
-            "pentagonal pyramidal",           #18
+            "octahedral",                     #16
+            "hexagonal",                      #17
+            "trigonal prismatic",             #18
+            "pentagonal pyramidal",           #19
             
-            "capped octahedral",              #19
-            "capped trigonal prismatic",      #20
-            "heptagonal",                     #21
-            "hexagonal pyramidal",            #22
-            "pentagonal bipyramidal",         #23
+            "capped octahedral",              #20
+            "capped trigonal prismatic",      #21
+            "heptagonal",                     #22
+            "hexagonal pyramidal",            #23
+            "pentagonal bipyramidal",         #24
             
-            "biaugmented trigonal prismatic", #24
-            "cubic",                          #25
-            "elongated trigonal bipyramidal", #26
-            "hexagonal bipyramidal",          #27
-            "heptagonal pyramidal",           #28
-            "octagonal",                      #29
-            "square antiprismatic",           #30
-            "trigonal dodecahedral",          #31
+            "biaugmented trigonal prismatic", #25
+            "cubic",                          #26
+            "elongated trigonal bipyramidal", #27
+            "hexagonal bipyramidal",          #28
+            "heptagonal pyramidal",           #29
+            "octagonal",                      #30
+            "square antiprismatic",           #31
+            "trigonal dodecahedral",          #32
             
-            "capped cube",                    #32
-            "capped square antiprismatic",    #33
-            "enneagonal",                     #34
-            "heptagonal bipyramidal",         #35
-            "hula-hoop",                      #36
-            "triangular cupola",              #37
-            "tridiminished icosahedral",      #38
-            "muffin",                         #39
-            "octagonal pyramidal",            #40
-            "tricapped trigonal prismatic",   #41
+            "capped cube",                    #33
+            "capped square antiprismatic",    #34
+            "enneagonal",                     #35
+            "heptagonal bipyramidal",         #36
+            "hula-hoop",                      #37
+            "triangular cupola",              #38
+            "tridiminished icosahedral",      #39
+            "muffin",                         #40
+            "octagonal pyramidal",            #41
+            "tricapped trigonal prismatic",   #42
         ])
         
         self.vsepr.setCurrentIndex(9)
         
-        self.vsepr.insertSeparator(32)
-        self.vsepr.insertSeparator(24)
-        self.vsepr.insertSeparator(19)
-        self.vsepr.insertSeparator(15)
-        self.vsepr.insertSeparator(12)
+        self.vsepr.insertSeparator(33)
+        self.vsepr.insertSeparator(25)
+        self.vsepr.insertSeparator(20)
+        self.vsepr.insertSeparator(16)
+        self.vsepr.insertSeparator(13)
         self.vsepr.insertSeparator(8)
         self.vsepr.insertSeparator(5)
         self.vsepr.insertSeparator(2)
@@ -539,21 +540,6 @@ class EditStructure(ToolInstance):
         elif vsepr == "tetrahedral (3 bonds)":
             vsepr = "bent 3 tetrahedral"
             goal = 3
-        elif vsepr == "T-shaped":
-            vsepr = "t shaped"
-            goal = 3
-        elif vsepr == "tetrahedral":
-            goal = 4
-        elif vsepr == "sawhorse":
-            goal = 4
-        elif vsepr == "square planar":
-            goal = 4
-        elif vsepr == "trigonal bipyramidal":
-            goal = 5
-        elif vsepr == "square pyramidal":
-            goal = 5
-        elif vsepr == "octahedral":
-            goal = 6
         else:
             goal = len(Atom.get_shape(vsepr)) - 1
         

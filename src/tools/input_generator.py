@@ -2414,8 +2414,7 @@ class MethodOption(QWidget):
         sapt_layout.setContentsMargins(0, 0, 0, 0)
 
         self.sapt_type = QComboBox()
-        # TODO: charge-transfer sapt
-        self.sapt_type.addItems(["standard", "F/I", "spin-flip"])
+        self.sapt_type.addItems(["standard", "F/I", "spin-flip", "charge-transfer"])
         self.sapt_type.currentIndexChanged.connect(self.something_changed)
         sapt_layout.addRow("SAPT type:", self.sapt_type)
 
@@ -2657,7 +2656,7 @@ class MethodOption(QWidget):
 
         elif self.method_option.currentText() == "SAPT":
 
-            if self.sapt_type.currentText() == "standard":
+            if self.sapt_type.currentText() == "standard" or self.sapt_type.currentText() == "charge-transfer":
                 method = "sapt"
             elif self.sapt_type.currentText() == "F/I":
                 method = "fisapt"
@@ -2667,6 +2666,9 @@ class MethodOption(QWidget):
             if method != "sf-sapt":
                 sapt_level = self.sapt_level.currentText()
                 method += sapt_level
+
+            if self.sapt_type.currentText() == "charge-transfer":
+                method += "%s-ct"
 
             if update_settings:
                 self.settings.previous_method = method
@@ -2770,15 +2772,18 @@ class MethodOption(QWidget):
 
         elif "sapt" in test_value:
             ndx = self.method_option.findText("SAPT", Qt.MatchExactly)
-            m = QRegularExpression("(.*)sapt(.*)")
+            m = QRegularExpression("(.*)sapt(.*)(-ct)")
             match = m.match(test_value)
             sapt_type = match.captured(1)
             sapt_level = match.captured(2)
+            charge_transfer = match.captured(3)
 
             if sapt_type == "sf-":
                 type_ndx = self.sapt_type.findText("spin-flip", Qt.MatchExactly)
             elif sapt_type == "fi":
                 type_ndx = self.sapt_type.findText("F/I", Qt.MatchExactly)
+            elif charge_transfer:
+                type_ndx = self.sapt_type.findText("charge-transfer", Qt.MatchExactly)
             else:
                 type_ndx = 0
 

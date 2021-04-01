@@ -255,6 +255,7 @@
         <DataDir>Ligands</DataDir>
         <DataDir>Substituents</DataDir>
         <DataDir>Rings</DataDir>
+        <DataDir>coordination_complex</DataDir>
         <DataDir>utils</DataDir>
         <DataDir>utils/quad_grids</DataDir>
         <DataDir>theory/valid_methods</DataDir>
