@@ -34,9 +34,7 @@ def sterimol(session, selection, radii="UMN", showVectors=True, showRadii=True, 
     b5 = None
     targets = []
     neighbors = []
-    ls = []
-    b1s = []
-    b5s = []
+    datas = []
     
     info = "<pre>substituent atom\tbonded atom\tL\tB1\tB5\n"
     
@@ -60,27 +58,25 @@ def sterimol(session, selection, radii="UMN", showVectors=True, showRadii=True, 
                                   detect=False,
                       )
                 
-                l_start, l_end = sub.sterimol("L", return_vector=True, radii=radii)
-                l = np.linalg.norm(l_end - l_start)
-                
-                b1_start, b1_end = sub.sterimol("B1", return_vector=True, radii=radii)
-                b1 = np.linalg.norm(b1_end - b1_start)
-                
-                b5_start, b5_end = sub.sterimol("B5", return_vector=True, radii=radii)
-                b5 = np.linalg.norm(b5_end - b5_start)
+                data = sub.sterimol(return_vector=True, radii=radii)
+                l = np.linalg.norm(data["L"][1] - data["L"][0])
+                b1 = np.linalg.norm(data["B1"][1] - data["B1"][0])
+                b2 = np.linalg.norm(data["B2"][1] - data["B2"][0])
+                b3 = np.linalg.norm(data["B3"][1] - data["B3"][0])
+                b4 = np.linalg.norm(data["B4"][1] - data["B4"][0])
+                b5 = np.linalg.norm(data["B5"][1] - data["B5"][0])
                 
                 s = ""
                 if showVectors:
-                    s += ".color black\n"
-                    s += ".note Sterimol B1\n"
-                    s += ".arrow %6.3f %6.3f %6.3f   %6.3f %6.3f %6.3f   0.1 0.25 %f\n" % (*b1_start, *b1_end, b1/(b1 + 0.75))
-                    s += ".color red\n"
-                    s += ".note Sterimol B5\n"
-                    s += ".arrow %6.3f %6.3f %6.3f   %6.3f %6.3f %6.3f   0.1 0.25 %f\n" % (*b5_start, *b5_end, b5/(b5 + 0.75))
-                    s += ".color blue\n"
-                    s += ".note Sterimol L\n"
-                    s += ".arrow %6.3f %6.3f %6.3f   %6.3f %6.3f %6.3f   0.1 0.25 %f\n" % (*l_start, *l_end, l/(l + 0.75))
-                
+                    for key, color in zip(
+                            ["B1", "B2", "B3", "B4", "B5", "L"],
+                            ["black", "green", "purple", "orange", "red", "blue"]
+                    ):
+                        start, end = data[key]
+                        s += ".color %s\n" % color
+                        s += ".note Sterimol %s\n" % key
+                        s += ".arrow %6.3f %6.3f %6.3f   %6.3f %6.3f %6.3f\n" % (*start, *end)
+            
                 if showRadii:
                     s += ".note radii\n"
                     s += ".transparency 75\n"
@@ -107,12 +103,12 @@ def sterimol(session, selection, radii="UMN", showVectors=True, showRadii=True, 
                     
                     session.models.add(bild_obj, parent=model)
                 
-                info += "%-16s\t%-11s\t%.2f\t%.2f\t%.2f\n" % (target.atomspec, attached[target].atomspec, l, b1, b5)
+                info += "%-16s\t%-11s\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\n" % (
+                    target.atomspec, attached[target].atomspec, l, b1, b2, b3, b4, b5
+                )
                 targets.append(target.atomspec)
                 neighbors.append(attached[target].atomspec)
-                ls.append(l)
-                b1s.append(b1)
-                b5s.append(b5)
+                datas.append(data)
     
     info = info.strip()
     info += "</pre>"
@@ -120,4 +116,4 @@ def sterimol(session, selection, radii="UMN", showVectors=True, showRadii=True, 
         session.logger.info(info, is_html=True)
     
     if return_values:
-        return targets, neighbors, ls, b1s, b5s
+        return targets, neighbors, datas

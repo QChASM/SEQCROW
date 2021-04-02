@@ -1,5 +1,7 @@
 import os
 
+import numpy as np
+
 from chimerax.core.tools import ToolInstance
 from chimerax.atomic import selected_atoms
 from chimerax.core.configfile import Value
@@ -73,8 +75,10 @@ class Sterimol(ToolInstance):
         self.remove_sterimol_button = remove_sterimol_button
         
         self.table = QTableWidget()
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(['substituent atom', 'bonded atom', 'L', 'B\u2081', 'B\u2085'])
+        self.table.setColumnCount(8)
+        self.table.setHorizontalHeaderLabels(
+            ['substituent atom', 'bonded atom', 'L', 'B\u2081', 'B\u2082', 'B\u2083', 'B\u2084', 'B\u2085']
+        )
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.resizeColumnToContents(0)
@@ -82,9 +86,15 @@ class Sterimol(ToolInstance):
         self.table.resizeColumnToContents(2)
         self.table.resizeColumnToContents(3)
         self.table.resizeColumnToContents(4)
+        self.table.resizeColumnToContents(5)
+        self.table.resizeColumnToContents(6)
+        self.table.resizeColumnToContents(7)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(6, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(7, QHeaderView.Stretch)
         layout.addRow(self.table)
 
         menu = QMenuBar()
@@ -162,12 +172,13 @@ class Sterimol(ToolInstance):
         self.settings.display_radii = self.display_radii.checkState() == Qt.Checked
         self.settings.display_vectors = self.display_vectors.checkState() == Qt.Checked
 
-        targets, neighbors, ls, b1s, b5s = sterimol_cmd(self.session, 
-                                                        selected_atoms(self.session), 
-                                                        radii=self.radii_option.currentText(),
-                                                        showVectors=self.display_vectors.checkState() == Qt.Checked,
-                                                        showRadii=self.display_radii.checkState() == Qt.Checked,
-                                                        return_values=True,
+        targets, neighbors, datas = sterimol_cmd(
+            self.session, 
+            selected_atoms(self.session), 
+            radii=self.radii_option.currentText(),
+            showVectors=self.display_vectors.checkState() == Qt.Checked,
+            showRadii=self.display_radii.checkState() == Qt.Checked,
+            return_values=True,
         )
         
         if len(targets) == 0:
@@ -175,7 +186,7 @@ class Sterimol(ToolInstance):
         
         self.table.setRowCount(0)
         
-        for t, b, l, b1, b5 in zip(targets, neighbors, ls, b1s, b5s):
+        for t, b, data in zip(targets, neighbors, datas):
             row = self.table.rowCount()
             self.table.insertRow(row)
             
@@ -187,6 +198,13 @@ class Sterimol(ToolInstance):
             neigh.setData(Qt.DisplayRole, b)
             self.table.setItem(row, 1, neigh)
 
+            l = np.linalg.norm(data["L"][1] - data["L"][0])
+            b1 = np.linalg.norm(data["B1"][1] - data["B1"][0])
+            b2 = np.linalg.norm(data["B2"][1] - data["B2"][0])
+            b3 = np.linalg.norm(data["B3"][1] - data["B3"][0])
+            b4 = np.linalg.norm(data["B4"][1] - data["B4"][0])
+            b5 = np.linalg.norm(data["B5"][1] - data["B5"][0])
+            
             li = QTableWidgetItem()
             li.setData(Qt.DisplayRole, "%.2f" % l)
             self.table.setItem(row, 2, li)
@@ -195,9 +213,21 @@ class Sterimol(ToolInstance):
             b1i.setData(Qt.DisplayRole, "%.2f" % b1)
             self.table.setItem(row, 3, b1i)
 
+            b2i = QTableWidgetItem()
+            b2i.setData(Qt.DisplayRole, "%.2f" % b2)
+            self.table.setItem(row, 4, b2i)
+
+            b3i = QTableWidgetItem()
+            b3i.setData(Qt.DisplayRole, "%.2f" % b3)
+            self.table.setItem(row, 5, b3i)
+
+            b4i = QTableWidgetItem()
+            b4i.setData(Qt.DisplayRole, "%.2f" % b4)
+            self.table.setItem(row, 6, b4i)
+
             b5i = QTableWidgetItem()
             b5i.setData(Qt.DisplayRole, "%.2f" % b5)
-            self.table.setItem(row, 4, b5i)
+            self.table.setItem(row, 7, b5i)
     
     def header_check(self, state):
         """user has [un]checked the 'include header' option on the menu"""
@@ -217,13 +247,13 @@ class Sterimol(ToolInstance):
             delim = ";"
             
         if self.settings.include_header:
-            s = delim.join(["substituent_atom", "bonded_atom", "L", "B1", "B5"])
+            s = delim.join(["substituent_atom", "bonded_atom", "L", "B1", "B2", "B3", "B4", "B5"])
             s += "\n"
         else:
             s = ""
         
         for i in range(0, self.table.rowCount()):
-            s += delim.join([item.data(Qt.DisplayRole) for item in [self.table.item(i, j) for j in range(0, 5)]])
+            s += delim.join([item.data(Qt.DisplayRole) for item in [self.table.item(i, j) for j in range(0, 8)]])
             s += "\n"
         
         return s
