@@ -449,22 +449,25 @@ class ResidueCollection(Geometry):
         """find the residue that target is on and substitute it for sub"""
         target = self.find_exact(target)[0]
         residue = self.find_residue(target)
+
         if len(residue) != 1:
             raise RuntimeError("multiple or no residues found containing %s" % str(target))
         else:
             residue = residue[0]
         
+        if attached_to:
+            attached_to = residue.find_exact(attached_to)[0]        
+        
         if not new_residue:
 
             # call substitute on residue so atoms are added to that residue
             if attached_to and attached_to not in residue.atoms:
-                extra_atom = self.find_exact(attached_to)[0]
-                residue.atoms.append(extra_atom)
+                residue.atoms.append(attached_to)
                 residue.substitute(sub, target, attached_to=attached_to, *args, minimize=False, **kwargs)
-                residue.atoms.remove(extra_atom)
+                residue.atoms.remove(attached_to)
+                new_residue = True
             else:
                 residue.substitute(sub, target, *args, attached_to=attached_to, minimize=False, **kwargs)
-                new_residue = True
 
             if new_name:
                 residue.name = new_name
