@@ -29,13 +29,15 @@ from SEQCROW.managers.filereader_manager import apply_seqcrow_preset
 
 
 class _EditStructureSettings(Settings):
-    AUTO_SAVE = {'modify': Value(True, BoolArg), 
-                 'guess': Value(True, BoolArg),
-                 'minimize': Value(False, BoolArg), 
-                 'change_bonds': Value(True, BoolArg), 
-                 'use_greek': Value(False, BoolArg),
-                 'minimize_ring': Value(False, BoolArg),
-                }
+    AUTO_SAVE = {
+        'modify': Value(True, BoolArg), 
+        'guess': Value(True, BoolArg),
+        'minimize': Value(False, BoolArg), 
+        'change_bonds': Value(True, BoolArg), 
+        'use_greek': Value(False, BoolArg),
+        'new_residue': Value(False, BoolArg),
+        'minimize_ring': Value(False, BoolArg),
+    }
 
 
 class EditStructure(ToolInstance):
@@ -68,6 +70,7 @@ class EditStructure(ToolInstance):
         substitute_layout.addWidget(sublabel, 0, 0, Qt.AlignVCenter)
         
         self.subname = QLineEdit()
+        # self.subname.setText("Et")
         sub_completer = NameCompleter(Substituent.list(), self.subname)
         self.subname.setCompleter(sub_completer)
         self.subname.setToolTip("name of substituent in the AaronTools library or your personal library\nseparate names with commas and uncheck 'modify selected structure' to create several structures")
@@ -100,6 +103,14 @@ class EditStructure(ToolInstance):
         self.guess_old.stateChanged.connect(lambda state, settings=self.settings: settings.__setattr__("guess", True if state == Qt.Checked else False))
         substitute_layout.addWidget(self.guess_old, 3, 1, 1, 2, Qt.AlignTop)
         
+        substitute_layout.addWidget(QLabel("new residue:"), 5, 0, 1, 1, Qt.AlignVCenter)
+
+        self.new_residue = QCheckBox()
+        self.new_residue.setToolTip("put the new substituent in its own residue instead\nof adding it to the residue of the old substituent")
+        self.new_residue.setChecked(self.settings.new_residue)
+        self.new_residue.stateChanged.connect(lambda state, settings=self.settings: settings.__setattr__("new_residue", True if state == Qt.Checked else False))
+        substitute_layout.addWidget(self.new_residue, 5, 1, 1, 2, Qt.AlignTop)
+        
         substitute_layout.addWidget(QLabel("use distance names:"), 4, 0, 1, 1, Qt.AlignVCenter)
         
         self.use_greek = QCheckBox()
@@ -107,16 +118,16 @@ class EditStructure(ToolInstance):
         self.use_greek.setToolTip("indicate distance from point of attachment with atom name")
         substitute_layout.addWidget(self.use_greek, 4, 1, 1, 1, Qt.AlignTop)
 
-        substitute_layout.addWidget(QLabel("new residue name:"), 5, 0, 1, 1, Qt.AlignVCenter)
+        substitute_layout.addWidget(QLabel("change residue name:"), 6, 0, 1, 1, Qt.AlignVCenter)
         
         self.new_sub_name = QLineEdit()
         self.new_sub_name.setToolTip("change name of modified residues")
         self.new_sub_name.setPlaceholderText("leave blank to keep current")
-        substitute_layout.addWidget(self.new_sub_name, 5, 1, 1, 2, Qt.AlignTop)
+        substitute_layout.addWidget(self.new_sub_name, 6, 1, 1, 2, Qt.AlignTop)
 
         substitute_button = QPushButton("substitute current selection")
         substitute_button.clicked.connect(self.do_substitute)
-        substitute_layout.addWidget(substitute_button, 6, 0, 1, 3, Qt.AlignTop)
+        substitute_layout.addWidget(substitute_button, 7, 0, 1, 3, Qt.AlignTop)
         self.substitute_button = substitute_button
         
         substitute_layout.setRowStretch(0, 0)
@@ -125,7 +136,8 @@ class EditStructure(ToolInstance):
         substitute_layout.setRowStretch(3, 0)
         substitute_layout.setRowStretch(4, 0)
         substitute_layout.setRowStretch(5, 0)
-        substitute_layout.setRowStretch(6, 1)
+        substitute_layout.setRowStretch(6, 0)
+        substitute_layout.setRowStretch(7, 1)
         
         
         #map ligand
@@ -370,6 +382,8 @@ class EditStructure(ToolInstance):
         
         minimize = self.minimize.isChecked()
         
+        new_residue = self.new_residue.isChecked()
+
         use_greek = self.use_greek.isChecked()
         
         self.settings.minimize = minimize
@@ -378,7 +392,7 @@ class EditStructure(ToolInstance):
         if len(new_name.strip()) > 0:
             run(
                 self.session, 
-                "substitute sel substituents %s newName %s guessAttachment %s modify %s minimize %s useRemoteness %s" %
+                "substitute sel substituents %s newName %s guessAttachment %s modify %s minimize %s useRemoteness %s newResidue %s" %
                 (
                     subnames,
                     new_name,
@@ -386,19 +400,21 @@ class EditStructure(ToolInstance):
                     self.close_previous_bool,
                     minimize,
                     use_greek,
+                    new_residue,
                 )
             )
 
         else:
             run(
                 self.session,
-                "substitute sel substituents %s guessAttachment %s modify %s minimize %s useRemoteness %s" %
+                "substitute sel substituents %s guessAttachment %s modify %s minimize %s useRemoteness %s newResidue %s" %
                 (
                     subnames,
                     not use_attached,
                     self.close_previous_bool,
                     minimize,
                     use_greek,
+                    new_residue,
                 )
             )
 

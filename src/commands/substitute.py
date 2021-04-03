@@ -26,6 +26,7 @@ substitute_description = CmdDesc(
         ("guessAttachment", BoolArg),
         ("modify", BoolArg),
         ("minimize", BoolArg),
+        ("newResidue", BoolArg),
         ("useRemoteness", BoolArg),
         ("available", NoArg),
     ],
@@ -99,6 +100,7 @@ def substitute(
         minimize=False,
         useRemoteness=False,
         available=False,
+        newResidue=False,
     ):
 
     if available:
@@ -115,7 +117,7 @@ def substitute(
     attached = {}
     
     if newName is None:
-        pass
+        newName = [None for s in substituents]
     elif any(len(name.strip()) > 4 for name in newName):
         raise RuntimeError("residue names must be 4 characters or less")
     elif not all(name.isalnum() for name in newName):
@@ -149,12 +151,12 @@ def substitute(
                 for res in models[model]:
                     if res not in conv_res:
                         conv_res.append(res)
-
+                
                     if minimize:
                         for chix_res in model.residues:
                             if chix_res in conv_res:
                                 continue
-
+                
                             added_res = False
                             for atom in chix_res.atoms:
                                 for target in models[model][res]:
@@ -163,7 +165,7 @@ def substitute(
                                         conv_res.append(chix_res)
                                         added_res = True
                                         break
-
+                
                                 if added_res:
                                     break
 
@@ -182,14 +184,12 @@ def substitute(
                             AtomSpec(target.atomspec),
                             attached_to=end,
                             minimize=minimize,
-                            use_greek=useRemoteness
+                            use_greek=useRemoteness,
+                            new_residue=newResidue,
+                            new_name=newName[ndx],
                         )
 
-                for res in models[model]:
-                    residue = [resi for resi in rescol.residues if resi.chix_residue is res][0]
-                    if newName is not None:
-                        residue.name = newName[ndx]
-                    residue.update_chix(res)
+                rescol.update_chix(model)
 
             elif modify and not first_pass:
                 raise RuntimeError("only the first model can be replaced")
@@ -197,6 +197,7 @@ def substitute(
                 model_copy = model.copy()
 
                 conv_res = [model_copy.residues[i] for i in [model.residues.index(res) for res in models[model]]]
+                # modifying_residues = [model_copy.residues[i] for i in [model.residues.index(res) for res in models[model]]]
                 modifying_residues = [r for r in conv_res]
 
                 if minimize:
@@ -216,7 +217,7 @@ def substitute(
                                 
                                 if added_res:
                                     break
-
+                
                             if added_res:
                                 break
 
@@ -234,13 +235,11 @@ def substitute(
                             attached_to=end,
                             minimize=minimize,
                             use_greek=useRemoteness,
+                            new_residue=newResidue,
+                            new_name=newName[ndx],
                         )
 
-                for residue in modifying_residues:
-                    res_copy = [r for r in rescol.residues if r.chix_residue is residue][0]
-                    if newName is not None:
-                        res_copy.name = newName[ndx]
-                    res_copy.update_chix(residue)
+                rescol.update_chix(model_copy)
 
                 new_structures.append(model_copy)
 

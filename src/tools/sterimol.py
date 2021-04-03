@@ -77,7 +77,16 @@ class Sterimol(ToolInstance):
         self.table = QTableWidget()
         self.table.setColumnCount(8)
         self.table.setHorizontalHeaderLabels(
-            ['substituent atom', 'bonded atom', 'L', 'B\u2081', 'B\u2082', 'B\u2083', 'B\u2084', 'B\u2085']
+            [
+                'substituent atom',
+                'bonded atom',
+                'B\u2081',
+                'B\u2082',
+                'B\u2083',
+                'B\u2084',
+                'B\u2085',
+                'L',
+            ]
         )
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -207,27 +216,27 @@ class Sterimol(ToolInstance):
             
             li = QTableWidgetItem()
             li.setData(Qt.DisplayRole, "%.2f" % l)
-            self.table.setItem(row, 2, li)
+            self.table.setItem(row, 7, li)
 
             b1i = QTableWidgetItem()
             b1i.setData(Qt.DisplayRole, "%.2f" % b1)
-            self.table.setItem(row, 3, b1i)
+            self.table.setItem(row, 2, b1i)
 
             b2i = QTableWidgetItem()
             b2i.setData(Qt.DisplayRole, "%.2f" % b2)
-            self.table.setItem(row, 4, b2i)
+            self.table.setItem(row, 3, b2i)
 
             b3i = QTableWidgetItem()
             b3i.setData(Qt.DisplayRole, "%.2f" % b3)
-            self.table.setItem(row, 5, b3i)
+            self.table.setItem(row, 4, b3i)
 
             b4i = QTableWidgetItem()
             b4i.setData(Qt.DisplayRole, "%.2f" % b4)
-            self.table.setItem(row, 6, b4i)
+            self.table.setItem(row, 5, b4i)
 
             b5i = QTableWidgetItem()
             b5i.setData(Qt.DisplayRole, "%.2f" % b5)
-            self.table.setItem(row, 7, b5i)
+            self.table.setItem(row, 6, b5i)
     
     def header_check(self, state):
         """user has [un]checked the 'include header' option on the menu"""
@@ -247,13 +256,21 @@ class Sterimol(ToolInstance):
             delim = ";"
             
         if self.settings.include_header:
-            s = delim.join(["substituent_atom", "bonded_atom", "L", "B1", "B2", "B3", "B4", "B5"])
+            s = delim.join(
+                ["substituent_atom", "bonded_atom", "B1", "B2", "B3", "B4", "B5", "L"]
+            )
             s += "\n"
         else:
             s = ""
         
         for i in range(0, self.table.rowCount()):
-            s += delim.join([item.data(Qt.DisplayRole) for item in [self.table.item(i, j) for j in range(0, 8)]])
+            s += delim.join(
+                [
+                    item.data(Qt.DisplayRole) for item in [
+                        self.table.item(i, j) for j in range(0, 8)
+                    ]
+                ]
+            )
             s += "\n"
         
         return s

@@ -134,8 +134,8 @@ class BuildQM(ToolInstance):
         if self.settings.settings_version == 2:
             self.migrate_settings_from_v2()
             self.session.logger.warning("settings migrated from version 2")
-            self.session.logger.warning("migration will occur until migration testing is completed")
-            # self.settings.settings_version = self.settings.settings_version + 1
+            # self.session.logger.warning("migration will occur until migration testing is completed")
+            self.settings.settings_version = self.settings.settings_version + 1
 
         self.refresh_presets()
 

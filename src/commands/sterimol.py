@@ -36,11 +36,11 @@ def sterimol(session, selection, radii="UMN", showVectors=True, showRadii=True, 
     neighbors = []
     datas = []
     
-    info = "<pre>substituent atom\tbonded atom\tL\tB1\tB5\n"
+    info = "<pre>substituent atom\tbonded atom\tB1\tB2\tB3\tB4\tB5\tL\n"
     
     if return_values:
-        if len(models.keys()) > 1:
-            raise RuntimeError("only one substituent may be selected")
+        # if len(models.keys()) > 1:
+        #     raise RuntimeError("only one substituent may be selected")
         
         if any(len(models[key]) > 1 for key in models.keys()):
             raise RuntimeError("only one substituent may be selected")
@@ -104,7 +104,7 @@ def sterimol(session, selection, radii="UMN", showVectors=True, showRadii=True, 
                     session.models.add(bild_obj, parent=model)
                 
                 info += "%-16s\t%-11s\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\n" % (
-                    target.atomspec, attached[target].atomspec, l, b1, b2, b3, b4, b5
+                    target.atomspec, attached[target].atomspec, b1, b2, b3, b4, b5, l
                 )
                 targets.append(target.atomspec)
                 neighbors.append(attached[target].atomspec)
