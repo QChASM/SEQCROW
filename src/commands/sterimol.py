@@ -13,18 +13,24 @@ from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.finders import AtomSpec
 from SEQCROW.commands.substitute import avoidTargets
 
-sterimol_description = CmdDesc(required=[("selection", AtomsArg)], \
-                               keyword=[("radii", EnumOf(["UMN", "Bondi"], 
-                                                         case_sensitive=False,
-                                                  ),
-                                        ),
-                                        ("showVectors", BoolArg),
-                                        ("showRadii", BoolArg), 
-                               ],
-                               synopsis="calculate Sterimol B1, B5, and L"
-                       )
+sterimol_description = CmdDesc(
+    required=[("selection", AtomsArg)], \
+    keyword=[
+        ("radii", EnumOf(["UMN", "Bondi"], case_sensitive=False)),
+        ("showVectors", BoolArg),
+        ("showRadii", BoolArg), 
+    ],
+    synopsis="calculate Sterimol B1, B5, and L"
+)
 
-def sterimol(session, selection, radii="UMN", showVectors=True, showRadii=True, return_values=False):
+def sterimol(
+        session,
+        selection,
+        radii="UMN",
+        showVectors=True,
+        showRadii=True,
+        return_values=False
+    ):
     models, attached = avoidTargets(selection)
     
     radii = radii.lower()
@@ -66,19 +72,23 @@ def sterimol(session, selection, radii="UMN", showVectors=True, showRadii=True, 
                 b4 = np.linalg.norm(data["B4"][1] - data["B4"][0])
                 b5 = np.linalg.norm(data["B5"][1] - data["B5"][0])
                 
-                s = ""
                 if showVectors:
                     for key, color in zip(
                             ["B1", "B2", "B3", "B4", "B5", "L"],
                             ["black", "green", "purple", "orange", "red", "blue"]
                     ):
                         start, end = data[key]
-                        s += ".color %s\n" % color
+                        s = ".color %s\n" % color
                         s += ".note Sterimol %s\n" % key
                         s += ".arrow %6.3f %6.3f %6.3f   %6.3f %6.3f %6.3f\n" % (*start, *end)
-            
+                        
+                        stream = BytesIO(bytes(s, "utf-8"))
+                        bild_obj, status = read_bild(session, stream, "Sterimol %s" % key)
+                        
+                        session.models.add(bild_obj, parent=model)
+                    
                 if showRadii:
-                    s += ".note radii\n"
+                    s = ".note radii\n"
                     s += ".transparency 75\n"
                     color = None
                     for atom in sub.atoms:
@@ -97,9 +107,8 @@ def sterimol(session, selection, radii="UMN", showVectors=True, showRadii=True, 
                         
                         s += ".sphere %f %f %f %f\n" % (*chix_atom.coord, r)
                 
-                if showVectors or showRadii:
                     stream = BytesIO(bytes(s, "utf-8"))
-                    bild_obj, status = read_bild(session, stream, "Sterimol")
+                    bild_obj, status = read_bild(session, stream, "Sterimol radii")
                     
                     session.models.add(bild_obj, parent=model)
                 

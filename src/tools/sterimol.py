@@ -295,7 +295,7 @@ class Sterimol(ToolInstance):
     
     def del_sterimol(self):
         for model in self.session.models.list(type=Generic3DModel):
-            if model.name == "Sterimol":
+            if model.name.startswith("Sterimol"):
                 model.delete()
     
     def display_help(self):
