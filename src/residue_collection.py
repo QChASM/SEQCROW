@@ -456,7 +456,7 @@ class ResidueCollection(Geometry):
             residue = residue[0]
         
         if attached_to:
-            attached_to = residue.find_exact(attached_to)[0]        
+            attached_to = self.find_exact(attached_to)[0]        
         
         if not new_residue:
 
