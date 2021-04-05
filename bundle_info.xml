@@ -249,7 +249,9 @@
             <Package name="AaronTools.test" folder="/home/tony/Documents/QChASM/AaronTools/test"/>
         -->
         <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools"/>
+		<!--
         <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
+		-->
     </AdditionalPackages>
 
     <DataFiles package="AaronTools">
@@ -270,8 +272,10 @@
         <DataFile>LICENSE</DataFile>
     </DataFiles>
     
+	<!--
     <DataFiles package="AaronTools.test">
         <DataDir>test_files</DataDir>
         <DataDir>ref_files</DataDir>
     </DataFiles>
+	-->
 </BundleInfo>
