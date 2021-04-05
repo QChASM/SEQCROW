@@ -2,15 +2,15 @@ import numpy as np
 
 from AaronTools.ring import Ring
 
-from chimerax.atomic import OrderedAtomsArg
-from chimerax.core.commands import BoolArg, CmdDesc, StringArg, DynamicEnum, ListOf
+from chimerax.atomic import OrderedAtomsArg, selected_atoms
+from chimerax.core.commands import BoolArg, CmdDesc, StringArg, DynamicEnum, ListOf, NoArg, Or, EmptyArg
 
 from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.finders import AtomSpec
 
 
 fuseRing_description = CmdDesc(
-    required=[("selection", OrderedAtomsArg)], \
+    required=[("selection", Or(OrderedAtomsArg, EmptyArg))], \
     keyword=[
         (
             "rings",
@@ -27,8 +27,8 @@ fuseRing_description = CmdDesc(
         ("newName", ListOf(StringArg)), 
         ("modify", BoolArg),
         ("minimize", BoolArg),
+        ("available", NoArg),
     ],
-    required_arguments=["rings"],
     synopsis="fuse a ring",
 )
 
@@ -91,12 +91,23 @@ def minimal_ring_convert(atomic_structure, atom1, atom2, avoid=None):
     return residues
 
 
-def fuseRing(session, selection, rings, newName=None, modify=True, minimize=False):
+def fuseRing(session, selection=None, rings=None, newName=None, modify=True, minimize=False, available=False):
+    if available:
+        fuseRing_list(session)
+        return
+    
+    if not selection:
+        selection = selected_atoms(session)
+    
+    if not rings:
+        session.logger.error("missing required \"rings\" argument")
+        return
+    
     if newName is None:
         pass
     elif any(len(name.strip()) > 4 for name in newName):
         raise RuntimeError("residue names must be 4 characters or less")
-    elif any(x in "".join(newName) for x in "!@#$%^&*()\\/.<><;':\"[]{}|-=_+"):
+    elif not all(name.isalnum() for name in newName):
         raise RuntimeError("invalid residue name: %s" % newName)
     elif len(rings) != len(newName):
         raise RuntimeError("number of substituents is not the same as the number of new names")
@@ -164,3 +175,10 @@ def fuseRing(session, selection, rings, newName=None, modify=True, minimize=Fals
     
     if not modify:
         session.models.add(new_structures)
+
+
+def fuseRing_list(session):
+    s = ""
+    for ringname in Ring.list():
+        s += "%s\n" % ringname
+    session.logger.info(s.strip())

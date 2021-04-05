@@ -178,7 +178,11 @@ def seqcrow_s(session, models=None, atoms=None):
                 bond.halfbond = True
                 bond.radius = 0.25
                 bond.hide = False
-                
+        
+        tm_bonds = m.pseudobond_group(m.PBG_METAL_COORDINATION, create_type=None)
+        ts_bonds = m.pseudobond_group("TS bonds", create_type=None)
+        h_bonds = m.pseudobond_group("hydrogen bonds", create_type=None)
+
         for atom in atom_list:
             ele = atom.element.name
             color = element_color(atom.element.number)
@@ -195,10 +199,36 @@ def seqcrow_s(session, models=None, atoms=None):
             
             if atom.element.name == "H":
                 display = len(atom.neighbors) != 1
-                for bonded_atom in atom.neighbors:
-                    if any(x == bonded_atom.element.name for x in ["N", "O", "F", "Cl", "Br"] + list(TMETAL.keys())):
+                if tm_bonds:
+                    if any(atom in bond.atoms for bond in tm_bonds.pseudobonds):
                         display = True
-                        break
+                
+                if h_bonds:
+                    if any(atom in bond.atoms for bond in h_bonds.pseudobonds):
+                        display = True
+                
+                if ts_bonds:
+                    if any(atom in bond.atoms for bond in ts_bonds.pseudobonds):
+                        display = True
+
+                if not display:
+                    for bonded_atom in atom.neighbors:
+                        # do not display H's on C unless it's a terminus
+                        if "C" != bonded_atom.element.name or (
+                            (
+                                bonded_atom.element.name == "C" and (
+                                    sum(len(a.neighbors) == 1 for a in bonded_atom.neighbors) >= bonded_atom.num_bonds - 1
+                                    and not (
+                                        sum(int(a.element.name == "H") for a in bonded_atom.neighbors) == 3
+                                        and len(bonded_atom.neighbors) == 4
+                                    )
+                                    or (ts_bonds and any(bonded_atom in bond.atoms for bond in ts_bonds.pseudobonds))
+                                    or (tm_bonds and any(bonded_atom in bond.atoms for bond in tm_bonds.pseudobonds))
+                                )
+                            )
+                        ): 
+                            display = True
+                            break
                 
                 atom.display = display
 

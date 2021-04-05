@@ -10,6 +10,8 @@ class OrderedSelectionManager(ProviderManager):
         params = signature(super().__init__).parameters
         if any("name" in param for param in params):
             super().__init__(*args, **kwargs)
+        else:
+            super().__init__()
 
         session.triggers.add_handler(SELECTION_CHANGED, self.selection_changed)
         

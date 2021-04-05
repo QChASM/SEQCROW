@@ -13,18 +13,24 @@ from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.finders import AtomSpec
 from SEQCROW.commands.substitute import avoidTargets
 
-sterimol_description = CmdDesc(required=[("selection", AtomsArg)], \
-                               keyword=[("radii", EnumOf(["UMN", "Bondi"], 
-                                                         case_sensitive=False,
-                                                  ),
-                                        ),
-                                        ("showVectors", BoolArg),
-                                        ("showRadii", BoolArg), 
-                               ],
-                               synopsis="calculate Sterimol B1, B5, and L"
-                       )
+sterimol_description = CmdDesc(
+    required=[("selection", AtomsArg)], \
+    keyword=[
+        ("radii", EnumOf(["UMN", "Bondi"], case_sensitive=False)),
+        ("showVectors", BoolArg),
+        ("showRadii", BoolArg), 
+    ],
+    synopsis="calculate Sterimol B1, B5, and L"
+)
 
-def sterimol(session, selection, radii="UMN", showVectors=True, showRadii=True, return_values=False):
+def sterimol(
+        session,
+        selection,
+        radii="UMN",
+        showVectors=True,
+        showRadii=True,
+        return_values=False
+    ):
     models, attached = avoidTargets(selection)
     
     radii = radii.lower()
@@ -34,15 +40,13 @@ def sterimol(session, selection, radii="UMN", showVectors=True, showRadii=True, 
     b5 = None
     targets = []
     neighbors = []
-    ls = []
-    b1s = []
-    b5s = []
+    datas = []
     
-    info = "<pre>substituent atom\tbonded atom\tL\tB1\tB5\n"
+    info = "<pre>substituent atom\tbonded atom\tB1\tB2\tB3\tB4\tB5\tL\n"
     
     if return_values:
-        if len(models.keys()) > 1:
-            raise RuntimeError("only one substituent may be selected")
+        # if len(models.keys()) > 1:
+        #     raise RuntimeError("only one substituent may be selected")
         
         if any(len(models[key]) > 1 for key in models.keys()):
             raise RuntimeError("only one substituent may be selected")
@@ -60,29 +64,31 @@ def sterimol(session, selection, radii="UMN", showVectors=True, showRadii=True, 
                                   detect=False,
                       )
                 
-                l_start, l_end = sub.sterimol("L", return_vector=True, radii=radii)
-                l = np.linalg.norm(l_end - l_start)
+                data = sub.sterimol(return_vector=True, radii=radii)
+                l = np.linalg.norm(data["L"][1] - data["L"][0])
+                b1 = np.linalg.norm(data["B1"][1] - data["B1"][0])
+                b2 = np.linalg.norm(data["B2"][1] - data["B2"][0])
+                b3 = np.linalg.norm(data["B3"][1] - data["B3"][0])
+                b4 = np.linalg.norm(data["B4"][1] - data["B4"][0])
+                b5 = np.linalg.norm(data["B5"][1] - data["B5"][0])
                 
-                b1_start, b1_end = sub.sterimol("B1", return_vector=True, radii=radii)
-                b1 = np.linalg.norm(b1_end - b1_start)
-                
-                b5_start, b5_end = sub.sterimol("B5", return_vector=True, radii=radii)
-                b5 = np.linalg.norm(b5_end - b5_start)
-                
-                s = ""
                 if showVectors:
-                    s += ".color black\n"
-                    s += ".note Sterimol B1\n"
-                    s += ".arrow %6.3f %6.3f %6.3f   %6.3f %6.3f %6.3f   0.1 0.25 %f\n" % (*b1_start, *b1_end, b1/(b1 + 0.75))
-                    s += ".color red\n"
-                    s += ".note Sterimol B5\n"
-                    s += ".arrow %6.3f %6.3f %6.3f   %6.3f %6.3f %6.3f   0.1 0.25 %f\n" % (*b5_start, *b5_end, b5/(b5 + 0.75))
-                    s += ".color blue\n"
-                    s += ".note Sterimol L\n"
-                    s += ".arrow %6.3f %6.3f %6.3f   %6.3f %6.3f %6.3f   0.1 0.25 %f\n" % (*l_start, *l_end, l/(l + 0.75))
-                
+                    for key, color in zip(
+                            ["B1", "B2", "B3", "B4", "B5", "L"],
+                            ["black", "green", "purple", "orange", "red", "blue"]
+                    ):
+                        start, end = data[key]
+                        s = ".color %s\n" % color
+                        s += ".note Sterimol %s\n" % key
+                        s += ".arrow %6.3f %6.3f %6.3f   %6.3f %6.3f %6.3f\n" % (*start, *end)
+                        
+                        stream = BytesIO(bytes(s, "utf-8"))
+                        bild_obj, status = read_bild(session, stream, "Sterimol %s" % key)
+                        
+                        session.models.add(bild_obj, parent=model)
+                    
                 if showRadii:
-                    s += ".note radii\n"
+                    s = ".note radii\n"
                     s += ".transparency 75\n"
                     color = None
                     for atom in sub.atoms:
@@ -101,18 +107,17 @@ def sterimol(session, selection, radii="UMN", showVectors=True, showRadii=True, 
                         
                         s += ".sphere %f %f %f %f\n" % (*chix_atom.coord, r)
                 
-                if showVectors or showRadii:
                     stream = BytesIO(bytes(s, "utf-8"))
-                    bild_obj, status = read_bild(session, stream, "Sterimol")
+                    bild_obj, status = read_bild(session, stream, "Sterimol radii")
                     
                     session.models.add(bild_obj, parent=model)
                 
-                info += "%-16s\t%-11s\t%.2f\t%.2f\t%.2f\n" % (target.atomspec, attached[target].atomspec, l, b1, b5)
+                info += "%-16s\t%-11s\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\n" % (
+                    target.atomspec, attached[target].atomspec, b1, b2, b3, b4, b5, l
+                )
                 targets.append(target.atomspec)
                 neighbors.append(attached[target].atomspec)
-                ls.append(l)
-                b1s.append(b1)
-                b5s.append(b5)
+                datas.append(data)
     
     info = info.strip()
     info += "</pre>"
@@ -120,4 +125,4 @@ def sterimol(session, selection, radii="UMN", showVectors=True, showRadii=True, 
         session.logger.info(info, is_html=True)
     
     if return_values:
-        return targets, neighbors, ls, b1s, b5s
+        return targets, neighbors, datas

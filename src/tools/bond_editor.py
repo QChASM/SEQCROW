@@ -218,13 +218,14 @@ class BondEditor(ToolInstance):
         self.bond_distance.setRange(0.5, 10.0)
         self.bond_distance.setSingleStep(0.05)
         self.bond_distance.setValue(1.51)
+        self.bond_distance.setSuffix(" \u212B")
         bond_length_layout.addRow("bond length:", self.bond_distance)
         
         self.move_fragment = QComboBox()
         self.move_fragment.addItems(["both", "smaller", "larger"])
         bond_length_layout.addRow("move side:", self.move_fragment)
         
-        bond_lookup = QGroupBox("lookup bond length:")
+        bond_lookup = QGroupBox("bond length lookup:")
         bond_lookup_layout = QGridLayout(bond_lookup)
         
         bond_lookup_layout.addWidget(

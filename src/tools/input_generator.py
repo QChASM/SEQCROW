@@ -21,15 +21,15 @@ from PyQt5.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter
 
 from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.utils import iter2str
-from SEQCROW.jobs import ORCAJob, GaussianJob, Psi4Job
 from SEQCROW.widgets import PeriodicTable, ModelComboBox
 from SEQCROW.finders import AtomSpec
 
-from AaronTools.config import Config, SECTIONS
+from AaronTools.config import Config
 from AaronTools.const import TMETAL
 from AaronTools.theory import *
 from AaronTools.theory.method import KNOWN_SEMI_EMPIRICAL
 from AaronTools.utils.utils import combine_dicts
+from AaronTools.json_extension import ATDecoder, ATEncoder
 
 # import cProfile
 
@@ -70,195 +70,16 @@ class _InputGeneratorSettings(Settings):
         'previous_mult': Value(1, IntArg),
         'previous_solvent_model': Value("None", StringArg),
         'previous_solvent_name': Value("", StringArg),
-        #shh these are just jsons
-        'previous_gaussian_options': Value(
-            dumps(
-                {
-                    GAUSSIAN_ROUTE: {
-                        'opt': ['NoEigenTest', 'Tight', 'VeryTight'],
-                        'DensityFit': [],
-                        'pop': ['NBO', 'NBOREAD', 'NBO7'],
-                        'scrf': ['COSMORS'],
-                        'Integral': ['grid=99302'],
-                    },
-                    GAUSSIAN_COMMENT:[],
-                    GAUSSIAN_PRE_ROUTE: {
-                        'LindaWorkers':
-                            #I found this example online at
-                            # http://wild.life.nctu.edu.tw/~jsyu/compchem/g09/g09ur/m_linda.htm
-                            #I don't know if it works (I don't use linda)
-                            ["spain", "hamlet:2", "ophelia:4"],
-                    },
-                    GAUSSIAN_POST: [
-                        '$nbo RESONANCE NBOSUM E2PERT=0.0 NLMO BNDIDX $end'
-                    ],
-                }
-            ),
-            StringArg
-        ),
-        'last_gaussian_options': Value(dumps({GAUSSIAN_ROUTE:{}}), StringArg),
-        'previous_orca_solvent_model': Value("None", StringArg),
-        'previous_orca_solvent_name': Value("", StringArg),
-        'previous_orca_options': Value(
-            dumps(
-                {
-                    ORCA_ROUTE: ['TightSCF'],
-                    ORCA_BLOCKS: {
-                        'basis': ['decontract true'],
-                        'elprop': ['Quadrupole True'],
-                        'freq': ['Increment 0.001'],
-                        'geom': ['Calc_Hess true']
-                    },
-                }
-            ),
-            StringArg
-        ),
-        'last_orca_options': Value(dumps({}), StringArg),
-        'previous_psi4_options': Value(
-            dumps(
-                {
-                    PSI4_SETTINGS:{
-                        'reference': ['rhf', 'rohf', 'uhf', 'cuhf', 'rks', 'uks'],
-                        'cubeprop_tasks': ["frontier_orbitals"],
-                    },
-                    PSI4_BEFORE_GEOM: [],
-                    PSI4_BEFORE_JOB: ['activate(auto_fragments())'],
-                    PSI4_JOB: {
-                        'energy': ['return_wfn=True', 'dft_method=pbe0'],
-                        'optimize': ['return_wfn=True', "engine='geometric'"],
-                        'gradient': ['return_wfn=True'],
-                        'frequencies': [
-                            'return_wfn=True',
-                            'dertype=\'gradient\'',
-                            'dertype=\'energy\''
-                        ],
-                    },
-                    PSI4_COMMENT: [],
-                    PSI4_MOLECULE: {
-                        'units': ['angstrom', 'bohr'],
-                        'pubchem': ['benzene'],
-                        'symmetry': ['c1', 'c2', 'ci', 'cs', 'd2', 'c2h', 'c2v', 'd2h'],
-                        'no_reorient': [],
-                        'no_com': [],
-                    },
-                    PSI4_AFTER_JOB: [
-                        "fchk_writer = psi4.core.FCHKWriter(wfn)\nfchk_writer.write('output.fchk')",
-                        "cubeprop(wfn)",
-                    ],
-                }
-            ),
-            StringArg
-        ),
-        'last_psi4_options': Value(dumps({}), StringArg),
+        # shh is just a json
+        'last_options': Value(dumps(dict()), StringArg),
+        'previous_options': Value(dumps(dict()), StringArg),
         'last_program': Value("Gaussian", StringArg),
     }
 
     AUTO_SAVE = {
-        'gaussian_presets': Value(
-            dumps(
-                {
-                    "quick optimize": {
-                        "opt": True,
-                        "ts": False,
-                        "freq": False,
-                        "semi-empirical": False,
-                        "solvent model": 'None',
-                        "solvent": '',
-                        "method": 'PM6',
-                        "grid": None,
-                        "disp": None,
-                        "basis": {'name':[], 'auxiliary':[], 'file':[], 'elements':[]},
-                        "ecp": {'name':[], 'file':[], 'elements':[]},
-                        "other": {},
-                    },
-                }
-            ),
-            StringArg
-        ),
-        'orca_presets': Value(
-            dumps(
-                {
-                    "quick optimize":{
-                        "opt":True,
-                        "ts":False,
-                        "freq":False,
-                        "semi-empirical":False,
-                        "solvent model":'None',
-                        "solvent":'',
-                        "method":'HF-3c',
-                        "grid":None,
-                        "disp":None,
-                        "basis": {
-                            'name':[],
-                            'auxiliary':[],
-                            'file':[],
-                            'elements':[]
-                        },
-                        "ecp": {
-                            'name':[],
-                            'file':[],
-                            'elements':[]
-                        },
-                        "other": {},
-                    },
-                    "DLPNO single-point":{
-                        "opt":False,
-                        "ts":False,
-                        "freq":False,
-                        "semi-empirical":False,
-                        "solvent model":'None',
-                        "solvent":'',
-                        "method":'DLPNO-CCSD(T)',
-                        "grid":None,
-                        "disp":None,
-                        "basis": {
-                            'name':["cc-pVTZ", "cc-pVTZ"],
-                            'auxiliary':[None, "C"],
-                            'file':[False, False],
-                            'elements':['all', 'all']
-                        },
-                        "ecp": {
-                            'name':[],
-                            'file':[],
-                            'elements':[]
-                        },
-                        "other": {ORCA_ROUTE:['TightSCF']},
-                    },
-                }
-            ),
-            StringArg
-        ),
-        'psi4_presets': Value(
-            dumps(
-                {
-                    "quick optimize":{
-                        "opt":True,
-                        "ts":False,
-                        "freq":False,
-                        "semi-empirical":False,
-                        "solvent model":'None',
-                        "solvent":'',
-                        "method":'HF',
-                        "grid":None,
-                        "disp":None,
-                        "basis": {
-                            'name':['sto-3g'],
-                            'auxiliary':[None],
-                            'file':[False],
-                            'elements':['all']
-                        },
-                        "ecp": {
-                            'name':[],
-                            'file':[],
-                            'elements':[]
-                        },
-                        "other": {},
-                    },
-                }
-            ),
-            StringArg
-        ),
-        'on_finished': Value('do nothing', StringArg),
+        "presets": Value(dumps(dict(), cls=ATEncoder), StringArg),
+        "on_finished": Value("do nothing", StringArg),
+        "settings_version": 2,
     }
 
     # def save(self, *args, **kwargs):
@@ -286,16 +107,18 @@ class BuildQM(ToolInstance):
     def __init__(self, session, name):
         super().__init__(session, name)
 
-        self.settings = _InputGeneratorSettings(session, name, version="2")
+        self.settings = _InputGeneratorSettings(session, name, version="3")
 
         self.display_name = "QM Input Generator"
 
         self.tool_window = MainToolWindow(self)
         self.preview_window = None
+        self.warning_window = None
         self.preset_window = None
         self.job_local_prep = None
         self.remove_preset_window = None
         self.export_preset_window = None
+        self.program = None
 
         self._build_ui()
 
@@ -303,10 +126,16 @@ class BuildQM(ToolInstance):
         if ndx != -1:
             self.change_model(ndx)
 
-        self.presets = {}
-        self.presets['Gaussian'] = loads(self.settings.gaussian_presets)
-        self.presets['ORCA'] = loads(self.settings.orca_presets)
-        self.presets['Psi4'] = loads(self.settings.psi4_presets)
+        self.presets = loads(self.settings.presets, cls=ATDecoder)
+        for file_format in session.seqcrow_qm_input_manager.formats:
+            if file_format not in self.presets:
+                self.presets[file_format] = session.seqcrow_qm_input_manager.get_info(file_format).initial_presets
+
+        if self.settings.settings_version == 2:
+            self.migrate_settings_from_v2()
+            self.session.logger.warning("settings migrated from version 2")
+            # self.session.logger.warning("migration will occur until migration testing is completed")
+            self.settings.settings_version = self.settings.settings_version + 1
 
         self.refresh_presets()
 
@@ -326,7 +155,12 @@ class BuildQM(ToolInstance):
         #change from one software widget to another when the dropdown menu changes
         #TODO: add a presets tab to save/load presets to aaronrc
         #      so it can easily be used in other tools (like one that makes AARON input files)
-        init_form = self.settings.last_program
+        if any(x == self.settings.last_program for x in self.session.seqcrow_qm_input_manager.formats.keys()):
+            init_form = self.session.seqcrow_qm_input_manager.get_info(self.settings.last_program)
+        else:
+            init_form = self.session.seqcrow_qm_input_manager.get_info(
+                list(self.session.seqcrow_qm_input_manager.formats.keys())[0]
+            )
 
         layout = QGridLayout()
 
@@ -334,9 +168,10 @@ class BuildQM(ToolInstance):
         form_layout = QFormLayout(basics_form)
 
         self.file_type = QComboBox()
-        self.file_type.addItems(['Gaussian', 'ORCA', 'Psi4'])
-        ndx = self.file_type.findText(init_form, Qt.MatchExactly)
-        self.file_type.setCurrentIndex(ndx)
+        self.file_type.addItems(self.session.seqcrow_qm_input_manager.formats.keys())
+        ndx = self.file_type.findText(init_form.name, Qt.MatchExactly)
+        if ndx >= 0:
+            self.file_type.setCurrentIndex(ndx)
         self.file_type.currentIndexChanged.connect(self.change_file_type)
 
         form_layout.addRow("file type:", self.file_type)
@@ -359,7 +194,7 @@ class BuildQM(ToolInstance):
         self.basis_widget.basisChanged.connect(self.update_preview)
 
         #other keywords
-        self.other_keywords_widget = KeywordWidget(self.settings, init_form=init_form)
+        self.other_keywords_widget = KeywordWidget(self.session, self.settings, init_form=init_form)
         self.other_keywords_widget.additionalOptionsChanged.connect(self.update_preview)
 
         tabs = QTabWidget()
@@ -394,9 +229,15 @@ class BuildQM(ToolInstance):
         export.addAction(save)
 
         view = menu.addMenu("&View")
+        
         preview = QAction("&Preview", self.tool_window.ui_area)
         preview.triggered.connect(self.show_preview)
         view.addAction(preview)
+
+        warnings = QAction("&Warnings", self.tool_window.ui_area)
+        warnings.triggered.connect(self.show_warnings)
+        view.addAction(warnings)
+        
         queue = QAction("&Queue", self.tool_window.ui_area)
         queue.triggered.connect(self.show_queue)
         view.addAction(queue)
@@ -448,6 +289,286 @@ class BuildQM(ToolInstance):
 
         self.tool_window.manage(None)
 
+    def migrate_settings_from_v2(self):
+        """
+        import settings from version 2
+        this was the version before seqcrow_qm_input_manager was added and
+        everything was specific for Gaussian, ORCA, or Psi4
+        """
+        import os
+        from configparser import ConfigParser
+        from chimerax import app_dirs_unversioned
+        
+        filename = os.path.join(
+            app_dirs_unversioned.user_config_dir,
+            "Build QM Input-2"
+        )
+        
+        if not os.access(filename, os.R_OK):
+            return
+
+        old_settings = ConfigParser()
+        old_settings.read(filename)
+        if old_settings.has_option("DEFAULT", "previous_basis_names"):
+            previous_basis_names = old_settings.get("DEFAULT", "previous_basis_names")
+            self.settings.previous_basis_names = eval("[%s]" % old_settings.get("DEFAULT", "previous_basis_names"))
+        if old_settings.has_option("DEFAULT", "previous_basis_paths"):
+            previous_basis_paths = eval("[%s]" % old_settings.get("DEFAULT", "previous_basis_paths"))
+            self.settings.previous_basis_paths = previous_basis_paths
+        if old_settings.has_option("DEFAULT", "previous_functional_names"):
+            previous_functional_names = eval("[%s]" % old_settings.get("DEFAULT", "previous_functional_names"))
+            self.settings.previous_functional_names = previous_functional_names
+        if old_settings.has_option("DEFAULT", "previous_functional_needs_basis"):
+            previous_functional_needs_basis = eval("[%s]" % old_settings.get("DEFAULT", "previous_functional_needs_basis"))
+            self.settings.previous_functional_needs_basis = previous_functional_needs_basis
+        
+        if old_settings.has_option("DEFAULT", "previous_psi4_options"):
+            previous_psi4_options = loads(eval(old_settings.get("DEFAULT", "previous_psi4_options")))
+            previous_options = loads(self.settings.previous_options)
+            if "Psi4" in previous_options:
+                previous_options["Psi4"] = combine_dicts(
+                    previous_psi4_options, previous_options["Psi4"]
+                )
+            else:
+                previous_options["Psi4"] = previous_psi4_options
+            self.settings.previous_options = dumps(previous_options)
+        
+        if old_settings.has_option("DEFAULT", "previous_gaussian_options"):
+            previous_gaussian_options = loads(eval(old_settings.get("DEFAULT", "previous_gaussian_options")))
+            previous_options = loads(self.settings.previous_options)
+            if "Gaussian" in previous_options:
+                previous_options["Gaussian"] = combine_dicts(
+                    previous_gaussian_options, previous_options["Gaussian"]
+                )
+            else:
+                previous_options["Gaussian"] = previous_gaussian_options
+            self.settings.previous_options = dumps(previous_options)
+        
+        if old_settings.has_option("DEFAULT", "previous_orca_options"):
+            previous_orca_options = loads(eval(old_settings.get("DEFAULT", "previous_orca_options")))
+            previous_options = loads(self.settings.previous_options)
+            if "ORCA" in previous_options:
+                previous_options["ORCA"] = combine_dicts(
+                    previous_orca_options, previous_options["ORCA"]
+                )
+            else:
+                previous_options["ORCA"] = previous_orca_options
+            self.settings.previous_options = dumps(previous_options)
+            
+        if old_settings.has_option("DEFAULT", "gaussian_presets"):
+            gaussian_presets = loads(eval(old_settings.get("DEFAULT", "gaussian_presets")))
+            for preset_name in gaussian_presets:
+                theory = Theory()
+                new_preset = dict()
+                preset = gaussian_presets[preset_name]
+                if "opt" in preset:
+                    new_preset["use_job_type"] = True
+                    if preset["opt"]:
+                        job = OptimizationJob(transition_state=preset["ts"])
+                        if not theory.job_type:
+                            theory.job_type = job
+                        else:
+                            theory.job_type.append(job)
+                if "freq" in preset:
+                    new_preset["use_job_type"] = True
+                    if preset["freq"]:
+                        new_preset["raman"] = preset["raman"]
+                        job = FrequencyJob(temperature=preset["temp"], numerical=preset["num_freq"])
+                        if not theory.job_type:
+                            theory.job_type = job
+                        else:
+                            theory.job_type.append(job)
+                if "nproc" in preset:
+                    new_preset["use_job_resources"] = True
+                    theory.processors = preset["nproc"]
+                if "mem" in preset:
+                    new_preset["use_job_resources"] = True
+                    theory.memory = preset["mem"]
+                if "solvent" in preset:
+                    new_preset["use_solvent"] = True
+                    if preset["solvent model"] and preset["solvent model"] != "None":
+                        theory.solvent = ImplicitSolvent(preset["solvent model"], preset["solvent"])
+                if "method" in preset:
+                    new_preset["use_method"] = True
+                    theory.method = Method(preset["method"], preset["semi-empirical"])
+                if "grid" in preset:
+                    new_preset["use_method"] = True
+                    if preset["grid"]:
+                        theory.grid = IntegrationGrid(preset["grid"])
+                if "disp" in preset:
+                    new_preset["use_method"] = True
+                    if preset["disp"]:
+                        theory.dispersion = EmpiricalDispersion(preset["disp"])
+                if "other" in preset:
+                    new_preset["use_other"] = True
+                    theory.kwargs = preset["other"]
+                if "basis" in preset:
+                    new_preset["use_basis"] = True
+                    basis_list = []
+                    for i, name in enumerate(preset['basis']['name']):
+                        elements = preset['basis']['elements'][i]
+                        aux_type = preset['basis']['auxiliary'][i]
+                        user_defined = preset['basis']['file'][i]
+        
+                        basis_list.append(Basis(name, elements, aux_type=aux_type, user_defined=user_defined))
+        
+                    ecp_list = []
+                    for i, name in enumerate(preset['ecp']['name']):
+                        elements = preset['ecp']['elements'][i]
+                        user_defined = preset['ecp']['file'][i]
+        
+                        ecp_list.append(ECP(name, elements, user_defined=user_defined))
+        
+                    basis_set = BasisSet(basis_list, ecp_list)
+                    theory.basis = basis_set
+                new_preset["theory"] = theory
+                
+                self.presets["Gaussian"][preset_name] = new_preset
+                
+        if old_settings.has_option("DEFAULT", "orca_presets"):
+            orca_presets = loads(eval(old_settings.get("DEFAULT", "orca_presets")))
+            for preset_name in orca_presets:
+                theory = Theory()
+                new_preset = dict()
+                preset = orca_presets[preset_name]
+                if "opt" in preset:
+                    new_preset["use_job_type"] = True
+                    if preset["opt"]:
+                        job = OptimizationJob(transition_state=preset["ts"])
+                        if not theory.job_type:
+                            theory.job_type = job
+                        else:
+                            theory.job_type.append(job)
+                if "freq" in preset:
+                    new_preset["use_job_type"] = True
+                    if preset["freq"]:
+                        new_preset["raman"] = preset["raman"]
+                        job = FrequencyJob(temperature=preset["temp"], numerical=preset["num_freq"])
+                        if not theory.job_type:
+                            theory.job_type = job
+                        else:
+                            theory.job_type.append(job)
+                if "nproc" in preset:
+                    new_preset["use_job_resources"] = True
+                    theory.processors = preset["nproc"]
+                if "mem" in preset:
+                    new_preset["use_job_resources"] = True
+                    theory.memory = preset["mem"]
+                if "solvent" in preset:
+                    new_preset["use_solvent"] = True
+                    if preset["solvent model"] and preset["solvent model"] != "None":
+                        theory.solvent = ImplicitSolvent(preset["solvent model"], preset["solvent"])
+                if "method" in preset:
+                    new_preset["use_method"] = True
+                    theory.method = Method(preset["method"], preset["semi-empirical"])
+                if "grid" in preset:
+                    new_preset["use_method"] = True
+                    if preset["grid"]:
+                        theory.grid = IntegrationGrid(preset["grid"])
+                if "disp" in preset:
+                    new_preset["use_method"] = True
+                    if preset["disp"]:
+                        theory.dispersion = EmpiricalDispersion(preset["disp"])
+                if "other" in preset:
+                    new_preset["use_other"] = True
+                    theory.kwargs = preset["other"]
+                if "basis" in preset:
+                    new_preset["use_basis"] = True
+                    basis_list = []
+                    for i, name in enumerate(preset['basis']['name']):
+                        elements = preset['basis']['elements'][i]
+                        aux_type = preset['basis']['auxiliary'][i]
+                        user_defined = preset['basis']['file'][i]
+        
+                        basis_list.append(Basis(name, elements, aux_type=aux_type, user_defined=user_defined))
+        
+                    ecp_list = []
+                    for i, name in enumerate(preset['ecp']['name']):
+                        elements = preset['ecp']['elements'][i]
+                        user_defined = preset['ecp']['file'][i]
+        
+                        ecp_list.append(ECP(name, elements, user_defined=user_defined))
+        
+                    basis_set = BasisSet(basis_list, ecp_list)
+                    theory.basis = basis_set
+                new_preset["theory"] = theory
+                
+                self.presets["ORCA"][preset_name] = new_preset
+                
+        if old_settings.has_option("DEFAULT", "psi4_presets"):
+            psi4_presets = loads(eval(old_settings.get("DEFAULT", "psi4_presets")))
+            for preset_name in psi4_presets:
+                theory = Theory()
+                new_preset = dict()
+                preset = psi4_presets[preset_name]
+                if "opt" in preset:
+                    new_preset["use_job_type"] = True
+                    if preset["opt"]:
+                        job = OptimizationJob(transition_state=preset["ts"])
+                        if not theory.job_type:
+                            theory.job_type = job
+                        else:
+                            theory.job_type.append(job)
+                if "freq" in preset:
+                    new_preset["use_job_type"] = True
+                    if preset["freq"]:
+                        new_preset["raman"] = preset["raman"]
+                        job = FrequencyJob(temperature=preset["temp"], numerical=preset["num_freq"])
+                        if not theory.job_type:
+                            theory.job_type = job
+                        else:
+                            theory.job_type.append(job)
+                if "nproc" in preset:
+                    new_preset["use_job_resources"] = True
+                    theory.processors = preset["nproc"]
+                if "mem" in preset:
+                    new_preset["use_job_resources"] = True
+                    theory.memory = preset["mem"]
+                if "solvent" in preset:
+                    new_preset["use_solvent"] = True
+                    if preset["solvent model"] and preset["solvent model"] != "None":
+                        theory.solvent = ImplicitSolvent(preset["solvent model"], preset["solvent"])
+                if "method" in preset:
+                    new_preset["use_method"] = True
+                    theory.method = Method(preset["method"], preset["semi-empirical"])
+                if "grid" in preset:
+                    new_preset["use_method"] = True
+                    if preset["grid"]:
+                        theory.grid = IntegrationGrid(preset["grid"])
+                if "disp" in preset:
+                    new_preset["use_method"] = True
+                    if preset["disp"]:
+                        theory.dispersion = EmpiricalDispersion(preset["disp"])
+                if "other" in preset:
+                    new_preset["use_other"] = True
+                    theory.kwargs = preset["other"]
+                if "basis" in preset:
+                    new_preset["use_basis"] = True
+                    basis_list = []
+                    for i, name in enumerate(preset['basis']['name']):
+                        elements = preset['basis']['elements'][i]
+                        aux_type = preset['basis']['auxiliary'][i]
+                        user_defined = preset['basis']['file'][i]
+        
+                        basis_list.append(Basis(name, elements, aux_type=aux_type, user_defined=user_defined))
+        
+                    ecp_list = []
+                    for i, name in enumerate(preset['ecp']['name']):
+                        elements = preset['ecp']['elements'][i]
+                        user_defined = preset['ecp']['file'][i]
+        
+                        ecp_list.append(ECP(name, elements, user_defined=user_defined))
+        
+                    basis_set = BasisSet(basis_list, ecp_list)
+                    theory.basis = basis_set
+                new_preset["theory"] = theory
+                
+                self.presets["Psi4"][preset_name] = new_preset
+
+        self.settings.presets = dumps(self.presets, cls=ATEncoder)
+
+        self.settings.save()
+
     def refresh_presets(self):
         """cleans and repopulates the "presets" dropdown on the tool's ribbon"""
         self.presets_menu.clear()
@@ -459,9 +580,7 @@ class BuildQM(ToolInstance):
                 preset_action.triggered.connect(lambda *args, program=program, name=preset: self.apply_preset(program, name))
                 program_submenu.addAction(preset_action)
 
-        self.settings.gaussian_presets = dumps(self.presets['Gaussian'])
-        self.settings.orca_presets = dumps(self.presets['ORCA'])
-        self.settings.psi4_presets = dumps(self.presets['Psi4'])
+        self.settings.presets = dumps(self.presets, cls=ATEncoder)
 
         sep = self.presets_menu.addSeparator()
         self.presets_menu.addAction(sep)
@@ -475,7 +594,7 @@ class BuildQM(ToolInstance):
         if self.preset_window is None:
             self.preset_window = self.tool_window.create_child_window("New Preset", window_class=SavePreset)
         else:
-            self.preset_window.display(True)
+            self.preset_window.shown = True
 
     def apply_preset(self, program, preset_name):
         """apply preset named 'preset_name' for 'program'"""
@@ -490,71 +609,54 @@ class BuildQM(ToolInstance):
         self.job_widget.blockSignals(True)
         self.other_keywords_widget.blockSignals(True)
 
-        if 'opt' in preset:
-            self.job_widget.do_geom_opt.setChecked(preset['opt'])
-            self.job_widget.ts_opt.setChecked(preset['ts'])
+        theory = preset["theory"]
 
-        if 'freq' in preset:
-            self.job_widget.do_freq.setChecked(preset['freq'])
+        if "use_job_type" in preset and preset["use_job_type"]:
+            self.job_widget.do_geom_opt.setChecked(False)
+            self.job_widget.do_freq.setChecked(False)
+            if theory.job_type:
+                for job in theory.job_type:
+                    if isinstance(job, OptimizationJob):
+                        self.job_widget.do_geom_opt.setChecked(True)
+                        self.job_widget.ts_opt.setChecked(job.transition_state)
+            
+                    elif isinstance(job, FrequencyJob):
+                        self.job_widget.do_freq.setChecked(True)
+                        self.job_widget.temp.setValue(job.temperature)
+                        self.job_widget.num_freq.setChecked(job.numerical)
 
-        if 'temp' in preset:
-            self.job_widget.temp.setValue(float(preset['temp']))
+            if 'raman' in preset:
+                self.job_widget.raman.setChecked(preset['raman'])
 
-        if 'raman' in preset:
-            self.job_widget.raman.setChecked(preset['raman'])
+        if "use_job_resources" in preset and preset["use_job_resources"]:
+            if theory.processors:
+                self.job_widget.setProcessors(theory.processors)
+            else:
+                self.job_widget.setProcessors(0)
+            
+            if theory.memory:
+                self.job_widget.setMemory(theory.memory)
+            else:
+                self.job_widget.setMemory(0)
+            
 
-        if 'num_freq' in preset:
-            self.job_widget.num_freq.setChecked(preset['num_freq'])
+        if "use_solvent" in preset and preset["use_solvent"]:
+            self.job_widget.setSolvent(theory.solvent)
 
-        if 'nproc' in preset:
-            self.job_widget.setProcessors(preset['nproc'])
-            self.job_widget.setMemory(preset['mem'])
+        if "use_method" in preset and preset["use_method"]:
+            self.method_widget.setMethod(theory.method)
+            self.method_widget.setGrid(theory.grid)
+            self.method_widget.setDispersion(theory.empirical_dispersion)
 
-        if 'solvent' in preset:
-            solvent = ImplicitSolvent(preset['solvent model'], preset['solvent'])
-            self.job_widget.setSolvent(solvent)
+        if "use_basis" in preset and preset["use_basis"]:
+            if self.model_selector.currentData():
+                rescol = ResidueCollection(self.model_selector.currentData(), bonds_matter=False)
+                if theory.basis:
+                    theory.basis.refresh_elements(rescol)
+            self.basis_widget.setBasis(theory.basis)
 
-        if 'method' in preset:
-            func = Method(preset['method'], preset['semi-empirical'])
-            self.method_widget.setMethod(func)
-
-        if 'grid' in preset:
-            self.method_widget.setGrid(preset['grid'])
-
-        if 'disp' in preset:
-            self.method_widget.setDispersion(preset['disp'])
-
-        if 'functional' in preset:
-            func = Method(preset['functional'], preset['semi-empirical'])
-            self.method_widget.setMethod(func)
-
-        if 'basis' in preset:
-            basis_list = []
-            for i, name in enumerate(preset['basis']['name']):
-                elements = preset['basis']['elements'][i]
-                aux_type = preset['basis']['auxiliary'][i]
-                user_defined = preset['basis']['file'][i]
-
-                basis_list.append(Basis(name, elements, aux_type=aux_type, user_defined=user_defined))
-
-            ecp_list = []
-            for i, name in enumerate(preset['ecp']['name']):
-                elements = preset['ecp']['elements'][i]
-                user_defined = preset['ecp']['file'][i]
-
-                ecp_list.append(ECP(name, elements, user_defined=user_defined))
-
-            basis_set = BasisSet(basis_list, ecp_list)
-
-            self.basis_widget.setBasis(basis_set)
-
-        if 'other' in preset:
-            raw_kw_dict = preset['other']
-            kw_dict = {}
-            for kw in raw_kw_dict.keys():
-                kw_dict[kw] = raw_kw_dict[kw]
-
-            self.other_keywords_widget.setKeywords(kw_dict)
+        if "use_other" in preset and preset["use_other"]:
+            self.other_keywords_widget.setKeywords(theory.kwargs)
 
         self.file_type.blockSignals(False)
         self.method_widget.blockSignals(False)
@@ -573,11 +675,15 @@ class BuildQM(ToolInstance):
         """shows the child window to remove a preset"""
         if self.remove_preset_window is None:
             self.remove_preset_window = self.tool_window.create_child_window("Remove Presets", window_class=RemovePreset)
+        else:
+            self.remove_preset_window.shown = True
 
     def show_export_preset(self):
         """shows child window to export preset json"""
         if self.export_preset_window is None:
             self.export_preset_window = self.tool_window.create_child_window("Export Presets", window_class=ExportPreset)
+        else:
+            self.export_preset_window.shown = True
 
     def import_preset_file(self):
         """open file browser, select file, and import presets"""
@@ -588,16 +694,18 @@ class BuildQM(ToolInstance):
 
         if filename.lower().endswith("json"):
             with open(filename, 'r') as f:
-                new_presets = load(f)
+                new_presets = load(f, cls=ATDecoder)
 
-            for program in ["Gaussian", "ORCA", "Psi4"]:
+            for program in self.session.seqcrow_qm_input_manager.formats.keys():
                 if program in new_presets:
                     for preset_name in new_presets[program]:
                         if preset_name in self.presets[program]:
-                            yes = QMessageBox.question(self.presets_menu, \
-                                                        "%s preset named \"%s\" already exists" % (program, preset_name), \
-                                                        "would you like to overwrite \"%s\"?" % preset_name, \
-                                                        QMessageBox.Yes | QMessageBox.No)
+                            yes = QMessageBox.question(
+                                self.presets_menu,
+                                "%s preset named \"%s\" already exists" % (program, preset_name),
+                                "would you like to overwrite \"%s\"?" % preset_name,
+                                QMessageBox.Yes | QMessageBox.No,
+                            )
 
                             if yes != QMessageBox.Yes:
                                 continue
@@ -605,117 +713,51 @@ class BuildQM(ToolInstance):
                         self.presets[program][preset_name] = new_presets[program][preset_name]
                         self.session.logger.status("imported %s preset \"%s\"" % (program, preset_name))
 
-                        if 'basis' in self.presets[program][preset_name]:
-                            #print(any(file is not False for file in self.presets[program][preset_name]['basis']['file']))
-                            if any(file is not False for file in self.presets[program][preset_name]['basis']['file']):
-                                self.session.logger.warning("preset contains a basis set that is not built-in\n" +
-                                                            "the external basis file location may need to be updated")
-
-                        if 'ecp' in self.presets[program][preset_name]:
-                            if any(file is not False for file in self.presets[program][preset_name]['ecp']['file']):
-                                self.session.logger.warning("preset contains an ECP that is not built-in\n" +
-                                                            "the external ECP file location may need to be updated")
-
         elif filename.lower().endswith("ini"):
             config = Config(filename, quiet=True)
 
             for section in config.sections():
-                if any(section == x for x in SECTIONS):
-                    self.session.logger.info("skipping AaronTools standard section: %s" % section)
-                    continue
-
                 new_preset = {}
 
                 program = config.get(section, "exec_type", fallback=False)
                 if not program:
                     self.session.logger.info("skipping %s; no program was specified (exec_type)" % section)
                     continue
-                elif program.lower() == "gaussian":
-                    program = "Gaussian"
-                elif program.lower() == "orca":
-                    program = "ORCA"
-                elif program.lower() == "psi4":
-                    program = "Psi4"
+                
+                for form in self.session.seqcrow_qm_input_manager.formats.keys():
+                    if re.match(form, program, flags=re.IGNORECASE):
+                        program = form
+                        break
                 else:
-                    self.session.logger.warning("skipping %s; exec_type was not gaussian, orca, or psi4")
+                    self.session.logger.warning("skipping %s; exec_type %s was not recognized" % (section, program))
                     continue
 
                 if section in self.presets[program]:
-                    yes = QMessageBox.question(self.presets_menu, \
-                                                "%s preset named \"%s\" already exists" % (program, section), \
-                                                "would you like to overwrite \"%s\"?" % section, \
-                                                QMessageBox.Yes | QMessageBox.No)
+                    yes = QMessageBox.question(
+                        self.presets_menu,
+                        "%s preset named \"%s\" already exists" % (program, section),
+                        "would you like to overwrite \"%s\"?" % section,
+                        QMessageBox.Yes | QMessageBox.No
+                    )
 
                     if yes != QMessageBox.Yes:
                         continue
 
                 theory = config.get_theory(None, section=section)
-                other_kw_dict = config.get_other_kwargs(section=section)
-                if len(other_kw_dict.keys()) > 0:
-                    new_preset["other"] = other_kw_dict
-
-                if theory.basis is not None:
-                    new_preset["basis"] = {"name":[], "elements":[], "auxiliary":[], "file":[]}
-                    new_preset["ecp"] = {"name":[], "elements":[], "auxiliary":[], "file":[]}
-                    if theory.basis.basis is not None:
-                        new_preset["basis"]["name"] = [basis.name for basis in theory.basis.basis]
-                        new_preset["basis"]["elements"] = [basis.elements for basis in theory.basis.basis]
-                        new_preset["basis"]["auxiliary"] = [basis.aux_type for basis in theory.basis.basis]
-                        new_preset["basis"]["file"] = [basis.user_defined for basis in theory.basis.basis]
-                        if any(basis.user_defined for basis in theory.basis.basis):
-                            self.session.logger.warning("preset contains a basis set that is not built-in\n" +
-                                                        "the external basis set file location may need to be updated")
-
-
-                    if theory.basis.ecp is not None:
-                        new_preset["ecp"]["name"] = [basis.name for basis in theory.basis.ecp]
-                        new_preset["ecp"]["elements"] = [basis.elements for basis in theory.basis.ecp]
-                        new_preset["ecp"]["file"] = [basis.user_defined for basis in theory.basis.ecp]
-                        if any(basis.user_defined for basis in theory.basis.ecp):
-                            self.session.logger.warning("preset contains an ECP that is not built-in\n" +
-                                                        "the external ECP file location may need to be updated")
-
-                if theory.method is not None:
-                    new_preset["method"] = theory.method.name
-                    new_preset["semi-empirical"] = theory.method.is_semiempirical
-
-                if theory.empirical_dispersion is not None:
-                    new_preset["disp"] = theory.empirical_dispersion.name
-
-                if theory.grid is not None:
-                    new_preset["grid"] = theory.grid.name
-
-                if theory.solvent is not None:
-                    if theory.solvent.solvent == "gas":
-                        new_preset["solvent"] = ""
-                    else:
-                        new_preset["solvent"] = theory.solvent.solvent
-
-                        new_preset["solvent model"] = theory.solvent.name
-
-                if theory.processors is not None:
-                    new_preset["nprocs"] = theory.processors
-
-                if theory.memory is not None:
-                    new_preset["mem"] = theory.memory
-
-                for job in theory.job_type:
-                    if isinstance(job, OptimizationJob):
-                        new_preset["opt"] = True
-                        new_preset["ts"] = job.ts
-
-                    elif isinstance(job, FrequencyJob):
-                        new_preset["freq"] = True
-                        new_preset["temp"] = job.temperature
-                        new_preset["num_freq"] = job.numerical
-
-                    else:
-                        self.session.logger.warning("job type cannot be imported: %s" % repr(job))
+                theory.kwargs = config.get_other_kwargs(section=section)
+                new_preset["theory"] = theory
+                new_preset["use_job_type"] = config.getboolean(section, "use_job_type", True)
+                new_preset["use_job_resources"] = config.getboolean(section, "use_job_resources", True)
+                new_preset["use_solvent"] = config.getboolean(section, "use_solvent", True)
+                new_preset["use_method"] = config.getboolean(section, "use_method", True)
+                new_preset["use_basis"] = config.getboolean(section, "use_basis", True)
+                new_preset["use_other"] = config.getboolean(section, "use_other", True)
+                new_preset["raman"] = config.getboolean(section, "raman", False)
 
                 self.presets[program][section] = new_preset
 
         else:
-            self.session.logger.error("use JSON or INI extention")
+            self.session.logger.error("file must have JSON or INI extention")
 
         self.refresh_presets()
 
@@ -728,42 +770,23 @@ class BuildQM(ToolInstance):
         if self.preview_window is None:
             self.preview_window = self.tool_window.create_child_window("Input Preview", window_class=InputPreview)
             self.update_preview()
+        else:
+            self.preview_window.shown = True
+
+    def show_warnings(self):
+        """open child tool that showns contents of input file"""
+        if self.warning_window is None:
+            self.warning_window = self.tool_window.create_child_window("Warnings", window_class=WarningPreview)
+            self.update_preview()
+        else:
+            self.warning_window.shown = True
 
     def get_file_contents(self, update_settings=False):
         self.update_theory(update_settings=update_settings)
-        kw_dict = self.job_widget.getKWDict(update_settings=update_settings)
-        other_kw_dict = self.other_keywords_widget.getKWDict(update_settings=update_settings)
-        if update_settings:
-            self.settings.save()
-
-        combined_dict = combine_dicts(kw_dict, other_kw_dict)
 
         program = self.file_type.currentText()
-        if program == "Gaussian":
-            header, header_warnings = self.theory.get_gaussian_header(return_warnings=True, **combined_dict)
-            molecule, mol_warnings = self.theory.get_gaussian_molecule(return_warnings=True, **combined_dict)
-            footer, footer_warnings = self.theory.get_gaussian_footer(return_warnings=True, **combined_dict)
-            contents = header + molecule + footer
-            warnings = header_warnings + mol_warnings + footer_warnings
-            return contents, warnings
-        elif program == "ORCA":
-            header, header_warnings = self.theory.get_orca_header(return_warnings=True, **combined_dict)
-            molecule = ""
-            fmt = "{:<3s} {: 10.6f} {: 10.6f} {: 10.6f}\n"
-            for atom in self.theory.geometry.atoms:
-                molecule += fmt.format(atom.element, *atom.coords)
-
-            molecule += "*\n"
-            contents = header + molecule
-            warnings = header_warnings
-            return contents, warnings
-        elif program == "Psi4":
-            header, header_warnings = self.theory.get_psi4_header(return_warnings=True, **combined_dict)
-            molecule, mol_warnings = self.theory.get_psi4_molecule(return_warnings=True, **combined_dict)
-            footer, footer_warnings = self.theory.get_psi4_footer(return_warnings=True, **combined_dict)
-            contents = header + molecule + footer
-            warnings = header_warnings + mol_warnings + footer_warnings
-            return contents, warnings
+        contents, warnings = self.session.seqcrow_qm_input_manager.get_info(program).get_file_contents(self.theory)
+        return contents, warnings
 
     def check_changes(self, trigger_name=None, changes=None):
         if changes is not None:
@@ -787,10 +810,13 @@ class BuildQM(ToolInstance):
         # profile.enable()
 
         self.check_elements()
-        if self.preview_window is not None:
+        if self.preview_window is not None or self.warning_window is not None:
             contents, warnings = self.get_file_contents(update_settings=False)
             if contents is not None and warnings is not None:
-                self.preview_window.setPreview(contents, warnings)
+                if self.preview_window is not None:
+                    self.preview_window.setPreview(contents, warnings)
+                if self.warning_window is not None:
+                    self.warning_window.setWarnings(warnings)
 
         # profile.disable()
         # profile.print_stats()
@@ -807,11 +833,12 @@ class BuildQM(ToolInstance):
         self.other_keywords_widget.blockSignals(True)
 
         program = self.file_type.currentText()
+        file_info = self.session.seqcrow_qm_input_manager.get_info(program)
         self.settings.last_program = program
-        self.method_widget.setOptions(program)
-        self.basis_widget.setOptions(program)
-        self.job_widget.setOptions(program)
-        self.other_keywords_widget.setOptions(program)
+        self.method_widget.setOptions(file_info)
+        self.basis_widget.setOptions(file_info)
+        self.job_widget.setOptions(file_info)
+        self.other_keywords_widget.setOptions(file_info)
 
         self.file_type.blockSignals(False)
         self.method_widget.blockSignals(False)
@@ -836,10 +863,10 @@ class BuildQM(ToolInstance):
         mult = self.job_widget.getMultiplicity(update_settings)
         if isinstance(meth, SAPTMethod):
             charges = [widget.value() for widget in \
-                          [self.method_widget.sapt_layers.tabs.widget(i).charge for i in range(0, self.method_widget.sapt_layers.tabs.count())]
+                [self.method_widget.sapt_layers.tabs.widget(i).charge for i in range(0, self.method_widget.sapt_layers.tabs.count())]
             ]
             multiplicities = [widget.value() for widget in \
-                          [self.method_widget.sapt_layers.tabs.widget(i).multiplicity for i in range(0, self.method_widget.sapt_layers.tabs.count())]
+                [self.method_widget.sapt_layers.tabs.widget(i).multiplicity for i in range(0, self.method_widget.sapt_layers.tabs.count())]
             ]
 
             charge = [charge]
@@ -869,6 +896,13 @@ class BuildQM(ToolInstance):
         jobs = self.job_widget.getJobs() #job settings get updated during getKWDict
 
         solvent = self.job_widget.getSolvent(update_settings)
+        
+        kw_dict = self.job_widget.getKWDict(update_settings=update_settings)
+        other_kw_dict = self.other_keywords_widget.getKWDict(update_settings=update_settings)
+        if update_settings:
+            self.settings.save()
+
+        combined_dict = combine_dicts(kw_dict, other_kw_dict)
 
         self.theory = Theory(
             charge=charge,
@@ -881,7 +915,8 @@ class BuildQM(ToolInstance):
             memory=mem,
             job_type=jobs,
             solvent=solvent,
-            geometry=rescol
+            geometry=rescol,
+            **combined_dict
         )
 
     def change_model(self, index):
@@ -940,22 +975,33 @@ class BuildQM(ToolInstance):
         self.settings.last_program = self.file_type.currentText()
 
         program = self.file_type.currentText()
-        if program == "Gaussian":
-            job = GaussianJob(name, self.session, self.theory, combined_dict, auto_update=auto_update, auto_open=auto_open)
-        elif program == "ORCA":
-            job = ORCAJob(name, self.session, self.theory, combined_dict, auto_update=auto_update, auto_open=auto_open)
-        elif program == "Psi4":
-            job = Psi4Job(name, self.session, self.theory, combined_dict, auto_update=auto_update, auto_open=auto_open)
-
-        self.session.logger.status("adding %s to queue" % name)
-
-        self.session.seqcrow_job_manager.add_job(job)
+        if program in self.session.seqcrow_job_manager.formats:
+            job_cls = self.session.seqcrow_job_manager.formats[program].run_provider(
+                self.session,
+                program,
+                self.session.seqcrow_job_manager,
+            )
+            job = job_cls(name, self.session, self.theory, auto_update=auto_update, auto_open=auto_open)
+    
+            self.session.logger.status("adding %s to queue" % name)
+    
+            self.session.seqcrow_job_manager.add_job(job)
+        else:
+            raise NotImplementedError("no provider for running local %s jobs" % program)
 
         self.update_preview()
 
     def copy_input(self):
         """copies input file to the clipboard"""
         output, warnings = self.get_file_contents(update_settings=True)
+
+        if isinstance(output, dict):
+            s = ""
+            for key, item in output.items():
+                s += "<<- %s\n" % key
+                s += item
+                s += "%s\n\n\n" % key
+            output = s
 
         for warning in warnings:
             self.session.logger.warning(warning)
@@ -973,22 +1019,26 @@ class BuildQM(ToolInstance):
         a file dialog will open asking for a file location"""
 
         program = self.file_type.currentText()
+        info = self.session.seqcrow_qm_input_manager.get_info(program)
         self.settings.last_program = program
-        if program == "Gaussian":
-            filename, _ = QFileDialog.getSaveFileName(filter="Gaussian input files (*.com *.gjf)")
-
-        elif program == "ORCA":
-            filename, _ = QFileDialog.getSaveFileName(filter="ORCA input files (*.inp)")
-
-        elif program == "Psi4":
-            filename, _ = QFileDialog.getSaveFileName(filter="Psi4 input files (*.in)")
+        filename, _ = QFileDialog.getSaveFileName(filter=info.save_file_filer)
 
         if not filename:
             return
 
         contents, warnings = self.get_file_contents(update_settings=True)
-        with open(filename, "w") as f:
-            f.write(contents)
+
+        if isinstance(contents, dict):
+            for key, item in contents.items():
+                if "%" in key:
+                    fname = key % filename
+                else:
+                    fname = filename
+                with open(fname, "w") as f:
+                    f.write(item)
+        else:
+            with open(filename, "w") as f:
+                f.write(contents)
 
         for warning in warnings:
             self.session.logger.warning(warning)
@@ -1035,9 +1085,6 @@ class JobTypeOption(QWidget):
         - solvent
     """
     jobTypeChanged = Signal()
-
-    GAUSSIAN_SOLVENT_MODELS = ["PCM", "SMD", "CPCM", "Dipole", "IPCM", "SCIPCM"]
-    ORCA_SOLVENT_MODELS = ["SMD", "CPCM"]
 
     #TODO:
     #make selecting a row in one of the contraints tables select the atoms
@@ -1089,11 +1136,9 @@ class JobTypeOption(QWidget):
         job_type_layout.addRow("multiplicity:", self.multiplicity)
 
         self.do_geom_opt = QCheckBox()
-        self.do_geom_opt.stateChanged.connect(self.change_job_type)
         job_type_layout.addRow("geometry optimization:", self.do_geom_opt)
 
         self.do_freq = QCheckBox()
-        self.do_freq.stateChanged.connect(self.change_job_type)
         job_type_layout.addRow("frequency calculation:", self.do_freq)
 
         self.job_type_opts = QTabWidget()
@@ -1126,6 +1171,7 @@ class JobTypeOption(QWidget):
 
         self.use_checkpoint = QCheckBox()
         self.use_checkpoint.stateChanged.connect(self.something_changed)
+        self.use_checkpoint.stateChanged.connect(self.chk_state_changed)
         runtime_layout.addRow("read checkpoint:", self.use_checkpoint)
 
         runtime_outer_shell_layout.addWidget(runtime_form, 0, 0, 1, 1, Qt.AlignTop)
@@ -1137,7 +1183,7 @@ class JobTypeOption(QWidget):
         file_browse_layout.setContentsMargins(*new_margins)
         self.chk_file_path = QLineEdit()
         self.chk_file_path.textChanged.connect(self.something_changed)
-        self.chk_browse_button = QPushButton("browse")
+        self.chk_browse_button = QPushButton("browse...")
         self.chk_browse_button.clicked.connect(self.open_chk_save)
         label = QLabel("checkpoint path:")
         file_browse_layout.addWidget(label, 0, 0, Qt.AlignVCenter)
@@ -1339,12 +1385,15 @@ class JobTypeOption(QWidget):
 
         self.change_job_type()
 
+        self.do_geom_opt.stateChanged.connect(self.opt_checked)
+        self.do_freq.stateChanged.connect(self.freq_checked)
+        self.do_geom_opt.stateChanged.connect(self.change_job_type)
+        self.do_freq.stateChanged.connect(self.change_job_type)
+
         self.do_geom_opt.setCheckState(Qt.Checked if self.settings.last_opt else Qt.Unchecked)
         self.ts_opt.setCheckState(Qt.Checked if self.settings.last_ts else Qt.Unchecked)
         self.do_freq.setCheckState(Qt.Checked if self.settings.last_freq else Qt.Unchecked)
-
-        self.do_geom_opt.stateChanged.connect(self.opt_checked)
-        self.do_freq.stateChanged.connect(self.freq_checked)
+        self.job_type_opts.setCurrentIndex(0)
 
         self.constrained_atom_table.resizeColumnToContents(1)
         self.constrained_atom_table.horizontalHeader().setStretchLastSection(False)
@@ -1383,17 +1432,19 @@ class JobTypeOption(QWidget):
 
     def open_chk_save(self):
         """open file dialog to locate chk/gbs/hess file"""
-        if self.form == "Gaussian" and self.use_checkpoint.checkState() == Qt.Checked:
-            filename, _ = QFileDialog.getOpenFileName(filter="Gaussian checkpoint files (*.chk)")
+        if self.use_checkpoint.checkState() == Qt.Unchecked and not self.form.save_checkpoint_filter and self.form.read_checkpoint_filter:
+            self.use_checkpoint.setCheckState(Qt.Checked)
         
-        elif self.form == "Gaussian" and self.use_checkpoint.checkState() == Qt.Unchecked:
-            filename, _ = QFileDialog.getSaveFileName(filter="Gaussian checkpoint files (*.chk)")
-
-        elif self.form == "ORCA":
-            filename, _ = QFileDialog.getOpenFileName(
-                filter="ORCA orbital files (*.gbw);;" +
-                "ORCA Hessian files (*.hess)"
-            )
+        elif self.use_checkpoint.checkState() == Qt.Checked and not self.form.read_checkpoint_filter and self.form.save_checkpoint_filter:
+            self.use_checkpoint.setCheckState(Qt.Unchecked)
+            
+        if self.use_checkpoint.checkState() == Qt.Checked and self.form.read_checkpoint_filter:
+            filename, _ = QFileDialog.getOpenFileName(filter=self.form.read_checkpoint_filter)
+        
+        elif self.use_checkpoint.checkState() == Qt.Unchecked and self.form.save_checkpoint_filter:
+            filename, _ = QFileDialog.getSaveFileName(filter=self.form.save_checkpoint_filter)
+        else:
+            return
 
         if filename:
             self.chk_file_path.setText(filename)
@@ -1406,60 +1457,58 @@ class JobTypeOption(QWidget):
         """when optimization is checked, switch the tab widget to show optimization settings"""
         if state == Qt.Checked:
             self.job_type_opts.setCurrentIndex(1)
+        elif self.job_type_opts.currentIndex() == 1:
+            self.job_type_opts.setCurrentIndex(0)
 
     def freq_checked(self, state):
         """when frequency is checked, switch the tab widget to show freq settings"""
         if state == Qt.Checked:
             self.job_type_opts.setCurrentIndex(2)
+        elif self.job_type_opts.currentIndex() == 2:
+            self.job_type_opts.setCurrentIndex(0)
 
-    def setOptions(self, program):
+    def chk_state_changed(self, state):
+        if state == Qt.Checked:
+            self.chk_file_path.setEnabled(bool(self.form.read_checkpoint_filter))
+            self.chk_browse_button.setEnabled(bool(self.form.read_checkpoint_filter))
+        else:
+            self.chk_file_path.setEnabled(bool(self.form.save_checkpoint_filter))
+            self.chk_browse_button.setEnabled(bool(self.form.save_checkpoint_filter))
+
+    def setOptions(self, file_info):
         """change all options to show the ones available for 'program'"""
-        self.form = program
+        self.form = file_info
         self.solvent_option.clear()
         self.solvent_names.clear()
-        if program == "Gaussian":
-            self.solvent_option.addItems(["None"])
-            self.solvent_option.addItems(self.GAUSSIAN_SOLVENT_MODELS)
-            self.hpmodes.setEnabled(True)
-            self.raman.setToolTip("ask Gaussian to compute Raman intensities")
-            self.raman.setEnabled(True)
-            self.solvent_names.addItems(ImplicitSolvent.KNOWN_GAUSSIAN_SOLVENTS)
+        self.solvent_option.addItems(["None"])
+        if file_info.solvent_models is not None:
+            self.solvent_option.addItems(file_info.solvent_models)
+        self.hpmodes.setEnabled(file_info.hpmodes_available)
+        self.raman.setToolTip("ask %s to compute Raman intensities" % file_info.name)
+        self.raman.setEnabled(file_info.raman_available)
+        if file_info.solvents:
             ndx = self.solvent_option.findText(self.settings.previous_solvent_model)
             if ndx >= 0:
                 self.solvent_option.setCurrentIndex(ndx)
-            self.solvent_name.setText(self.settings.previous_solvent_name)
-            self.job_type_opts.setTabEnabled(3, True)
-            self.use_checkpoint.setEnabled(True)
-            self.chk_file_path.setEnabled(True)
-            self.chk_browse_button.setEnabled(True)
-
-        elif program == "ORCA":
-            self.solvent_option.addItems(["None"])
-            self.solvent_option.addItems(self.ORCA_SOLVENT_MODELS)
-            self.hpmodes.setEnabled(False)
-            self.raman.setToolTip("ask ORCA to compute Raman intensities")
-            self.raman.setEnabled(True)
-            if self.settings.previous_solvent_model == "SMD":
-                self.solvent_names.addItems(ImplicitSolvent.KNOWN_ORCA_SMD_SOLVENTS)
+            if isinstance(file_info.solvents, dict) and self.solvent_option.currentText() in file_info.solvents:
+                self.solvent_names.addItems(file_info.solvents[self.solvent_option.currentText()])
             else:
-                self.solvent_names.addItems(ImplicitSolvent.KNOWN_ORCA_CPCM_SOLVENTS)
-            ndx = self.solvent_option.findText(self.settings.previous_solvent_model)
-            if ndx >= 0:
-                self.solvent_option.setCurrentIndex(ndx)
+                self.solvent_names.addItems(file_info.solvents)
             self.solvent_name.setText(self.settings.previous_solvent_name)
-            self.job_type_opts.setTabEnabled(3, True)
-            self.use_checkpoint.setEnabled(True)
-            self.chk_file_path.setEnabled(True)
-            self.chk_browse_button.setEnabled(True)
-
-        elif program == "Psi4":
-            self.solvent_option.addItems(["None"])
-            self.job_type_opts.setTabEnabled(3, False)
-            self.hpmodes.setEnabled(False)
-            self.raman.setEnabled(False)
-            self.use_checkpoint.setEnabled(False)
-            self.chk_file_path.setEnabled(False)
-            self.chk_browse_button.setEnabled(False)
+        self.job_type_opts.setTabEnabled(3, bool(file_info.solvent_models))
+        if not file_info.read_checkpoint_filter:
+            self.use_checkpoint.setCheckState(Qt.Unchecked)
+        self.use_checkpoint.setEnabled(
+            bool(file_info.read_checkpoint_filter)
+        )
+        self.chk_file_path.setEnabled(
+            (self.use_checkpoint.checkState() == Qt.Checked and bool(file_info.read_checkpoint_filter)) or 
+            (self.use_checkpoint.checkState() == Qt.Unchecked and bool(file_info.save_checkpoint_filter))
+        )
+        self.chk_browse_button.setEnabled(
+            (self.use_checkpoint.checkState() == Qt.Checked and bool(file_info.read_checkpoint_filter)) or 
+            (self.use_checkpoint.checkState() == Qt.Unchecked and bool(file_info.save_checkpoint_filter))
+        )
 
         self.solvent_names.sortItems()
 
@@ -1505,17 +1554,11 @@ class JobTypeOption(QWidget):
             self.solvent_name.setVisible(False)
             self.solvent_names.setVisible(False)
 
-        if self.form == "ORCA":
-            if self.solvent_option.currentText() == "CPCM":
-                self.solvent_names.clear()
-                self.solvent_names.addItems(ImplicitSolvent.KNOWN_ORCA_CPCM_SOLVENTS)
-                self.solvent_names.sortItems()
-                self.filter_solvents(self.solvent_name.text())
-            elif self.solvent_option.currentText() == "SMD":
-                self.solvent_names.clear()
-                self.solvent_names.addItems(ImplicitSolvent.KNOWN_ORCA_SMD_SOLVENTS)
-                self.solvent_names.sortItems()
-                self.filter_solvents(self.solvent_name.text())
+        if isinstance(self.form.solvents, dict) and self.solvent_option.currentText() in self.form.solvents:
+            self.solvent_names.clear()
+            self.solvent_names.addItems(self.form.solvents[self.solvent_option.currentText()])
+            self.solvent_names.sortItems()
+            self.filter_solvents(self.solvent_name.text())
 
         self.jobTypeChanged.emit()
 
@@ -1679,11 +1722,14 @@ class JobTypeOption(QWidget):
 
     def setSolvent(self, solvent):
         """sets solvent to match the given ImplicitSolvent"""
-        ndx = self.solvent_option.findText(solvent.name)
-        if ndx >= 0:
-            self.solvent_option.setCurrentIndex(ndx)
-
-        self.solvent_name.setText(solvent.solvent)
+        if isinstance(solvent, ImplicitSolvent):
+            ndx = self.solvent_option.findText(solvent.name)
+            if ndx >= 0:
+                self.solvent_option.setCurrentIndex(ndx)
+    
+            self.solvent_name.setText(solvent.solvent)
+        else:
+            self.solvent_option.setCurrentIndex(0)
 
     def constrain_atoms(self):
         """add selected atoms to list of contrained atoms"""
@@ -2128,95 +2174,23 @@ class JobTypeOption(QWidget):
 
     def getKWDict(self, update_settings=False):
         """returns dictiory specifying misc options for writing an input file"""
-        if self.form == "Gaussian":
-            route = {}
-            if self.do_geom_opt.checkState() == Qt.Checked:
-                route['opt'] = []
+        if update_settings:
+            self.settings.last_nproc = self.nprocs.value()
+            self.settings.last_mem = self.mem.value()
+            self.settings.last_opt = self.do_geom_opt.checkState() == Qt.Checked
+            self.settings.last_ts = self.ts_opt.checkState() == Qt.Checked
+            self.settings.last_freq = self.do_freq.checkState() == Qt.Checked
+            self.settings.last_num_freq = self.num_freq.checkState() == Qt.Checked
+            self.settings.last_raman = self.raman.checkState() == Qt.Checked
 
-            if self.do_freq.checkState() == Qt.Checked:
-                route['freq'] = []
-
-                if self.raman.checkState() == Qt.Checked:
-                    route['freq'].append("Raman")
-
-                if self.hpmodes.checkState() == Qt.Checked:
-                    route['freq'].append('HPModes')
-
-            link0 = {}
-
-            #XXX: Move to AaronTools theory
-            if self.use_checkpoint.checkState() == Qt.Checked:
-                for kw in route:
-                    if "CalcFC" in route[kw]:
-                        if kw == "opt" or kw == "irc" :
-                            #apparently, IRC can only read cartesian force constants and not interal coords
-                            #opt can do ReadFC and ReadCartesianFC, but I'm just going to pick ReadCartesianFC
-                            route[kw].append("ReadCartesianFC")
-
-            if self.chk_file_path.text() != "":
-                link0["chk"] = [self.chk_file_path.text()]
-
-            if update_settings:
-                self.settings.last_nproc = self.nprocs.value()
-                self.settings.last_mem = self.mem.value()
-                self.settings.last_opt = self.do_geom_opt.checkState() == Qt.Checked
-                self.settings.last_ts = self.ts_opt.checkState() == Qt.Checked
-                self.settings.last_freq = self.do_freq.checkState() == Qt.Checked
-                self.settings.last_num_freq = self.num_freq.checkState() == Qt.Checked
-                self.settings.last_raman = self.raman.checkState() == Qt.Checked
-
-            return {GAUSSIAN_PRE_ROUTE:link0, GAUSSIAN_ROUTE:route}
-
-        elif self.form == "ORCA":
-            route = []
-            blocks = {}
-
-            if self.do_freq.checkState() == Qt.Checked:
-                if self.raman.checkState() == Qt.Checked:
-                    blocks['elprop'] = ['Polar 1']
-
-            if update_settings:
-                self.settings.last_nproc = self.nprocs.value()
-                self.settings.last_mem = self.mem.value()
-                self.settings.last_opt = self.do_geom_opt.checkState() == Qt.Checked
-                self.settings.last_ts = self.ts_opt.checkState() == Qt.Checked
-                self.settings.last_freq = self.do_freq.checkState() == Qt.Checked
-                self.settings.last_num_freq = self.num_freq.checkState() == Qt.Checked
-                self.settings.last_raman = self.raman.checkState() == Qt.Checked
-            
-            if self.use_checkpoint.checkState() == Qt.Checked:
-                fname = self.chk_file_path.text()
-                if fname.lower().endswith("gbw"):
-                    blocks["scf"] = [
-                        "guess MORead",
-                        "MOInp \"%s\"" % fname,
-                    ]
-                
-                elif fname.lower().endswith("hess"):
-                    blocks["geom"] = [
-                        "inHess Read",
-                        "inHessName \"%s\"" % fname,
-                    ]
-
-            return {ORCA_ROUTE:route, ORCA_BLOCKS:blocks}
-
-        elif self.form == "Psi4":
-            settings = {}
-            job = {}
-
-            if update_settings:
-                self.settings.last_nproc = self.nprocs.value()
-                self.settings.last_mem = self.mem.value()
-                self.settings.last_opt = self.do_geom_opt.checkState() == Qt.Checked
-                self.settings.last_ts = self.ts_opt.checkState() == Qt.Checked
-                self.settings.last_freq = self.do_freq.checkState() == Qt.Checked
-                self.settings.last_num_freq = self.num_freq.checkState() == Qt.Checked
-
-            info = {PSI4_JOB:job}
-            if len(settings.keys()) > 0:
-                info[PSI4_SETTINGS] = settings
-
-            return info
+        return self.form.get_job_kw_dict(
+            self.do_geom_opt.checkState() == Qt.Checked,
+            self.do_freq.checkState() == Qt.Checked,
+            self.raman.checkState() == Qt.Checked,
+            self.hpmodes.checkState() == Qt.Checked,
+            self.use_checkpoint.checkState() == Qt.Checked,
+            self.chk_file_path.text(),
+        )
 
     def check_deleted_atoms(self):
         """purge deleted atoms from constraints table and lists"""
@@ -2406,21 +2380,6 @@ class LayerWidget(QWidget):
 class MethodOption(QWidget):
     #TODO: make checking the "is_semiempirical" box disable the basis functions tab of the parent tab widget
     #      dispersion names can be moved to EmpiricalDispersion
-    GAUSSIAN_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D", "B3PW91", "B97-D", "BP86", "PBE0", "PM6", "AM1"]
-    GAUSSIAN_DISPERSION = ["Grimme D2", "Zero-damped Grimme D3", "Becke-Johnson damped Grimme D3", "Petersson-Frisch"]
-    GAUSSIAN_GRIDS = ["Default", "SuperFineGrid", "UltraFine", "FineGrid"]
-
-    ORCA_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D3", "B3PW91", "B97-D2", "BP86", "PBE0", "HF-3c", "AM1"]
-    ORCA_DISPERSION = ["Grimme D2", "Zero-damped Grimme D3", "Becke-Johnson damped Grimme D3", "Grimme D4"]
-    ORCA_GRIDS = ["Default", "Grid7", "Grid6", "Grid5", "Grid4"]
-
-    PSI4_FUNCTIONALS = ["B3LYP", "M06", "M06-L", "M06-2X", "ωB97X-D", "B3PW91", "B97-D", "BP86", "PBE0", "SAPT", "CCSD", "CCSD(T)"]
-    PSI4_DISPERSION = ["Grimme D1", "Grimme D2", "Zero-damped Grimme D3", "Becke-Johnson damped Grimme D3", \
-                       "Becke-Johnson damped modified Grimme D3", "Chai & Head-Gordon", "Nonlocal Approximation", \
-                       "Pernal, Podeszwa, Patkowski, & Szalewicz", "Podeszwa, Katarzyna, Patkowski, & Szalewicz", \
-                       "Řezác, Greenwell, & Beran", "Coupled-Cluster Doubles", "Coupled-Cluster Doubles + Řezác, Greenwell, & Beran", \
-    ]
-    PSI4_GRIDS = ["Default", "(250, 974)", "(175, 974)", "(60, 770)", "(99, 590)", "(55, 590)", "(50, 434)", "(75, 302)"]
 
     methodChanged = Signal()
 
@@ -2467,8 +2426,7 @@ class MethodOption(QWidget):
         sapt_layout.setContentsMargins(0, 0, 0, 0)
 
         self.sapt_type = QComboBox()
-        # TODO: charge-transfer sapt
-        self.sapt_type.addItems(["standard", "F/I", "spin-flip"])
+        self.sapt_type.addItems(["standard", "F/I", "spin-flip", "charge-transfer"])
         self.sapt_type.currentIndexChanged.connect(self.something_changed)
         sapt_layout.addRow("SAPT type:", self.sapt_type)
 
@@ -2635,47 +2593,30 @@ class MethodOption(QWidget):
         for i in range(0, self.previously_used_table.rowCount()):
             self.previously_used_table.setRowHidden(i, not filter(i))
 
-    def setOptions(self, program):
+    def setOptions(self, file_info):
         """change options to what's available in the specified program"""
-        current_func = self.method_option.currentText()
+        current_func = self.getMethod(update_settings=False).name
         self.method_option.clear()
         cur_disp = self.dispersion.currentText()
         self.dispersion.clear()
         self.grid.clear()
-        self.form = program
-        if program == "Gaussian":
-            self.method_option.addItems(self.GAUSSIAN_FUNCTIONALS)
-            self.method_option.addItem("other")
+        self.form = file_info
+        self.method_option.addItems(file_info.methods)
+        self.method_option.addItem("other")
 
-            self.dispersion.addItem("None")
-            self.dispersion.addItems(self.GAUSSIAN_DISPERSION)
+        self.dispersion.addItem("None")
+        if file_info.dispersion:
+            self.dispersion.addItems(file_info.dispersion)
 
-            self.grid.addItems(self.GAUSSIAN_GRIDS)
-
-        elif program == "ORCA":
-            self.method_option.addItems(self.ORCA_FUNCTIONALS)
-            self.method_option.addItem("other")
-
-            self.dispersion.addItem("None")
-            self.dispersion.addItems(self.ORCA_DISPERSION)
-
-            self.grid.addItems(self.ORCA_GRIDS)
-
-        elif program == "Psi4":
-            self.method_option.addItems(self.PSI4_FUNCTIONALS)
-            self.method_option.addItem("other")
-
-            self.dispersion.addItem("None")
-            self.dispersion.addItems(self.PSI4_DISPERSION)
-
-            self.grid.addItems(self.PSI4_GRIDS)
+        self.grid.addItem("Default")
+        if file_info.grids:
+            self.grid.addItems(file_info.grids)
 
         ndx = self.method_option.findText(current_func, Qt.MatchExactly)
         if ndx == -1:
-            ndx = self.method_option.findText(self.settings.previous_method, Qt.MatchExactly)
-
-        if ndx != -1:
-            self.method_option.setCurrentIndex(ndx)
+            ndx = self.method_option.count() - 1
+            self.method_kw.setText(current_func)
+        self.method_option.setCurrentIndex(ndx)
 
         ndx = self.dispersion.findText(cur_disp, Qt.MatchExactly)
         if ndx != -1:
@@ -2727,7 +2668,7 @@ class MethodOption(QWidget):
 
         elif self.method_option.currentText() == "SAPT":
 
-            if self.sapt_type.currentText() == "standard":
+            if self.sapt_type.currentText() == "standard" or self.sapt_type.currentText() == "charge-transfer":
                 method = "sapt"
             elif self.sapt_type.currentText() == "F/I":
                 method = "fisapt"
@@ -2737,6 +2678,9 @@ class MethodOption(QWidget):
             if method != "sf-sapt":
                 sapt_level = self.sapt_level.currentText()
                 method += sapt_level
+
+            if self.sapt_type.currentText() == "charge-transfer":
+                method += "%s-ct"
 
             if update_settings:
                 self.settings.previous_method = method
@@ -2799,8 +2743,10 @@ class MethodOption(QWidget):
         """sets grid option to the specified grid"""
         if grid is None:
             ndx = self.grid.findText("Default")
-        else:
+        elif isinstance(grid, str):
             ndx = self.grid.findText(grid)
+        else:
+            ndx = self.grid.findText(grid.name)
 
         self.grid.setCurrentIndex(ndx)
 
@@ -2838,15 +2784,18 @@ class MethodOption(QWidget):
 
         elif "sapt" in test_value:
             ndx = self.method_option.findText("SAPT", Qt.MatchExactly)
-            m = QRegularExpression("(.*)sapt(.*)")
+            m = QRegularExpression("(.*)sapt(.*)(-ct)")
             match = m.match(test_value)
             sapt_type = match.captured(1)
             sapt_level = match.captured(2)
+            charge_transfer = match.captured(3)
 
             if sapt_type == "sf-":
                 type_ndx = self.sapt_type.findText("spin-flip", Qt.MatchExactly)
             elif sapt_type == "fi":
                 type_ndx = self.sapt_type.findText("F/I", Qt.MatchExactly)
+            elif charge_transfer:
+                type_ndx = self.sapt_type.findText("charge-transfer", Qt.MatchExactly)
             else:
                 type_ndx = 0
 
@@ -2882,10 +2831,6 @@ class BasisOption(QWidget):
 
     basisChanged = Signal()
 
-    #for psi4, ECP's are included in basis set definitions
-    options = ["def2-SVP", "def2-TZVP", "cc-pVDZ", "cc-pVTZ", "aug-cc-pVDZ", "aug-cc-pVTZ", "6-311+G**", "SDD", "LANL2DZ", "other"]
-    psi4_options = ["def2-SVP", "def2-TZVP", "cc-pVDZ", "cc-pVTZ", "aug-cc-pVDZ", "aug-cc-pVTZ", "6-311+G**", "other"]
-
     name_setting = "previous_basis_names"
     path_setting = "previous_basis_paths"
     last_used = "last_basis"
@@ -2894,16 +2839,17 @@ class BasisOption(QWidget):
     last_custom_path = "last_basis_path"
     last_elements = "last_basis_elements"
     aux_setting = "last_basis_aux"
+    info_attribute = "basis_sets"
 
     toolbox_name = "basis_toolbox"
 
     aux_available = True
     basis_class = Basis
 
-    def __init__(self, parent, settings, form):
+    def __init__(self, parent, settings, init_form):
         self.parent = parent
         self.settings = settings
-        self.form = form
+        self.form = init_form
         super().__init__(parent)
 
         self.layout = QGridLayout(self)
@@ -2913,7 +2859,6 @@ class BasisOption(QWidget):
         self.basis_name_options.setContentsMargins(0, 0, 0, 0)
 
         self.basis_option = QComboBox()
-        self.basis_option.addItems(self.options)
         self.basis_option.currentIndexChanged.connect(self.basis_changed)
         self.basis_name_options.addRow(self.basis_option)
 
@@ -2994,10 +2939,6 @@ class BasisOption(QWidget):
 
         self.aux_options = [aux_label, self.aux_type]
 
-        if not self.aux_available:
-            for opt in self.aux_options:
-                opt.setVisible(False)
-
         #this doesn't seem to do anything?
         self.layout.setColumnStretch(0, 0)
         self.layout.setColumnStretch(1, 1)
@@ -3008,76 +2949,41 @@ class BasisOption(QWidget):
         self.setOptions(self.form)
         self.aux_type.currentIndexChanged.connect(self.basis_changed)
 
-    def setOptions(self, program):
+    def setOptions(self, file_info):
         """display options that are available in the specified program"""
         self.blockSignals(True)
-
-        basis = self.basis_option.currentText()
+        self.form = file_info
+        basis = self.currentBasis()
+        basis.elements = []
         aux = self.aux_type.currentText()
         self.basis_option.clear()
 
-        elements = self.currentElements()
-
-        if program == "Gaussian":
-            self.basis_option.addItems(self.options)
-            ndx = self.basis_option.findText(basis, Qt.MatchExactly)
-            if ndx != -1:
-                self.basis_option.setCurrentIndex(ndx)
-            else:
-                self.basis_option.setCurrentIndex(len(self.options) - 1)
-
-            if self.getAuxType() != "no":
-                self.destruct()
-                return
-
+        self.basis_option.addItems(getattr(file_info, self.info_attribute))
+        self.basis_option.addItem("other")
+        
+        if not file_info.aux_options and self.getAuxType() != "no":
+            self.destruct()
+            return
+        elif self.aux_available:
+            for opt in self.aux_options:
+                opt.setVisible(bool(file_info.aux_options))
+        else:
             for opt in self.aux_options:
                 opt.setVisible(False)
-
-        elif program == "ORCA":
-            self.basis_option.addItems(self.options)
-            ndx = self.basis_option.findText(basis, Qt.MatchExactly)
-            if ndx != -1:
-                self.basis_option.setCurrentIndex(ndx)
-            else:
-                self.basis_option.setCurrentIndex(len(self.options) - 1)
-
-            self.aux_type.clear()
-            if self.aux_available:
-                for opt in self.aux_options:
-                    opt.setVisible(True)
-
-            self.aux_type.addItem("no")
-            self.aux_type.addItems(BasisSet.ORCA_AUX)
-
-        elif program == "Psi4":
-            self.basis_option.addItems(self.psi4_options)
-            ndx = self.basis_option.findText(basis, Qt.MatchExactly)
-            if ndx != -1:
-                self.basis_option.setCurrentIndex(ndx)
-            else:
-                self.basis_option.setCurrentIndex(len(self.psi4_options) - 1)
-
-            self.aux_type.clear()
-            if self.aux_available:
-                for opt in self.aux_options:
-                    opt.setVisible(True)
-
-            self.aux_type.addItem("no")
-            self.aux_type.addItems(BasisSet.PSI4_AUX)
+        
+        self.aux_type.clear()
+        self.aux_type.addItem("no")
+        if file_info.aux_options:
+            self.aux_type.addItems(file_info.aux_options)
 
         self.setAux(aux)
-        self.setSelectedElements(elements)
+        self.setBasis(basis.name)
 
         self.blockSignals(False)
 
     def open_file_dialog(self):
         """ask user to locate external basis file on their computer"""
-        if self.form == "Gaussian":
-            filename, _ = QFileDialog.getOpenFileName(filter="Basis Set Files (*.gbs)")
-        elif self.form == "Psi4":
-            filename, _ = QFileDialog.getOpenFileName(filter="Basis Set Files (*.gbs)")
-        elif self.form == "ORCA":
-            filename, _ = QFileDialog.getOpenFileName(filter="Basis Set Files (*.basis)")
+        filename, _ = QFileDialog.getOpenFileName(filter=self.form.basis_file_filter)
 
         if filename:
             self.path_to_basis_file.setText(filename)
@@ -3425,6 +3331,8 @@ class BasisOption(QWidget):
         ndx = self.aux_type.findData(name, Qt.MatchExactly)
         if ndx >= 0:
             self.aux_type.setCurrentIndex(ndx)
+            return True
+        return False
 
     def getAuxType(self):
         """returns aux type"""
@@ -3432,8 +3340,6 @@ class BasisOption(QWidget):
 
 
 class ECPOption(BasisOption):
-    options = ["SDD", "LANL2DZ", "other"]
-    psi4_options = options
     label_text = "ECP:"
     name_setting = "previous_ecp_names"
     path_setting = "previous_ecp_paths"
@@ -3442,6 +3348,7 @@ class ECPOption(BasisOption):
     last_custom_builtin = "last_custom_ecp_builtin"
     last_custom_path = "last_ecp_path"
     last_elements = "last_ecp_elements"
+    info_attribute = "ecps"
 
     aux_available = False
 
@@ -3460,7 +3367,7 @@ class BasisWidget(QWidget):
     """widget to store and manage BasisOptions and ECPOptions"""
     basisChanged = Signal()
 
-    def __init__(self, settings, init_form="Gaussian", parent=None):
+    def __init__(self, settings, init_form, parent=None):
         super().__init__(parent)
         self.form = init_form
         self.settings = settings
@@ -3579,7 +3486,7 @@ class BasisWidget(QWidget):
 
     def new_basis(self, checked=None, use_saved=None):
         """add a BasisOption"""
-        new_basis = BasisOption(self, self.settings, form=self.form)
+        new_basis = BasisOption(self, self.settings, self.form)
         new_basis.setToolBox(self.basis_toolbox)
         new_basis.setElements(self.elements)
         new_basis.basisChanged.connect(self.something_changed)
@@ -3589,7 +3496,7 @@ class BasisWidget(QWidget):
             #must set auxiliary before selected elements
             #otherwise elements will be deselected on non-auxiliary basis
             #if they are selected on a new auxiliary basis
-            if self.form != "Gaussian":
+            if self.form.aux_options:
                 aux = self.settings.last_basis_aux[use_saved]
                 new_basis.setAux(aux)
 
@@ -3749,24 +3656,25 @@ class BasisWidget(QWidget):
         for i in range(len(self.ecp_options)-1, -1, -1):
             self.close_ecp_tab(i)
 
-        for i, basis in enumerate(basis_set.basis):
-            self.new_basis()
-
-            self.basis_options[i].setBasis(basis.name, basis_path=basis.user_defined)
-            self.basis_options[i].setAux(basis.aux_type)
-            if len(basis_set.basis) == 1 and (basis_set.ecp is None or len(basis_set.ecp) == 0):
-                #a preset might have only saved one basis set
-                #we'll use it for all elements
-                self.basis_options[i].setSelectedElements(['all'])
-            else:
-                self.basis_options[i].setSelectedElements(basis.elements)
-
-        if basis_set.ecp is not None:
-            for i, basis in enumerate(basis_set.ecp):
-                self.new_ecp()
-
-                self.ecp_options[i].setBasis(basis.name, basis_path=basis.user_defined)
-                self.ecp_options[i].setSelectedElements(basis.elements)
+        if basis_set:
+            for i, basis in enumerate(basis_set.basis):
+                self.new_basis()
+    
+                self.basis_options[i].setBasis(basis.name, basis_path=basis.user_defined)
+                self.basis_options[i].setAux(basis.aux_type)
+                if len(basis_set.basis) == 1 and (basis_set.ecp is None or len(basis_set.ecp) == 0):
+                    #a preset might have only saved one basis set
+                    #we'll use it for all elements
+                    self.basis_options[i].setSelectedElements(['all'])
+                else:
+                    self.basis_options[i].setSelectedElements(basis.elements)
+    
+            if basis_set.ecp is not None:
+                for i, basis in enumerate(basis_set.ecp):
+                    self.new_ecp()
+    
+                    self.ecp_options[i].setBasis(basis.name, basis_path=basis.user_defined)
+                    self.ecp_options[i].setSelectedElements(basis.elements)
 
     def add_to_all_but(self, exclude_option, row, name, path):
         """called by child BasisOption
@@ -3811,23 +3719,25 @@ class BasisWidget(QWidget):
                         if option.elements.item(i).text() in element_list:
                             option.elements.item(i).setSelected(False)
 
-    def setOptions(self, program):
+    def setOptions(self, file_info):
         """changes the basis set options to display what's available for the specified program"""
-        self.form = program
-        #reverse basis options because some might delete themselves
-        #like if auxiliary basis sets aren't available in the program
-        for basis in self.basis_options[::-1]:
-            basis.setOptions(program)
+        self.form = file_info
+        # reverse basis options because some might delete themselves
+        # like if auxiliary basis sets aren't available in the program
+        # also need to set elements after settings the options b/c things get changed and that could cause elements
+        # of other basis sets to be cleared
+        for basis, elements in zip(self.basis_options[::-1], [basis.currentElements() for basis in self.basis_options[::-1]]):
+            basis.setOptions(file_info)
+            basis.setSelectedElements(elements)
 
-        for basis in self.ecp_options:
-            basis.setOptions(program)
-
-        if program == "Psi4":
+        if not file_info.ecps:
             self.ecp_widget.setVisible(False)
             for ecp in self.ecp_options:
                 self.remove_basis(ecp)
         else:
             self.ecp_widget.setVisible(True)
+            for ecp in self.ecp_options:
+                ecp.setOptions(file_info)
 
     def setElements(self, element_list):
         """sets the available elements in all child BasisOptions
@@ -3936,6 +3846,9 @@ class CurrentOptTable(QTableWidget):
 
 
 class OneLayerKeyWordOption(QWidget):
+    """
+    widget for 'one-layer' options
+    """
     #TODO:
     #* add option to not save (who wants to save a comment? some people might, but I don't)
     optionChanged = Signal()
@@ -4203,13 +4116,22 @@ class OneLayerKeyWordOption(QWidget):
 
 
 class TwoLayerKeyWordOption(QWidget):
-    """widget for 'two-layer' options
-    like opt(noeigentest)"""
+    """
+    widget for 'two-layer' options, useful when there are specific keywords and values
+    """
     optionChanged = Signal()
     settingsChanged = Signal()
 
-    def __init__(self, name, last_dict, previous_dict, opt_fmt, \
-                 one_opt_per_kw=False, parent=None, allow_dup=False):
+    def __init__(
+            self,
+            name,
+            last_dict,
+            previous_dict,
+            opt_fmt,
+            one_opt_per_kw=False,
+            parent=None,
+            allow_dup=False
+    ):
         """
         name                    - name of the left groupbox
         last_dict               - dict of 'last' setting corresponding to just the target position (i.e. route, blocks)
@@ -4753,6 +4675,7 @@ class KeywordOptions(QWidget):
                                         the values should be the map to specify the
                                         location in the input file (e.g. AaronTools.theory.GAUSSIAN_ROUTE for route)
 
+    old_items                   depracated
     previous_option_name        name of the'previous' setting
     last_option_name            name of the 'last' setting
     one_route_opt_per_kw        bool; whether the route accepts multiple settings for keywords (who does this?)
@@ -4761,7 +4684,8 @@ class KeywordOptions(QWidget):
     """
     optionsChanged = Signal()
     settingsChanged = Signal()
-    items = {}
+    items = dict()
+    old_items = dict()
     previous_option_name = None
     last_option_name = None
     one_route_opt_per_kw = False
@@ -4769,19 +4693,21 @@ class KeywordOptions(QWidget):
     route_opt_fmt = "%s %s"
     comment_opt_fmt = "%s %s"
 
-    def __init__(self, settings, parent=None):
+    def __init__(self, info, settings, parent=None):
         super().__init__(parent)
         self.settings = settings
 
-        self.previous_dict = {}
-        previous_dict = loads(self.settings.__getattr__(self.previous_option_name))
-        for key in previous_dict.keys():
-            self.previous_dict[key] = previous_dict[key]
-
-        self.last_dict = {}
-        last_dict = loads(self.settings.__getattr__(self.last_option_name))
-        for key in last_dict.keys():
-            self.last_dict[key] = last_dict[key]
+        previous_options = loads(self.settings.previous_options)
+        if self.previous_option_name in previous_options:
+            self.previous_dict = previous_options[self.previous_option_name]
+        else:
+            self.previous_dict = info.initial_options
+        
+        last_options = loads(self.settings.last_options)
+        if self.last_option_name in last_options:
+            self.last_dict = last_options[self.last_option_name]
+        else:
+            self.last_dict = dict()
 
         self.layout = QGridLayout(self)
 
@@ -4852,8 +4778,17 @@ class KeywordOptions(QWidget):
                 last_dict[self.items[item]] = self.widgets[item].last_list
                 previous_dict[self.items[item]] = self.widgets[item].previous_list
 
-        self.settings.__setattr__(self.last_option_name, dumps(last_dict))
-        self.settings.__setattr__(self.previous_option_name, dumps(previous_dict))
+        self.previous_dict = previous_dict
+        self.last_dict = last_dict
+
+        previous_dict = loads(self.settings.previous_options)
+        last_dict = loads(self.settings.last_options)
+        previous_dict[self.previous_option_name] = self.previous_dict
+        last_dict[self.last_option_name] = self.last_dict
+
+        self.settings.previous_options = dumps(previous_dict)
+        self.settings.last_options = dumps(last_dict)
+        self.settings.save()
 
     def change_widget(self, name):
         """show only the widget for 'name' settings"""
@@ -4917,375 +4852,53 @@ class KeywordOptions(QWidget):
         pass
 
 
-class GaussianKeywordOptions(KeywordOptions):
-    items = {'route': GAUSSIAN_ROUTE, \
-             'link 0': GAUSSIAN_PRE_ROUTE, \
-             'comment': GAUSSIAN_COMMENT, \
-             'end of file': GAUSSIAN_POST, \
-            }
-
-    #the keys used to be an int map before this stuff got moved to AaronTools
-    #old_items allows users to keep old settings
-    old_items = {'link 0': "1", \
-                 'comment': "8", \
-                 'route': "2", \
-                 'end of file': "7", \
-                }
-
-    previous_option_name = "previous_gaussian_options"
-    last_option_name = "last_gaussian_options"
-
-    @classmethod
-    def get_options_for(cls, name, last, previous):
-        if name == "route":
-            if last is None:
-                last_dict = {}
-            else:
-                last_dict = last
-
-            if previous is None:
-                previous_dict = {}
-            else:
-                previous_dict = previous
-
-            return TwoLayerKeyWordOption("keywords", last_dict, previous_dict, "double click to add %s=(%s)", one_opt_per_kw=False)
-
-        elif name == "comment":
-            if last is None:
-                last_list = []
-            else:
-                last_list = last
-
-            if previous is None:
-                previous_list = []
-            else:
-                previous_list = previous
-
-            return OneLayerKeyWordOption("comment", last_list, previous_list, multiline=True)
-
-        elif name == "end of file":
-            if last is None:
-                last_list = []
-            else:
-                last_list = last
-
-            if previous is None:
-                previous_list = []
-            else:
-                previous_list = previous
-
-            return OneLayerKeyWordOption("end of file", last_list, previous_list, multiline=True)
-
-        elif name == "link 0":
-            if last is None:
-                last_dict = {}
-            else:
-                last_dict = last
-
-            if previous is None:
-                previous_dict = {}
-            else:
-                previous_dict = previous
-
-            return TwoLayerKeyWordOption("link 0", last_dict, previous_dict, "double click to use %%%s=%s", one_opt_per_kw=False)
-
-
-class ORCAKeywordOptions(KeywordOptions):
-    items = {'simple keywords': ORCA_ROUTE, \
-             'blocks': ORCA_BLOCKS, \
-             'comment': ORCA_COMMENT, \
-            }
-
-    old_items = {'simple keywords': "1", \
-                 'comment': "4", \
-                 'blocks': "2", \
-                }
-
-    previous_option_name = "previous_orca_options"
-    last_option_name = "last_orca_options"
-
-    @classmethod
-    def get_options_for(cls, name, last, previous):
-        if name == "simple keywords":
-            if last is None:
-                last_list = []
-            else:
-                last_list = last
-
-            if previous is None:
-                previous_list = []
-            else:
-                previous_list = previous
-
-            return OneLayerKeyWordOption("keyword", last_list, previous_list, multiline=False)
-
-        elif name == "comment":
-            if last is None:
-                last_list = []
-            else:
-                last_list = last
-
-            if previous is None:
-                previous_list = []
-            else:
-                previous_list = previous
-
-            return OneLayerKeyWordOption("comment", last_list, previous_list, multiline=True)
-
-        elif name == "blocks":
-            if last is None:
-                last_dict = {}
-            else:
-                last_dict = last
-
-            if previous is None:
-                previous_dict = {}
-            else:
-                previous_dict = previous
-
-            return TwoLayerKeyWordOption("blocks", last_dict, previous_dict, "double click to use %%%s %s end", one_opt_per_kw=False)
-
-
-class Psi4KeywordOptions(KeywordOptions):
-    items = {'settings': PSI4_SETTINGS, \
-             'job': PSI4_JOB, \
-             'molecule': PSI4_MOLECULE, \
-             'before job': PSI4_BEFORE_JOB, \
-             'after job': PSI4_AFTER_JOB, \
-             'optking': PSI4_OPTKING, \
-             'before molecule': PSI4_BEFORE_GEOM, \
-             'comment': PSI4_COMMENT, \
-            }
-
-    old_items = {'settings': "1", \
-                 'before molecule': "2", \
-                 'molecule': "5", \
-                 'before job': "3", \
-                 'comment': "4", \
-                 'job': "6", \
-                }
-
-    previous_option_name = "previous_psi4_options"
-    last_option_name = "last_psi4_options"
-
-    @classmethod
-    def get_options_for(cls, name, last, previous):
-        if name == "job":
-            if last is None:
-                last_dict = {}
-            else:
-                last_dict = last
-
-            if previous is None:
-                previous_dict = {}
-            else:
-                previous_dict = previous
-
-            return TwoLayerKeyWordOption(
-                "job",
-                last_dict,
-                previous_dict,
-                "double click to use \"%s(%s)\"",
-                one_opt_per_kw=False
-            )
-
-        if name == "after job":
-            if last is None:
-                last_list = []
-            else:
-                last_list = last
-
-            if previous is None:
-                previous_list = []
-            else:
-                previous_list = previous
-
-            return OneLayerKeyWordOption("after job", last_list, previous_list, multiline=True)
-
-        if name == "before job":
-            if last is None:
-                last_list = []
-            else:
-                last_list = last
-
-            if previous is None:
-                previous_list = []
-            else:
-                previous_list = previous
-
-            return OneLayerKeyWordOption("after job", last_list, previous_list, multiline=True)
-
-        elif name == "before molecule":
-            if last is None:
-                last_list = []
-            else:
-                last_list = last
-
-            if previous is None:
-                previous_list = []
-            else:
-                previous_list = previous
-
-            return OneLayerKeyWordOption("before molecule", last_list, previous_list, multiline=True)
-
-        elif name == "comment":
-            if last is None:
-                last_list = []
-            else:
-                last_list = last
-
-            if previous is None:
-                previous_list = []
-            else:
-                previous_list = previous
-
-            return OneLayerKeyWordOption("comment", last_list, previous_list, multiline=True)
-
-        elif name == "settings":
-            if last is None:
-                last_dict = {}
-            else:
-                last_dict = last
-
-            if previous is None:
-                previous_dict = {}
-            else:
-                previous_dict = previous
-
-            def check_single_kw(kw):
-                return any(kw.strip().lower() == sk for sk in Theory.FORCED_PSI4_SINGLE)
-
-            return TwoLayerKeyWordOption(
-                "settings",
-                last_dict,
-                previous_dict,
-                "double click to use \"set { %s %s }\"",
-                one_opt_per_kw=check_single_kw,
-                allow_dup=True,
-            )
-
-        elif name == "optking":
-            if last is None:
-                last_dict = {}
-            else:
-                last_dict = last
-
-            if previous is None:
-                previous_dict = {}
-            else:
-                previous_dict = previous
-
-            return TwoLayerKeyWordOption(
-                "optking settings",
-                last_dict,
-                previous_dict,
-                "double click to use \"set optking { %s %s }\"",
-                one_opt_per_kw=True
-            )
-
-        elif name == "molecule":
-            if last is None:
-                last_dict = {}
-            else:
-                last_dict = last
-
-            if previous is None:
-                previous_dict = {}
-            else:
-                previous_dict = previous
-
-            return TwoLayerKeyWordOption(
-                "molecule options",
-                last_dict,
-                previous_dict,
-                "double click to use \"%s %s\"",
-                one_opt_per_kw=True
-            )
-
-
 class KeywordWidget(QWidget):
     """widget shown on 'additional options' tab"""
     additionalOptionsChanged = Signal()
 
-    def __init__(self, settings, init_form, parent=None):
+    def __init__(self, session, settings, init_form, parent=None):
         super().__init__(parent)
         self.settings = settings
         self.form = init_form
 
         self.layout = QGridLayout(self)
 
-        self.gaussian_widget = GaussianKeywordOptions(self.settings)
-        self.gaussian_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.gaussian_widget.optionsChanged.connect(self.options_changed)
-        self.layout.addWidget(self.gaussian_widget, 0, 0)
-
-        self.orca_widget = ORCAKeywordOptions(self.settings)
-        self.orca_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.orca_widget.optionsChanged.connect(self.options_changed)
-        self.layout.addWidget(self.orca_widget, 0, 0)
-
-        self.psi4_widget = Psi4KeywordOptions(self.settings)
-        self.psi4_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.psi4_widget.optionsChanged.connect(self.options_changed)
-        self.layout.addWidget(self.psi4_widget, 0, 0)
+        self.widgets = {}
+        for form in session.seqcrow_qm_input_manager.formats:
+            info = session.seqcrow_qm_input_manager.get_info(form)
+            if info.keyword_options:
+                self.widgets[form] = info.keyword_options(info, settings)
+                self.widgets[form].optionsChanged.connect(self.options_changed)
+            else:
+                self.widgets[form] = QWidget()
+            
+            self.widgets[form].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            self.layout.addWidget(self.widgets[form], 0, 0)
 
         self.setOptions(init_form)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
-    def setOptions(self, program):
-        self.form = program
-        if program == "Gaussian":
-            self.gaussian_widget.setVisible(True)
-            self.orca_widget.setVisible(False)
-            self.psi4_widget.setVisible(False)
-
-        elif program == "ORCA":
-            self.gaussian_widget.setVisible(False)
-            self.orca_widget.setVisible(True)
-            self.psi4_widget.setVisible(False)
-
-        elif program == "Psi4":
-            self.gaussian_widget.setVisible(False)
-            self.orca_widget.setVisible(False)
-            self.psi4_widget.setVisible(True)
+    def setOptions(self, file_info):
+        self.form = file_info
+        for form in self.widgets:
+            if form != file_info.name:
+                self.widgets[form].setVisible(False)
+            else:
+                self.widgets[form].setVisible(True)
 
     def options_changed(self):
         self.additionalOptionsChanged.emit()
 
     def setKeywords(self, current_dict):
-        if self.form == "Gaussian":
-            self.gaussian_widget.setKeywords(current_dict)
-
-        elif self.form == "ORCA":
-            self.orca_widget.setKeywords(current_dict)
-
-        elif self.form == "Psi4":
-            self.psi4_widget.setKeywords(current_dict)
+        self.widgets[self.form.name].setKeywords(current_dict)
 
     def getKWDict(self, update_settings=False):
-        if self.form == "Gaussian":
-            last_dict = self.gaussian_widget.getKWDict(update_settings)
-
-            if update_settings:
-                self.gaussian_widget.settings_changed()
-
-            return last_dict
-
-        elif self.form == "ORCA":
-            last_dict = self.orca_widget.getKWDict(update_settings)
-
-            if update_settings:
-                self.orca_widget.settings_changed()
-
-            return last_dict
-
-        elif self.form == "Psi4":
-            last_dict = self.psi4_widget.getKWDict(update_settings)
-
-            if update_settings:
-                self.psi4_widget.settings_changed()
-
-            return last_dict
+        for form in self.widgets:
+            if self.form.name == form and self.form.keyword_options:
+                last_dict = self.widgets[form].getKWDict(update_settings)
+                if update_settings:
+                    self.widgets[form].settings_changed()
+                return last_dict
 
 
 class InputPreview(ChildToolWindow):
@@ -5301,14 +4914,73 @@ class InputPreview(ChildToolWindow):
         self.preview = QTextBrowser()
         font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
         self.preview.setFont(font)
-        layout.addWidget(self.preview, 0, 0, 1, 2)
+        layout.addWidget(self.preview, 0, 0, 1, 3)
 
         #chimera toolwindows can have a statusbar, but the message goes away after a few seconds
         #I'll just use a Qt statusbar
         self.status = QStatusBar()
         self.status.setSizeGripEnabled(False)
         self.status.setStyleSheet("color: red")
-        layout.addWidget(self.status, 1, 1, 1, 1)
+        layout.addWidget(self.status, 1, 2, 1, 1)
+
+        refresh_button = QPushButton()
+        refresh_button.setIcon(QIcon(refresh_button.style().standardIcon(QStyle.SP_BrowserReload)))
+        refresh_button.clicked.connect(self.tool_instance.update_preview)
+        layout.addWidget(refresh_button, 1, 0, 1, 1, Qt.AlignLeft)
+
+        self.warning_button = QPushButton()
+        self.warning_button.setIcon(QIcon(self.warning_button.style().standardIcon(QStyle.SP_MessageBoxWarning)))
+        self.warning_button.clicked.connect(self.tool_instance.show_warnings)
+        self.warning_button.setToolTip("click to view warnings in a separate window")
+        layout.addWidget(self.warning_button, 1, 1, 1, 1, Qt.AlignLeft)
+
+        layout.setRowStretch(0, 1)
+        layout.setRowStretch(1, 0)
+        layout.setColumnStretch(0, 0)
+        layout.setColumnStretch(1, 0)
+        layout.setColumnStretch(2, 1)
+
+        self.ui_area.setLayout(layout)
+
+        self.manage(None)
+
+    def setPreview(self, text, warnings_list):
+        """sets preview to 'text' and shows warnings in the status bar"""
+        if isinstance(text, dict):
+            s = ""
+            for key, item in text.items():
+                s += "<<- %s\n" % key
+                s += item
+                s += "%s\n\n\n" % key
+            text = s
+        self.preview.setText(text)
+        if len(warnings_list) > 0:
+            self.status.setVisible(True)
+            self.warning_button.setVisible(True)
+            self.status.showMessage("; ".join(warnings_list))
+        else:
+            self.status.setVisible(False)
+            self.warning_button.setVisible(False)
+
+    def cleanup(self):
+        self.tool_instance.preview_window = None
+
+        super().cleanup()
+
+
+class WarningPreview(ChildToolWindow):
+    def __init__(self, tool_instance, title, **kwargs):
+        super().__init__(tool_instance, title, statusbar=False, **kwargs)
+
+        self._build_ui()
+
+    def _build_ui(self):
+        layout = QGridLayout()
+
+        self.preview = QTextBrowser()
+        font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
+        self.preview.setFont(font)
+        layout.addWidget(self.preview, 0, 0, 1, 2)
 
         refresh_button = QPushButton()
         refresh_button.setIcon(QIcon(refresh_button.style().standardIcon(QStyle.SP_BrowserReload)))
@@ -5324,17 +4996,15 @@ class InputPreview(ChildToolWindow):
 
         self.manage(None)
 
-    def setPreview(self, text, warnings_list):
-        """sets preview to 'text' and shows warnings in the status bar"""
-        self.preview.setText(text)
-        if len(warnings_list) > 0:
-            self.status.setVisible(True)
-            self.status.showMessage("; ".join(warnings_list))
+    def setWarnings(self, warnings_list):
+        """display the listed warnings"""
+        if warnings_list:
+            self.preview.setText("\n---------\n".join(warnings_list))
         else:
-            self.status.setVisible(False)
+            self.preview.setText("looks fine")
 
     def cleanup(self):
-        self.tool_instance.preview_window = None
+        self.tool_instance.warning_window = None
 
         super().cleanup()
 
@@ -5479,88 +5149,29 @@ class SavePreset(ChildToolWindow):
             return
 
         elif name in self.tool_instance.presets[program]:
-            yes = QMessageBox.question(self.preset_name, "\"%s\" is already saved" % name, \
-                                        "would you like to overwrite \"%s\"?" % name, \
-                                        QMessageBox.Yes | QMessageBox.No)
+            yes = QMessageBox.question(
+                self.preset_name, "\"%s\" is already saved" % name,
+                "would you like to overwrite \"%s\"?" % name,
+                QMessageBox.Yes | QMessageBox.No
+            )
 
             if yes != QMessageBox.Yes:
                 return
 
-        if self.job_type.checkState() == Qt.Checked:
-            geom_opt = self.tool_instance.job_widget.getGeometryOptimization()
-            preset['opt'] = geom_opt
+        preset["use_job_type"] = self.job_type.checkState() == Qt.Checked
 
-            ts_opt = self.tool_instance.job_widget.getTSOptimization()
-            preset['ts'] = ts_opt
+        preset["use_job_resources"] = self.job_resources.checkState() == Qt.Checked
 
-            freq = self.tool_instance.job_widget.getFrequencyCalculation()
-            preset['freq'] = freq
+        preset["use_solvent"] = self.solvent.checkState() == Qt.Checked
 
-            num_freq = self.tool_instance.job_widget.num_freq.checkState() == Qt.Checked
-            preset['num_freq'] = num_freq
+        preset["use_method"] = self.method.checkState() == Qt.Checked
 
-            raman = self.tool_instance.job_widget.raman.checkState() == Qt.Checked
-            preset['raman'] = raman
+        preset["use_basis"] = self.basis.checkState() == Qt.Checked
 
-            temp = self.tool_instance.job_widget.temp.value()
-            preset['temp'] = temp
-
-        if self.job_resources.checkState() == Qt.Checked:
-            nproc = self.tool_instance.job_widget.getNProc()
-            if nproc is None:
-                nproc = 0
-            preset['nproc'] = nproc
-
-            mem = self.tool_instance.job_widget.getMem()
-            if mem is None:
-                mem = 0
-            preset['mem'] = mem
-
-        if self.solvent.checkState() == Qt.Checked:
-            solvent = self.tool_instance.job_widget.getSolvent(update_settings=True)
-            if solvent is not None:
-                preset['solvent model'] = solvent.name
-                preset['solvent'] = solvent.solvent
-            else:
-                preset['solvent model'] = 'None'
-                preset['solvent'] = ''
-
-        if self.method.checkState() == Qt.Checked:
-            method = self.tool_instance.method_widget.getMethod(update_settings=True)
-            preset['method'] = method.name
-            preset['semi-empirical'] = method.is_semiempirical
-
-            dispersion = self.tool_instance.method_widget.getDispersion(update_settings=True)
-            if dispersion is not None:
-                preset['disp'] = dispersion.name
-            else:
-                preset['disp'] = dispersion
-
-            grid = self.tool_instance.method_widget.getGrid(update_settings=True)
-            if grid is not None:
-                preset['grid'] = grid.name
-            else:
-                preset['grid'] = grid
-
-        if self.basis.checkState() == Qt.Checked:
-            basis_elements, ecp_elements = self.basis_elements.getElements()
-
-            basis_set = self.tool_instance.basis_widget.getBasis(update_settings=True)
-            preset['basis'] = {'name':[], 'file':[], 'auxiliary':[], 'elements':basis_elements}
-            if basis_set.basis is not None:
-                for basis, elements in zip(basis_set.basis, basis_elements):
-                    preset['basis']['name'].append(basis.name)
-                    preset['basis']['file'].append(basis.user_defined)
-                    preset['basis']['auxiliary'].append(basis.aux_type)
-
-            preset['ecp'] = {'name':[], 'file':[], 'elements':ecp_elements}
-            if basis_set.ecp is not None:
-                for basis, elements in zip(basis_set.ecp, ecp_elements):
-                    preset['ecp']['name'].append(basis.name)
-                    preset['ecp']['file'].append(basis.user_defined)
-
-        if self.additional.checkState() == Qt.Checked:
-            preset["other"] = self.tool_instance.other_keywords_widget.getKWDict(update_settings=True)
+        preset["use_other"] = self.additional.checkState() == Qt.Checked
+        
+        self.tool_instance.update_theory(update_settings=True)
+        preset["theory"] = self.tool_instance.theory
 
         self.tool_instance.presets[program][name] = preset
 
@@ -5596,7 +5207,7 @@ class RemovePreset(ChildToolWindow):
         layout = QGridLayout()
 
         self.tree = QTreeWidget()
-        self.tree.setHeaderLabels(["", "trash"])
+        self.tree.setHeaderLabels(["program", "trash"])
         self.fill_tree()
         self.tree.resizeColumnToContents(1)
         self.tree.setColumnWidth(0, 200)
@@ -5609,62 +5220,27 @@ class RemovePreset(ChildToolWindow):
         self.tree.clear()
         root = self.tree.invisibleRootItem()
 
-        gaussian_preset = QTreeWidgetItem(root)
-        gaussian_preset.setData(0, Qt.DisplayRole, "Gaussian")
-        for preset in self.tool_instance.presets['Gaussian']:
-            preset_item = QTreeWidgetItem(gaussian_preset)
-            preset_item.setData(0, Qt.DisplayRole, preset)
-
-            remove_widget = QWidget()
-            remove_layout = QGridLayout(remove_widget)
-            remove = QPushButton()
-            remove.setIcon(QIcon(remove_widget.style().standardIcon(QStyle.SP_DialogDiscardButton)))
-            remove.setFlat(True)
-            remove.clicked.connect(lambda *args, name=preset, tool=self.tool_instance: tool.presets['Gaussian'].pop(name))
-            remove.clicked.connect(self.tool_instance.refresh_presets)
-            remove.clicked.connect(lambda *args, item=preset_item, parent=gaussian_preset: parent.removeChild(item))
-            remove_layout.addWidget(remove, 0, 0, 1, 1, Qt.AlignLeft)
-            remove_layout.setColumnStretch(0, 0)
-            remove_layout.setContentsMargins(0, 0, 0, 0)
-            self.tree.setItemWidget(preset_item, 1, remove_widget)
-
-        orca_preset = QTreeWidgetItem(root)
-        orca_preset.setData(0, Qt.DisplayRole, "ORCA")
-        for preset in self.tool_instance.presets['ORCA']:
-            preset_item = QTreeWidgetItem(orca_preset)
-            preset_item.setData(0, Qt.DisplayRole, preset)
-
-            remove_widget = QWidget()
-            remove_layout = QGridLayout(remove_widget)
-            remove = QPushButton()
-            remove.setIcon(QIcon(remove_widget.style().standardIcon(QStyle.SP_DialogDiscardButton)))
-            remove.setFlat(True)
-            remove.clicked.connect(lambda *args, name=preset, tool=self.tool_instance: tool.presets['ORCA'].pop(name))
-            remove.clicked.connect(self.tool_instance.refresh_presets)
-            remove.clicked.connect(lambda *args, item=preset_item, parent=orca_preset: parent.removeChild(item))
-            remove_layout.addWidget(remove, 0, 0, 1, 1, Qt.AlignLeft)
-            remove_layout.setColumnStretch(0, 0)
-            remove_layout.setContentsMargins(0, 0, 0, 0)
-            self.tree.setItemWidget(preset_item, 1, remove_widget)
-
-        psi4_preset = QTreeWidgetItem(root)
-        psi4_preset.setData(0, Qt.DisplayRole, "Psi4")
-        for preset in self.tool_instance.presets['Psi4']:
-            preset_item = QTreeWidgetItem(psi4_preset)
-            preset_item.setData(0, Qt.DisplayRole, preset)
-
-            remove_widget = QWidget()
-            remove_layout = QGridLayout(remove_widget)
-            remove = QPushButton()
-            remove.setIcon(QIcon(remove_widget.style().standardIcon(QStyle.SP_DialogDiscardButton)))
-            remove.setFlat(True)
-            remove.clicked.connect(lambda *args, name=preset, tool=self.tool_instance: tool.presets['Psi4'].pop(name))
-            remove.clicked.connect(self.tool_instance.refresh_presets)
-            remove.clicked.connect(lambda *args, item=preset_item, parent=psi4_preset: parent.removeChild(item))
-            remove_layout.addWidget(remove, 0, 0, 1, 1, Qt.AlignLeft)
-            remove_layout.setColumnStretch(0, 0)
-            remove_layout.setContentsMargins(0, 0, 0, 0)
-            self.tree.setItemWidget(preset_item, 1, remove_widget)
+        for program in self.tool_instance.presets:
+            section = QTreeWidgetItem(root)
+            section.setData(0, Qt.DisplayRole, program)
+            for preset in self.tool_instance.presets[program]:
+                preset_item = QTreeWidgetItem(section)
+                preset_item.setData(0, Qt.DisplayRole, preset)
+                
+                remove_widget = QWidget()
+                remove_layout = QGridLayout(remove_widget)
+                remove = QPushButton()
+                remove.setIcon(QIcon(remove_widget.style().standardIcon(QStyle.SP_DialogDiscardButton)))
+                remove.setFlat(True)
+                remove.clicked.connect(
+                    lambda *args, name=preset, form=program, tool=self.tool_instance: tool.presets[form].pop(name)
+                )
+                remove.clicked.connect(self.tool_instance.refresh_presets)
+                remove.clicked.connect(lambda *args, item=preset_item, parent=section: parent.removeChild(item))
+                remove_layout.addWidget(remove, 0, 0, 1, 1, Qt.AlignLeft)
+                remove_layout.setColumnStretch(0, 0)
+                remove_layout.setContentsMargins(0, 0, 0, 0)
+                self.tree.setItemWidget(preset_item, 1, remove_widget)
 
     def cleanup(self):
         self.tool_instance.remove_preset_window = None
@@ -5759,29 +5335,16 @@ class ExportPreset(ChildToolWindow):
         self.tree.clear()
         root = self.tree.invisibleRootItem()
 
-        self.gaussian_preset = QTreeWidgetItem(root)
-        self.gaussian_preset.setData(0, Qt.DisplayRole, "Gaussian")
-        for preset in self.tool_instance.presets['Gaussian']:
-            preset_item = QTreeWidgetItem(self.gaussian_preset)
-            preset_item.setData(0, Qt.DisplayRole, preset)
-            preset_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
-            preset_item.setCheckState(1, Qt.Unchecked)
-
-        self.orca_preset = QTreeWidgetItem(root)
-        self.orca_preset.setData(0, Qt.DisplayRole, "ORCA")
-        for preset in self.tool_instance.presets['ORCA']:
-            preset_item = QTreeWidgetItem(self.orca_preset)
-            preset_item.setData(0, Qt.DisplayRole, preset)
-            preset_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
-            preset_item.setCheckState(1, Qt.Unchecked)
-
-        self.psi4_preset = QTreeWidgetItem(root)
-        self.psi4_preset.setData(0, Qt.DisplayRole, "Psi4")
-        for preset in self.tool_instance.presets['Psi4']:
-            preset_item = QTreeWidgetItem(self.psi4_preset)
-            preset_item.setData(0, Qt.DisplayRole, preset)
-            preset_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
-            preset_item.setCheckState(1, Qt.Unchecked)
+        self.preset_sections = {}
+        for program in self.tool_instance.presets:
+            preset_section = QTreeWidgetItem(root)
+            self.preset_sections[program] = preset_section
+            preset_section.setData(0, Qt.DisplayRole, program)
+            for preset in self.tool_instance.presets[program]:
+                preset_item = QTreeWidgetItem(preset_section)
+                preset_item.setData(0, Qt.DisplayRole, preset)
+                preset_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+                preset_item.setCheckState(1, Qt.Unchecked)
 
     def save_presets(self):
         filename, _ = QFileDialog.getSaveFileName(filter="JSON files (*.json);;INI files (*.ini)")
@@ -5791,62 +5354,30 @@ class ExportPreset(ChildToolWindow):
         if filename.lower().endswith("json"):
             out = {}
 
-            for i in range(0, self.gaussian_preset.childCount()):
-                if self.gaussian_preset.child(i).checkState(1) == Qt.Checked:
-                    if "Gaussian" not in out:
-                        out["Gaussian"] = {}
-
-                    preset_name = self.gaussian_preset.child(i).data(0, Qt.DisplayRole)
-                    out["Gaussian"][preset_name] = self.tool_instance.presets["Gaussian"][preset_name]
-
-            for i in range(0, self.orca_preset.childCount()):
-                if self.orca_preset.child(i).checkState(1) == Qt.Checked:
-                    if "ORCA" not in out:
-                        out["ORCA"] = {}
-
-                    preset_name = self.orca_preset.child(i).data(0, Qt.DisplayRole)
-                    out["ORCA"][preset_name] = self.tool_instance.presets["ORCA"][preset_name]
-
-            for i in range(0, self.psi4_preset.childCount()):
-                if self.psi4_preset.child(i).checkState(1) == Qt.Checked:
-                    if "Psi4" not in out:
-                        out["Psi4"] = {}
-
-                    preset_name = self.psi4_preset.child(i).data(0, Qt.DisplayRole)
-                    out["Psi4"][preset_name] = self.tool_instance.presets["Psi4"][preset_name]
+            for program in self.preset_sections:
+                for i in range(0, self.preset_sections[program].childCount()):
+                    if self.preset_sections[program].child(i).checkState(1) == Qt.Checked:
+                        if program not in out:
+                            out[program] = {}
+                        
+                        preset_name = self.preset_sections[program].child(i).data(0, Qt.DisplayRole)
+                        out[program][preset_name] = self.tool_instance.presets[program][preset_name]
 
             with open(filename, "w") as f:
-                dump(out, f, indent=4)
+                dump(out, f, cls=ATEncoder, indent=4)
 
         elif filename.lower().endswith("ini"):
             out = ConfigParser()
-
-            for i in range(0, self.gaussian_preset.childCount()):
-                if self.gaussian_preset.child(i).checkState(1) == Qt.Checked:
-                    preset_name = self.gaussian_preset.child(i).data(0, Qt.DisplayRole)
-                    preset = self.tool_instance.presets["Gaussian"][preset_name]
-                    if not out.has_section(preset_name):
-                        out.add_section(preset_name)
-
-                    self.fill_preset(out, preset, preset_name, "gaussian")
-
-            for i in range(0, self.orca_preset.childCount()):
-                if self.orca_preset.child(i).checkState(1) == Qt.Checked:
-                    preset_name = self.orca_preset.child(i).data(0, Qt.DisplayRole)
-                    preset = self.tool_instance.presets["ORCA"][preset_name]
-                    if not out.has_section(preset_name):
-                        out.add_section(preset_name)
-
-                    self.fill_preset(out, preset, preset_name, "orca")
-
-            for i in range(0, self.psi4_preset.childCount()):
-                if self.psi4_preset.child(i).checkState(1) == Qt.Checked:
-                    preset_name = self.psi4_preset.child(i).data(0, Qt.DisplayRole)
-                    preset = self.tool_instance.presets["Psi4"][preset_name]
-                    if not out.has_section(preset_name):
-                        out.add_section(preset_name)
-
-                    self.fill_preset(out, preset, preset_name, "psi4")
+            
+            for program in self.preset_sections:
+                for i in range(0, self.preset_sections[program].childCount()):
+                    if self.preset_sections[program].child(i).checkState(1) == Qt.Checked:
+                        preset_name = self.preset_sections[program].child(i).data(0, Qt.DisplayRole)
+                        preset = self.tool_instance.presets[program][preset_name]
+                        if not out.has_section(preset_name):
+                            out.add_section(preset_name)
+                        
+                        self.fill_preset(out, preset, preset_name, program)
 
             with open(filename, "w") as f:
                 out.write(f)

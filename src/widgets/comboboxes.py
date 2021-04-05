@@ -116,11 +116,12 @@ class FilereaderComboBox(QComboBox):
         self._refresh_models()
 
     def _refresh_models(self):
+        filereaders = self._session.filereader_manager.list(other=self._other)
         for i in range(self.count(), -1, -1):
-            if self.itemData(i) not in self._session.filereader_manager.list(other=self._other):
+            if self.itemData(i) not in filereaders:
                 self.removeItem(i)
         
-        for fr in self._session.filereader_manager.list(other=self._other):
+        for fr in filereaders:
             ndx = self.findData(fr)
             if ndx == -1:
                 mdl = self._session.filereader_manager.get_model(fr)

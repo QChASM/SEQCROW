@@ -34,10 +34,18 @@ class BuriedVolumeToolTest(TestWithSession):
         vbur_tool.calc_vbur_button.click()
         
         csv = vbur_tool.get_csv()
+        delim_name = vbur_tool.settings.delimiter
+        if delim_name == "comma":
+            delim = ","
+        elif delim_name == "tab":
+            delim = "\t"
+        elif delim_name == "semicolon":
+            delim = ";"
+        elif delim_name == "space":
+            delim = " "
         
-        ref = """model,center,%Vbur
-tm_single-lig.xyz,/a:1@Cu1,56.2
-"""
+        ref = delim.join(["model", "center", "%Vbur\n"]) + delim.join(["tm_single-lig.xyz", "/a:1@Cu1", "56.2"])
+
         csv_lines = csv.splitlines()
         ref_lines = ref.splitlines()
         

@@ -76,7 +76,8 @@ class Residue(Geometry):
             name=None,
             use_scene=False,
             **kwargs
-    ):      
+    ):
+        object.__setattr__(self, "_hashed", False)
         if isinstance(geom, ChimeraResidue):
             aaron_atoms = []
             for atom in geom.atoms:
@@ -221,7 +222,7 @@ class Residue(Geometry):
                 k += 1
                 if len(atom_name) > 4:
                     if atom.name == atom.element.name:
-                        print("breaking:", k, atom.name)
+                        # print("breaking:", k, atom.name)
                         break
                     atom.name = atom.element.name
                     k = 1
@@ -284,7 +285,7 @@ class Residue(Geometry):
         
         for bond in residue_bonds:
             if bond not in known_chix_bonds:
-                print("deleting bond %s" % str(bond))
+                # print("deleting bond %s" % str(bond))
                 bond.delete()
 
     def substitute(self, sub, target, *args, attached_to=None, **kwargs):
@@ -321,14 +322,14 @@ class Residue(Geometry):
 
 class ResidueCollection(Geometry):
     """geometry object used for SEQCROW to easily convert to AaronTools but keep residue info"""
-    def __init__(self, molecule, convert_residues=None, bonds_matter=True, use_scene=False, **kwargs):
+    def __init__(self, molecule, name="new", bonds_matter=True, convert_residues=None, use_scene=False, **kwargs):
         """molecule       - chimerax AtomicStructure or AaronTools Geometry (for easy compatibility stuff)
         convert_residues  - None to convert everything or [chimerax.atomic.Residue] to convert only specific residues
                             this only applies to chimerax AtomicStructures
         bonds_matter      - False to skip adding bonds/determining connectivity based on ChimeraX AtomicStructure
         """
+        object.__setattr__(self, "_hashed", False)
         self.convert_residues = convert_residues
-        
         if isinstance(molecule, AtomicStructure):
             self.chix_atomicstructure = molecule
             self.residues = []
@@ -384,15 +385,15 @@ class ResidueCollection(Geometry):
 
         else:
             #assume whatever we got is something AaronTools can turn into a Geometry
-            super().__init__(molecule, **kwargs)
+            super().__init__(molecule, name=name, **kwargs)
             self.chix_atomicstructure = None
             self.atomspec = None
             if "comment" in kwargs:
-                self.residues = [Residue(molecule, resnum=1, name="UNK", comment=kwargs['comment'])]
+                self.residues = [Residue(molecule, resnum=1, name="UNK", **kwargs)]
             elif hasattr(molecule, "comment"):
-                self.residues = [Residue(molecule, resnum=1, name="UNK", comment=molecule.comment)]
+                self.residues = [Residue(molecule, resnum=1, name="UNK", comment=molecule.comment, **kwargs)]
             else:
-                self.residues = [Residue(molecule, resnum=1, name="UNK")]
+                self.residues = [Residue(molecule, resnum=1, name="UNK", **kwargs)]
 
             return
 
@@ -433,33 +434,68 @@ class ResidueCollection(Geometry):
         new_lig = Residue(atoms_not_in_residue, name="LIG", resnum=len([res for res in self.residues if len(res.atoms) > 0])+1)
         self.residues.append(new_lig)
 
-    def substitute(self, sub, target, *args, minimize=False, use_greek=False, **kwargs):
+    def substitute(
+        self,
+        sub,
+        target,
+        attached_to=None,
+        *args,
+        minimize=False,
+        use_greek=False,
+        new_residue=False,
+        new_name=None,
+        **kwargs
+    ):
         """find the residue that target is on and substitute it for sub"""
-        target = self.find(target)
-        if len(target) != 1:
-            raise RuntimeError("substitute can only apply to one target at a time: %s" % ", ".join(str(t) for t in target))
-        else:
-            target = target[0]
-            
+        target = self.find_exact(target)[0]
         residue = self.find_residue(target)
+
         if len(residue) != 1:
             raise RuntimeError("multiple or no residues found containing %s" % str(target))
         else:
             residue = residue[0]
         
-        # call substitute on residue so atoms are added to that residue
-        sub = residue.substitute(sub, target, *args, minimize=False, **kwargs)
+        if attached_to:
+            attached_to = residue.find_exact(attached_to)[0]        
+        
+        if not new_residue:
+
+            # call substitute on residue so atoms are added to that residue
+            if attached_to and attached_to not in residue.atoms:
+                residue.atoms.append(attached_to)
+                residue.substitute(sub, target, attached_to=attached_to, *args, minimize=False, **kwargs)
+                residue.atoms.remove(attached_to)
+                new_residue = True
+            else:
+                residue.substitute(sub, target, *args, attached_to=attached_to, minimize=False, **kwargs)
+
+            if new_name:
+                residue.name = new_name
+        
+        else:
+            super().substitute(sub, target, attached_to=attached_to, *args, minimize=False, **kwargs)
+            frag = self.remove_fragment(target, avoid=attached_to)
+            for atom in frag:
+                if atom is attached_to:
+                    continue
+                if atom in residue:
+                    residue -= atom
+                else:
+                    warn("tried to remove an atom beyond the residues being considered: %s" % atom)
+            resnum = len(self.residues) + 1
+            self.residues.append(
+                Residue(sub.atoms, name=new_name, resnum=resnum, chain_id=target.chix_atom.residue.chain_id)
+            )
 
         self._atom_update()
 
         # minimize on self so other residues can be taken into account
         if minimize:
             sub_start = sub.find_exact(BondedTo(sub.end))[0]
-            shift = sub_start.coords.copy()
             self.minimize_torsion(
                 sub.atoms, 
                 sub_start.bond(sub.end), 
-                shift,
+                sub.end,
                 increment=10,
             )
 
@@ -491,7 +527,7 @@ class ResidueCollection(Geometry):
             
             start_atom = sub.end
             start = start_atom.chix_name[len(start_atom.element):]
-            if any(letter == start for letter in alphabet):
+            if not new_residue and any(letter == start for letter in alphabet):
                 ndx = alphabet.index(start) + 1
             else:
                 ndx = 0
@@ -514,11 +550,11 @@ class ResidueCollection(Geometry):
                             if match:
                                 i = int(match.group(1)) - 1
                                 break
-                        
+
                         atom.chix_name += "%i" % (i + 1)
 
                     h_atoms = sub.find("H", BondedTo(atom))
-                    
+
                     for j, h_atom in enumerate(h_atoms):
                         if len([a for a in cur_atoms if a.element == atom.element]) == 1 and len(h_atoms) > 1:
                             h_atom.chix_name = "%s%s%i" % ("H", alphabet[ndx], j + 1)
@@ -633,7 +669,7 @@ class ResidueCollection(Geometry):
                 residue.chix_residue = res
             else:
                 res = residue.chix_residue
-            
+
             try:
                 residue.update_chix(res, refresh_connected=False)
             except RuntimeError:
@@ -646,7 +682,7 @@ class ResidueCollection(Geometry):
         if self.convert_residues is None:
             for residue in atomic_structure.residues:
                 if not any(residue is res.chix_residue for res in self.residues):
-                    residue.delete()            
+                    residue.delete()
             
             for residue in atomic_structure.residues[len(self.residues):]:
                 residue.delete()
@@ -686,8 +722,8 @@ class ResidueCollection(Geometry):
                 if sorted((aaron_atom1, aaron_atom2,)) in known_bonds:
                     continue
                 
-                if not hasattr(aaron_atom2, "chix_atom"):
-                    print(aaron_atom2, "has no chix_atom")
+                # if not hasattr(aaron_atom2, "chix_atom"):
+                #     print(aaron_atom2, "has no chix_atom")
                 
                 known_bonds.append(sorted((aaron_atom1, aaron_atom2,)))
 

@@ -31,12 +31,13 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
 
     try:
         geom = ResidueCollection(fr)
-    except:
+    except Exception as e:
         s = "could not open %s" % file_name
         if "error" in fr.other and fr.other["error"]:
             s += "\n%s contains an error (%s):\n%s" % (format_name, fr.other["error"], fr.other["error_msg"])
         
         session.logger.error(s)
+        session.logger.error(repr(e))
         return [], "SEQCROW failed to open %s" % file_name
 
     structure = geom.get_chimera(session, coordsets=(fr.all_geom is not None and len(fr.all_geom) > 1), filereader=fr)

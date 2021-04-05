@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="0.24.3">
+            version="0.25">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -73,6 +73,7 @@
                 <Manager name="filereader_manager" uiOnly="false"/>
                 <Manager name="seqcrow_ordered_selection_manager" uiOnly="false"/>
                 <Manager name="seqcrow_job_manager" uiOnly="false"/>
+                <Manager name="seqcrow_qm_input_manager" uiOnly="true"/>
             </Managers>
             
             <Providers manager="data formats">
@@ -136,6 +137,18 @@
                 <Provider name="XYZ file"/>
             </Providers>
 
+            <Providers manager="seqcrow_job_manager">
+                <Provider name="Gaussian"/>
+                <Provider name="ORCA"/>
+                <Provider name="Psi4"/>
+            </Providers>
+			
+            <Providers manager="seqcrow_qm_input_manager">
+                <Provider name="Gaussian"/>
+                <Provider name="ORCA"/>
+                <Provider name="Psi4"/>
+            </Providers>
+			
             <Providers manager="test_manager">
                 <Provider name="fuseRing_command"/>
                 <Provider name="input_builder"/>
@@ -223,24 +236,33 @@
                 <ChimeraXClassifier>ChimeraX :: Command :: ~tsbond             :: Structure Editing  :: remove a forming/breaking bond</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: sterimol            :: Structure Analysis :: calculate L, B1, and B5 Sterimol parameters</ChimeraXClassifier>
 				<ChimeraXClassifier>ChimeraX :: Command :: percentVolumeBuried :: Structure Analysis :: calculate percent volume buried by ligands around a metal center</ChimeraXClassifier>
+				<ChimeraXClassifier>ChimeraX :: Command :: highlight           :: General            :: make some atoms or bonds stand out</ChimeraXClassifier>
+				<ChimeraXClassifier>ChimeraX :: Command :: ~highlight          :: General            :: remove highlights</ChimeraXClassifier>
                 <!--
                 <ChimeraXClassifier>ChimeraX :: Command :: duplicate           :: Structure Editing  :: duplicate selected atoms</ChimeraXClassifier>
                 -->
 	   </Classifiers>
     
     <AdditionalPackages>
-        <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools"/>
-        <!--
-        <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
+		<!--
+            <Package name="AaronTools" folder="/home/tony/Documents/QChASM/AaronTools"/>
+            <Package name="AaronTools.test" folder="/home/tony/Documents/QChASM/AaronTools/test"/>
         -->
+        <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools"/>
+        <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
     </AdditionalPackages>
 
     <DataFiles package="AaronTools">
         <DataDir>Ligands</DataDir>
         <DataDir>Substituents</DataDir>
         <DataDir>Rings</DataDir>
-        <DataDir>utils</DataDir>
-        <DataDir>utils\quad_grids</DataDir>
+        <!--
+		<DataDir>coordination_complex</DataDir>
+        -->
+		<DataDir>utils</DataDir>
+        <DataDir>utils/quad_grids</DataDir>
+        <DataDir>theory/valid_methods</DataDir>
+        <DataDir>theory/valid_basis_sets</DataDir>
         <DataFile>bond_data.json</DataFile>
         <DataFile>calculated_bond_lengths.json</DataFile>
         <DataFile>config.ini</DataFile>
@@ -248,11 +270,8 @@
         <DataFile>LICENSE</DataFile>
     </DataFiles>
     
-    <!--
     <DataFiles package="AaronTools.test">
         <DataDir>test_files</DataDir>
         <DataDir>ref_files</DataDir>
     </DataFiles>
-    -->
-
 </BundleInfo>

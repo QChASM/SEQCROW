@@ -1,3 +1,7 @@
+from io import BytesIO
+from os.path import basename
+import re
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -16,10 +20,6 @@ from AaronTools.const import PHYSICAL
 from AaronTools.geometry import Geometry
 from AaronTools.pathway import Pathway
 
-from io import BytesIO
-
-from os.path import basename
-
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.backend_bases import MouseEvent
 from matplotlib.figure import Figure
@@ -29,7 +29,8 @@ from PyQt5.QtCore import Qt, QRect, QItemSelectionModel
 from PyQt5.QtGui import QValidator, QFont, QIcon
 from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, QTabWidget, QComboBox, \
                             QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, \
-                            QFormLayout, QCheckBox, QHeaderView, QMenuBar, QAction, QFileDialog, QStyle
+                            QFormLayout, QCheckBox, QHeaderView, QMenuBar, QAction, QFileDialog, QStyle, \
+                            QGroupBox, QLabel, QToolBox
 
 from SEQCROW.tools.per_frame_plot import NavigationToolbar
 from SEQCROW.utils import iter2str
@@ -47,11 +48,923 @@ class _NormalModeSettings(Settings):
         'anim_duration': Value(60, IntArg),
         'anim_fps': Value(60, IntArg), 
         'fwhm': Value(5, FloatArg), 
-        'peak_type': 'Gaussian', 
+        'peak_type': 'pseudo-Voigt', 
         'plot_type': 'Absorbance',
-        'voigt_mix': 0.5,        
+        'voigt_mix': 0.5,
+        'exp_color': Value((0.0, 0.0, 1.0), TupleOf(FloatArg, 3), iter2str),
+        'reverse_x': True,
     }
 
+
+SCALE_LIBS = {
+    "NIST CCCBDB": (
+        "https://cccbdb.nist.gov/vibscalejust.asp",
+        {
+            "HF": {
+                "STO-3G": 0.817,
+                "3-21G": 0.906,
+                "3-21G(d)": 0.903,
+                "6-31G": 0.903,
+                "6-31G(d)": 0.899,
+                "6-31G(d,p)": 0.903,
+                "6-31+G(d,p)": 0.904,
+                "6-311G(d)": 0.904,
+                "6-311G(d,p)": 0.909,
+                "6-31G(2df,p)": 0.906,
+                "6-311+G(3df,2p)": 0.909,
+                "6-311+G(3df,2pd)": 0.906,
+                "TZVP": 0.909,
+                "cc-pVDZ": 0.908,
+                "cc-pVTZ": 0.910,
+                "cc-pVQZ": 0.908,
+                "aug-cc-pVDZ": 0.911,
+                "aug-cc-pVTZ": 0.910,
+                "aug-cc-pVQZ": 0.909,
+                "cc-pV(T+d)Z": 0.910,
+                "cc-pCVDZ": 0.916,
+                "cc-pCVTZ": 0.913,
+                "daug-cc-pVDZ": 0.912,
+                "daug-cc-pVTZ": 0.905,
+                "Sadlej_pVTZ": 0.913,
+            },
+            "ROHF": {
+                "3-21G": 0.907,
+                "3-21G(d)": 0.909,
+                "6-31G": 0.895,
+                "6-31G(d)": 0.890,
+                "6-31G(d,p)": 0.855,
+                "6-31+G(d,p)": 0.856,
+                "6-311G(d)": 0.856,
+                "6-311G(d,p)": 0.913,
+                "6-311+G(3df,2p)": 0.909,
+                "cc-pVDZ": 0.861,
+                "cc-pVTZ": 0.901,
+            },
+            "LSDA": {
+                "STO-3G": 0.896,
+                "3-21G": 0.984,
+                "3-21G(d)": 0.982,
+                "6-31G": 0.980,
+                "6-31G(d)": 0.981,
+                "6-31G(d,p)": 0.981,
+                "6-31+G(d,p)": 0.985,
+                "6-311G(d)": 0.984,
+                "6-311G(d,p)": 0.988,
+                "6-31G(2df,p)": 0.984,
+                "TZVP": 0.988,
+                "cc-pVDZ": 0.989,
+                "cc-pVTZ": 0.989,
+                "aug-cc-pVDZ": 0.989,
+                "aug-cc-pVTZ": 0.991,
+                "cc-pV(T+d)Z": 0.990,
+            },
+            "BLYP": {
+                "STO-3G": 0.925,
+                "3-21G": 0.995,
+                "3-21G(d)": 0.994,
+                "6-31G": 0.992,
+                "6-31G(d)": 0.992,
+                "6-31G(d,p)": 0.992,
+                "6-31+G(d,p)": 0.995,
+                "6-311G(d)": 0.998,
+                "6-311G(d,p)": 0.996,
+                "6-31G(2df,p)": 0.995,
+                "6-311+G(3df,2p)": 0.995,
+                "TZVP": 0.998,
+                "cc-pVDZ": 1.002,
+                "cc-pVTZ": 0.997,
+                "aug-cc-pVDZ": 0.998,
+                "aug-cc-pVTZ": 0.997,
+                "cc-pV(T+d)Z": 0.996,
+            },
+            "B1B95": {
+                "STO-3G": 0.883,
+                "3-21G": 0.957,
+                "3-21G(d)": 0.955,
+                "6-31G": 0.954,
+                "6-31G(d)": 0.949,
+                "6-31G(d,p)": 0.955,
+                "6-31+G(d,p)": 0.957,
+                "6-311G(d)": 0.959,
+                "6-311G(d,p)": 0.960,
+                "6-31G(2df,p)": 0.958,
+                "TZVP": 0.957,
+                "cc-pVDZ": 0.961,
+                "cc-pVTZ": 0.957,
+                "aug-cc-pVDZ": 0.958,
+                "aug-cc-pVTZ": 0.959,
+                "cc-pV(T+d)Z": 0.957,
+            },
+            "B3LYP": {
+                "STO-3G": 0.892,
+                "3-21G": 0.965,
+                "3-21G(d)": 0.962,
+                "6-31G": 0.962,
+                "6-31G(d)": 0.960,
+                "6-31G(d,p)": 0.961,
+                "6-31+G(d,p)": 0.964,
+                "6-311G(d)": 0.966,
+                "6-311G(d,p)": 0.967,
+                "6-31G(2df,p)": 0.965,
+                "6-311+G(3df,2p)": 0.967,
+                "6-311+G(3df,2pd)": 0.964,
+                "TZVP": 0.965,
+                "cc-pVDZ": 0.970,
+                "cc-pVTZ": 0.967,
+                "cc-pVQZ": 0.969,
+                "aug-cc-pVDZ": 0.970,
+                "aug-cc-pVTZ": 0.968,
+                "aug-cc-pVQZ": 0.969,
+                "cc-pV(T+d)Z": 0.965,
+                "Sadlej_pVTZ": 0.972,
+            },
+            "B3LYP (ultrafine grid)": {
+                "STO-3G": 0.892,
+                "3-21G": 0.965,
+                "3-21G(d)": 0.962,
+                "6-31G": 0.962,
+                "6-31G(d)": 0.958,
+                "6-31G(d,p)": 0.961,
+                "6-31+G(d,p)": 0.963,
+                "6-311G(d)": 0.966,
+                "6-311G(d,p)": 0.967,
+                "6-31G(2df,p)": 0.965,
+                "6-311+G(3df,2pd)": 0.970,
+                "TZVP": 0.963,
+                "cc-pVDZ": 0.970,
+                "cc-pVTZ": 0.967,
+                "aug-cc-pVDZ": 0.970,
+                "aug-cc-pVTZ": 0.968,
+            },
+            "B3PW91": {
+                "STO-3G": 0.885,
+                "3-21G": 0.961,
+                "3-21G(d)": 0.959,
+                "6-31G": 0.958,
+                "6-31G(d)": 0.957,
+                "6-31G(d,p)": 0.958,
+                "6-31+G(d,p)": 0.960,
+                "6-311G(d)": 0.963,
+                "6-311G(d,p)": 0.963,
+                "6-31G(2df,p)": 0.961,
+                "6-311+G(3df,2p)": 0.957,
+                "TZVP": 0.964,
+                "cc-pVDZ": 0.965,
+                "cc-pVTZ": 0.962,
+                "aug-cc-pVDZ": 0.965,
+                "aug-cc-pVTZ": 0.965,
+                "cc-pV(T+d)Z": 0.964,
+            },
+            "mPW1PW91": {
+                "STO-3G": 0.879,
+                "3-21G": 0.955,
+                "3-21G(d)": 0.950,
+                "6-31G": 0.947,
+                "6-31G(d)": 0.948,
+                "6-31G(d,p)": 0.952,
+                "6-31+G(d,p)": 0.952,
+                "6-311G(d)": 0.954,
+                "6-311G(d,p)": 0.957,
+                "6-31G(2df,p)": 0.955,
+                "TZVP": 0.954,
+                "cc-pVDZ": 0.958,
+                "cc-pVTZ": 0.959,
+                "aug-cc-pVDZ": 0.958,
+                "aug-cc-pVTZ": 0.958,
+                "cc-pV(T+d)Z": 0.958,
+            },
+            "M06-2X": {
+                "3-21G": 0.959,
+                "3-21G(d)": 0.947,
+                "6-31G(d)": 0.947,
+                "6-31G(d,p)": 0.950,
+                "6-31+G(d,p)": 0.952,
+                "6-31G(2df,p)": 0.952,
+                "TZVP": 0.946,
+                "cc-pVTZ": 0.955,
+                "aug-cc-pVTZ": 0.956,
+            },
+            "PBEPBE": {
+                "STO-3G": 0.914,
+                "3-21G": 0.991,
+                "3-21G(d)": 0.954,
+                "6-31G": 0.986,
+                "6-31G(d)": 0.986,
+                "6-31G(d,p)": 0.986,
+                "6-31+G(d,p)": 0.989,
+                "6-311G(d)": 0.990,
+                "6-311G(d,p)": 0.991,
+                "6-31G(2df,p)": 0.990,
+                "6-311+G(3df,2p)": 0.992,
+                "6-311+G(3df,2pd)": 0.990,
+                "TZVP": 0.989,
+                "cc-pVDZ": 0.994,
+                "cc-pVTZ": 0.993,
+                "aug-cc-pVDZ": 0.994,
+                "aug-cc-pVTZ": 0.994,
+                "cc-pV(T+d)Z": 0.993,
+                "Sadlej_pVTZ": 0.995,
+            },
+            "PBEPBE (ultrafine grid)": {
+                "STO-3G": 0.914,
+                "3-21G": 0.991,
+                "3-21G(d)": 0.954,
+                "6-31G": 0.986,
+                "6-31G(d)": 0.984,
+                "6-31G(d,p)": 0.986,
+                "6-31+G(d,p)": 0.989,
+                "6-311G(d)": 0.990,
+                "6-311G(d,p)": 0.991,
+                "6-31G(2df,p)": 0.990,
+                "6-311+G(3df,2pd)": 0.990,
+                "TZVP": 0.989,
+                "cc-pVDZ": 0.994,
+                "cc-pVTZ": 0.993,
+                "aug-cc-pVDZ": 0.994,
+                "aug-cc-pVTZ": 0.989,
+            },
+            "PBE0": {
+                "STO-3G": 0.882,
+                "3-21G": 0.960,
+                "3-21G(d)": 0.960,
+                "6-31G": 0.956,
+                "6-31G(d)": 0.950,
+                "6-31G(d,p)": 0.953,
+                "6-31+G(d,p)": 0.955,
+                "6-311G(d)": 0.959,
+                "6-311G(d,p)": 0.959,
+                "6-31G(2df,p)": 0.957,
+                "TZVP": 0.960,
+                "cc-pVDZ": 0.962,
+                "cc-pVTZ": 0.961,
+                "aug-cc-pVDZ": 0.962,
+                "aug-cc-pVTZ": 0.962,
+            },
+            "HSEh1PBE": {
+                "STO-3G": 0.883,
+                "3-21G": 0.963,
+                "3-21G(d)": 0.960,
+                "6-31G": 0.957,
+                "6-31G(d)": 0.951,
+                "6-31G(d,p)": 0.954,
+                "6-31+G(d,p)": 0.955,
+                "6-311G(d)": 0.960,
+                "6-311G(d,p)": 0.960,
+                "6-31G(2df,p)": 0.958,
+                "TZVP": 0.960,
+                "cc-pVDZ": 0.962,
+                "cc-pVTZ": 0.961,
+                "aug-cc-pVDZ": 0.962,
+                "aug-cc-pVTZ": 0.962,
+            },
+            "TPSSh": {
+                "3-21G": 0.969,
+                "3-21G(d)": 0.966,
+                "6-31G": 0.962,
+                "6-31G(d)": 0.959,
+                "6-31G(d,p)": 0.959,
+                "6-31+G(d,p)": 0.963,
+                "6-311G(d)": 0.963,
+                "6-31G(2df,p)": 0.965,
+                "TZVP": 0.964,
+                "cc-pVDZ": 0.972,
+                "cc-pVTZ": 0.968,
+                "aug-cc-pVDZ": 0.967,
+                "aug-cc-pVTZ": 0.965,
+            },
+            "ωB97X-D": {
+                "3-21G(d)": 0.948,
+                "6-31G(d)": 0.949,
+                "6-31+G(d,p)": 0.952,
+                "6-311G(d,p)": 0.957,
+                "TZVP": 0.955,
+                "cc-pVDZ": 0.953,
+                "cc-pVTZ": 0.956,
+                "aug-cc-pVDZ": 0.957,
+                "aug-cc-pVTZ": 0.957,
+            },
+            "B97-D3": {
+                "3-21G": 0.983,
+                "6-31G(d)": 0.980,
+                "6-31+G(d,p)": 0.983,
+                "6-311G(d,p)": 0.986,
+                "6-311+G(3df,2p)": 0.987,
+                "6-311+G(3df,2pd)": 0.986,
+                "TZVP": 0.986,
+                "cc-pVDZ": 0.992,
+                "cc-pVTZ": 0.986,
+                "aug-cc-pVTZ": 0.985,
+            },
+            "MP2": {
+                "STO-3G": 0.872,
+                "3-21G": 0.955,
+                "3-21G(d)": 0.951,
+                "6-31G": 0.957,
+                "6-31G(d)": 0.943,
+                "6-31G(d,p)": 0.937,
+                "6-31+G(d,p)": 0.941,
+                "6-311G(d)": 0.950,
+                "6-311G(d,p)": 0.950,
+                "6-31G(2df,p)": 0.945,
+                "6-311+G(3df,2p)": 0.943,
+                "6-311+G(3df,2pd)": 0.950,
+                "TZVP": 0.948,
+                "cc-pVDZ": 0.953,
+                "cc-pVTZ": 0.950,
+                "cc-pVQZ": 0.948,
+                "aug-cc-pVDZ": 0.959,
+                "aug-cc-pVTZ": 0.953,
+                "aug-cc-pVQZ": 0.950,
+                "cc-pV(T+d)Z": 0.953,
+                "cc-pCVDZ": 0.956,
+                "cc-pCVTZ": 0.953,
+                "Sadlej_pVTZ": 0.962,
+            },
+            "MP2=Full": {
+                "STO-3G": 0.889,
+                "3-21G": 0.955,
+                "3-21G(d)": 0.948,
+                "6-31G": 0.950,
+                "6-31G(d)": 0.942,
+                "6-31G(d,p)": 0.934,
+                "6-31+G(d,p)": 0.939,
+                "6-311G(d)": 0.947,
+                "6-311G(d,p)": 0.949,
+                "6-31G(2df,p)": 0.940,
+                "6-311+G(3df,2p)": 0.943,
+                "TZVP": 0.953,
+                "cc-pVDZ": 0.950,
+                "cc-pVTZ": 0.949,
+                "cc-pVQZ": 0.957,
+                "aug-cc-pVDZ": 0.969,
+                "aug-cc-pVTZ": 0.951,
+                "aug-cc-pVQZ": 0.956,
+                "cc-pV(T+d)Z": 0.948,
+                "cc-pCVDZ": 0.955,
+                "cc-pCVTZ": 0.951,
+            },
+            "MP3": {
+                "STO-3G": 0.894,
+                "3-21G": 0.968,
+                "3-21G(d)": 0.965,
+                "6-31G": 0.966,
+                "6-31G(d)": 0.939,
+                "6-31G(d,p)": 0.935,
+                "6-31+G(d,p)": 0.931,
+                "TZVP": 0.935,
+                "cc-pVDZ": 0.948,
+                "cc-pVTZ": 0.945,
+            },
+            "MP3=Full": {
+                "6-31G(d)": 0.938,
+                "6-31+G(d,p)": 0.932,
+                "6-311G(d)": 0.904,
+                "TZVP": 0.934,
+                "cc-pVDZ": 0.940,
+                "cc-pVTZ": 0.933,
+            },
+            "MP4": {
+                "3-21G": 0.970,
+                "3-21G(d)": 0.944,
+                "6-31G": 0.944,
+                "6-31G(d)": 0.955,
+                "6-31G(d,p)": 0.944,
+                "6-31+G(d,p)": 0.944,
+                "6-311G(d)": 0.959,
+                "6-311G(d,p)": 0.970,
+                "6-311+G(3df,2p)": 0.944,
+                "TZVP": 0.963,
+                "cc-pVDZ": 0.967,
+                "cc-pVTZ": 0.969,
+                "aug-cc-pVDZ": 0.977,
+                "aug-cc-pVTZ": 0.973,
+            },
+            "MP4=Full": {
+                "3-21G": 0.979,
+                "6-31G(d)": 0.962,
+                "6-311G(d,p)": 0.962,
+                "TZVP": 0.966,
+                "cc-pVDZ": 0.965,
+                "cc-pVTZ": 0.963,
+                "aug-cc-pVDZ": 0.975,
+                "aug-cc-pVTZ": 0.969,
+            },
+            "B2PLYP": {
+                "6-31G(d)": 0.949,
+                "6-31+G(d,p)": 0.952,
+                "6-31G(2df,p)": 0.955,
+                "TZVP": 0.954,
+                "cc-pVDZ": 0.958,
+                "cc-pVTZ": 0.959,
+                "cc-pVQZ": 0.957,
+                "aug-cc-pVTZ": 0.961,
+            },
+            "B2PLYP=Full": {
+                "3-21G": 0.952,
+                "6-31G(d)": 0.948,
+                "6-31+G(d,p)": 0.951,
+                "6-311G(d)": 0.904,
+                "TZVP": 0.954,
+                "cc-pVDZ": 0.959,
+                "cc-pVTZ": 0.956,
+                "aug-cc-pVDZ": 0.962,
+                "aug-cc-pVTZ": 0.959,
+            },
+            "B2PLYP=Full (ultrafine grid)": {
+                "6-31G(d)": 0.949,
+                "cc-pVDZ": 0.958,
+                "cc-pVTZ": 0.955,
+                "aug-cc-pVDZ": 0.962,
+                "aug-cc-pVTZ": 0.959,
+            },
+            "CID": {
+                "3-21G": 0.932,
+                "3-21G(d)": 0.931,
+                "6-31G": 0.935,
+                "6-31G(d)": 0.924,
+                "6-31G(d,p)": 0.924,
+                "6-31+G(d,p)": 0.924,
+                "6-311G(d)": 0.929,
+                "6-311+G(3df,2p)": 0.924,
+                "cc-pVDZ": 0.924,
+                "cc-pVTZ": 0.927,
+            },
+            "CISD": {
+                "3-21G": 0.941,
+                "3-21G(d)": 0.934,
+                "6-31G": 0.938,
+                "6-31G(d)": 0.926,
+                "6-31G(d,p)": 0.918,
+                "6-31+G(d,p)": 0.922,
+                "6-311G(d)": 0.925,
+                "6-311+G(3df,2p)": 0.922,
+                "cc-pVDZ": 0.922,
+                "cc-pVTZ": 0.930,
+            },
+            "QCISD": {
+                "3-21G": 0.969,
+                "3-21G(d)": 0.961,
+                "6-31G": 0.964,
+                "6-31G(d)": 0.952,
+                "6-31G(d,p)": 0.941,
+                "6-31+G(d,p)": 0.945,
+                "6-311G(d)": 0.957,
+                "6-311G(d,p)": 0.954,
+                "6-31G(2df,p)": 0.947,
+                "6-311+G(3df,2p)": 0.954,
+                "TZVP": 0.955,
+                "cc-pVDZ": 0.959,
+                "cc-pVTZ": 0.956,
+                "aug-cc-pVDZ": 0.969,
+                "aug-cc-pVTZ": 0.962,
+                "cc-pV(T+d)Z": 0.955,
+            },
+            "QCISD(T)": {
+                "3-21G": 0.954,
+                "3-21G(d)": 0.954,
+                "6-31G": 0.954,
+                "6-31G(d)": 0.959,
+                "6-31G(d,p)": 0.937,
+                "6-31+G(d,p)": 0.939,
+                "6-311G(d)": 0.963,
+                "6-311+G(3df,2p)": 0.954,
+                "TZVP": 0.963,
+                "cc-pVDZ": 0.953,
+                "cc-pVTZ": 0.949,
+                "aug-cc-pVDZ": 0.978,
+                "aug-cc-pVTZ": 0.967,
+            },
+            "QCISD(T)=Full": {
+                "cc-pVDZ": 0.959,
+                "cc-pVTZ": 0.957,
+                "aug-cc-pVDZ": 0.970,
+            },
+            "CCD": {
+                "3-21G": 0.972,
+                "3-21G(d)": 0.957,
+                "6-31G": 0.960,
+                "6-31G(d)": 0.947,
+                "6-31G(d,p)": 0.938,
+                "6-31+G(d,p)": 0.942,
+                "6-311G(d)": 0.955,
+                "6-311G(d,p)": 0.955,
+                "6-31G(2df,p)": 0.947,
+                "6-311+G(3df,2p)": 0.943,
+                "TZVP": 0.948,
+                "cc-pVDZ": 0.957,
+                "cc-pVTZ": 0.934,
+                "aug-cc-pVDZ": 0.965,
+                "aug-cc-pVTZ": 0.957,
+                "cc-pV(T+d)Z": 0.952,
+            },
+            "CCSD": {
+                "3-21G": 0.943,
+                "3-21G(d)": 0.943,
+                "6-31G": 0.943,
+                "6-31G(d)": 0.944,
+                "6-31G(d,p)": 0.933,
+                "6-31+G(d,p)": 0.934,
+                "6-311G(d)": 0.954,
+                "6-31G(2df,p)": 0.946,
+                "6-311+G(3df,2p)": 0.943,
+                "TZVP": 0.954,
+                "cc-pVDZ": 0.947,
+                "cc-pVTZ": 0.941,
+                "cc-pVQZ": 0.951,
+                "aug-cc-pVDZ": 0.963,
+                "aug-cc-pVTZ": 0.956,
+                "aug-cc-pVQZ": 0.953,
+            },
+            "CCSD=Full": {
+                "6-31G(d)": 0.950,
+                "6-31G(2df,p)": 0.942,
+                "TZVP": 0.948,
+                "cc-pVTZ": 0.948,
+                "aug-cc-pVTZ": 0.951,
+            },
+            "CCSD(T)": {
+                "3-21G": 0.991,
+                "3-21G(d)": 0.943,
+                "6-31G": 0.943,
+                "6-31G(d)": 0.962,
+                "6-31G(d,p)": 0.949,
+                "6-31+G(d,p)": 0.960,
+                "6-311G(d)": 0.963,
+                "6-311G(d,p)": 0.965,
+                "6-311+G(3df,2p)": 0.987,
+                "TZVP": 0.963,
+                "cc-pVDZ": 0.979,
+                "cc-pVTZ": 0.975,
+                "cc-pVQZ": 0.970,
+                "aug-cc-pVDZ": 0.963,
+                "aug-cc-pVTZ": 0.970,
+                "aug-cc-pVQZ": 0.961,
+                "cc-pV(T+d)Z": 0.965,
+                "cc-pCVDZ": 0.971,
+                "cc-pCVTZ": 0.966,
+            },
+            "CCSD(T)=Full": {
+                "6-31G(d)": 0.971,
+                "TZVP": 0.956,
+                "cc-pVDZ": 0.963,
+                "cc-pVTZ": 0.958,
+                "cc-pVQZ": 0.966,
+                "aug-cc-pVDZ": 0.971,
+                "aug-cc-pVTZ": 0.964,
+                "aug-cc-pVQZ": 0.958,
+                "cc-pV(T+d)Z": 0.959,
+                "cc-pCVDZ": 0.969,
+                "cc-pCVTZ": 0.966,
+            },
+            "AM1": 0.954,
+            "PM3": 0.974,
+            "PM6": 1.062,
+            "AMBER": 1.000,
+            "DREIDING": 0.936,
+        }
+    ),
+    "UMN CTC (v4)": (
+        "https://comp.chem.umn.edu/freqscale/index.html",
+        {
+            "B1B95": {
+                "6-31+G(d,p)": 0.946,
+                "MG3S": 0.948,
+            },
+            "B1LYP": {
+                "MG3S": 0.955,
+            },
+            "B3LYP": {
+                "6-31G(d)": 0.952,
+                "6-31G(2df,2p)": 0.955,
+                "MG3S": 0.960,
+                "aug-cc-pVTZ": 0.959,
+                "def2-TZVP": 0.960,
+                "ma-TZVP": 0.960,
+            },
+            "B3P86": {
+                "6-31G(d)": 0.946,
+            },
+            "B3PW91": {
+                "6-31G(d)": 0.947,
+            },
+            "B97-3": {
+                "def2-TZVP": 0.949,
+                "ma-TZVP": 0.950,
+                "MG3S": 0.947,
+            },
+            "B98": {
+                "def2-TZVP": 0.958,
+                "ma-TZVP": 0.959,
+                "MG3S": 0.956,
+            },
+            "BB1K": {
+                "MG3S": 0.932,
+                "6-31+G(d,p)": 0.929,
+            },
+            "BB95": {
+                "6-31+G(d,p)": 0.985,
+                "MG3S": 0.986,
+            },
+            "BLYP": {
+                "6-311G(df,p)": 0.987,
+                "6-31G(d)": 0.983,
+                "MG3S": 0.991,
+            },
+            "BMK": {
+                "ma-TZVP": 0.947,
+                "MG3S": 0.945,
+            },
+            "BP86": {
+                "6-31G(d)": 0.981,
+                "ma-TZVP": 0.988,
+            },
+            "BPW60": {
+                "6-311+G(d,p)": 0.947,
+            },
+            "BPW63": {
+                "MG3S": 0.936,
+            },
+            "CAM-B3LYP": {
+                "ma-TZVP": 0.951,
+            },
+            "CCSD(T)": {
+                "jul-cc-pVTZ": 0.958,
+                "aug-cc-pVTZ": 0.961,
+            },
+            "CCSD(T)-F12": {
+                "jul-cc-pVTZ": 0.955,
+            },
+            "CCSD(T)-F12a": {
+                "cc-pVDZ-F12": 0.957,
+                "cc-pVTZ-F12": 0.958,
+            },
+            "CCSD": {
+                "jul-cc-pVTZ": 0.948,
+            },
+            "CCSD-F12": {
+                "jul-cc-pVTZ": 0.946,
+            },
+            "G96LYP80": {
+                "6-311+G(d,p)": 0.924,
+            },
+            "G96LYP82": {
+                "MG3S": 0.920,
+            },
+            "GAM": {
+                "def2-TZVP": 0.955,
+                "ma-TZVP": 0.956,
+            },
+            "HF": {
+                "3-21G": 0.895,
+                "6-31+G(d)": 0.887,
+                "6-31+G(d,p)": 0.891,
+                "6-311G(d,p)": 0.896,
+                "6-311G(df,p)": 0.896,
+                "6-31G(d)": 0.885,
+                "6-31G(d,p)": 0.889,
+                "MG3S": 0.895,
+            },
+            "HFLYP": {
+                "MG3S": 0.876,
+            },
+            "HSEh1PBE": {
+                "ma-TZVP": 0.954,
+            },
+            "M05": {
+                "aug-cc-pVTZ": 0.953,
+                "def2-TZVP": 0.952,
+                "ma-TZVP": 0.954,
+                "maug-cc-pVTZ": 0.953,
+                "MG3S": 0.951,
+            },
+            "M05-2X": {
+                "6-31+G(d,p)": 0.936,
+                "aug-cc-pVTZ": 0.939,
+                "def2-TZVPP": 0.938,
+                "ma-TZVP": 0.940,
+                "maug-cc-pVTZ": 0.939,
+                "MG3S": 0.937,
+            },
+            "M06": {
+                "6-31+G(d,p)": 0.950,
+                "aug-cc-pVTZ": 0.958,
+                "def2-TZVP": 0.956,
+                "def2-TZVPP": 0.963,
+                "ma-TZVP": 0.956,
+                "maug-cc-pVTZ": 0.956,
+                "MG3S": 0.955,
+            },
+            "M06-2X": {
+                "6-31+G(d,p)": 0.940,
+                "6-311+G(d,p)": 0.944,
+                "6-311++G(d,p)": 0.944,
+                "aug-cc-pVDZ": 0.954,
+                "aug-cc-pVTZ": 0.946,
+                "def2-TZVP": 0.946,
+                "def2-QZVP": 0.945,
+                "def2-TZVPP": 0.945,
+                "jul-cc-pVDZ": 0.952,
+                "jul-cc-pVTZ": 0.946,
+                "jun-cc-pVDZ": 0.951,
+                "jun-cc-pVTZ": 0.946,
+                "ma-TZVP": 0.947,
+                "maug-cc-pV(T+d)Z": 0.945,
+                "MG3S": 0.944,
+            },
+            "M06-HF": {
+                "6-31+G(d,p)": 0.931,
+                "aug-cc-pVTZ": 0.936,
+                "def2-TZVPP": 0.932,
+                "ma-TZVP": 0.932,
+                "maug-cc-pVTZ": 0.934,
+                "MG3S": 0.930,
+            },
+            "M06-L": {
+                "6-31G(d,p)": 0.952,
+                "6-31+G(d,p)": 0.953,
+                "aug-cc-pVTZ": 0.955,
+                "aug-cc-pV(T+d)Z": 0.955,
+                "aug-cc-pVTZ-pp": 0.955,
+                "def2-TZVP": 0.951,
+                "def2-TZVPP": 0.956,
+                "ma-TZVP": 0.956,
+                "maug-cc-pVTZ": 0.952,
+                "MG3S": 0.958,
+            },
+            "M06-L(DKH2)": {
+                "aug-cc-pwcVTZ-DK": 0.959,
+            },
+            "M08-HX": {
+                "6-31+G(d,p)": 0.944,
+                "aug-cc-pVTZ": 0.950,
+                "cc-pVTZ+": 0.946,
+                "def2-TZVPP": 0.945,
+                "jun-cc-pVTZ": 0.947,
+                "ma-TZVP": 0.951,
+                "maug-cc-pVTZ": 0.951,
+                "MG3S": 0.946,
+            },
+            "M08-SO": {
+                "6-31+G(d,p)": 0.951,
+                "aug-cc-pVTZ": 0.959,
+                "cc-pVTZ+": 0.956,
+                "def2-TZVPP": 0.954,
+                "ma-TZVP": 0.958,
+                "maug-cc-pVTZ": 0.957,
+                "MG3": 0.959,
+                "MG3S": 0.956,
+                "MG3SXP": 0.957,
+            }, 
+            "M11-L": {
+                "maug-cc-pVTZ": 0.962,
+            }, 
+            "MN11-L": {
+                "MG3S": 0.959,
+            },
+            "MN12-L": {
+                "jul-cc-pVDZ": 0.950,
+                "MG3S": 0.959,
+            },
+            "MN12-SX": {
+                "6-311++G(d,p)": 0.947,
+                "jul-cc-pVDZ": 0.954,
+            },
+            "MN15-L": {
+                "MG3S": 0.952,
+                "maug-cc-pVTZ": 0.954,
+            },
+            "MOHLYP": {
+                "ma-TZVP": 1.000,
+                "MG3S": 0.995,
+            },
+            "MP2 (frozen core)": {
+                "6-31+G(d,p)": 0.943,
+                "6-311G(d,p)": 0.945,
+                "6-31G(d)": 0.939,
+                "6-31G(d,p)": 0.933,
+                "cc-pVDZ": 0.952,
+                "cc-pVTZ": 0.953,
+            },
+            "MP2 (full)": {
+                "6-31G(d)": 0.938,
+            },
+            "MP4 (SDQ)": {
+                "jul-cc-pVTZ": 0.948,
+            },
+            "MPW1B95": {
+                "6-31+G(d,p)": 0.945,
+                "MG3": 0.945,
+                "MG3S": 0.947,
+            },
+            "MPW1K": {
+                "6-31+G(d,p)": 0.924,
+                "aug-cc-pVDTZ": 0.934,
+                "aug-cc-pVTZ": 0.930,
+                "jul-cc-pVDZ": 0.932,
+                "jul-cc-pVTZ": 0.929,
+                "jun-cc-pVDZ": 0.930,
+                "jun-cc-pVTZ": 0.929,
+                "ma-TZVP": 0.931,
+                "MG3": 0.928,
+                "MG3S": 0.931,
+                "MIDI!": 0.928,
+                "MIDIY": 0.922,
+            },
+            "MPW3LYP": {
+                "6-31+G(d,p)": 0.955,
+                "6-311+G(2d,p)": 0.960,
+                "6-31G(d)": 0.951,
+                "ma-TZVP": 0.960,
+                "MG3S": 0.956,
+            },
+            "MPW74": {
+                "6-311+G(d,p)": 0.925,
+            },
+            "MPW76": {
+                "MG3S": 0.956,
+            },
+            "MPWB1K": {
+                "6-31+G(d,p)": 0.926,
+                "MG3S": 0.929
+            },
+            "MPWLYP1M": {
+                "ma-TZVP": 0.983,
+            },
+            "OreLYP": {
+                "ma-TZVP": 0.984,
+                "def2-TZVP": 0.982,
+            },
+            "PBE": {
+                "def2-TZVP": 0.985,
+                "MG3S": 0.985,
+                "ma-TZVP": 0.987,
+            },
+            "PBE0": {
+                "MG3S": 0.950,
+            },
+            "PBE1KCIS": {
+                "MG3": 0.955,
+                "MG3S": 0.955,
+            },
+            "PW6B95": {
+                "def2-TZVP": 0.949,
+            },
+            "PWB6K": {
+                "cc-pVDZ": 0.928,
+            },
+            "QCISD": {
+                "cc-pVTZ": 0.950,
+                "MG3S": 0.953,
+            },
+            "QCISD(FC)": {
+                "6-31G(d)": 0.948,
+            },
+            "QCISD(T)": {
+                "aug-cc-pVQZ": 0.963,
+            },
+            "revTPSS": {
+                "def2-TZVP": 0.972,
+                "ma-TZVP": 0.973,
+            },
+            "SOGGA": {
+                "ma-TZVP": 0.991,
+            },
+            "τHCTHhyb": {
+                "ma-TZVP": 0.963,
+            },
+            "TPSS1KCIS": {
+                "def2-TZVP": 0.956,
+                "ma-TZVP": 0.957,
+            },
+            "TPSSh": {
+                "MG3S": 0.963,
+            },
+            "VSXC": {
+                "MG3S": 0.962,
+            },
+            "ωB97": {
+                "def2-TZVP": 0.944,
+                "ma-TZVP": 0.945,
+            },
+            "ωB97X-D": {
+                "def2-TZVP": 0.945,
+                "ma-TZVP": 0.946,
+                "maug-cc-pVTZ": 0.949,
+            },
+            "X1B95": {
+                "6-31+G(d,p)": 0.943,
+                "MG3S": 0.946,
+            },
+            "XB1K": {
+                "6-31+G(d,p)": 0.927,
+                "MG3S": 0.930,
+            },
+            "AM1": 0.923,
+            "PM3": 0.916,
+            "PM6": 1.050,
+        }
+    ),
+}
 
 
 class FPSSpinBox(QSpinBox):
@@ -136,6 +1049,7 @@ class NormalModes(ToolInstance):
         
         self.vec_mw_bool = False
         self.ir_plot = None
+        self.match_peaks = None
         
         self.settings = _NormalModeSettings(session, name)
         
@@ -153,18 +1067,19 @@ class NormalModes(ToolInstance):
         
         #table that lists frequencies
         table = QTableWidget()
-        table.setColumnCount(2)
-        table.setHorizontalHeaderLabels(['Frequency (cm\u207b\u00b9)', 'IR intensity'])
+        table.setColumnCount(3)
+        table.setHorizontalHeaderLabels(["Frequency (cm\u207b\u00b9)", "symmetry", "IR intensity"])
         table.setSortingEnabled(True)
         table.setSelectionBehavior(QTableView.SelectRows)
         table.setSelectionMode(QTableView.SingleSelection)
         table.setEditTriggers(QTableWidget.NoEditTriggers)
-        for i in range(0, 2):
+        for i in range(0, 3):
             table.resizeColumnToContents(i)
         
         table.horizontalHeader().setStretchLastSection(False)            
         table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
-        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)        
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)        
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)        
         
         layout.addWidget(table)
         self.table = table
@@ -256,34 +1171,13 @@ class NormalModes(ToolInstance):
         self.plot_type.addItems(['Absorbance', 'Transmittance'])
         ndx = self.plot_type.findText(self.settings.plot_type, Qt.MatchExactly)
         self.plot_type.setCurrentIndex(ndx)
+        self.plot_type.currentIndexChanged.connect(lambda *args: self.show_ir_plot(create=False))
         ir_layout.addRow("plot type:", self.plot_type)
         
-        self.peak_type = QComboBox()
-        self.peak_type.addItems(['Gaussian', 'Lorentzian', 'pseudo-Voigt', 'Delta'])
-        ndx = self.peak_type.findText(self.settings.peak_type, Qt.MatchExactly)
-        self.peak_type.setCurrentIndex(ndx)
-        ir_layout.addRow("peak type:", self.peak_type)
-        
-        self.fwhm = QDoubleSpinBox()
-        self.fwhm.setSingleStep(5)
-        self.fwhm.setRange(0.01, 200.0)
-        self.fwhm.setValue(self.settings.fwhm)
-        self.fwhm.setToolTip("width of peaks at half of their maximum value")
-        ir_layout.addRow("FWHM:", self.fwhm)
-        
-        self.fwhm.setEnabled(self.peak_type.currentText() != "Delta")
-        self.peak_type.currentTextChanged.connect(lambda text, widget=self.fwhm: widget.setEnabled(text != "Delta"))
-        
-        self.voigt_mix = QDoubleSpinBox()
-        self.voigt_mix.setSingleStep(0.005)
-        self.voigt_mix.setDecimals(3)
-        self.voigt_mix.setRange(0, 1)
-        self.voigt_mix.setValue(self.settings.voigt_mix)
-        self.voigt_mix.setToolTip("fraction of pseudo-Voigt function that is Gaussian")
-        ir_layout.addRow("Voigt mixing:", self.voigt_mix)
-        
-        self.voigt_mix.setEnabled(self.peak_type.currentText() == "pseudo-Voigt")
-        self.peak_type.currentTextChanged.connect(lambda text, widget=self.voigt_mix: widget.setEnabled(text == "pseudo-Voigt"))
+        self.reverse_x = QCheckBox()
+        self.reverse_x.setCheckState(Qt.Checked if self.settings.reverse_x else Qt.Unchecked)
+        self.reverse_x.stateChanged.connect(lambda *args: self.show_ir_plot(create=False))
+        ir_layout.addRow("reverse x-axis:", self.reverse_x)
         
         show_plot = QPushButton("show plot")
         show_plot.clicked.connect(self.show_ir_plot)
@@ -320,9 +1214,7 @@ class NormalModes(ToolInstance):
         fr = self.model_selector.currentData()
         if fr is None:
             return 
-            
-        model = self.session.filereader_manager.get_model(fr)
-        
+
         freq_data = fr.other['frequency'].data
         
         for i, mode in enumerate(freq_data):
@@ -334,10 +1226,27 @@ class NormalModes(ToolInstance):
             freq.setData(Qt.UserRole, i)
             self.table.setItem(row, 0, freq)
             
+            if mode.symmetry:
+                text = mode.symmetry
+                if re.search("\d", text):
+                    text = re.sub(r"(\d+)", r"<sub>\1</sub>", text)
+                if text.startswith("SG"):
+                    text = "Σ" + text[2:]
+                elif text.startswith("PI"):
+                    text = "Π" + text[2:]
+                elif text.startswith("DLT"):
+                    text = "Δ" + text[3:]
+                if any(text.endswith(char) for char in "vhdugVHDUG"):
+                    text = text[:-1] + "<sub>" + text[-1].lower() + "</sub>"
+
+                label = QLabel(text)
+                label.setAlignment(Qt.AlignCenter)
+                self.table.setCellWidget(row, 1, label)
+
             intensity = QTableWidgetItem()
             if mode.intensity is not None:
                 intensity.setData(Qt.DisplayRole, round(mode.intensity, 2))
-            self.table.setItem(row, 1, intensity)
+            self.table.setItem(row, 2, intensity)
         
         self.table.setSelection(QRect(0, 0, 2, 1), QItemSelectionModel.Select)
     
@@ -510,8 +1419,8 @@ class NormalModes(ToolInstance):
         run(self.session,
             'open %s' % self.help if self.help is not None else "")
     
-    def show_ir_plot(self):
-        if self.ir_plot is None:
+    def show_ir_plot(self, *args, create=True, **kwargs):
+        if self.ir_plot is None and create:
             self.ir_plot = self.tool_window.create_child_window("IR Plot", window_class=IRPlot)
         else:
             self.ir_plot.refresh_plot()
@@ -551,6 +1460,12 @@ class IRPlot(ChildToolWindow):
         
         layout = QGridLayout()
         
+        toolbox = QTabWidget()
+        layout.addWidget(toolbox)
+        
+        plot_widget = QWidget()
+        plot_layout = QGridLayout(plot_widget)
+        
         self.figure = Figure(figsize=(2,2))
         self.canvas = Canvas(self.figure)
         
@@ -564,18 +1479,157 @@ class IRPlot(ChildToolWindow):
         self.canvas.setMinimumWidth(500)
         self.canvas.setMinimumHeight(300)
 
-        layout.addWidget(self.canvas, 0, 0, 1, 2)
+        plot_layout.addWidget(self.canvas, 0, 0, 1, 2)
 
         toolbar_widget = QWidget()
         self.toolbar = NavigationToolbar(self.canvas, toolbar_widget)
         self.toolbar.setMaximumHeight(32)
-        layout.addWidget(self.toolbar, 1, 1, 1, 1)
+        plot_layout.addWidget(self.toolbar, 1, 1, 1, 1)
         
         refresh_button = QPushButton()
         refresh_button.setIcon(QIcon(refresh_button.style().standardIcon(QStyle.SP_BrowserReload)))
         refresh_button.clicked.connect(self.refresh_plot)
-        layout.addWidget(refresh_button, 1, 0, 1, 1, Qt.AlignVCenter)
+        plot_layout.addWidget(refresh_button, 1, 0, 1, 1, Qt.AlignVCenter)
         
+        toolbox.addTab(plot_widget, "plot")
+
+        # peak style
+        peak_widget = QWidget()
+        peak_layout = QFormLayout(peak_widget)
+
+        self.peak_type = QComboBox()
+        self.peak_type.addItems(['Gaussian', 'Lorentzian', 'pseudo-Voigt', 'Delta'])
+        ndx = self.peak_type.findText(self.tool_instance.settings.peak_type, Qt.MatchExactly)
+        self.peak_type.setCurrentIndex(ndx)
+        peak_layout.addRow("peak type:", self.peak_type)
+        
+        self.fwhm = QDoubleSpinBox()
+        self.fwhm.setSingleStep(5)
+        self.fwhm.setRange(0.01, 200.0)
+        self.fwhm.setValue(self.tool_instance.settings.fwhm)
+        self.fwhm.setToolTip("width of peaks at half of their maximum value")
+        peak_layout.addRow("FWHM:", self.fwhm)
+        
+        self.fwhm.setEnabled(self.peak_type.currentText() != "Delta")
+        self.peak_type.currentTextChanged.connect(lambda text, widget=self.fwhm: widget.setEnabled(text != "Delta"))
+        
+        self.voigt_mix = QDoubleSpinBox()
+        self.voigt_mix.setSingleStep(0.005)
+        self.voigt_mix.setDecimals(3)
+        self.voigt_mix.setRange(0, 1)
+        self.voigt_mix.setValue(self.tool_instance.settings.voigt_mix)
+        self.voigt_mix.setToolTip("fraction of pseudo-Voigt function that is Gaussian")
+        peak_layout.addRow("Voigt mixing:", self.voigt_mix)
+        
+        self.voigt_mix.setEnabled(self.peak_type.currentText() == "pseudo-Voigt")
+        self.peak_type.currentTextChanged.connect(lambda text, widget=self.voigt_mix: widget.setEnabled(text == "pseudo-Voigt"))
+        
+        toolbox.addTab(peak_widget, "peak settings")
+        
+        # plot experimental data alongside computed
+        experimental_widget = QWidget()
+        experimental_layout = QFormLayout(experimental_widget)
+        
+        self.skip_lines = QSpinBox()
+        self.skip_lines.setRange(0, 15)
+        experimental_layout.addRow("skip first lines:", self.skip_lines)
+        
+        browse_button = QPushButton("browse...")
+        browse_button.clicked.connect(self.load_data)
+        experimental_layout.addRow("load CSV data:", browse_button)
+        
+        self.line_color = ColorButton(has_alpha_channel=False, max_size=(16, 16))
+        self.line_color.set_color(self.tool_instance.settings.exp_color)
+        experimental_layout.addRow("line color:", self.line_color)
+        
+        clear_button = QPushButton("clear experimental data")
+        clear_button.clicked.connect(self.clear_data)
+        experimental_layout.addRow(clear_button)
+        
+        toolbox.addTab(experimental_widget, "plot experimental data")
+        
+        
+        # frequency scaling
+        scaling_group = QWidget()
+        scaling_layout = QFormLayout(scaling_group)
+        
+        desc = QLabel("")
+        desc.setText("<a href=\"test\" style=\"text-decoration: none;\">Δ<sub>anh</sub> ≈ c<sub>1</sub>𝜈<sub>e</sub> + c<sub>2</sub>𝜈<sub>e</sub><sup>2</sup></a>")
+        desc.setTextFormat(Qt.RichText)
+        desc.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        desc.linkActivated.connect(self.open_link)
+        desc.setToolTip("Crittenden and Sibaev's quadratic scaling for harmonic frequencies\nDOI 10.1021/acs.jpca.5b11386")
+        scaling_layout.addRow(desc)
+
+        self.linear = QDoubleSpinBox()
+        self.linear.setDecimals(6)
+        self.linear.setRange(-.2, .2)
+        self.linear.setSingleStep(0.001)
+        self.linear.setValue(0.)
+        scaling_layout.addRow("c<sub>1</sub> =", self.linear)
+
+        self.quadratic = QDoubleSpinBox()
+        self.quadratic.setDecimals(9)
+        self.quadratic.setRange(-.2, .2)
+        self.quadratic.setSingleStep(0.000001)
+        self.quadratic.setValue(0.)
+        scaling_layout.addRow("c<sub>2</sub> =", self.quadratic)
+        
+        set_zero = QPushButton("set scales to 0")
+        set_zero.clicked.connect(lambda *args: self.linear.setValue(0.))
+        set_zero.clicked.connect(lambda *args: self.quadratic.setValue(0.))
+        scaling_layout.addRow(set_zero)
+        
+        
+        lookup_scale = QGroupBox("scale factor lookup")
+        scaling_layout.addRow(lookup_scale)
+        lookup_layout = QFormLayout(lookup_scale)
+        
+        self.library = QComboBox()
+        self.library.addItems(SCALE_LIBS.keys())
+        lookup_layout.addRow("database:", self.library)
+        
+        self.method = QComboBox()
+        self.method.addItems(SCALE_LIBS[self.library.currentText()][1].keys())
+        lookup_layout.addRow("method:", self.method)
+        
+        self.basis = QComboBox()
+        self.basis.addItems(SCALE_LIBS[self.library.currentText()][1][self.method.currentText()].keys())
+        lookup_layout.addRow("basis set:", self.basis)
+        
+        desc = QLabel("")
+        desc.setText("view database online <a href=\"test\" style=\"text-decoration: none;\">here</a>")
+        desc.setTextFormat(Qt.RichText)
+        desc.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        desc.linkActivated.connect(self.open_scale_library_link)
+        desc.setToolTip("view library online")
+        lookup_layout.addRow(desc)
+
+        self.library.currentTextChanged.connect(self.change_scale_lib)
+        self.method.currentTextChanged.connect(self.change_method)
+        self.basis.currentTextChanged.connect(self.change_basis)
+
+        fit_scale = QGroupBox("linear least squares fitting")
+        scaling_layout.addRow(fit_scale)
+        fit_layout = QFormLayout(fit_scale)
+        
+        self.fit_c1 = QCheckBox()
+        fit_layout.addRow("fit c<sub>1</sub>:", self.fit_c1)
+        
+        self.fit_c2 = QCheckBox()
+        fit_layout.addRow("fit c<sub>2</sub>:", self.fit_c2)
+        
+        match_peaks = QPushButton("match peaks...")
+        match_peaks.clicked.connect(self.show_match_peaks)
+        fit_layout.addRow(match_peaks)
+
+        toolbox.addTab(scaling_group, "frequency scaling")
+        
+
+        toolbox.currentChanged.connect(lambda ndx: self.refresh_plot() if not ndx else None)
+        # toolbox.setMinimumWidth(int(1.1 * plot_widget.size().width()))
+        # toolbox.setMinimumHeight(int(1.2 * plot_widget.size().height()))
+
         #menu bar for saving stuff
         menu = QMenuBar()
         file = menu.addMenu("&Export")
@@ -605,7 +1659,10 @@ class IRPlot(ChildToolWindow):
                     self.tool_instance.session.logger.error("no model selected")
                     return 
                 
-                frequencies = [freq.frequency for freq in fr.other['frequency'].data]
+                frequencies = np.array([freq.frequency for freq in fr.other['frequency'].data])
+                c1 = self.linear.value()
+                c2 = self.quadratic.value()
+                frequencies -= c1 * frequencies + c2 * frequencies ** 2
                 intensities = [freq.intensity for freq in fr.other['frequency'].data]
                 for x, y in zip(frequencies, intensities):
                     s += "%f,%f\n" % (x, y if y is not None else 0)
@@ -614,6 +1671,49 @@ class IRPlot(ChildToolWindow):
                 f.write(s.strip())
                 
             self.tool_instance.session.logger.info("saved to %s" % filename)
+
+    def open_link(self, *args):
+        """open Crittenden's paper on scaling harmonic frequencies"""
+        run(self.session, "open https://doi.org/10.1021/acs.jpca.5b11386")
+
+    def open_scale_library_link(self, *args):
+        run(self.session, "open %s" % SCALE_LIBS[self.library.currentText()][0])
+
+    def change_scale_lib(self, lib):
+        cur_method = self.method.currentText()
+        cur_basis = self.basis.currentText()
+        self.prev_basis = self.basis.currentText()
+        self.method.blockSignals(True)
+        self.method.clear()
+        self.method.blockSignals(False)
+        self.method.addItems(SCALE_LIBS[lib][1].keys())
+        ndx = self.method.findText(cur_method, Qt.MatchExactly)
+        if ndx >= 0:
+            self.method.setCurrentIndex(ndx)
+        
+        ndx = self.basis.findText(cur_basis, Qt.MatchExactly)
+        if ndx >= 0:
+            self.basis.setCurrentIndex(ndx)
+    
+    def change_method(self, method):
+        cur_basis = self.basis.currentText()
+        self.basis.blockSignals(True)
+        self.basis.clear()
+        self.basis.blockSignals(False)
+        if isinstance(SCALE_LIBS[self.library.currentText()][1][method], dict):
+            self.basis.addItems(SCALE_LIBS[self.library.currentText()][1][method].keys())
+            ndx = self.basis.findText(cur_basis, Qt.MatchExactly)
+            if ndx >= 0:
+                self.basis.setCurrentIndex(ndx)
+        else:
+            scale = SCALE_LIBS[self.library.currentText()][1][method]
+            self.linear.setValue(1 - scale)
+            self.quadratic.setValue(0.)
+
+    def change_basis(self, basis):
+        scale = SCALE_LIBS[self.library.currentText()][1][self.method.currentText()][basis]
+        self.linear.setValue(1 - scale)
+        self.quadratic.setValue(0.)
 
     def zoom(self, event):
         if event.xdata is None:
@@ -680,17 +1780,23 @@ class IRPlot(ChildToolWindow):
         if fr is None:
             return 
 
-        fwhm = self.tool_instance.fwhm.value()
+        fwhm = self.fwhm.value()
         self.tool_instance.settings.fwhm = fwhm
-        self.tool_instance.settings.peak_type = self.tool_instance.peak_type.currentText()
+        self.tool_instance.settings.peak_type = self.peak_type.currentText()
         self.tool_instance.settings.plot_type = self.tool_instance.plot_type.currentText()
-        eta = self.tool_instance.voigt_mix.value()
+        self.tool_instance.settings.reverse_x = self.tool_instance.reverse_x.checkState() == Qt.Checked
+        eta = self.voigt_mix.value()
         self.tool_instance.settings.voigt_mix = eta
-        frequencies = [freq.frequency for freq in fr.other['frequency'].data if freq.frequency > 0]
+        
+        frequencies = np.array([freq.frequency for freq in fr.other['frequency'].data if freq.frequency > 0])
+        c1 = self.linear.value()
+        c2 = self.quadratic.value()
+        frequencies -= c1 * frequencies + c2 * frequencies ** 2
+        
         intensities = [freq.intensity for freq in fr.other['frequency'].data if freq.frequency > 0]
         e_factor = -4 * np.log(2) / fwhm**2
         
-        if self.tool_instance.peak_type.currentText() != "Delta":
+        if self.peak_type.currentText() != "Delta":
             functions = []
             x_values = np.linspace(0, max(frequencies) - 10 * fwhm, num=100).tolist()
             for freq, intensity in zip(frequencies, intensities):
@@ -706,15 +1812,15 @@ class IRPlot(ChildToolWindow):
                         ).tolist()
                     )
                     x_values.append(freq)
-                    if self.tool_instance.peak_type.currentText() == "Gaussian":
+                    if self.peak_type.currentText() == "Gaussian":
                         functions.append(lambda x, x0=freq, inten=intensity: \
                                         inten * np.exp(e_factor * (x - x0)**2))
     
-                    elif self.tool_instance.peak_type.currentText() == "Lorentzian":
+                    elif self.peak_type.currentText() == "Lorentzian":
                         functions.append(lambda x, x0=freq, inten=intensity, : \
                                         inten * 0.5 * (0.5 * fwhm / ((x - x0)**2 + (0.5 * fwhm)**2)))
                     
-                    elif self.tool_instance.peak_type.currentText() == "pseudo-Voigt":
+                    elif self.peak_type.currentText() == "pseudo-Voigt":
                         functions.append(
                             lambda x, x0=freq, inten=intensity:
                                 inten * (
@@ -725,7 +1831,6 @@ class IRPlot(ChildToolWindow):
     
         
             x_values = np.array(list(set(x_values)))
-            #print(len(x_values), len(functions))
             x_values.sort()
             y_values = np.sum([f(x_values) for f in functions], axis=0)
         
@@ -747,29 +1852,44 @@ class IRPlot(ChildToolWindow):
         y_values /= np.amax(y_values)
 
         ax = self.figure.gca()
-        ax.clear()
-        self.highlighted_mode = None
+        for line in ax.get_lines():
+            label = line.get_label()
+            if label == "computed":
+                ax.lines.remove(line)
+
+        if self.highlighted_mode is not None and self.highlighted_mode in ax.collections:
+            ax.collections.remove(self.highlighted_mode)
+            self.highlighted_mode = None
+        
+        for line in ax.collections[::-1]:
+            if line.get_label() == "computed":
+                ax.collections.remove(line)
 
         if self.tool_instance.plot_type.currentText() == "Transmittance":
-            y_values = np.array([10 ** (2 - y) for y in y_values])
-            ax.set_ylabel('transmittance (%)')
+            y_values = np.array([10 ** (-y) for y in y_values])
+            ax.set_ylabel('transmittance (arb.)')
         else:
-            ax.set_ylabel('absorbance (a.u.)')
+            ax.set_ylabel('absorbance (arb.)')
        
         ax.set_xlabel(r'wavenumber (cm$^{-1}$)')
-        if self.tool_instance.peak_type.currentText() != "Delta":
-            ax.plot(x_values, y_values, color='k', linewidth=0.5)
+        if self.peak_type.currentText() != "Delta":
+            ax.plot(x_values, y_values, color='k', linewidth=0.5, label="computed")
         else:
             if self.tool_instance.plot_type.currentText() == "Transmittance":
-                ax.vlines(x_values, y_values, [100 for y in y_values], linewidth=0.5, colors=['k' for x in x_values])
-                ax.hlines(100, 0, max(4000, *frequencies), linewidth=0.5, colors=['k' for y in y_values])
+                ax.vlines(x_values, y_values, [1 for y in y_values], linewidth=0.5, colors=['k' for x in x_values], label="computed")
+                ax.hlines(1, 0, max(4000, *frequencies), linewidth=0.5, colors=['k' for y in y_values], label="computed")
             
             else:
-                ax.vlines(x_values, [0 for y in y_values], y_values, linewidth=0.5, colors=['k' for x in x_values])
-                ax.hlines(0, 0, max(4000, *frequencies), linewidth=0.5, colors=['k' for y in y_values])
+                ax.vlines(x_values, [0 for y in y_values], y_values, linewidth=0.5, colors=['k' for x in x_values], label="computed")
+                ax.hlines(0, 0, max(4000, *frequencies), linewidth=0.5, colors=['k' for y in y_values], label="computed")
 
         x_lim = ax.get_xlim()
-        ax.set_xlim(max(x_lim), min(x_lim))
+        if self.tool_instance.reverse_x.checkState() == Qt.Checked:
+            ax.set_xlim(max(x_lim), min(x_lim))
+        else:
+            ax.set_xlim(min(x_lim), max(x_lim))
+        
+        ax.autoscale_view()
         
         self.canvas.draw()
 
@@ -793,18 +1913,166 @@ class IRPlot(ChildToolWindow):
         
         frequency = [freq.frequency for freq in fr.other['frequency'].data][row]
         if frequency < 0:
+            self.canvas.draw()
             return
+        
+        c1 = self.linear.value()
+        c2 = self.quadratic.value()
+        frequency -= c1 * frequency + c2 * frequency ** 2
         
         if ax.get_ylim()[1] > 50:
             y_vals = (10**(2-0.9), 100)
         else:
             y_vals = (0, 1)
             
-        self.highlighted_mode = ax.vlines(frequency, *y_vals, color='r', zorder=-1)
+        self.highlighted_mode = ax.vlines(frequency, *y_vals, color='r', zorder=-1, label="highlight")
         
         self.canvas.draw()
 
+    def load_data(self, *args):
+        filename, _ = QFileDialog.getOpenFileName(filter="comma-separated values file (*.csv)")
+
+        if not filename:
+            return
+
+        data = np.loadtxt(filename, delimiter=",", skiprows=self.skip_lines.value())
+
+        color = self.line_color.get_color()
+        self.tool_instance.settings.exp_color = tuple([c / 255. for c in color[:-1]])
+        
+        # figure out hex code for specified color 
+        # color is RGBA tuple with values from 0 to 255
+        # python's hex turns that to base 16 (0 to ff)
+        # if value is < 16, there will only be one digit, so pad with 0
+        hex_code = "#"
+        for x in color[:-1]:
+            channel = str(hex(x))[2:]
+            if len(channel) == 1:
+                channel = "0" + channel
+            hex_code += channel
+
+        ax = self.figure.gca()
+        ax.plot(data[:,0], data[:,1], linewidth=0.5, zorder=-1, color=hex_code, label="experimental")
+        
+        self.canvas.draw()
+
+    def clear_data(self, *args):
+        ax = self.figure.gca()
+        for line in ax.get_lines():
+            if line.get_label() == "experimental":
+                ax.lines.remove(line)
+        
+        self.canvas.draw()
+
+    def show_match_peaks(self, *args):
+        if self.tool_instance.match_peaks is None:
+            self.tool_instance.match_peaks = self.tool_instance.tool_window.create_child_window("match peaks", window_class=MatchPeaks)
+
     def cleanup(self):
         self.tool_instance.ir_plot = None
+        
+        super().cleanup()
+
+
+class MatchPeaks(ChildToolWindow):
+    def __init__(self, tool_instance, title, *args, **kwargs):
+        super().__init__(tool_instance, title, *args, **kwargs)
+        
+        self._build_ui()
+    
+    def _build_ui(self):
+        layout = QFormLayout()
+        
+        table = QTableWidget()
+        table.setColumnCount(2)
+        table.setHorizontalHeaderLabels(["comp. freq. (cm\u207b\u00b9)", "obs. freq. (cm\u207b\u00b9)"])
+        for i in range(0, 2):
+            table.resizeColumnToContents(i)
+        
+        table.horizontalHeader().setStretchLastSection(False)            
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)        
+        
+        fr = self.tool_instance.model_selector.currentData()
+        if fr:
+            freq_data = fr.other['frequency'].data
+            
+            for i, mode in enumerate(freq_data):
+                if mode.frequency < 0:
+                    continue
+                row = table.rowCount()
+                table.insertRow(row)
+                
+                freq = FreqTableWidgetItem()
+                freq.setData(Qt.DisplayRole, "%.2f" % mode.frequency)
+                freq.setData(Qt.UserRole, mode.frequency)
+                table.setItem(row, 0, freq)
+                
+                exp_freq = QDoubleSpinBox()
+                exp_freq.setRange(0, 4500)
+                exp_freq.setDecimals(2)
+                exp_freq.setToolTip("observed frequency\nleave at 0 to not use this in fitting")
+                table.setCellWidget(row, 1, exp_freq)
+        
+        layout.addRow(table)
+        self.table = table
+        
+        do_fit_button = QPushButton("do least squares")
+        do_fit_button.clicked.connect(self.do_fit)
+        layout.addRow(do_fit_button)
+        
+        self.ui_area.setLayout(layout)
+        self.manage(None)
+    
+    def do_fit(self, *args):
+        if not self.tool_instance.ir_plot:
+            raise RuntimeError("plot window must be open during fitting")
+        comp_freqs = []
+        exp_freqs = []
+        
+        for i in range(0, self.table.rowCount()):
+            spinbox = self.table.cellWidget(i, 1)
+            if spinbox.value() != 0:
+                exp_freqs.append(spinbox.value())
+                comp_freqs.append(self.table.item(i, 0).data(Qt.UserRole))
+        
+        comp_freqs = np.array(comp_freqs)
+        exp_freqs = np.array(exp_freqs)
+        
+        fit_c1 = self.tool_instance.ir_plot.fit_c1.checkState() == Qt.Checked
+        fit_c2 = self.tool_instance.ir_plot.fit_c2.checkState() == Qt.Checked
+        
+        params = int(fit_c1) + int(fit_c2)
+        
+        if len(comp_freqs) < params:
+            raise RuntimeError("must specify enough data for %i parameter(s)" % params)
+        
+        if fit_c1 and fit_c2:
+            mat = np.array([comp_freqs, comp_freqs**2]).T
+
+            c_vals, res, _, _ = np.linalg.lstsq(mat, comp_freqs - exp_freqs)
+            self.tool_instance.ir_plot.linear.setValue(c_vals[0])
+            self.tool_instance.ir_plot.quadratic.setValue(c_vals[1])
+            if abs(c_vals[0]) > 0.2:
+                self.tool_instance.session.logger.warning("c1 value %f is outside the bounds of the spinbox widget, check your input" % c_vals[0])
+            if abs(c_vals[1]) > 0.2:
+                self.tool_instance.session.logger.warning("c2 value %f is outside the bounds of the spinbox widget, check your input" % c_vals[1])
+        elif fit_c1:
+            l = np.dot(exp_freqs, comp_freqs) / np.dot(comp_freqs, comp_freqs)
+            self.tool_instance.ir_plot.linear.setValue(1 - l)
+            self.tool_instance.ir_plot.quadratic.setValue(0.)
+            if abs(1 - l) > 0.2:
+                self.tool_instance.session.logger.warning("c1 value %f is outside the bounds of the spinbox widget, check your input" % (1 - l))
+        elif fit_c2:
+            l = np.dot(comp_freqs - exp_freqs, comp_freqs ** 2) / np.dot(comp_freqs ** 2, comp_freqs ** 2)
+            self.tool_instance.ir_plot.linear.setValue(0.)
+            self.tool_instance.ir_plot.quadratic.setValue(l)
+            if abs(l) > 0.2:
+                self.tool_instance.session.logger.warning("c2 value %f is outside the bounds of the spinbox widget, check your input" % l)
+        else:
+            self.tool_instance.session.logger.error("no fit parameters selected on plot tool window")
+
+    def cleanup(self):
+        self.tool_instance.match_peaks = None
         
         super().cleanup()

@@ -95,11 +95,16 @@ class _SEQCROW_API(BundleAPI):
             from SEQCROW.managers import JobManager
             session.seqcrow_job_manager = JobManager(session, name)
             return session.seqcrow_job_manager
-        
+
         elif name == "seqcrow_ordered_selection_manager":
             from SEQCROW.managers import OrderedSelectionManager
             session.seqcrow_ordered_selection_manager = OrderedSelectionManager(session, name)
             return session.seqcrow_ordered_selection_manager
+
+        elif name == "seqcrow_qm_input_manager":
+            from SEQCROW.managers import QMInputManager
+            session.seqcrow_qm_input_manager = QMInputManager(session, name)
+            return session.seqcrow_qm_input_manager
 
         else:
             raise RuntimeError("manager named '%s' is unknown to SEQCROW" % name)
@@ -277,7 +282,7 @@ class _SEQCROW_API(BundleAPI):
                         return {}
                         
                 return Info()
-                
+
         elif mgr is session.save_command:
             from chimerax.save_command import SaverInfo
             from SEQCROW.io import save_aarontools
@@ -301,6 +306,28 @@ class _SEQCROW_API(BundleAPI):
                         
                 return Info()
         
+        elif mgr is session.seqcrow_qm_input_manager:
+            if name == "Gaussian":
+                from SEQCROW.input_file_formats import GaussianFileInfo
+                return GaussianFileInfo()
+            elif name == "ORCA":
+                from SEQCROW.input_file_formats import ORCAFileInfo
+                return ORCAFileInfo()
+            elif name == "Psi4":
+                from SEQCROW.input_file_formats import Psi4FileInfo
+                return Psi4FileInfo()
+
+        elif mgr is session.seqcrow_job_manager:
+            if name == "Gaussian":
+                from SEQCROW.jobs import GaussianJob
+                return GaussianJob
+            elif name == "ORCA":
+                from SEQCROW.jobs import ORCAJob
+                return ORCAJob
+            elif name == "Psi4":
+                from SEQCROW.jobs import Psi4Job
+                return Psi4Job
+
         elif mgr is session.test_manager:
             if name == "fuseRing_command":
                 from .tests.fuseRing_command import FuseRingCmdTest
@@ -317,7 +344,7 @@ class _SEQCROW_API(BundleAPI):
             elif name == "input_builder":
                 from .tests.input_builder import QMInputBuilderToolTest
                 return QMInputBuilderToolTest
-  
+            
             elif name == "buried_volume":
                 from .tests.buried_volume import BuriedVolumeToolTest
                 return BuriedVolumeToolTest
@@ -355,10 +382,19 @@ class _SEQCROW_API(BundleAPI):
         elif command_info.name == "duplicate":
             from .commands.duplicate import duplicate, duplicate_description
             register("duplicate", duplicate_description, duplicate)
+        
+        elif command_info.name == "highlight":
+            from .commands.highlight import highlight, highlight_description
+            register("highlight", highlight_description, highlight)
+        
+        elif command_info.name == "~highlight":
+            from .commands.highlight import erase_highlight, erase_highlight_description
+            register("~highlight", erase_highlight_description, erase_highlight)
 
     @staticmethod
     def register_selector_menus(session):
         from PyQt5.QtWidgets import QAction
+
         from AaronTools.const import ELEMENTS
         from AaronTools.substituent import Substituent
 
@@ -366,7 +402,6 @@ class _SEQCROW_API(BundleAPI):
         add_selector = session.ui.main_window.add_menu_selector
         substituent_menu = add_submenu(['Che&mistry'], 'Substituents')
         for sub in Substituent.list():
-
             if sub in ELEMENTS:
                 # print(sub, "in ELEMENTS")
                 continue
@@ -424,6 +459,7 @@ class _SEQCROW_API(BundleAPI):
     @staticmethod
     def finish(session, bundle_info):
         del session.filereader_manager
+        del session.seqcrow_qm_input_manager
         del session.seqcrow_job_manager
 
 bundle_api = _SEQCROW_API()
