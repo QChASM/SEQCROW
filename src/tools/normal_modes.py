@@ -1454,6 +1454,7 @@ class IRPlot(ChildToolWindow):
         self.press = None
         self.drag_prev = None
         self.dragging = False
+        self.exp_data = None
         
         self._build_ui()
         self.refresh_plot()
@@ -1672,18 +1673,17 @@ class IRPlot(ChildToolWindow):
 
         section_center = QDoubleSpinBox()
         section_center.setRange(0, 5000)
-        section_center.setValue(2000)
+        section_center.setValue(950)
         section_center.setSuffix(" cm\u207b\u00b9")
-        section_center.setSingleStep(15)
+        section_center.setSingleStep(25)
         self.section_table.setCellWidget(rows, 0, section_center)
         
         section_width = QDoubleSpinBox()
         section_width.setRange(1, 5000)
-        section_width.setValue(50)
+        section_width.setValue(1900)
         section_width.setSuffix(" cm\u207b\u00b9")
-        section_width.setSingleStep(15)
+        section_width.setSingleStep(25)
         self.section_table.setCellWidget(rows, 1, section_width)
-
         
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
         widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
@@ -1708,25 +1708,10 @@ class IRPlot(ChildToolWindow):
         filename, _ = QFileDialog.getSaveFileName(filter="CSV Files (*.csv)")
         if filename:
             s = "frequency (cm^-1),IR intensity\n"
-            ax = self.figure.gca()
-            if len(ax.lines) > 0:
-                line = ax.lines[0]
-                for x, y in zip(line.get_xdata(), line.get_ydata()):
-                    s += "%f,%f\n" % (x, y)
-            
-            else:
-                fr = self.tool_instance.model_selector.currentData()
-                if fr is None:
-                    self.tool_instance.session.logger.error("no model selected")
-                    return 
-                
-                frequencies = np.array([freq.frequency for freq in fr.other['frequency'].data])
-                c1 = self.linear.value()
-                c2 = self.quadratic.value()
-                frequencies -= c1 * frequencies + c2 * frequencies ** 2
-                intensities = [freq.intensity for freq in fr.other['frequency'].data]
-                for x, y in zip(frequencies, intensities):
-                    s += "%f,%f\n" % (x, y if y is not None else 0)
+            data = self.get_data()
+            x_values, y_values = data
+            for x, y in zip(x_values, y_values):
+                s += "%f,%f\n" % (x, y)
 
             with open(filename, 'w') as f:
                 f.write(s.strip())
@@ -1812,9 +1797,10 @@ class IRPlot(ChildToolWindow):
     def move(self, dx, dy):
         for ax in self.figure.get_axes():
             w = self.figure.get_figwidth() * self.figure.get_dpi()
+            x0, x1 = self.figure.gca().get_xlim()
+            xs = dx/w * (x1 - x0)
             x0, x1 = ax.get_xlim()
-            xs = dx/w * (x1-x0)
-            nx0, nx1 = x0-xs, x1-xs
+            nx0, nx1 = x0 - xs, x1 - xs
             #y0, y1 = ax.get_ylim()
             #ys = dy/h * (y1-y0)
             #ny0, ny1 = y0-ys, y1-ys
@@ -1836,13 +1822,10 @@ class IRPlot(ChildToolWindow):
         self.drag_prev = None
         self.dragging = False
 
-    def refresh_plot(self):
+    def get_data(self):
         fr = self.tool_instance.model_selector.currentData()
         if fr is None:
-            return 
-
-        self.figure.clear()
-
+            return None
         fwhm = self.fwhm.value()
         self.tool_instance.settings.fwhm = fwhm
         self.tool_instance.settings.peak_type = self.peak_type.currentText()
@@ -1857,7 +1840,7 @@ class IRPlot(ChildToolWindow):
         frequencies -= c1 * frequencies + c2 * frequencies ** 2
         
         intensities = [freq.intensity for freq in fr.other['frequency'].data if freq.frequency > 0]
-        e_factor = -4 * np.log(2) / fwhm**2
+        e_factor = -4 * np.log(2) / fwhm ** 2
         
         if self.peak_type.currentText() != "Delta":
             functions = []
@@ -1871,17 +1854,17 @@ class IRPlot(ChildToolWindow):
                         np.linspace(
                             max(freq - (3.5 * fwhm), 0), 
                             freq + (3.5 * fwhm), 
-                            num=50
+                            num=65,
                         ).tolist()
                     )
                     x_values.append(freq)
                     if self.peak_type.currentText() == "Gaussian":
                         functions.append(lambda x, x0=freq, inten=intensity: \
-                                        inten * np.exp(e_factor * (x - x0)**2))
+                                        inten * np.exp(e_factor * (x - x0) ** 2))
     
                     elif self.peak_type.currentText() == "Lorentzian":
                         functions.append(lambda x, x0=freq, inten=intensity, : \
-                                        inten * 0.5 * (0.5 * fwhm / ((x - x0)**2 + (0.5 * fwhm)**2)))
+                                        inten * 0.5 * (0.5 * fwhm / ((x - x0) ** 2 + (0.5 * fwhm)**2)))
                     
                     elif self.peak_type.currentText() == "pseudo-Voigt":
                         functions.append(
@@ -1910,13 +1893,23 @@ class IRPlot(ChildToolWindow):
 
         if len(y_values) == 0:
             self.tool_instance.session.logger.error("nothing to plot")
-            return
+            return None
 
         y_values /= np.amax(y_values)
 
 
         if self.tool_instance.plot_type.currentText() == "Transmittance":
             y_values = np.array([10 ** (-y) for y in y_values])
+
+        return x_values, y_values
+
+    def refresh_plot(self):
+        data = self.get_data()
+        if data is None:
+            return
+        x_values, y_values = data
+
+        self.figure.clear()
 
         if self.section_table.rowCount() <= 2:
             axes = [self.figure.subplots(nrows=1, ncols=1)]
@@ -1959,7 +1952,7 @@ class IRPlot(ChildToolWindow):
                         [1, 1],
                         [0, 1],
                         marker=((-1, -1), (1, 1)),
-                        markersize=10,
+                        markersize=5,
                         linestyle='none',
                         color='k',
                         mec='k',
@@ -1975,7 +1968,7 @@ class IRPlot(ChildToolWindow):
                     [0, 0],
                     [0, 1],
                     marker=((-1, -1), (1, 1)),
-                    markersize=10,
+                    markersize=5,
                     linestyle='none',
                     color='k',
                     mec='k',
@@ -1992,8 +1985,9 @@ class IRPlot(ChildToolWindow):
                     [0, 0],
                     [0, 1],
                     marker=((-1, -1), (1, 1)),
-                    markersize=10,
+                    markersize=5,
                     linestyle='none',
+                    label="Silence Between Two Subplots",
                     color='k',
                     mec='k',
                     mew=1,
@@ -2004,7 +1998,8 @@ class IRPlot(ChildToolWindow):
                     [1, 1],
                     [0, 1],
                     marker=((-1, -1), (1, 1)),
-                    markersize=10,
+                    markersize=5,
+                    label="Silence Between Two Subplots",
                     linestyle='none',
                     color='k',
                     mec='k',
@@ -2035,7 +2030,7 @@ class IRPlot(ChildToolWindow):
                     ax.hlines(
                         1,
                         0,
-                        max(4000, *frequencies),
+                        max(4000, *x_values),
                         linewidth=0.5,
                         colors=['k' for y in y_values],
                         label="computed",
@@ -2053,11 +2048,15 @@ class IRPlot(ChildToolWindow):
                     ax.hlines(
                         0,
                         0,
-                        max(4000, *frequencies),
+                        max(4000, *x_values),
                         linewidth=0.5,
                         colors=['k' for y in y_values],
                         label="computed"
                     )
+
+            if self.exp_data:
+                for x, y, color in self.exp_data:
+                    ax.plot(x, y, color=color, zorder=-1, linewidth=0.5, label="observed")
 
             center = centers[i]
             width = widths[i]
@@ -2134,18 +2133,15 @@ class IRPlot(ChildToolWindow):
                 channel = "0" + channel
             hex_code += channel
 
-        ax = self.figure.gca()
-        ax.plot(data[:,0], data[:,1], linewidth=0.5, zorder=-1, color=hex_code, label="experimental")
-        
-        self.canvas.draw()
+        if self.exp_data is None:
+            self.exp_data = []
+
+        for i in range(1, data.shape[1]):
+            print(i)
+            self.exp_data.append((data[:,0], data[:,i], hex_code))
 
     def clear_data(self, *args):
-        ax = self.figure.gca()
-        for line in ax.get_lines():
-            if line.get_label() == "experimental":
-                ax.lines.remove(line)
-        
-        self.canvas.draw()
+        self.exp_data = None
 
     def show_match_peaks(self, *args):
         if self.tool_instance.match_peaks is None:
