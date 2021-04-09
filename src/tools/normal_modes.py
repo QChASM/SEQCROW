@@ -55,6 +55,9 @@ class _NormalModeSettings(Settings):
         'voigt_mix': 0.5,
         'exp_color': Value((0.0, 0.0, 1.0), TupleOf(FloatArg, 3), iter2str),
         'reverse_x': True,
+        'figure_width': 2,
+        'figure_height': 2,
+        "fixed_size": False,
     }
 
 
@@ -1470,6 +1473,7 @@ class IRPlot(ChildToolWindow):
         plot_layout = QGridLayout(plot_widget)
         
         self.figure = Figure(figsize=(1.5, 1.5), dpi=100)
+        self.figure.subplots_adjust(bottom=0.15)
         self.canvas = Canvas(self.figure)
 
         self.canvas.mpl_connect('button_release_event', self.unclick)
@@ -1478,19 +1482,48 @@ class IRPlot(ChildToolWindow):
         self.canvas.mpl_connect('scroll_event', self.zoom)
         
         self.canvas.setMinimumWidth(400)
-        self.canvas.setMinimumHeight(300)
+        # self.canvas.setMinimumHeight(300)
 
-        plot_layout.addWidget(self.canvas, 0, 0, 1, 2)
+        plot_layout.addWidget(self.canvas, 0, 0, 1, 7)
+
+        refresh_button = QPushButton()
+        refresh_button.setIcon(QIcon(refresh_button.style().standardIcon(QStyle.SP_BrowserReload)))
+        refresh_button.clicked.connect(self.refresh_plot)
+        plot_layout.addWidget(refresh_button, 1, 0, 1, 1, Qt.AlignVCenter)
 
         toolbar_widget = QWidget()
         self.toolbar = NavigationToolbar(self.canvas, toolbar_widget)
         self.toolbar.setMaximumHeight(32)
         plot_layout.addWidget(self.toolbar, 1, 1, 1, 1)
-        
-        refresh_button = QPushButton()
-        refresh_button.setIcon(QIcon(refresh_button.style().standardIcon(QStyle.SP_BrowserReload)))
-        refresh_button.clicked.connect(self.refresh_plot)
-        plot_layout.addWidget(refresh_button, 1, 0, 1, 1, Qt.AlignVCenter)
+
+        plot_layout.addWidget(QLabel("fixed size:"), 1, 2, 1, 1, Qt.AlignVCenter | Qt.AlignRight)
+
+        self.fixed_size = QCheckBox()
+        self.fixed_size.setCheckState(Qt.Checked if self.tool_instance.settings.fixed_size else Qt.Unchecked)
+        self.fixed_size.stateChanged.connect(self.change_figure_size)
+        plot_layout.addWidget(self.fixed_size, 1, 3, 1, 1, Qt.AlignVCenter | Qt.AlignLeft)
+
+        self.figure_width = QDoubleSpinBox()
+        self.figure_width.setRange(1, 24)
+        self.figure_width.setDecimals(2)
+        self.figure_width.setSingleStep(0.25)
+        self.figure_width.setSuffix(" in.")
+        self.figure_width.setValue(self.tool_instance.settings.figure_width)
+        self.figure_width.valueChanged.connect(self.change_figure_size)
+        plot_layout.addWidget(self.figure_width, 1, 4, 1, 1)
+     
+        plot_layout.addWidget(QLabel("x"), 1, 5, 1, 1, Qt.AlignVCenter | Qt.AlignHCenter)
+     
+        self.figure_height = QDoubleSpinBox()
+        self.figure_height.setRange(1, 24)
+        self.figure_height.setDecimals(2)
+        self.figure_height.setSingleStep(0.25)
+        self.figure_height.setSuffix(" in.")
+        self.figure_height.setValue(self.tool_instance.settings.figure_height)
+        self.figure_height.valueChanged.connect(self.change_figure_size)
+        plot_layout.addWidget(self.figure_height, 1, 6, 1, 1)
+
+        self.change_figure_size()
         
         toolbox.addTab(plot_widget, "plot")
 
@@ -1633,8 +1666,9 @@ class IRPlot(ChildToolWindow):
 
         self.section_table = QTableWidget()
         self.section_table.setColumnCount(3)
-        self.section_table.setHorizontalHeaderLabels(["section center", "width", "remove"])
+        self.section_table.setHorizontalHeaderLabels(["center", "width", "remove"])
         self.section_table.cellClicked.connect(self.section_table_clicked)
+        self.section_table.setEditTriggers(QTableWidget.NoEditTriggers)
         interrupt_layout.addRow(self.section_table)
         self.add_section()
 
@@ -1657,9 +1691,30 @@ class IRPlot(ChildToolWindow):
         layout.setMenuBar(menu)        
         self.ui_area.setLayout(layout)
         self.manage(None)
+
+    def change_figure_size(self, *args):
+        if self.fixed_size.checkState() == Qt.Checked:
+            self.figure_height.setEnabled(True)
+            self.figure_width.setEnabled(True)
+            h = self.figure_height.value()
+            w = self.figure_width.value()
+            
+            self.figure.set_size_inches(w, h)
+            
+            self.canvas.setMinimumHeight(100 * h)
+            self.canvas.setMaximumHeight(100 * h)
+            self.canvas.setMinimumWidth(100 * w)
+            self.canvas.setMaximumWidth(100 * w)
+        else:
+            self.canvas.setMinimumHeight(1)
+            self.canvas.setMaximumHeight(100000)
+            self.canvas.setMinimumWidth(1)
+            self.canvas.setMaximumWidth(100000)
+            self.figure_height.setEnabled(False)
+            self.figure_width.setEnabled(False)
     
     def section_table_clicked(self, row, column):
-        if row == self.section_table.rowCount() - 1:
+        if row == self.section_table.rowCount() - 1 or self.section_table.rowCount() == 1:
             self.add_section()
         elif column == 2:
             self.section_table.removeRow(row)
@@ -1668,33 +1723,30 @@ class IRPlot(ChildToolWindow):
         rows = self.section_table.rowCount()
         if rows != 0:
             rows -= 1
-        else:
-            self.section_table.insertRow(rows)
+            section_center = QDoubleSpinBox()
+            section_center.setRange(0, 5000)
+            section_center.setValue(950)
+            section_center.setSuffix(" cm\u207b\u00b9")
+            section_center.setSingleStep(25)
+            self.section_table.setCellWidget(rows, 0, section_center)
+            
+            section_width = QDoubleSpinBox()
+            section_width.setRange(1, 5000)
+            section_width.setValue(1900)
+            section_width.setSuffix(" cm\u207b\u00b9")
+            section_width.setSingleStep(25)
+            self.section_table.setCellWidget(rows, 1, section_width)
+            
+            widget_that_lets_me_horizontally_align_an_icon = QWidget()
+            widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
+            section_remove = QLabel()
+            dim = int(1.5 * section_remove.fontMetrics().boundingRect("Q").height())
+            section_remove.setPixmap(QIcon(section_remove.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(dim, dim))
+            widget_layout.addWidget(section_remove, 0, Qt.AlignHCenter)
+            widget_layout.setContentsMargins(0, 0, 0, 0)
+            self.section_table.setCellWidget(rows, 2, widget_that_lets_me_horizontally_align_an_icon)
+            rows += 1
 
-        section_center = QDoubleSpinBox()
-        section_center.setRange(0, 5000)
-        section_center.setValue(950)
-        section_center.setSuffix(" cm\u207b\u00b9")
-        section_center.setSingleStep(25)
-        self.section_table.setCellWidget(rows, 0, section_center)
-        
-        section_width = QDoubleSpinBox()
-        section_width.setRange(1, 5000)
-        section_width.setValue(1900)
-        section_width.setSuffix(" cm\u207b\u00b9")
-        section_width.setSingleStep(25)
-        self.section_table.setCellWidget(rows, 1, section_width)
-        
-        widget_that_lets_me_horizontally_align_an_icon = QWidget()
-        widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
-        section_remove = QLabel()
-        dim = int(1.5 * section_remove.fontMetrics().boundingRect("Q").height())
-        section_remove.setPixmap(QIcon(section_remove.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(dim, dim))
-        widget_layout.addWidget(section_remove, 0, Qt.AlignHCenter)
-        widget_layout.setContentsMargins(0, 0, 0, 0)
-        self.section_table.setCellWidget(rows, 2, widget_that_lets_me_horizontally_align_an_icon)
-        
-        rows += 1
         self.section_table.insertRow(rows)
 
         widget_that_lets_me_horizontally_align_an_icon = QWidget()
@@ -1899,7 +1951,7 @@ class IRPlot(ChildToolWindow):
 
 
         if self.tool_instance.plot_type.currentText() == "Transmittance":
-            y_values = np.array([10 ** (-y) for y in y_values])
+            y_values = np.array([10 ** (2 - y) for y in y_values])
 
         return x_values, y_values
 
@@ -1911,7 +1963,7 @@ class IRPlot(ChildToolWindow):
 
         self.figure.clear()
 
-        if self.section_table.rowCount() <= 2:
+        if self.section_table.rowCount() == 1:
             axes = [self.figure.subplots(nrows=1, ncols=1)]
             widths = [max(x_values)]
             centers = [max(x_values) / 2]
@@ -1937,13 +1989,15 @@ class IRPlot(ChildToolWindow):
                 sharey=True,
                 gridspec_kw={'width_ratios': widths},
             )
+            if not hasattr(axes, "__iter__"):
+                axes = [axes]
 
         for i, ax in enumerate(axes):
             if i == 0:
                 if self.tool_instance.plot_type.currentText() == "Transmittance":
-                    ax.set_ylabel('transmittance (arb.)')
+                    ax.set_ylabel('Transmittance (%)')
                 else:
-                    ax.set_ylabel('absorbance (arb.)')
+                    ax.set_ylabel('Absorbance (arb.)')
             
                 if len(axes) > 1:
                     ax.spines["right"].set_visible(False)
@@ -2022,13 +2076,13 @@ class IRPlot(ChildToolWindow):
                     ax.vlines(
                         x_values,
                         y_values,
-                        [1 for y in y_values],
+                        [100 for y in y_values],
                         linewidth=0.5,
                         colors=['k' for x in x_values],
                         label="computed"
                     )
                     ax.hlines(
-                        1,
+                        100,
                         0,
                         max(4000, *x_values),
                         linewidth=0.5,
@@ -2080,8 +2134,6 @@ class IRPlot(ChildToolWindow):
                         ax.collections.remove(mode)
             
             if len(items) == 0:
-                self.highlighted_mode = None
-                self.canvas.draw()
                 continue
             
             fr = self.tool_instance.model_selector.currentData()
@@ -2101,7 +2153,7 @@ class IRPlot(ChildToolWindow):
             c2 = self.quadratic.value()
             frequency -= c1 * frequency + c2 * frequency ** 2
             
-            if ax.get_ylim()[1] > 50:
+            if self.tool_instance.plot_type.currentText() == "Transmittance":
                 y_vals = (10 ** (2 - 0.9), 100)
             else:
                 y_vals = (0, 1)
@@ -2149,6 +2201,10 @@ class IRPlot(ChildToolWindow):
 
     def cleanup(self):
         self.tool_instance.ir_plot = None
+        
+        self.tool_instance.settings.figure_height = self.figure_height.value()
+        self.tool_instance.settings.figure_width = self.figure_width.value()
+        self.tool_instance.settings.fixed_size = self.fixed_size.checkState() == Qt.Checked
         
         super().cleanup()
 
@@ -2229,9 +2285,14 @@ class MatchPeaks(ChildToolWindow):
         if fit_c1 and fit_c2:
             mat = np.array([comp_freqs, comp_freqs**2]).T
 
-            c_vals, res, _, _ = np.linalg.lstsq(mat, comp_freqs - exp_freqs)
+            c_vals, res, _, _ = np.linalg.lstsq(mat, comp_freqs - exp_freqs, rcond=None)
+            self.tool_instance.session.logger.info("sum of squared residuals: %.2f" % sum(res))
             self.tool_instance.ir_plot.linear.setValue(c_vals[0])
             self.tool_instance.ir_plot.quadratic.setValue(c_vals[1])
+            # res_v = comp_freqs - c_vals[0] * comp_freqs - c_vals[1] * comp_freqs ** 2
+            # res_v -= exp_freqs
+            # res = np.dot(res_v, res_v)
+            # self.tool_instance.session.logger.info("sum of squared residuals: %.2f" % res)
             if abs(c_vals[0]) > 0.2:
                 self.tool_instance.session.logger.warning("c1 value %f is outside the bounds of the spinbox widget, check your input" % c_vals[0])
             if abs(c_vals[1]) > 0.2:
@@ -2240,12 +2301,19 @@ class MatchPeaks(ChildToolWindow):
             l = np.dot(exp_freqs, comp_freqs) / np.dot(comp_freqs, comp_freqs)
             self.tool_instance.ir_plot.linear.setValue(1 - l)
             self.tool_instance.ir_plot.quadratic.setValue(0.)
+            res_v = (exp_freqs - (l * comp_freqs))
+            res = np.dot(res_v, res_v)
+            self.tool_instance.session.logger.info("sum of squared residuals: %.2f" % res)
             if abs(1 - l) > 0.2:
                 self.tool_instance.session.logger.warning("c1 value %f is outside the bounds of the spinbox widget, check your input" % (1 - l))
         elif fit_c2:
             l = np.dot(comp_freqs - exp_freqs, comp_freqs ** 2) / np.dot(comp_freqs ** 2, comp_freqs ** 2)
             self.tool_instance.ir_plot.linear.setValue(0.)
             self.tool_instance.ir_plot.quadratic.setValue(l)
+            res_v = comp_freqs - l * comp_freqs ** 2
+            res_v -= exp_freqs
+            res = np.dot(res_v, res_v)
+            self.tool_instance.session.logger.info("sum of squared residuals: %.2f" % res)
             if abs(l) > 0.2:
                 self.tool_instance.session.logger.warning("c2 value %f is outside the bounds of the spinbox widget, check your input" % l)
         else:

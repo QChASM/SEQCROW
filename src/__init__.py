@@ -53,6 +53,29 @@ class _SEQCROW_API(BundleAPI):
 
         #need to reregister selectors b/c ^ that bypassed the bundle_info.xml or something
         bundle_info._register_selectors(session.logger)
+        
+        # set stream of AaronTools logger to the ChimeraX log
+        from SEQCROW.logging_logger import LoggingLogger
+        from AaronTools.geometry import Geometry
+        from AaronTools.job_control import SubmitProcess
+        from AaronTools.fileIO import Frequency
+        from AaronTools.config import Config
+        from AaronTools.atoms import Atom
+        
+        log = LoggingLogger(session)
+        
+        for hdlr in Geometry.LOG.handlers:
+            hdlr.setStream(log)
+        for hdlr in Substituent.LOG.handlers:
+            hdlr.setStream(log)
+        for hdlr in SubmitProcess.LOG.handlers:
+            hdlr.setStream(log)
+        for hdlr in Frequency.LOG.handlers:
+            hdlr.setStream(log)
+        for hdlr in Config.LOG.handlers:
+            hdlr.setStream(log)
+        for hdlr in Atom.LOG.handlers:
+            hdlr.setStream(log)
 
     @staticmethod
     def open_file(session, path, format_name, coordsets=False):

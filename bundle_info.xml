@@ -66,6 +66,8 @@
             <Categories>
                 <Category name="General"/>
                 <Category name="Input/Output"/>
+                <Category name="Structre Editing"/>
+                <Category name="Structre Analysis"/>
                 <Category name="External Program"/>
             </Categories>
             
