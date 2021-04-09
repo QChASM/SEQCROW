@@ -1,6 +1,6 @@
 from chimerax.atomic.colors import element_color
 
-from PyQt5.QtCore import Qt, Signal
+from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import QPushButton, QGridLayout, QWidget, QStyle
 
 from AaronTools.const import ELEMENTS, TMETAL
@@ -11,7 +11,7 @@ class ElementButton(QPushButton):
     Checked = 1
     Excluded = 2
     
-    stateChanged = Signal([int])
+    stateChanged = pyqtSignal([int])
     
     def __init__(self, element, *args, **kwargs):
         super().__init__(element, *args, **kwargs)
@@ -64,7 +64,7 @@ class ElementButton(QPushButton):
         self._tristate = b
 
 class PeriodicTable(QWidget):
-    elementSelectionChanged = Signal()
+    elementSelectionChanged = pyqtSignal()
     
     def __init__(self, *args, initial_elements=[], select_multiple=True, **kwargs):
         super().__init__(*args, **kwargs)
