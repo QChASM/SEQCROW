@@ -274,5 +274,9 @@
     <DataFiles package="AaronTools.test">
         <DataDir>test_files</DataDir>
         <DataDir>ref_files</DataDir>
-    </DataFiles>    
+    </DataFiles>
+	
+	<DataFiles>
+		<DataDir>docs</DataDir>
+	</DataFiles>
 </BundleInfo>

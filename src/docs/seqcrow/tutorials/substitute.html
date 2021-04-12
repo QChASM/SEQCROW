@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+
+	<head>
+		<meta charset="UTF-8">
+		<title>Modify Structure</title>
+		<meta http-equiv="Content-Type" content="text/html">
+		<link rel="icon" href="../images/SEQCROW.png" type="image/png">
+		<link rel="stylesheet" href="../style.css">
+	</head>
+	
+	<div class="head">
+		<object data="../ribbon.html" class="head"></object>
+	</div>
+	
+	<body>
+		<h1>Changing Substituents</h1>
+			<p>
+			In these tutorials, we'll see how SEQCROW can be used to quickly edit the substituents of
+			molecules efficiently. Some tutorials will make use of the 'Change Substituents' tool, while
+			others will use the <code>substitute</code> command. These tutorials contain links that
+			run ChimeraX commands to make some steps easier. 
+			</p>
+
+		<h2>Tutorials on this page</h2>
+			<ul>
+				<li>
+					<a href="#TNT">Making TNT using the "Change Substituents" tool</a>
+				</li>
+				<li>
+					<a href="#OMe2">Turning TNT into Dimethyl Ether using the "Change Substituents" tool</a>
+				</li>
+				<li>
+					<a href="#simultaneous">Modifying Multiple Structures Simultaneously using the <span class="cxcmd">substitute</span> command</a>
+				</li>
+			</ul>
+
+		<h2 id="TNT">Making TNT</h2>
+			<p>
+				In this tutorial, we're going to make 1,3,5-trinitrotoluene starting from benzene using
+				SEQCROW's 'Change Substituents' tool. To begin, click the following command to open a
+				benzene structure from a SMILES string (requires internet access):
+				<br>
+				<a class="cxcmd" href="cxcmd:open smiles:C1=CC=CC=C1">
+					open smiles:C1=CC=CC=C1
+				</a>
+			</p>
+			<p>
+				Next, open the 'Change Substituents' tool using the ribbon at the top of the screen:
+				<ul>
+					<li><a class="menulike">Tools &rarr; Structure Editing &rarr; Change Substituents</a></li> or
+					<li><a class="menulike">Tools &rarr; AaronTools &rarr; Structure Modification</a></li>
+				</ul>
+				You may also click the command below to open the tool:
+			</p>
+			<a class="cxcmd" href="cxcmd:ui tool show &quot;Change Substituents&quot;">
+				<code>
+					ui tool show "Change Substituents"
+				</code>
+			</a>
+			<aside>
+				<img src="../images/structureMod_Me.png"  style="width:324px"/>
+			</aside>
+			<p>
+				First, we'll be turning this benzene structure into toluene. Then, we'll add the nitro groups.
+				To make toluene, we need to replace one of the hydrogens with a methyl substituent. In the 
+				'substituent name:' box on the tool window, enter "Me" or "CH3", the names of the methyl 
+				substituent in the AaronTools library.
+			</p>
+			
+			<p>
+				The substituents could have also been selected by clicking the 
+				<button>from library...</button> button. This will open another window where you can search for
+				substituents in the AaronTools library by name. Find the "Me" or "CH3" entry and click on it
+				to fill in the "substituent name" box back on the main tool window. 
+				This may be useful for discovering the available substituents or if you forget the name of 
+				the one you are looking for.
+			</p>
+
+			<p>
+				Next, select one of the hydrogens on the benzene structure. This can be done by 
+				<kbd>CTRL</kbd>-clicking (with a non-Mac keyboard) or <kbd>command</kbd>-clicking (on a Mac keyboard) on one of the hydrogens.
+			</p>
+			<p>
+				Regardless of the following options, you will still have a toluene structure in the end. But, 
+				the result might be slightly different depending on the other options:
+				<ul>
+					<li>
+						<b>modify selected structure</b> - if checked, the benzene structure you have open will
+						be modified. If unchecked, a copy of the structure will be created and modified.
+					</li>
+					<li>
+						<b>relax substituent</b> - if checked, the substituent will be rotated about its bond
+						to the rest of the molecule to try to mitigate any steric clashing.
+					</li>
+					<li>
+						<b>guess previous substituent</b> - this one doesn't matter here, but if you were 
+						replacing, e.g., a methyl group with another substituent, checking this would allow you 
+						to only select the carbon (or whichever substituent atom is bonded to the rest of the 
+						molecule) instead of the entire substituent you are replacing. The largest group attached 
+						to the selected atom wil be kept, while other groups are assumed to be part of the 
+						substituent being replaced.
+					</li>
+					<li>
+						<b>use distance names</b> - if checked, the names of new atoms will be CA, CB, etc. 
+						following the name of the atom the substituent is being attached to. This may be 
+						useful when modifying peptides for a structure in preparation for a molecular
+						dynamics simulation, which often require specific atom names. <b>NOTE</b> - these atom 
+						names are generated automatically, and should be double-checked if specific
+						atom names are required.
+					</li>
+					<li>
+						<b>new residue</b> - if checked, put the new substituent in its own residue. If unchecked,
+						substituent atoms will be added to the same residue as the selected atoms.
+					</li>
+					<li>
+						<b>change residue name</b> - set the name of whichever residue the substituent atoms
+						are placed in to the specified name. There are some restrictions on valid residue names,
+						but these will not be covered here.
+					</li>
+				</ul>
+			</p>
+			<p>
+				To create toluene, press the <button>substitute current selection</button> button on the tool. 
+				Now, we just need to attach the nitro groups.
+			</p>
+
+			<p>
+				Clear the "substituent name" box and enter "NO2" - this is the name of the nitro substituent. 
+				Select the hydrogen atoms that are <i>ortho</i> or <i>para</i> to the methyl group. This is similar to
+				before, but <kbd>CTRL</kbd>- or <kbd>command</kbd>-clicking on atoms will only allow you to select 
+				one atom by default. An easy way to select more atoms is <kbd>CTRL</kbd> + <kbd>shift</kbd> 
+				clicking or <kbd>command</kbd> + <kbd>shift</kbd> clicking on atoms. Press the 
+				<button>substitute current selection</button> again to create 1,3,5-trinitrotoluene.
+			</p>
+
+			<p>
+				<b>NOTE</b> - if the nitro groups are rotated strangely, it is possible to rotate them to be
+				in the plane of the rest of the ring. On the "Right Mouse" tab of ChimeraX's toolbar, select
+				"Bond rotation". Now, you can right click on a bond and drag up and down your screen to rotate
+				that bond.
+				<br>
+				<img src="../images/tnt.gif"/>
+			</p>
+		
+		<h2 id="OMe2">Turning TNT into Dimethyl Ether</h2>
+			<p>
+				In this tutorial, we will be turning the TNT structure from the previous tutorial into dimethyl
+				ether. If you'd like to skip making TNT, click the following command link:
+				<br>
+				<a class="cxcmd" href="cxcmd:open smiles:C1(C)=C(N(=O)=O)C=C(N(=O)=O)C=C1(N(=O)=O)">
+					open smiles:C1(C)=C(N(=O)=O)C=C(N(=O)=O)C=C1(N(=O)=O)
+				</a>
+				<br>
+				To do this, we'll be replacing everything but the methyl group with a methoxy group.
+			</p>
+			<aside>
+				<img src="../images/structureMod_OMe.png" style="width:324px"/>
+			</aside>
+			<p>
+				First, open the tool window as described in the previous tutorial. Then, select everything
+				except the methyl group. While this could be done by clicking the atoms one-by-one, there
+				are more efficient methods:
+				<ul>
+					<li>Using the "Select" menu on the ribbon at the top of your screen
+						<ol>
+							<li><a class="menulike">Select &rarr; Chemistry &rarr; Substituents &rarr; CH3</a></li>
+							<li><a class="menulike">Select &rarr; Invert</a></li>
+						</ol>
+					</li>
+					<li>Using the <a class="cxcmd">select</a> command
+						<ul>
+							<li><a href="cxcmd:select ~Me" class="cxcmd">select ~Me</a></li>
+						</ul>
+					</li>
+				</ul>
+			</p>
+			<p>
+				Now, we'll replace the selected fragment with a methoxy group. On the tool window, ensure the
+				'guess previous substituent' is not checked. This is explicitly telling SEQCROW to replace this
+				atom selection with the new substituent, keeping the smaller methyl group.
+			</p>
+			<p>
+				Enter "OMe" (the name of the methoxy substituent in the AaronTools library) in the "substituent name"
+				box. Press <button>substitute current selection</button> to finish the modification.
+			</p>
+	
+		<h2 id="simultaneous">Modifying Multiple Structures Simultaneously</h2>
+			<aside>
+				<img src="../images/claisen.png" style="width:256px"/>
+				<br>
+				A Claisen rearrangement is a sigmatropic rearrangement that results in a new C-C bond.
+				These are commonly exemplified with an allyl vinyl ether as the starting structure.
+			</aside>
+			<p>
+				In this tutorial, we'll be modifying two minima for a Claisen rearrangement using
+				the <a class="cxcmd">substitute</a> command. That is, running <a class="cxcmd">substitute</a>
+				just once to modify two structures.
+			</p>
+			<p>
+				To start, we'll make sure all other structures are close and open a structure of 
+				allyl vinyl ether and 4-pentenal:
+				<br>
+				<a href="cxcmd:close" class="cxcmd">close</a>
+				<br>
+				<a href="cxcmd:open smiles:C=CCOC=C" class="cxcmd">open smiles:C=CCOC=C</a>
+				<br>
+				<a href="cxcmd:open smiles:O=CCCC=C" class="cxcmd">open smiles:O=CCCC=C</a>
+			</p>
+	
+			<p>
+				When I open these structures, atom @H4 on the allyl vinyl ether (model #1) would become
+				@H7 on the 4-pentenal (model #2), depending on what reaction pathway is traversed. If 
+				these structures were made by hand, it would be most convenient if the order of the 
+				atoms was consistent. This would allow us to use one @H<i>n</i> atom specifier for both structures. 
+				But, we'll work with this arbitrary ordering for the purpose of this tutorial.
+			</p>
+
+			<p>
+				The <a class="cxcmd">substitute</a> command takes atom specifiers as the first argument and 
+				one or more substituents as a keyword argument. To put a methyl group at the positions indicated
+				above:
+				<br>
+				<a class="cxcmd" href="cxcmd:substitute #1@H4 #2@H7 substituents Me">substitute #1@H4 #2@H7 substituents Me</a>
+			</p>
+			<p>
+				ChimeraX commands and keyword names can be abbreviated as long as the abbreviation uniquely
+				identified the command or keyword. So, the <a class="cxcmd">substitute</a> command 
+				above can also be written as:
+				<br>
+				<a class="cxcmd" href="cxcmd:sub #1@H4 #2@H7 sub Me">sub #1@H4 #2@H7 sub Me</a>
+				<br>
+				as long as there is no other command that starts with 'sub'.
+			</p>
+			<p>
+				In principle, any number of structures can be modified at once. This can also be done using the
+				"Change Substituents" tool, just by making sure both #1@H4 and #2@H7 are selected. 
+			</p>
+	</body>
+</html>

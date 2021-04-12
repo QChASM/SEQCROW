@@ -21,11 +21,20 @@ class _SEQCROW_API(BundleAPI):
             session.presets.add_presets("SEQCROW", {"VDW":lambda p=seqcrow_vdw: p(session)})
             session.presets.add_presets("SEQCROW", {"index labels":lambda p=indexLabel: p(session)})
 
-            session.ui.triggers.add_handler('ready',
-                lambda *args, ses=session: settings.register_settings_options(ses))
-                    
-            session.ui.triggers.add_handler('ready',
-                lambda *args, ses=session: _SEQCROW_API.register_selector_menus(ses))
+            session.ui.triggers.add_handler(
+                'ready',
+                lambda *args, ses=session: settings.register_settings_options(ses)
+            )
+
+            session.ui.triggers.add_handler(
+                'ready',
+                lambda *args, ses=session: _SEQCROW_API.register_selector_menus(ses)
+            )
+
+            session.ui.triggers.add_handler(
+                'ready',
+                lambda *args, ses=session: _SEQCROW_API.register_tutorials(ses)
+            )
         
         #apply AARONLIB setting
         if seqcrow_settings.settings.AARONLIB is not None:
@@ -434,6 +443,17 @@ class _SEQCROW_API(BundleAPI):
         mw = session.ui.main_window
         structure_menu = add_submenu([], '&Structure')
         structure_menu.addAction(QAction("Connected", mw))
+
+    @staticmethod
+    def register_tutorials(session):
+        from Qt.QtWidgets import QMenu, QAction
+        from chimerax.core.commands import run
+        mb = session.ui.main_window.menuBar()
+        help_menu = mb.findChild(QMenu, "Help")
+        seqcrow_tutorials = QAction("SEQCROW Tutorials", session.ui.main_window)
+        seqcrow_tutorials.setToolTip("Tutorials for the SEQCROW bundle")
+        seqcrow_tutorials.triggered.connect(lambda *args: run(session, "help help:seqcrow/tutorials.html"))
+        help_menu.addAction(seqcrow_tutorials)
 
     @staticmethod
     def get_class(name):

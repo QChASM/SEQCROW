@@ -31,7 +31,7 @@ def sterimol(
         showRadii=True,
         return_values=False
     ):
-    models, attached = avoidTargets(selection)
+    models, attached = avoidTargets(session.logger, selection)
     
     radii = radii.lower()
     
