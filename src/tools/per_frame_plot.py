@@ -27,7 +27,7 @@ class NavigationToolbar(NavigationToolbar2QT):
 
     toolitems = list(NavigationToolbar2QT.toolitems)
     for i in range(0, len(toolitems)):
-        if toolitems[i][0] in ['Back', 'Forward', 'Subplots']:
+        if toolitems[i][0] in ['Back', 'Forward']:
             toolitems[i] = None
     
     toolitems = tuple(ti for ti in toolitems if ti is not None and ti != (None, None, None, None))
@@ -35,8 +35,8 @@ class NavigationToolbar(NavigationToolbar2QT):
     def home(self, *args, **kwargs):
         """make pressing the home button autoscale the axes instead of whatever
         it normally does"""
-        ax = self.canvas.figure.gca()
-        ax.autoscale()
+        for ax in self.canvas.figure.get_axes():
+            ax.autoscale()
         self.canvas.draw()
 
 class EnergyPlot(ToolInstance):

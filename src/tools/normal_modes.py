@@ -23,14 +23,14 @@ from AaronTools.pathway import Pathway
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.backend_bases import MouseEvent
 from matplotlib.figure import Figure
-from matplotlib import rc as matplotlib_rc
+from matplotlib import rcParams
 
 from PyQt5.QtCore import Qt, QRect, QItemSelectionModel 
 from PyQt5.QtGui import QValidator, QFont, QIcon
 from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, QTabWidget, QComboBox, \
                             QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, \
                             QFormLayout, QCheckBox, QHeaderView, QMenuBar, QAction, QFileDialog, QStyle, \
-                            QGroupBox, QLabel, QToolBox
+                            QGroupBox, QLabel, QToolBox, QHBoxLayout
 
 from SEQCROW.tools.per_frame_plot import NavigationToolbar
 from SEQCROW.utils import iter2str
@@ -38,6 +38,8 @@ from SEQCROW.widgets import FilereaderComboBox
 
 #TODO:
 #make double clicking something in the table visualize it
+
+rcParams["savefig.dpi"] = 300
 
 
 class _NormalModeSettings(Settings):
@@ -53,6 +55,9 @@ class _NormalModeSettings(Settings):
         'voigt_mix': 0.5,
         'exp_color': Value((0.0, 0.0, 1.0), TupleOf(FloatArg, 3), iter2str),
         'reverse_x': True,
+        'figure_width': 2,
+        'figure_height': 2,
+        "fixed_size": False,
     }
 
 
@@ -1452,6 +1457,7 @@ class IRPlot(ChildToolWindow):
         self.press = None
         self.drag_prev = None
         self.dragging = False
+        self.exp_data = None
         
         self._build_ui()
         self.refresh_plot()
@@ -1466,30 +1472,58 @@ class IRPlot(ChildToolWindow):
         plot_widget = QWidget()
         plot_layout = QGridLayout(plot_widget)
         
-        self.figure = Figure(figsize=(2,2))
+        self.figure = Figure(figsize=(1.5, 1.5), dpi=100)
+        self.figure.subplots_adjust(bottom=0.15)
         self.canvas = Canvas(self.figure)
-        
-        ax = self.figure.add_axes((0.15, 0.20, 0.80, 0.70))
-        
+
         self.canvas.mpl_connect('button_release_event', self.unclick)
         self.canvas.mpl_connect('button_press_event', self.onclick)
         self.canvas.mpl_connect('motion_notify_event', self.drag)
         self.canvas.mpl_connect('scroll_event', self.zoom)
         
-        self.canvas.setMinimumWidth(500)
-        self.canvas.setMinimumHeight(300)
+        self.canvas.setMinimumWidth(400)
+        # self.canvas.setMinimumHeight(300)
 
-        plot_layout.addWidget(self.canvas, 0, 0, 1, 2)
+        plot_layout.addWidget(self.canvas, 0, 0, 1, 7)
+
+        refresh_button = QPushButton()
+        refresh_button.setIcon(QIcon(refresh_button.style().standardIcon(QStyle.SP_BrowserReload)))
+        refresh_button.clicked.connect(self.refresh_plot)
+        plot_layout.addWidget(refresh_button, 1, 0, 1, 1, Qt.AlignVCenter)
 
         toolbar_widget = QWidget()
         self.toolbar = NavigationToolbar(self.canvas, toolbar_widget)
         self.toolbar.setMaximumHeight(32)
         plot_layout.addWidget(self.toolbar, 1, 1, 1, 1)
-        
-        refresh_button = QPushButton()
-        refresh_button.setIcon(QIcon(refresh_button.style().standardIcon(QStyle.SP_BrowserReload)))
-        refresh_button.clicked.connect(self.refresh_plot)
-        plot_layout.addWidget(refresh_button, 1, 0, 1, 1, Qt.AlignVCenter)
+
+        plot_layout.addWidget(QLabel("fixed size:"), 1, 2, 1, 1, Qt.AlignVCenter | Qt.AlignRight)
+
+        self.fixed_size = QCheckBox()
+        self.fixed_size.setCheckState(Qt.Checked if self.tool_instance.settings.fixed_size else Qt.Unchecked)
+        self.fixed_size.stateChanged.connect(self.change_figure_size)
+        plot_layout.addWidget(self.fixed_size, 1, 3, 1, 1, Qt.AlignVCenter | Qt.AlignLeft)
+
+        self.figure_width = QDoubleSpinBox()
+        self.figure_width.setRange(1, 24)
+        self.figure_width.setDecimals(2)
+        self.figure_width.setSingleStep(0.25)
+        self.figure_width.setSuffix(" in.")
+        self.figure_width.setValue(self.tool_instance.settings.figure_width)
+        self.figure_width.valueChanged.connect(self.change_figure_size)
+        plot_layout.addWidget(self.figure_width, 1, 4, 1, 1)
+     
+        plot_layout.addWidget(QLabel("x"), 1, 5, 1, 1, Qt.AlignVCenter | Qt.AlignHCenter)
+     
+        self.figure_height = QDoubleSpinBox()
+        self.figure_height.setRange(1, 24)
+        self.figure_height.setDecimals(2)
+        self.figure_height.setSingleStep(0.25)
+        self.figure_height.setSuffix(" in.")
+        self.figure_height.setValue(self.tool_instance.settings.figure_height)
+        self.figure_height.valueChanged.connect(self.change_figure_size)
+        plot_layout.addWidget(self.figure_height, 1, 6, 1, 1)
+
+        self.change_figure_size()
         
         toolbox.addTab(plot_widget, "plot")
 
@@ -1625,6 +1659,21 @@ class IRPlot(ChildToolWindow):
 
         toolbox.addTab(scaling_group, "frequency scaling")
         
+        
+        # break x axis
+        interrupt_widget = QWidget()
+        interrupt_layout = QFormLayout(interrupt_widget)
+
+        self.section_table = QTableWidget()
+        self.section_table.setColumnCount(3)
+        self.section_table.setHorizontalHeaderLabels(["center", "width", "remove"])
+        self.section_table.cellClicked.connect(self.section_table_clicked)
+        self.section_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        interrupt_layout.addRow(self.section_table)
+        self.add_section()
+
+        toolbox.addTab(interrupt_widget, "x-axis breaks")
+        
 
         toolbox.currentChanged.connect(lambda ndx: self.refresh_plot() if not ndx else None)
         # toolbox.setMinimumWidth(int(1.1 * plot_widget.size().width()))
@@ -1642,30 +1691,79 @@ class IRPlot(ChildToolWindow):
         layout.setMenuBar(menu)        
         self.ui_area.setLayout(layout)
         self.manage(None)
+
+    def change_figure_size(self, *args):
+        if self.fixed_size.checkState() == Qt.Checked:
+            self.figure_height.setEnabled(True)
+            self.figure_width.setEnabled(True)
+            h = self.figure_height.value()
+            w = self.figure_width.value()
+            
+            self.figure.set_size_inches(w, h)
+            
+            self.canvas.setMinimumHeight(100 * h)
+            self.canvas.setMaximumHeight(100 * h)
+            self.canvas.setMinimumWidth(100 * w)
+            self.canvas.setMaximumWidth(100 * w)
+        else:
+            self.canvas.setMinimumHeight(1)
+            self.canvas.setMaximumHeight(100000)
+            self.canvas.setMinimumWidth(1)
+            self.canvas.setMaximumWidth(100000)
+            self.figure_height.setEnabled(False)
+            self.figure_width.setEnabled(False)
+    
+    def section_table_clicked(self, row, column):
+        if row == self.section_table.rowCount() - 1 or self.section_table.rowCount() == 1:
+            self.add_section()
+        elif column == 2:
+            self.section_table.removeRow(row)
+    
+    def add_section(self):
+        rows = self.section_table.rowCount()
+        if rows != 0:
+            rows -= 1
+            section_center = QDoubleSpinBox()
+            section_center.setRange(0, 5000)
+            section_center.setValue(950)
+            section_center.setSuffix(" cm\u207b\u00b9")
+            section_center.setSingleStep(25)
+            self.section_table.setCellWidget(rows, 0, section_center)
+            
+            section_width = QDoubleSpinBox()
+            section_width.setRange(1, 5000)
+            section_width.setValue(1900)
+            section_width.setSuffix(" cm\u207b\u00b9")
+            section_width.setSingleStep(25)
+            self.section_table.setCellWidget(rows, 1, section_width)
+            
+            widget_that_lets_me_horizontally_align_an_icon = QWidget()
+            widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
+            section_remove = QLabel()
+            dim = int(1.5 * section_remove.fontMetrics().boundingRect("Q").height())
+            section_remove.setPixmap(QIcon(section_remove.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(dim, dim))
+            widget_layout.addWidget(section_remove, 0, Qt.AlignHCenter)
+            widget_layout.setContentsMargins(0, 0, 0, 0)
+            self.section_table.setCellWidget(rows, 2, widget_that_lets_me_horizontally_align_an_icon)
+            rows += 1
+
+        self.section_table.insertRow(rows)
+
+        widget_that_lets_me_horizontally_align_an_icon = QWidget()
+        widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
+        section_add = QLabel("add section")
+        widget_layout.addWidget(section_add, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(0, 0, 0, 0)
+        self.section_table.setCellWidget(rows, 1, widget_that_lets_me_horizontally_align_an_icon)
     
     def save(self):
         filename, _ = QFileDialog.getSaveFileName(filter="CSV Files (*.csv)")
         if filename:
             s = "frequency (cm^-1),IR intensity\n"
-            ax = self.figure.gca()
-            if len(ax.lines) > 0:
-                line = ax.lines[0]
-                for x, y in zip(line.get_xdata(), line.get_ydata()):
-                    s += "%f,%f\n" % (x, y)
-            
-            else:
-                fr = self.tool_instance.model_selector.currentData()
-                if fr is None:
-                    self.tool_instance.session.logger.error("no model selected")
-                    return 
-                
-                frequencies = np.array([freq.frequency for freq in fr.other['frequency'].data])
-                c1 = self.linear.value()
-                c2 = self.quadratic.value()
-                frequencies -= c1 * frequencies + c2 * frequencies ** 2
-                intensities = [freq.intensity for freq in fr.other['frequency'].data]
-                for x, y in zip(frequencies, intensities):
-                    s += "%f,%f\n" % (x, y if y is not None else 0)
+            data = self.get_data()
+            x_values, y_values = data
+            for x, y in zip(x_values, y_values):
+                s += "%f,%f\n" % (x, y)
 
             with open(filename, 'w') as f:
                 f.write(s.strip())
@@ -1718,15 +1816,15 @@ class IRPlot(ChildToolWindow):
     def zoom(self, event):
         if event.xdata is None:
             return
-        a = self.figure.gca()
-        x0, x1 = a.get_xlim()
-        x_range = x1 - x0
-        xdiff = -0.05 * event.step * x_range
-        xshift = 0.2 * (event.xdata - (x0 + x1)/2)
-        nx0 = x0 - xdiff + xshift
-        nx1 = x1 + xdiff + xshift
-
-        a.set_xlim(nx0, nx1)
+        for a in self.figure.get_axes():
+            x0, x1 = a.get_xlim()
+            x_range = x1 - x0
+            xdiff = -0.05 * event.step * x_range
+            xshift = 0.2 * (event.xdata - (x0 + x1)/2)
+            nx0 = x0 - xdiff + xshift
+            nx1 = x1 + xdiff + xshift
+    
+            a.set_xlim(nx0, nx1)
         self.canvas.draw()
 
     def drag(self, event):
@@ -1749,16 +1847,17 @@ class IRPlot(ChildToolWindow):
                 self.move(dx, dy)
 
     def move(self, dx, dy):
-        a = self.figure.gca()
-        w = self.figure.get_figwidth() * self.figure.get_dpi()
-        x0, x1 = a.get_xlim()
-        xs = dx/w * (x1-x0)
-        nx0, nx1 = x0-xs, x1-xs
-        #y0, y1 = a.get_ylim()
-        #ys = dy/h * (y1-y0)
-        #ny0, ny1 = y0-ys, y1-ys
-        a.set_xlim(nx0, nx1)
-        #a.set_ylim(ny0, ny1)
+        for ax in self.figure.get_axes():
+            w = self.figure.get_figwidth() * self.figure.get_dpi()
+            x0, x1 = self.figure.gca().get_xlim()
+            xs = dx/w * (x1 - x0)
+            x0, x1 = ax.get_xlim()
+            nx0, nx1 = x0 - xs, x1 - xs
+            #y0, y1 = ax.get_ylim()
+            #ys = dy/h * (y1-y0)
+            #ny0, ny1 = y0-ys, y1-ys
+            ax.set_xlim(nx0, nx1)
+            #ax.set_ylim(ny0, ny1)
         self.canvas.draw()
 
     def onclick(self, event):
@@ -1775,11 +1874,10 @@ class IRPlot(ChildToolWindow):
         self.drag_prev = None
         self.dragging = False
 
-    def refresh_plot(self):
+    def get_data(self):
         fr = self.tool_instance.model_selector.currentData()
         if fr is None:
-            return 
-
+            return None
         fwhm = self.fwhm.value()
         self.tool_instance.settings.fwhm = fwhm
         self.tool_instance.settings.peak_type = self.peak_type.currentText()
@@ -1794,7 +1892,7 @@ class IRPlot(ChildToolWindow):
         frequencies -= c1 * frequencies + c2 * frequencies ** 2
         
         intensities = [freq.intensity for freq in fr.other['frequency'].data if freq.frequency > 0]
-        e_factor = -4 * np.log(2) / fwhm**2
+        e_factor = -4 * np.log(2) / fwhm ** 2
         
         if self.peak_type.currentText() != "Delta":
             functions = []
@@ -1808,17 +1906,17 @@ class IRPlot(ChildToolWindow):
                         np.linspace(
                             max(freq - (3.5 * fwhm), 0), 
                             freq + (3.5 * fwhm), 
-                            num=50
+                            num=65,
                         ).tolist()
                     )
                     x_values.append(freq)
                     if self.peak_type.currentText() == "Gaussian":
                         functions.append(lambda x, x0=freq, inten=intensity: \
-                                        inten * np.exp(e_factor * (x - x0)**2))
+                                        inten * np.exp(e_factor * (x - x0) ** 2))
     
                     elif self.peak_type.currentText() == "Lorentzian":
                         functions.append(lambda x, x0=freq, inten=intensity, : \
-                                        inten * 0.5 * (0.5 * fwhm / ((x - x0)**2 + (0.5 * fwhm)**2)))
+                                        inten * 0.5 * (0.5 * fwhm / ((x - x0) ** 2 + (0.5 * fwhm)**2)))
                     
                     elif self.peak_type.currentText() == "pseudo-Voigt":
                         functions.append(
@@ -1847,86 +1945,222 @@ class IRPlot(ChildToolWindow):
 
         if len(y_values) == 0:
             self.tool_instance.session.logger.error("nothing to plot")
-            return
+            return None
 
         y_values /= np.amax(y_values)
 
-        ax = self.figure.gca()
-        for line in ax.get_lines():
-            label = line.get_label()
-            if label == "computed":
-                ax.lines.remove(line)
-
-        if self.highlighted_mode is not None and self.highlighted_mode in ax.collections:
-            ax.collections.remove(self.highlighted_mode)
-            self.highlighted_mode = None
-        
-        for line in ax.collections[::-1]:
-            if line.get_label() == "computed":
-                ax.collections.remove(line)
 
         if self.tool_instance.plot_type.currentText() == "Transmittance":
-            y_values = np.array([10 ** (-y) for y in y_values])
-            ax.set_ylabel('transmittance (arb.)')
-        else:
-            ax.set_ylabel('absorbance (arb.)')
-       
-        ax.set_xlabel(r'wavenumber (cm$^{-1}$)')
-        if self.peak_type.currentText() != "Delta":
-            ax.plot(x_values, y_values, color='k', linewidth=0.5, label="computed")
-        else:
-            if self.tool_instance.plot_type.currentText() == "Transmittance":
-                ax.vlines(x_values, y_values, [1 for y in y_values], linewidth=0.5, colors=['k' for x in x_values], label="computed")
-                ax.hlines(1, 0, max(4000, *frequencies), linewidth=0.5, colors=['k' for y in y_values], label="computed")
-            
-            else:
-                ax.vlines(x_values, [0 for y in y_values], y_values, linewidth=0.5, colors=['k' for x in x_values], label="computed")
-                ax.hlines(0, 0, max(4000, *frequencies), linewidth=0.5, colors=['k' for y in y_values], label="computed")
+            y_values = np.array([10 ** (2 - y) for y in y_values])
 
-        x_lim = ax.get_xlim()
-        if self.tool_instance.reverse_x.checkState() == Qt.Checked:
-            ax.set_xlim(max(x_lim), min(x_lim))
+        return x_values, y_values
+
+    def refresh_plot(self):
+        data = self.get_data()
+        if data is None:
+            return
+        x_values, y_values = data
+
+        self.figure.clear()
+
+        if self.section_table.rowCount() == 1:
+            axes = [self.figure.subplots(nrows=1, ncols=1)]
+            widths = [max(x_values)]
+            centers = [max(x_values) / 2]
         else:
-            ax.set_xlim(min(x_lim), max(x_lim))
+            n_sections = self.section_table.rowCount() - 1
+            self.figure.subplots_adjust(wspace=0.05)
+            centers = []
+            widths = []
+            for i in range(0, self.section_table.rowCount() - 1):
+                centers.append(self.section_table.cellWidget(i, 0).value())
+                widths.append(self.section_table.cellWidget(i, 1).value())
+                
+            widths = [x for _, x in sorted(
+                zip(centers, widths),
+                key=lambda p: p[0],
+                reverse=self.tool_instance.reverse_x.checkState() == Qt.Checked,
+            )]
+            centers = sorted(centers, reverse=self.tool_instance.reverse_x.checkState() == Qt.Checked)
+            
+            axes = self.figure.subplots(
+                nrows=1,
+                ncols=n_sections,
+                sharey=True,
+                gridspec_kw={'width_ratios': widths},
+            )
+            if not hasattr(axes, "__iter__"):
+                axes = [axes]
+
+        for i, ax in enumerate(axes):
+            if i == 0:
+                if self.tool_instance.plot_type.currentText() == "Transmittance":
+                    ax.set_ylabel('Transmittance (%)')
+                else:
+                    ax.set_ylabel('Absorbance (arb.)')
+            
+                if len(axes) > 1:
+                    ax.spines["right"].set_visible(False)
+                    ax.tick_params(labelright=False, right=False)
+                    ax.plot(
+                        [1, 1],
+                        [0, 1],
+                        marker=((-1, -1), (1, 1)),
+                        markersize=5,
+                        linestyle='none',
+                        color='k',
+                        mec='k',
+                        mew=1,
+                        clip_on=False,
+                        transform=ax.transAxes,
+                    )
+
+            elif i == len(axes) - 1 and len(axes) > 1:
+                ax.spines["left"].set_visible(False)
+                ax.tick_params(labelleft=False, left=False)
+                ax.plot(
+                    [0, 0],
+                    [0, 1],
+                    marker=((-1, -1), (1, 1)),
+                    markersize=5,
+                    linestyle='none',
+                    color='k',
+                    mec='k',
+                    mew=1,
+                    clip_on=False,
+                    transform=ax.transAxes,
+                )
+
+            elif len(axes) > 1:
+                ax.spines["right"].set_visible(False)
+                ax.spines["left"].set_visible(False)
+                ax.tick_params(labelleft=False, labelright=False, left=False, right=False)
+                ax.plot(
+                    [0, 0],
+                    [0, 1],
+                    marker=((-1, -1), (1, 1)),
+                    markersize=5,
+                    linestyle='none',
+                    label="Silence Between Two Subplots",
+                    color='k',
+                    mec='k',
+                    mew=1,
+                    clip_on=False,
+                    transform=ax.transAxes,
+                )
+                ax.plot(
+                    [1, 1],
+                    [0, 1],
+                    marker=((-1, -1), (1, 1)),
+                    markersize=5,
+                    label="Silence Between Two Subplots",
+                    linestyle='none',
+                    color='k',
+                    mec='k',
+                    mew=1,
+                    clip_on=False,
+                    transform=ax.transAxes,
+                )
+
+
+            if self.peak_type.currentText() != "Delta":
+                ax.plot(
+                    x_values,
+                    y_values,
+                    color='k',
+                    linewidth=0.5,
+                    label="computed",
+                )
+            else:
+                if self.tool_instance.plot_type.currentText() == "Transmittance":
+                    ax.vlines(
+                        x_values,
+                        y_values,
+                        [100 for y in y_values],
+                        linewidth=0.5,
+                        colors=['k' for x in x_values],
+                        label="computed"
+                    )
+                    ax.hlines(
+                        100,
+                        0,
+                        max(4000, *x_values),
+                        linewidth=0.5,
+                        colors=['k' for y in y_values],
+                        label="computed",
+                    )
+                
+                else:
+                    ax.vlines(
+                        x_values,
+                        [0 for y in y_values],
+                        y_values,
+                        linewidth=0.5,
+                        colors=['k' for x in x_values],
+                        label="computed"
+                    )
+                    ax.hlines(
+                        0,
+                        0,
+                        max(4000, *x_values),
+                        linewidth=0.5,
+                        colors=['k' for y in y_values],
+                        label="computed"
+                    )
+
+            if self.exp_data:
+                for x, y, color in self.exp_data:
+                    ax.plot(x, y, color=color, zorder=-1, linewidth=0.5, label="observed")
+
+            center = centers[i]
+            width = widths[i]
+            high = center + width / 2
+            low = center - width / 2
+            if self.tool_instance.reverse_x.checkState() == Qt.Checked:
+                ax.set_xlim(high, low)
+            else:
+                ax.set_xlim(low, high)
         
-        ax.autoscale_view()
-        
+        self.figure.text(0.5, 0.0, r"wavenumber (cm$^{-1}$)" , ha="center", va="bottom")
+
         self.canvas.draw()
 
     def highlight(self, items):
-        ax = self.figure.gca()
-        if self.highlighted_mode is not None and self.highlighted_mode in ax.collections:
-            ax.collections.remove(self.highlighted_mode)
-        
-        if len(items) == 0:
-            self.highlighted_mode = None
-            self.canvas.draw()
-            return
-        
-        fr = self.tool_instance.model_selector.currentData()
-        if fr is None:
-            return 
-
-        for item in items:
-            if item.column() == 0:
-                row = item.data(Qt.UserRole)
-        
-        frequency = [freq.frequency for freq in fr.other['frequency'].data][row]
-        if frequency < 0:
-            self.canvas.draw()
-            return
-        
-        c1 = self.linear.value()
-        c2 = self.quadratic.value()
-        frequency -= c1 * frequency + c2 * frequency ** 2
-        
-        if ax.get_ylim()[1] > 50:
-            y_vals = (10**(2-0.9), 100)
-        else:
-            y_vals = (0, 1)
+        highlights = []
+        for ax in self.figure.get_axes():
+            if self.highlighted_mode is not None:
+                for mode in self.highlighted_mode:
+                    if mode in ax.collections:
+                        ax.collections.remove(mode)
             
-        self.highlighted_mode = ax.vlines(frequency, *y_vals, color='r', zorder=-1, label="highlight")
+            if len(items) == 0:
+                continue
+            
+            fr = self.tool_instance.model_selector.currentData()
+            if fr is None:
+                return 
+    
+            for item in items:
+                if item.column() == 0:
+                    row = item.data(Qt.UserRole)
+            
+            frequency = [freq.frequency for freq in fr.other['frequency'].data][row]
+            if frequency < 0:
+                self.canvas.draw()
+                continue
+            
+            c1 = self.linear.value()
+            c2 = self.quadratic.value()
+            frequency -= c1 * frequency + c2 * frequency ** 2
+            
+            if self.tool_instance.plot_type.currentText() == "Transmittance":
+                y_vals = (10 ** (2 - 0.9), 100)
+            else:
+                y_vals = (0, 1)
+                
+            highlights.append(ax.vlines(frequency, *y_vals, color='r', zorder=-1, label="highlight"))
         
+        self.highlighted_mode = highlights
         self.canvas.draw()
 
     def load_data(self, *args):
@@ -1951,18 +2185,15 @@ class IRPlot(ChildToolWindow):
                 channel = "0" + channel
             hex_code += channel
 
-        ax = self.figure.gca()
-        ax.plot(data[:,0], data[:,1], linewidth=0.5, zorder=-1, color=hex_code, label="experimental")
-        
-        self.canvas.draw()
+        if self.exp_data is None:
+            self.exp_data = []
+
+        for i in range(1, data.shape[1]):
+            print(i)
+            self.exp_data.append((data[:,0], data[:,i], hex_code))
 
     def clear_data(self, *args):
-        ax = self.figure.gca()
-        for line in ax.get_lines():
-            if line.get_label() == "experimental":
-                ax.lines.remove(line)
-        
-        self.canvas.draw()
+        self.exp_data = None
 
     def show_match_peaks(self, *args):
         if self.tool_instance.match_peaks is None:
@@ -1970,6 +2201,10 @@ class IRPlot(ChildToolWindow):
 
     def cleanup(self):
         self.tool_instance.ir_plot = None
+        
+        self.tool_instance.settings.figure_height = self.figure_height.value()
+        self.tool_instance.settings.figure_width = self.figure_width.value()
+        self.tool_instance.settings.fixed_size = self.fixed_size.checkState() == Qt.Checked
         
         super().cleanup()
 
@@ -2050,9 +2285,14 @@ class MatchPeaks(ChildToolWindow):
         if fit_c1 and fit_c2:
             mat = np.array([comp_freqs, comp_freqs**2]).T
 
-            c_vals, res, _, _ = np.linalg.lstsq(mat, comp_freqs - exp_freqs)
+            c_vals, res, _, _ = np.linalg.lstsq(mat, comp_freqs - exp_freqs, rcond=None)
+            self.tool_instance.session.logger.info("sum of squared residuals: %.2f" % sum(res))
             self.tool_instance.ir_plot.linear.setValue(c_vals[0])
             self.tool_instance.ir_plot.quadratic.setValue(c_vals[1])
+            # res_v = comp_freqs - c_vals[0] * comp_freqs - c_vals[1] * comp_freqs ** 2
+            # res_v -= exp_freqs
+            # res = np.dot(res_v, res_v)
+            # self.tool_instance.session.logger.info("sum of squared residuals: %.2f" % res)
             if abs(c_vals[0]) > 0.2:
                 self.tool_instance.session.logger.warning("c1 value %f is outside the bounds of the spinbox widget, check your input" % c_vals[0])
             if abs(c_vals[1]) > 0.2:
@@ -2061,12 +2301,19 @@ class MatchPeaks(ChildToolWindow):
             l = np.dot(exp_freqs, comp_freqs) / np.dot(comp_freqs, comp_freqs)
             self.tool_instance.ir_plot.linear.setValue(1 - l)
             self.tool_instance.ir_plot.quadratic.setValue(0.)
+            res_v = (exp_freqs - (l * comp_freqs))
+            res = np.dot(res_v, res_v)
+            self.tool_instance.session.logger.info("sum of squared residuals: %.2f" % res)
             if abs(1 - l) > 0.2:
                 self.tool_instance.session.logger.warning("c1 value %f is outside the bounds of the spinbox widget, check your input" % (1 - l))
         elif fit_c2:
             l = np.dot(comp_freqs - exp_freqs, comp_freqs ** 2) / np.dot(comp_freqs ** 2, comp_freqs ** 2)
             self.tool_instance.ir_plot.linear.setValue(0.)
             self.tool_instance.ir_plot.quadratic.setValue(l)
+            res_v = comp_freqs - l * comp_freqs ** 2
+            res_v -= exp_freqs
+            res = np.dot(res_v, res_v)
+            self.tool_instance.session.logger.info("sum of squared residuals: %.2f" % res)
             if abs(l) > 0.2:
                 self.tool_instance.session.logger.warning("c2 value %f is outside the bounds of the spinbox widget, check your input" % l)
         else:

@@ -21,11 +21,20 @@ class _SEQCROW_API(BundleAPI):
             session.presets.add_presets("SEQCROW", {"VDW":lambda p=seqcrow_vdw: p(session)})
             session.presets.add_presets("SEQCROW", {"index labels":lambda p=indexLabel: p(session)})
 
-            session.ui.triggers.add_handler('ready',
-                lambda *args, ses=session: settings.register_settings_options(ses))
-                    
-            session.ui.triggers.add_handler('ready',
-                lambda *args, ses=session: _SEQCROW_API.register_selector_menus(ses))
+            session.ui.triggers.add_handler(
+                'ready',
+                lambda *args, ses=session: settings.register_settings_options(ses)
+            )
+
+            session.ui.triggers.add_handler(
+                'ready',
+                lambda *args, ses=session: _SEQCROW_API.register_selector_menus(ses)
+            )
+
+            session.ui.triggers.add_handler(
+                'ready',
+                lambda *args, ses=session: _SEQCROW_API.register_tutorials(ses)
+            )
         
         #apply AARONLIB setting
         if seqcrow_settings.settings.AARONLIB is not None:
@@ -53,6 +62,29 @@ class _SEQCROW_API(BundleAPI):
 
         #need to reregister selectors b/c ^ that bypassed the bundle_info.xml or something
         bundle_info._register_selectors(session.logger)
+        
+        # set stream of AaronTools logger to the ChimeraX log
+        from SEQCROW.logging_logger import LoggingLogger
+        from AaronTools.geometry import Geometry
+        from AaronTools.job_control import SubmitProcess
+        from AaronTools.fileIO import Frequency
+        from AaronTools.config import Config
+        from AaronTools.atoms import Atom
+        
+        log = LoggingLogger(session)
+        
+        for hdlr in Geometry.LOG.handlers:
+            hdlr.setStream(log)
+        for hdlr in Substituent.LOG.handlers:
+            hdlr.setStream(log)
+        for hdlr in SubmitProcess.LOG.handlers:
+            hdlr.setStream(log)
+        for hdlr in Frequency.LOG.handlers:
+            hdlr.setStream(log)
+        for hdlr in Config.LOG.handlers:
+            hdlr.setStream(log)
+        for hdlr in Atom.LOG.handlers:
+            hdlr.setStream(log)
 
     @staticmethod
     def open_file(session, path, format_name, coordsets=False):
@@ -416,6 +448,17 @@ class _SEQCROW_API(BundleAPI):
         mw = session.ui.main_window
         structure_menu = add_submenu([], '&Structure')
         structure_menu.addAction(QAction("Connected", mw))
+
+    @staticmethod
+    def register_tutorials(session):
+        from Qt.QtWidgets import QMenu, QAction
+        from chimerax.core.commands import run
+        mb = session.ui.main_window.menuBar()
+        help_menu = mb.findChild(QMenu, "Help")
+        seqcrow_tutorials = QAction("SEQCROW Tutorials", session.ui.main_window)
+        seqcrow_tutorials.setToolTip("Tutorials for the SEQCROW bundle")
+        seqcrow_tutorials.triggered.connect(lambda *args: run(session, "help help:seqcrow/tutorials.html"))
+        help_menu.addAction(seqcrow_tutorials)
 
     @staticmethod
     def get_class(name):

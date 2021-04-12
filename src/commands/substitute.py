@@ -41,7 +41,7 @@ def guessAttachmentTargets(selection, session, allow_adjacent=True):
         if any(bonded_atom in selection for bonded_atom in atom.neighbors):
             if allow_adjacent:
                 try:
-                    models, attached = avoidTargets(selection)
+                    models, attached = avoidTargets(session.logger, selection)
                     session.logger.warning("two adjacent atoms are both selected; use \"guessAttachment true\"")
                     return models, attached
                 except:
@@ -60,7 +60,7 @@ def guessAttachmentTargets(selection, session, allow_adjacent=True):
     
     return models, None
 
-def avoidTargets(selection):
+def avoidTargets(logger, selection):
     models = {}
     attached = {}
 
@@ -69,7 +69,7 @@ def avoidTargets(selection):
             atom2 = bond.other_atom(atom)
             if atom2 not in selection:
                 if atom in attached:
-                    raise RuntimeError(
+                    logger.warning(
                         "cannot determine previous substituent\n" +
                         "substituents should have one bond to the rest of the molecule\n" +
                         "it is assumed that the substituent(s) is/are selected and the rest of the molecule is not\n" +
@@ -126,7 +126,7 @@ def substitute(
         raise RuntimeError("number of substituents is not the same as the number of new names")
 
     if not guessAttachment:
-        models, attached = avoidTargets(selection)
+        models, attached = avoidTargets(session.logger, selection)
     else:
         models, attached = guessAttachmentTargets(selection, session)
 

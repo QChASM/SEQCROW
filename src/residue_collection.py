@@ -526,7 +526,9 @@ class ResidueCollection(Geometry):
             ]
             
             start_atom = sub.end
-            start = start_atom.chix_name[len(start_atom.element):]
+            start = ""
+            if len(start_atom.chix_name) > len(start_atom.element):
+                start = start_atom.chix_name[len(start_atom.element)]
             if not new_residue and any(letter == start for letter in alphabet):
                 ndx = alphabet.index(start) + 1
             else:

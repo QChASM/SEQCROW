@@ -1,4 +1,4 @@
-from chimerax.atomic import selected_atoms, selected_bonds, get_triggers
+from chimerax.atomic import selected_atoms, selected_bonds, get_triggers, Element
 from chimerax.markers import MarkerSet, create_link
 from chimerax.core.commands import BoolArg, FloatArg, ColorArg, ObjectsArg, CmdDesc
 
@@ -34,7 +34,11 @@ class Highlight(MarkerSet):
                 break
         else:
             a = super().create_marker(atom.coord, rgba, scale * atom.radius)
+            a.element = Element.get_element(atom.element.name)
             a._follow = atom
+            a.hide = atom.hide
+            a.display = atom.display
+            a.draw_mode = atom.draw_mode
 
         a._scale = scale
         if atom.draw_mode == atom.STICK_STYLE and atom.neighbors:
@@ -53,6 +57,9 @@ class Highlight(MarkerSet):
                     if atom._follow.draw_mode == atom.STICK_STYLE and atom._follow.neighbors:
                         atom.radius = atom._scale * atom._follow.bonds[-1].radius
                     atom.coord = atom._follow.coord
+                    atom.hide = atom._follow.hide
+                    atom.display = atom._follow.display
+                    atom.draw_mode = atom._follow.draw_mode
 
     def delete(self):
         global_triggers = get_triggers()
