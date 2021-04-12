@@ -451,7 +451,7 @@ class _SEQCROW_API(BundleAPI):
 
     @staticmethod
     def register_tutorials(session):
-        from Qt.QtWidgets import QMenu, QAction
+        from PyQt5.QtWidgets import QMenu, QAction
         from chimerax.core.commands import run
         mb = session.ui.main_window.menuBar()
         help_menu = mb.findChild(QMenu, "Help")
