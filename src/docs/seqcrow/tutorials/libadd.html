@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+
+	<head>
+		<meta charset="UTF-8">
+		<title>Expanding Libraries</title>
+		<meta http-equiv="Content-Type" content="text/html">
+		<link rel="icon" href="../images/SEQCROW.png" type="image/png">
+		<link rel="stylesheet" href="../style.css">
+	</head>
+	
+	<div class="head">
+		<object data="../ribbon.html" class="head"></object>
+	</div>
+	
+	<body>
+		<h1>Adding to Your Personal Libraries</h1>
+			<p>
+				SEQCROW uses AaronTools to perform various tasks, such as attaching
+				substituents to a molecule. Although AaronTools has a finite number
+				of substituents, ligands, and ring fragments at its disposal, you can add more.
+			</p>
+		
+		<h2>Library Setup</h2>
+			<aside>
+				<img src="../images/seqcrow_settings.png"/ width=384px>
+			</aside>
+			<p>
+				In order to expand your library, you should set the location AaronTools will
+				look for additional substituents, etc. On the ChimeraX ribbon at the top
+				of the screen, go to
+				<br>
+				<span class="menulike">Favorites &rarr; Settings...</span> on non-Mac operating systems
+				<br>
+				<span class="menulike">Preferences &rarr; Settings...</span> on Mac operating systems
+				<br>
+				This will open the ChimeraX settings.
+			</p>
+			<p>
+				On the settings window, switch over to the SEQCROW tab. Set the 
+				'Personal AaronTools library folder' to the location you would like the structures
+				to be saved to/fetched from. By default, this is a directory named 'AARON_libs' in
+				your home area. Clicking <button>Browse</button> will bring up a file explorer, 
+				allowing you to navigate to your desired location and select it.
+			</p>
+			<p>
+				After that is set, simply press 'Save' on the lower-left of the settings window.
+				It is necessary to restart ChimeraX after changing your AaronTools library
+				folder.
+			</p>
+
+		<h2>Adding a Substituent</h2>
+			<aside>
+				<img src="../images/libadd_sub.png"/>
+			</aside>
+			<p>
+				In this section, we're going to add a <i>p</i>-nitrophenyl substituent
+				to the library. To begin, we need to have a structure with this 
+				substituent already on it. This structure can be as simple as
+				nitrobenzene:
+				<br>
+				<a class="cxcmd" href="cxcmd:open smiles:C1(N(=O)=O)=CC=CC=C1">
+				open smiles:C1(N(=O)=O)=CC=CC=C1
+				</a>
+			</p>
+			
+			<p>
+				Now, open the 'Add to Personal Library' tool:
+				<br>
+				<ul>
+					<li>
+						<span class="menulike">
+							Tools &rarr; AaronTools &rarr; Add to Personal Library
+						</span>
+					</li>
+					<li>
+						<a class="cxcmd" href="cxcmd:ui tool show &quot;Add to Personal Library&quot;">
+							ui tool show "Add to Personal Library"
+						</a>
+					</li>
+				</ul>
+			</p>
+			<p>
+				Next, we need to select the <i>p</i>-nitrophenyl part of this structure. This
+				consistutes everything except the hydrogen opposite the nitro group. For me,
+				that is @H3:
+				<br>
+				<a class="cxcmd" href="cxcmd:select ~@H3">
+				select ~@H3
+				</a>
+			</p>
+			<p>
+				We can also add conformer information. This is used by 
+				<a href="https://github.com/QChASM/Aaron/wiki" target="blank">AARON</a> to do conformer searches of
+				catalyzed reactions. Based on intuition, this substituent could have two distinct 
+				conformers, each about 90° from each other. Enter this information on the tool window.
+				The last thing is to give this substituent a name. Something like "p-NO2-Ph" should
+				be sufficiently descriptive to remember what this is. If you do not enter a name,
+				the substituent structure will be opened in ChimeraX, allowing you to preview it
+				and make sure the correct atoms were selected. 
+			</p>
+			<p>
+				Pressing <button>add current selection to library</button> will finalize the new
+				library entry. If a substituent with this name is already in your library, you will
+				be asked if you want to overwrite it. If your substituent name is also a valid selector
+				(name starts with a letter, all other characters are letters, numbers, '+', or '-').
+				It will appear on the select menu at
+				<br>
+				<span class="menulike">Select &rarr; Chemistry &rarr; Substituents &rarr; <i>
+				your substituent name</i>
+				</span>
+				<br>
+				The substituent will also be immediately usable with the 'Change Substituents'
+				tool or <span class="cxcmd">substitute</span> command.
+			</p>
+				
+		
+	</body>
+</html>

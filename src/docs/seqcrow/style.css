@@ -1,6 +1,7 @@
 html {
     height:100%;
-    //margin:0;
+    margin:0;
+    //background-color:#f0f0f0;
     //background-color:#FCECD9;
 	font-family:sans-serif;
 	line-height: 1.3;
@@ -18,9 +19,13 @@ kbd {
 	border: 1px solid dimgray;
 }
 body {
-	margin-left: 10%;
-	margin-right: 10%;
+	margin-right: 5em;
+	margin-left: 5em;
 	padding-bottom: 5em;
+	padding-left: 1em;
+	padding-right: 1em;
+	//border-left: 1rem solid #f0f0f0;
+	//border-right: 1rem solid #f0f0f0;
 }
 aside {
     width: 40%;
@@ -39,7 +44,7 @@ aside > p {
 }
 .head {
 	width:100%;
-	font-family:sans-serif;
+	//border-bottom: 0.1em solid #f0f0f0;
     height: 120px;
     margin:0;
 }
@@ -104,4 +109,7 @@ aside > p {
 	padding-bottom: 0.2ex;
 	border-radius: 2px;
 	font-family: monospace;
+}
+input {
+	background-color: #00ff00;
 }
