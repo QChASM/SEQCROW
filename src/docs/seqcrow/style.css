@@ -19,11 +19,9 @@ kbd {
 	border: 1px solid dimgray;
 }
 body {
-	margin-right: 5em;
-	margin-left: 5em;
 	padding-bottom: 5em;
-	padding-left: 1em;
-	padding-right: 1em;
+	padding-left: 0.1em;
+	padding-right: 0.1em;
 	//border-left: 1rem solid #f0f0f0;
 	//border-right: 1rem solid #f0f0f0;
 }

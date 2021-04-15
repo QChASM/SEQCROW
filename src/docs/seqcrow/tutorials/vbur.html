@@ -17,7 +17,7 @@
 		<h1>Buried Volume</h1>
 			<p>
 				Buried volume has proven to be a useful parameter for gauging steric
-				bulk around a catalyst center (see <a href="https://doi.org/10.1021/om034016k">
+				bulk of a ligand around a catalyst center (see <a href="https://doi.org/10.1021/om034016k">
 				https://doi.org/10.1021/om034016k</a>). Here, you will see how to calculate
 				and visualize buried volume using SEQCROW.
 			</p>
@@ -26,12 +26,11 @@
 		<h2>Buried Volume of an N-Heterocyclic Carbene Ligand</h2>
 			<p>
 				In this tutorial, we'll measure the %V<sub>bur</sub> of 
-				1,3-bis(1-adamantyl)imidazol-2-ylidene (IAd) on a metal
+				1,3-bis(2,6-diisopropylphenyl)imidazol-2-ylidene (IPr) on a metal
 				center. Click the command below	to open a structure of an
-				Ir(III) complex with an IAd ligand:
+				Ru(II) complex with an IPr ligand:
 				<br>
-				<a class="cxcmd" href="cxcmd:open XXX">
-				open XXX
+				<a class="cxcmd" href="cxcmd:open https://raw.githubusercontent.com/QChASM/SEQCROW/images_for_wiki/strux/Ru_Cp-star_IPr_Cl_10.1021.om034016k.xyz">open https://raw.githubusercontent.com/QChASM/SEQCROW/images_for_wiki/strux/Ru_Cp-star_IPr_Cl_10.1021.om034016k.xyz
 				</a>
 			</p>
 			<h3>Setting the Settings</h3>
@@ -49,6 +48,9 @@
 					There's also the option to scale the VDW radii to account for 
 					Real Molecules not being totally static, like this structure.
 				</p>
+				<aside>
+					<img src="../images/Vbur_IPr.png" width=256px/>
+				</aside>
 				<p>
 					The next thing we can do is specify the atoms to include in the buried 
 					volume calculation by selecting them. 
@@ -69,10 +71,8 @@
 					total volume, and the %V<sub>bur</sub> is the portion of this sphere
 					that is taken up by the VDW radii of the ligand. For the purpose of
 					this tutorial, we'll use 3.0 Å. This radius should be chosen to 
-					exclude most of the ligand's atoms that would never interact with
-					any other coordinated substrates, while still capturing the atoms
-					that likely do interact with substrates. For other systems, different
-					radii should be tested.
+					capture the parts of the ligand that likely do interact with substrates.
+					For other systems, different radii should be tested.
 				</p>
 				<p>
 					We can also choose what algorithm to use to integrate this volume.
@@ -80,10 +80,8 @@
 					of the sphere and a Gauss-Legendre quadrature for the radial component. 
 					For this method, we can choose how many points to use for the angular
 					and radial components. More points will result in lower error, but 
-					it will also take longer to calculate %V<sub>bur</sub>. Because of
-					The descrete nature of this integral, the Lebedev option will always
-					slightly underestimate the true value. With sufficient points, this
-					error should be negligable. 
+					it will also take longer to calculate %V<sub>bur</sub>. With sufficient
+					points, the error in caclulated %V<sub>bur</sub> should be negligable. 
 				</p>
 				<p>
 					The other option we have is Monte-Carlo integration. For this, we can
@@ -92,7 +90,7 @@
 					until it converges (%V<sub>bur</sub> changes by &lt; 0.01 over the last 
 					four iterations and the average change over the last four iterations is
 					&lt; 0.01). The sign of the error from the MC method is random, but will
-					typically fall within ± 0.3.
+					typically fall within ± 0.3 of the expected value.
 				</p>
 				<p>
 					The next option, 'use centroid of centers' might be useful for calculating
@@ -100,10 +98,10 @@
 					We'll leave that unchecked for this tutorial.
 				</p>
 				<p>
-					Simply select the iridium and press <button>calculate % buried
+					Simply select the ruthenium and press <button>calculate % buried
 					volume for selected centers</button>. The %V<sub>bur</sub>
 					value should appear in the table on the lower half of the tool.
-					you should get a value around XXX.
+					you should get a value around 28%.
 				</p>
 
 			<h3>Visualization options</h3>
@@ -119,24 +117,31 @@
 					plot of a 2-D projection of the VDW radii of the ligand's atoms. 
 					This can provide insight into areas where the steric bulk of the ligand
 					is encroaching on the center or where the center is relatively open. 
-					Let's turn this option on for the purpose of this tutorial.
+					Let's turn this option on for the purpose of this tutorial. <b>Note</b> -
+					VDW radii are scaled for %V<sub>bur</sub> calculations, but not for
+					steric maps.
 				</p>
 				<p>
 					When generating a steric map, the default is to orient the projection of
 					the VDW radii such that the average of the vectors from the coordinating
 					atoms to the center is orthogonal to the plane. For our monodentate ligand,
-					this means thhe C-Ir bond defines the plane everything is projected on. 
+					this means thhe C-Ru bond defines the plane everything is projected on. 
 					The y-axis of the plot is defined as orthogonal to the
 					plane-of-best-fit of the center and any coordinating atoms. This typically
 					makes sense for polydentate ligands. For a monodentate ligand, this is 
 					going to be random, which may or may not be useful. 
 				</p>
+				<aside>
+					<img src="../images/Ru_IPr.png"/>
+					<br>
+					<img src="../images/steric_map.png" width=256px/>
+				</aside>
 				<p>
 					To eliminate this randomness, we can check the 'use display orientation'
 					box. With this box checked, the steric map will use whatever orientation
 					the structure appears on the screen. Check the box, and try to align 
-					the structure so you are looking down the O≡C--Ir--C line, and the adamantyl
-					groups are at about 3 o'clock and 9 o'clock positions.
+					the structure so you are looking down the Ru--C bond, and the N-Ph bonds
+					are horizontal.
 				</p>
 				<p>
 					The next option, 'number of points', specifies how many points should be along
@@ -151,7 +156,7 @@
 				</p>
 				<p>
 					We can also choose the shape of the map: circle or square. Given that %V<sub>bur</sub>
-					is calculated using a sphere around the Ir, we'll use 'circle'. The square option
+					is calculated using a sphere around the Ru, we'll use 'circle'. The square option
 					might be useful for generating a steric map of a small molecule, however. 
 					The 'radius around center' option back on the 'calculation' tab determines the
 					radius of of the circle (or the apothem of the square) on the steric map.
@@ -166,6 +171,11 @@
 				</p>
 				
 				<h4>Volume Cutout</h4>
+				<aside>
+					<img src="../images/Ru_IPr_cutout.png"/>
+					<br>
+					Cp* and Cl hidden for clarity
+				</aside>
 				<p>
 					The volume around the center that is free or buried can also be visualized.
 					This is mostly useful for ensuring all the intended ligand atoms were

@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+
+	<head>
+		<meta charset="UTF-8">
+		<title>Sterimol</title>
+		<meta http-equiv="Content-Type" content="text/html">
+		<link rel="icon" href="../images/SEQCROW.png" type="image/png">
+		<link rel="stylesheet" href="../style.css">
+	</head>
+	
+	<div class="head">
+		<object data="../ribbon.html" class="head"></object>
+	</div>
+	
+	<body>
+		<h1>Sterimol Parameters</h1>
+			<aside>
+				<img src="../images/sterimol_bs.png" width=256px/>
+				<br>
+				Depiciton of the Sterimol B<sub>1</sub>-B<sub>5</sub> parameters
+				for an <i>i</i>Pr substituent. Black: B<sub>1</sub>, green: B<sub>2</sub>
+				purple: B<sub>3</sub>, yellow: B<sub>4</sub>, red: B<sub>5</sub>.
+			</aside>
+			<p>
+				Sterimol parameters are useful for measuring the size of a substituent; they
+				acknowldge that substituents are not one-dimensional. Several of these parameters
+				have been shown to correlate with reactivity or selectivity, indicating that
+				substituents on a catalyst are blocking the substrate or possibly pushing
+				substrates together to facilite bond formation. The Sterimol parameters that
+				have proven to be most useful for building models to predict chemical behavior
+				are B<sub>1</sub>, B<sub>5</sub>, and L. For the original description,
+				see 
+				<a href="https://doi.org/10.1002/ps.2780070410">https://doi.org/10.1002/ps.2780070410</a>
+		    </p>
+			<p>
+				The parameters B<sub>1</sub> to B<sub>4</sub> are defined based on a bounding
+				box of the van der Waals radii of the substituent atoms projected onto a plane
+				perpendicular to the bond between the molecule and the substituent. Once the
+				bounding box with the shortest distance from the molecule-substituent bond and
+				one of its sides is found, B<sub>1</sub> is the shortest distance from the
+				molecule-substituent bond and the bounding box. B<sub>2</sub>-B<sub>4</sub>
+				are the lengths from the molecule-substituent to the other sides of the 
+				bounding box, sorted in increasing order. The B<sub>5</sub> parameter is the
+				greatest distance from the molecule-substituent bond and the projected
+				VDW radii. The B<sub>1</sub> and B<sub>5</sub> parameters repsectively
+				measure the	minimum and maximum width of the substituent.
+			</p>
+			<aside>
+				<img src="../images/old_L.png" width=256px/>
+				<br>
+				Depiciton of AaronTools' approximation of the FORTRAN implementation
+				of the L parameter of an <i>i</i>Pr substituent
+				<br>
+				<img src="../images/at_L.png" width=256px/>
+				<br>
+				Depiciton of AaronTools' default L of an <i>i</i>Pr substituent
+			</aside>
+			<p>
+				The L parameter is the distance from the substituent atom that is bonded to
+				the rest of the molecule to the furthest projected VDW radius projected onto
+				the molecule-substituent bond vector. In the old FORTRAN implementation,
+				an additive correction is made to account for the substituent being bonded to
+				a standard carbon atom. This correction is 0.4 Å + the ideal bond lendth
+				between the first substituent atom and a hydrogen (it was required that
+				the substituent be capped with a hydrogen). AaronTools uses a 
+				different correction by default: simply the van der Waals radius of the
+				first substituent atom. Either way, the L parameter effectively measures
+				the "length" of the substituent.
+			</p>
+			<p>
+				In these tutorials, you'll see how to calculate the Sterimol parameter for
+				substituents using SEQCROW.
+			</p>
+
+		<h2>Calculating Sterimol Parameters for <i>i</i>Pr</h2>
+			<p>
+				We'll start with one substituent at a time. To begin we'll open up a
+				structure with an isopropyl substituent. The simplest structure is
+				<i>n</i>-propane (H-<i>i</i>Pr). Ideally, we would use an optimized
+				structure, but we'll settle for a generated one for this tutorial.
+				Click the command below to open a propane structure:
+				<br>
+				<a class="cxcmd" href="cxcmd:open smiles:C(C)C">open smiles:C(C)C</a>
+			</p>
+			<p>
+				Now let's open the Sterimol tool, which is found under
+				<span class="menulike">Tools &rarr; Structure Analysis &rarr; Substituent Sterimol</span>
+				or by running the command:
+				<br>
+				<a class="cxcmd" href="cxcmd:ui tool show &quot;Substituent Sterimol&quot;">
+				ui tool show "Substituent Sterimol"
+				</a>
+			</p>
+			<p>
+				We've got a few options when we calculate Sterimol parameters. The only
+				two that affect the parameter values are the radii and whether or not
+				to use the FORTRAN-style L (see description above). The two radii options,
+				UMN and Bondi, will give similar results. The main difference is that UMN
+				has better coverage of the periodic table, but Bondi is used more
+				frequently in the literature. For now, we'll just leave those on the
+				default. 
+			</p>
+				The other options, 'show vectors' and 'show radii', allow for visualization
+				of the parameters. We will check both of those boxes.
+			</p>
+			<p>
+				To calculate the Sterimol parameters, we need to select the <i>i</i>Pr
+				portion of this structure. This is simple enough with the iPr selector,
+				found under <span class="menulike">Selection &rarr; Chemistry &rarr;
+				Substituents &rarr; iPr</span> or by running the command:
+				<br>
+				<a class="cxcmd" href="cxcmd:select iPr">select iPr</a>
+			</p>
+			<p>
+				Now, simply press <button>calculate parameters for selected substituents</button>.
+				The table on the lower half of the table will now have an entry for this substituent.
+				You should get the following results:
+				<br>
+				<table style="border: 1px solid #5c5c5c; text-align:center;">
+					<tr>
+						<th style="border: 1px solid #5c5c5c;">Parameter</th>
+						<th style="border: 1px solid #5c5c5c;">Value (Å)</th>
+					</tr>
+					<tr>
+						<td style="border: 1px solid #5c5c5c;">B1</td>
+						<td style="border: 1px solid #5c5c5c;">1.99</td>
+					</tr>
+					<tr>
+						<td style="border: 1px solid #5c5c5c;">B2</td>
+						<td style="border: 1px solid #5c5c5c;">2.85</td>
+					</tr>
+					<tr>
+						<td style="border: 1px solid #5c5c5c;">B3</td>
+						<td style="border: 1px solid #5c5c5c;">3.14</td>
+					</tr>
+					<tr>
+						<td style="border: 1px solid #5c5c5c;">B4</td>
+						<td style="border: 1px solid #5c5c5c;">3.24</td>
+					</tr>
+					<tr>
+						<td style="border: 1px solid #5c5c5c;">B5</td>
+						<td style="border: 1px solid #5c5c5c;">3.25</td>
+					</tr>
+					<tr>
+						<td style="border: 1px solid #5c5c5c;">L</td>
+						<td style="border: 1px solid #5c5c5c;">4.40</td>
+					</tr>
+				</table>
+			</p>
+
+		<h2>Calculating Parameters for Multiple Substituents</h2>
+			<p>
+				In order to build a model relating Sterimol parameters to reactivity,
+				you would have to calculate the parameters for several substituents.
+				In this tutorial, you'll see how this can be accomplished efficiently
+				in SEQCROW.
+			</p>
+			<p>
+				To being, we'll open structures for several substituents (again,
+				it would be better if these were optimized structures). Click the
+				command below to load a few structures:
+				<br>
+				<a class="cxcmd" href="cxcmd:open smiles:C smiles:CC smiles:C(C)C smiles:C(C)(C)C smiles:C1=CC=CC=C1 smiles:CF smiles:C(F)F smiles:C(F)(F)F smiles:CCl smiles:C(Cl)Cl">
+				open smiles:C smiles:CC smiles:C(C)C smiles:C(C)(C)C smiles:C1=CC=CC=C1 smiles:CF smiles:C(F)F smiles:C(F)(F)F smiles:CCl smiles:C(Cl)Cl
+				</a>
+			</p>
+			<p>
+				Next, to visualize these more clearly, we'll reorient the structures so that we
+				are looking down the substituent-molecule bond and split them up (this is optional).
+				We're counting @H1 as the molecule in each of these structures, so:
+				<br>
+				<a class="cxcmd" href="cxcmd:lookDown @C1 atom2 @H1">lookDown @C1 atom2 @H1</a>
+				<br>
+				<a class="cxcmd" href="cxcmd:tile spacingFactor 2">tile spacingFactor 2</a>
+				<br>
+				We can also change the camera to eliminate the parallax effect:
+				<br>
+				<a class="cxcmd" href="cxcmd:camera ortho">camera ortho</a>
+				<br>
+				(To return to the default camera style, run <a class="cxcmd" href="cxcmd:camera mono">camera mono</a>)
+			</p>
+			<p>
+				Now, we just need to select the substituents. A concise way of doing this is
+				with the command
+				<br>
+				<a class="cxcmd" href="cxcmd:select ~@H1">select ~@H1</a>
+			</p>
+			<p>
+				Finally, we can just press <button>calculate parameters for selected substituents</button>.
+				If you'd also like a good view of the L parameters, you can run 
+				<a class="cxcmd" href="cxcmd:lookDown @C1 atom2 @H1 axis x">lookDown @C1 atom2 @H1 axis x</a>
+				<b>BEFORE</b> calculating Sterimol parameters (the <span class="cxcmd">lookDown</span>
+				command does not reorient the spheres or arrows).
+			</p>
+			<p>
+				These parameters can now be exported to a CSV file using the
+				<span>Export</span> menu on the tool window. Be sure to make
+				a note of which model id corresponds to which substituent.
+				From there, you can set up your regression model or do
+				other data processing.
+			</p>
+			
+	</body>
+</html>

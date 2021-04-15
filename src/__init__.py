@@ -417,7 +417,11 @@ class _SEQCROW_API(BundleAPI):
         elif command_info.name == "~highlight":
             from .commands.highlight import erase_highlight, erase_highlight_description
             register("~highlight", erase_highlight_description, erase_highlight)
-
+        
+        elif command_info.name == "lookDown":
+            from .commands.lookDown import lookDown, lookDown_description
+            register("lookDown", lookDown_description, lookDown)
+        
     @staticmethod
     def register_selector_menus(session):
         from Qt.QtWidgets import QAction

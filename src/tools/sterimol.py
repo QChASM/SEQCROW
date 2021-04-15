@@ -28,6 +28,7 @@ class _SterimolSettings(Settings):
         "display_radii": Value(True, BoolArg),
         "display_vectors": Value(True, BoolArg),
         "include_header": Value(True, BoolArg),
+        "old_L": Value(False, BoolArg),
         "delimiter": "comma",
     }
 
@@ -55,7 +56,20 @@ class Sterimol(ToolInstance):
         ndx = self.radii_option.findText(self.settings.radii, Qt.MatchExactly)
         self.radii_option.setCurrentIndex(ndx)
         layout.addRow("radii:", self.radii_option)
-        
+
+        self.old_L = QCheckBox()
+        self.old_L.setChecked(self.settings.old_L)
+        self.old_L.setToolTip(
+            """approximate the FORTRAN Sterimol method for determining L
+If X is the substituent atom connected to the rest of the molecule,
+this is 0.4 + the ideal X-H bond length + the distance from X to
+the furthest VDW radii projected onto the molecule-X bond vector
+By default, L is calculated as the distance from the VDW radius
+of X (on the molecule side) to the furthest VDW radius projected
+onto the molecule-X bond vector"""
+        )
+        layout.addRow("FORTRAN-style L:", self.old_L)
+
         self.display_vectors = QCheckBox()
         self.display_vectors.setChecked(self.settings.display_vectors)
         layout.addRow("show vectors:", self.display_vectors)
@@ -63,7 +77,7 @@ class Sterimol(ToolInstance):
         self.display_radii = QCheckBox()
         self.display_radii.setChecked(self.settings.display_radii)
         layout.addRow("show radii:", self.display_radii)
-        
+
         calc_sterimol_button = QPushButton("calculate parameters for selected substituents")
         calc_sterimol_button.clicked.connect(self.calc_sterimol)
         layout.addRow(calc_sterimol_button)
@@ -180,6 +194,7 @@ class Sterimol(ToolInstance):
         self.settings.radii = self.radii_option.currentText()
         self.settings.display_radii = self.display_radii.checkState() == Qt.Checked
         self.settings.display_vectors = self.display_vectors.checkState() == Qt.Checked
+        self.settings.old_L = self.old_L.checkState() == Qt.Checked
 
         targets, neighbors, datas = sterimol_cmd(
             self.session, 
@@ -188,6 +203,7 @@ class Sterimol(ToolInstance):
             showVectors=self.display_vectors.checkState() == Qt.Checked,
             showRadii=self.display_radii.checkState() == Qt.Checked,
             return_values=True,
+            oldL=self.old_L.checkState() == Qt.Checked,
         )
         
         if len(targets) == 0:
