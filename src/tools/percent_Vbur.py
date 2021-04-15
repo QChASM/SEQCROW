@@ -512,7 +512,10 @@ class PercentVolumeBuried(ToolInstance):
                 self.table.setItem(row, 1, c)
                 
                 v = QTableWidgetItem()
-                v.setData(Qt.DisplayRole, ",".join(["%.1f" % x for x in vbur]))
+                if include_vbur:
+                    v.setData(Qt.DisplayRole, ",".join(["%.1f" % x for x in vbur]))
+                else:
+                    v.setData(Qt.DisplayRole, "%.1f" % sum(vbur))
                 v.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
                 self.table.setItem(row, 2, v)
                 
