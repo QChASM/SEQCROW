@@ -235,6 +235,10 @@ class _SEQCROW_API(BundleAPI):
         elif ti.name == "File Info":
             from .tools import Info
             return Info(session, ti.name)
+
+        elif ti.name == "Cone Angle":
+            from .tools import ConeAngle
+            return ConeAngle(session, ti.name)
         
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)
@@ -421,7 +425,7 @@ class _SEQCROW_API(BundleAPI):
         elif command_info.name == "lookDown":
             from .commands.lookDown import lookDown, lookDown_description
             register("lookDown", lookDown_description, lookDown)
-        
+
     @staticmethod
     def register_selector_menus(session):
         from Qt.QtWidgets import QAction

@@ -99,8 +99,8 @@ class BuildQM(ToolInstance):
     additional options - generic (and uncurated) options
     """
 
-    SESSION_ENDURING = True
-    SESSION_SAVE = True
+    SESSION_ENDURING = False
+    SESSION_SAVE = False
 
     help = "https://github.com/QChASM/SEQCROW/wiki/Build-QM-Input-Tool"
 

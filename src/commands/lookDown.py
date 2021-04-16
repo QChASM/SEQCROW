@@ -1,6 +1,6 @@
 import numpy as np
 
-from chimerax.core.commands import CmdDesc, EnumOf
+from chimerax.core.commands import CmdDesc, EnumOf, BoolArg
 from chimerax.atomic import AtomsArg
 
 from AaronTools.utils.utils import rotation_matrix
@@ -12,12 +12,13 @@ lookDown_description = CmdDesc(
     keyword=[
         ("atom2", AtomsArg),
         ("axis", EnumOf(["x", "y", "z"])), 
+        ("printRotation", BoolArg),
     ],
     required_arguments=["atom2"],
     synopsis="orient the molecule such that the atom1-atom2 vector is out of the screen",
 )
 
-def lookDown(session, atom1, atom2, axis="z"):
+def lookDown(session, atom1, atom2, axis="z", printRotation=False):
     models_g1 = dict()
     for atom in atom1:
         if atom.structure not in models_g1:
@@ -50,9 +51,18 @@ def lookDown(session, atom1, atom2, axis="z"):
         v /= np.linalg.norm(v)
         
         rot_axis = np.cross(align_to, v)
-        angle = np.arccos(np.dot(v, align_to))
+        dot = np.dot(v, align_to)
+        if dot > 1:
+            dot = 1
+        elif dot < -1:
+            dot = -1
+        angle = np.arccos(dot)
         
         rot_mat = rotation_matrix(-angle, rot_axis)
+        
+        if printRotation:
+            session.logger.info("rotation matrix:\n%s" % "\n".join([",".join(["%.3f" % x for x in r]) for r in rot_mat]))
+            session.logger.info("rotation center: %s" % str(start))
         
         xyzs = model.active_coordset.xyzs
         xyzs -= start

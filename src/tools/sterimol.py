@@ -1,5 +1,3 @@
-import os
-
 import numpy as np
 
 from chimerax.core.tools import ToolInstance
@@ -11,8 +9,19 @@ from chimerax.core.generic3d import Generic3DModel
 
 from Qt.QtCore import Qt
 from Qt.QtGui import QKeySequence, QClipboard
-from Qt.QtWidgets import QPushButton, QFormLayout, QComboBox, QLineEdit, QLabel, QCheckBox, QMenuBar, QAction, \
-                            QFileDialog, QApplication, QTableWidget, QTableWidgetItem, QHeaderView
+from Qt.QtWidgets import (
+    QPushButton,
+    QFormLayout,
+    QComboBox,
+    QCheckBox,
+    QMenuBar,
+    QAction,
+    QFileDialog,
+    QApplication,
+    QTableWidget,
+    QTableWidgetItem,
+    QHeaderView,
+)
 
 from AaronTools.const import VDW_RADII, BONDI_RADII
 from AaronTools.substituent import Substituent
@@ -35,8 +44,8 @@ class _SterimolSettings(Settings):
 class Sterimol(ToolInstance):
 
     help = "https://github.com/QChASM/SEQCROW/wiki/Sterimol-Tool"
-    SESSION_ENDURING = True
-    SESSION_SAVE = True
+    SESSION_ENDURING = False
+    SESSION_SAVE = False
     
     def __init__(self, session, name):       
         super().__init__(session, name)

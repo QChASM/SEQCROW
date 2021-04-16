@@ -38,7 +38,7 @@
 					<a href="#multisub">Making Multiple Derivatives Simultaneously using the "Change Substituents" tool</a>
 				</li>
 				<li>
-					<a href="#residues">Changing Peptide Sidechains using the "Change Substituents" tool</a>
+					<a href="#residues">Changing Peptide Side Chains using the "Change Substituents" tool</a>
 				</li>
 			</ul>
 
@@ -205,7 +205,7 @@
 			<p>
 				In this tutorial, we'll be modifying two minima for a Claisen rearrangement using
 				the <a class="cxcmd">substitute</a> command. That is, running <a class="cxcmd">substitute</a>
-				just once to modify two structures. While, we could do this with the tool just as easily,
+				just once to modify two structures. While we could do this with the tool just as easily,
 				we're using the <a class="cxcmd">substitute</a> command out of fairness. An astute reader may
 				have already noticed that the tool runs the <a class="cxcmd">substitute</a> command.
 			</p>
@@ -244,7 +244,7 @@
 			</p>
 			<p>
 				ChimeraX commands and keyword names can be abbreviated as long as the abbreviation uniquely
-				identified the command or keyword. So, the <a class="cxcmd">substitute</a> command 
+				identifies the command or keyword. So, the <a class="cxcmd">substitute</a> command 
 				above can also be written as:
 				<br>
 				<a class="cxcmd" href="cxcmd:sub #1@H4 #2@H7 sub Me">sub #1@H4 #2@H7 sub Me</a>
@@ -275,7 +275,7 @@
 			
 			<p>
 				In the tools, 'substituent name' box, enter "Me,  Et,  iPr,  tBu, OMe, Cl". Substituent names
-				can be seperated by commas like this to request different substitutions. However, 'modify 
+				can be separated by commas like this to request different substitutions. However, 'modify 
 				selected structure' must be unchecked. This will create a new structure for every substitution
 				that was requested.
 			</p>
@@ -286,7 +286,7 @@
 				<a href="cxcmd:tile spacingFactor 2" class="cxcmd">tile spacingFactor 2</a> command to see them all.
 			</p>
 		
-		<h2 id="residues">Changing Peptide Sidechains</h2>
+		<h2 id="residues">Changing Peptide Side Chains</h2>
 			<p>
 				As most amino acid side chains can be thought of as substituents, we can also use the 
 				"Change Substituents" tool to mutate polypeptides. We'll be mutating a tyrosine to a 
@@ -304,7 +304,7 @@
 			</p>
 			<p>
 				Next, enter "COCH3" in the 'substituent name' box. Ensure 'use distance names' is checked.
-				To my knowledge, there is to three letter code for <i>p</i>-acetylphenylalanine, so we
+				To my knowledge, there is no three letter code for <i>p</i>-acetylphenylalanine, so we
 				can change the residue name to "FpAc" or something else. Press <button>substitute current
 				selection</button> to complete the mutation.
 			</p>

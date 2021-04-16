@@ -32,6 +32,8 @@
 				<br>
 				<a class="cxcmd" href="cxcmd:open https://raw.githubusercontent.com/QChASM/SEQCROW/images_for_wiki/strux/Ru_Cp-star_IPr_Cl_10.1021.om034016k.xyz">open https://raw.githubusercontent.com/QChASM/SEQCROW/images_for_wiki/strux/Ru_Cp-star_IPr_Cl_10.1021.om034016k.xyz
 				</a>
+				<br>
+				This structure is from the article mentioned above.
 			</p>
 			<h3>Setting the Settings</h3>
 				<p>
@@ -81,7 +83,7 @@
 					For this method, we can choose how many points to use for the angular
 					and radial components. More points will result in lower error, but 
 					it will also take longer to calculate %V<sub>bur</sub>. With sufficient
-					points, the error in caclulated %V<sub>bur</sub> should be negligable. 
+					points, the error in calculated %V<sub>bur</sub> should be negligible. 
 				</p>
 				<p>
 					The other option we have is Monte-Carlo integration. For this, we can
@@ -125,7 +127,7 @@
 					When generating a steric map, the default is to orient the projection of
 					the VDW radii such that the average of the vectors from the coordinating
 					atoms to the center is orthogonal to the plane. For our monodentate ligand,
-					this means thhe C-Ru bond defines the plane everything is projected on. 
+					this means the C-Ru bond defines the plane onto which everything is projected. 
 					The y-axis of the plot is defined as orthogonal to the
 					plane-of-best-fit of the center and any coordinating atoms. This typically
 					makes sense for polydentate ligands. For a monodentate ligand, this is 
@@ -139,9 +141,17 @@
 				<p>
 					To eliminate this randomness, we can check the 'use display orientation'
 					box. With this box checked, the steric map will use whatever orientation
-					the structure appears on the screen. Check the box, and try to align 
-					the structure so you are looking down the Ru--C bond, and the N-Ph bonds
-					are horizontal.
+					the structure appears on the screen. Check the box, and align 
+					the structure so you are looking down the Ru-C bond and the N's 
+					lie close to the x-axis:
+					<br>
+					<a class="cxcmd" href="cxcmd:lookDown @N1 atom2 @N2 axis x">
+					lookDown @N1 atom2 @N2 axis x
+					</a>
+					<br>
+					<a class="cxcmd" href="cxcmd:lookDown Ru atom2 @C11">
+					lookDown Ru atom2 @C11
+					</a>
 				</p>
 				<p>
 					The next option, 'number of points', specifies how many points should be along
@@ -149,9 +159,9 @@
 					more smooth, but take considerably longer to generate.
 				</p>
 				<p>
-					The quadratants can also be labeled with the %V<sub>bur</sub> in each by checking
-					the 'label quadratants with %V<sub>bur</sub>' box. This will also cause the
-					buried volume to be reported for each individial quadratant back on the 
+					The quadrant can also be labeled with the %V<sub>bur</sub> in each by checking
+					the 'label quadrant with %V<sub>bur</sub>' box. This will also cause the
+					buried volume to be reported for each individual quadrant back on the 
 					'calculation' tab.
 				</p>
 				<p>
@@ -159,7 +169,7 @@
 					is calculated using a sphere around the Ru, we'll use 'circle'. The square option
 					might be useful for generating a steric map of a small molecule, however. 
 					The 'radius around center' option back on the 'calculation' tab determines the
-					radius of of the circle (or the apothem of the square) on the steric map.
+					radius of the circle (or the apothem of the square) on the steric map.
 				</p>
 				<p>
 					By default, the minimum and maximum of the steric map are chosen automatically
@@ -178,8 +188,8 @@
 				</aside>
 				<p>
 					The volume around the center that is free or buried can also be visualized.
-					This is mostly useful for ensuring all the intended ligand atoms were
-					included in the %V<sub>bur</sub> calculation, but it also looks nice.
+					This is mostly useful for double checking that all the intended ligand atoms 
+					were included in the %V<sub>bur</sub> calculation, but it also looks nice.
 					For this tutorial, we'll create a volume cutout for the buried volume.
 				</p>
 				<p>

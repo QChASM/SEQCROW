@@ -191,6 +191,7 @@
                 <ChimeraXClassifier>ChimeraX :: Tool :: Rotate Atoms                   :: Structure Editing  :: Rotate all or part of a molecular structure</ChimeraXClassifier>
 				<ChimeraXClassifier>ChimeraX :: Tool :: Buried Volume                  :: Structure Analysis :: Calculate percent buried volume</ChimeraXClassifier>
 				<ChimeraXClassifier>ChimeraX :: Tool :: File Info                      :: AaronTools         :: Miscellaneous file data</ChimeraXClassifier>
+				<ChimeraXClassifier>ChimeraX :: Tool :: Cone Angle                     :: Structure Analysis :: Calculate ligand cone angles</ChimeraXClassifier>
                 <!--ChimeraXClassifier>ChimeraX :: Tool :: AARON Input Builder :: AARON :: Build AARON input file</ChimeraXClassifier-->
                 
                 <ChimeraXClassifier>ChimeraX :: Selector :: tm        :: Transition metals</ChimeraXClassifier>
