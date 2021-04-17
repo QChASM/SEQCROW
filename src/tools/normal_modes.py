@@ -1701,10 +1701,10 @@ class IRPlot(ChildToolWindow):
             
             self.figure.set_size_inches(w, h)
             
-            self.canvas.setMinimumHeight(100 * h)
-            self.canvas.setMaximumHeight(100 * h)
-            self.canvas.setMinimumWidth(100 * w)
-            self.canvas.setMaximumWidth(100 * w)
+            self.canvas.setMinimumHeight(96 * h)
+            self.canvas.setMaximumHeight(96 * h)
+            self.canvas.setMinimumWidth(96 * w)
+            self.canvas.setMaximumWidth(96 * w)
         else:
             self.canvas.setMinimumHeight(1)
             self.canvas.setMaximumHeight(100000)
@@ -1874,254 +1874,49 @@ class IRPlot(ChildToolWindow):
         self.drag_prev = None
         self.dragging = False
 
-    def get_data(self):
+    def refresh_plot(self):
+        
         fr = self.tool_instance.model_selector.currentData()
         if fr is None:
-            return None
-        fwhm = self.fwhm.value()
-        self.tool_instance.settings.fwhm = fwhm
-        self.tool_instance.settings.peak_type = self.peak_type.currentText()
-        self.tool_instance.settings.plot_type = self.tool_instance.plot_type.currentText()
-        self.tool_instance.settings.reverse_x = self.tool_instance.reverse_x.checkState() == Qt.Checked
-        eta = self.voigt_mix.value()
-        self.tool_instance.settings.voigt_mix = eta
-        
-        frequencies = np.array([freq.frequency for freq in fr.other['frequency'].data if freq.frequency > 0])
-        c1 = self.linear.value()
-        c2 = self.quadratic.value()
-        frequencies -= c1 * frequencies + c2 * frequencies ** 2
-        
-        intensities = [freq.intensity for freq in fr.other['frequency'].data if freq.frequency > 0]
-        e_factor = -4 * np.log(2) / fwhm ** 2
-        
-        if self.peak_type.currentText() != "Delta":
-            functions = []
-            x_values = np.linspace(0, max(frequencies) - 10 * fwhm, num=100).tolist()
-            for freq, intensity in zip(frequencies, intensities):
-                if intensity is not None:
-                    #make sure to get x values near the peak
-                    #this makes the peaks look hi res, but we can cheap out
-                    #on areas where there's no peak
-                    x_values.extend(
-                        np.linspace(
-                            max(freq - (3.5 * fwhm), 0), 
-                            freq + (3.5 * fwhm), 
-                            num=65,
-                        ).tolist()
-                    )
-                    x_values.append(freq)
-                    if self.peak_type.currentText() == "Gaussian":
-                        functions.append(lambda x, x0=freq, inten=intensity: \
-                                        inten * np.exp(e_factor * (x - x0) ** 2))
-    
-                    elif self.peak_type.currentText() == "Lorentzian":
-                        functions.append(lambda x, x0=freq, inten=intensity, : \
-                                        inten * 0.5 * (0.5 * fwhm / ((x - x0) ** 2 + (0.5 * fwhm)**2)))
-                    
-                    elif self.peak_type.currentText() == "pseudo-Voigt":
-                        functions.append(
-                            lambda x, x0=freq, inten=intensity:
-                                inten * (
-                                    (1 - eta) * 0.5 * (0.5 * fwhm / ((x - x0)**2 + (0.5 * fwhm)**2)) + 
-                                    eta * np.exp(e_factor * (x - x0)**2)
-                                )
-                        )
-    
-        
-            x_values = np.array(list(set(x_values)))
-            x_values.sort()
-            y_values = np.sum([f(x_values) for f in functions], axis=0)
-        
-        else:
-            x_values = []
-            y_values = []
-
-            for freq, intensity in zip(frequencies, intensities):
-                if intensity is not None:
-                    y_values.append(intensity)
-                    x_values.append(freq)
-
-            y_values = np.array(y_values)
-
-        if len(y_values) == 0:
-            self.tool_instance.session.logger.error("nothing to plot")
-            return None
-
-        y_values /= np.amax(y_values)
-
-
-        if self.tool_instance.plot_type.currentText() == "Transmittance":
-            y_values = np.array([10 ** (2 - y) for y in y_values])
-
-        return x_values, y_values
-
-    def refresh_plot(self):
-        data = self.get_data()
-        if data is None:
             return
-        x_values, y_values = data
-
         self.figure.clear()
 
-        if self.section_table.rowCount() == 1:
-            axes = [self.figure.subplots(nrows=1, ncols=1)]
-            widths = [max(x_values)]
-            centers = [max(x_values) / 2]
-        else:
-            n_sections = self.section_table.rowCount() - 1
-            self.figure.subplots_adjust(wspace=0.05)
+        freq = fr.other["frequency"]
+        
+        fwhm = self.fwhm.value()
+        self.tool_instance.settings.fwhm = fwhm
+        peak_type = self.peak_type.currentText()
+        self.tool_instance.settings.peak_type = peak_type
+        plot_type = self.tool_instance.plot_type.currentText()
+        self.tool_instance.settings.plot_type = plot_type
+        reverse_x = self.tool_instance.reverse_x.checkState() == Qt.Checked
+        voigt_mixing = self.voigt_mix.value()
+        self.tool_instance.voigt_mix = voigt_mixing
+        linear = self.linear.value()
+        quadratic = self.quadratic.value()
+        
+        centers = None
+        widths = None
+        if self.section_table.rowCount() > 1:
             centers = []
             widths = []
             for i in range(0, self.section_table.rowCount() - 1):
                 centers.append(self.section_table.cellWidget(i, 0).value())
                 widths.append(self.section_table.cellWidget(i, 1).value())
-                
-            widths = [x for _, x in sorted(
-                zip(centers, widths),
-                key=lambda p: p[0],
-                reverse=self.tool_instance.reverse_x.checkState() == Qt.Checked,
-            )]
-            centers = sorted(centers, reverse=self.tool_instance.reverse_x.checkState() == Qt.Checked)
-            
-            axes = self.figure.subplots(
-                nrows=1,
-                ncols=n_sections,
-                sharey=True,
-                gridspec_kw={'width_ratios': widths},
-            )
-            if not hasattr(axes, "__iter__"):
-                axes = [axes]
-
-        for i, ax in enumerate(axes):
-            if i == 0:
-                if self.tool_instance.plot_type.currentText() == "Transmittance":
-                    ax.set_ylabel('Transmittance (%)')
-                else:
-                    ax.set_ylabel('Absorbance (arb.)')
-            
-                if len(axes) > 1:
-                    ax.spines["right"].set_visible(False)
-                    ax.tick_params(labelright=False, right=False)
-                    ax.plot(
-                        [1, 1],
-                        [0, 1],
-                        marker=((-1, -1), (1, 1)),
-                        markersize=5,
-                        linestyle='none',
-                        color='k',
-                        mec='k',
-                        mew=1,
-                        clip_on=False,
-                        transform=ax.transAxes,
-                    )
-
-            elif i == len(axes) - 1 and len(axes) > 1:
-                ax.spines["left"].set_visible(False)
-                ax.tick_params(labelleft=False, left=False)
-                ax.plot(
-                    [0, 0],
-                    [0, 1],
-                    marker=((-1, -1), (1, 1)),
-                    markersize=5,
-                    linestyle='none',
-                    color='k',
-                    mec='k',
-                    mew=1,
-                    clip_on=False,
-                    transform=ax.transAxes,
-                )
-
-            elif len(axes) > 1:
-                ax.spines["right"].set_visible(False)
-                ax.spines["left"].set_visible(False)
-                ax.tick_params(labelleft=False, labelright=False, left=False, right=False)
-                ax.plot(
-                    [0, 0],
-                    [0, 1],
-                    marker=((-1, -1), (1, 1)),
-                    markersize=5,
-                    linestyle='none',
-                    label="Silence Between Two Subplots",
-                    color='k',
-                    mec='k',
-                    mew=1,
-                    clip_on=False,
-                    transform=ax.transAxes,
-                )
-                ax.plot(
-                    [1, 1],
-                    [0, 1],
-                    marker=((-1, -1), (1, 1)),
-                    markersize=5,
-                    label="Silence Between Two Subplots",
-                    linestyle='none',
-                    color='k',
-                    mec='k',
-                    mew=1,
-                    clip_on=False,
-                    transform=ax.transAxes,
-                )
-
-
-            if self.peak_type.currentText() != "Delta":
-                ax.plot(
-                    x_values,
-                    y_values,
-                    color='k',
-                    linewidth=0.5,
-                    label="computed",
-                )
-            else:
-                if self.tool_instance.plot_type.currentText() == "Transmittance":
-                    ax.vlines(
-                        x_values,
-                        y_values,
-                        [100 for y in y_values],
-                        linewidth=0.5,
-                        colors=['k' for x in x_values],
-                        label="computed"
-                    )
-                    ax.hlines(
-                        100,
-                        0,
-                        max(4000, *x_values),
-                        linewidth=0.5,
-                        colors=['k' for y in y_values],
-                        label="computed",
-                    )
-                
-                else:
-                    ax.vlines(
-                        x_values,
-                        [0 for y in y_values],
-                        y_values,
-                        linewidth=0.5,
-                        colors=['k' for x in x_values],
-                        label="computed"
-                    )
-                    ax.hlines(
-                        0,
-                        0,
-                        max(4000, *x_values),
-                        linewidth=0.5,
-                        colors=['k' for y in y_values],
-                        label="computed"
-                    )
-
-            if self.exp_data:
-                for x, y, color in self.exp_data:
-                    ax.plot(x, y, color=color, zorder=-1, linewidth=0.5, label="observed")
-
-            center = centers[i]
-            width = widths[i]
-            high = center + width / 2
-            low = center - width / 2
-            if self.tool_instance.reverse_x.checkState() == Qt.Checked:
-                ax.set_xlim(high, low)
-            else:
-                ax.set_xlim(low, high)
         
-        self.figure.text(0.5, 0.0, r"wavenumber (cm$^{-1}$)" , ha="center", va="bottom")
+        freq.plot_ir(
+            self.figure,
+            centers=centers,
+            widths=widths,
+            exp_data=self.exp_data,
+            plot_type=plot_type,
+            peak_type=peak_type,
+            reverse_x=reverse_x,
+            fwhm=fwhm,
+            voigt_mixing=voigt_mixing,
+            linear_scale=linear,
+            quadratic_scale=quadratic,
+        )
 
         self.canvas.draw()
 
@@ -2189,7 +1984,6 @@ class IRPlot(ChildToolWindow):
             self.exp_data = []
 
         for i in range(1, data.shape[1]):
-            print(i)
             self.exp_data.append((data[:,0], data[:,i], hex_code))
 
     def clear_data(self, *args):

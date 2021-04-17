@@ -247,6 +247,23 @@ class EnergyPlot(ToolInstance):
         else:
             self.annotation.set_text(repr(self.ys[ndx]))
     
+    def update_hover(self, ndx):  
+        ax = self.figure.gca()
+        for line in ax.lines:
+            if line.get_label() == "hover":
+                ax.lines.remove(line)
+                break
+        
+        hover_circle = ax.plot(
+            self.structure.coordset_ids[ndx],
+            self.ys[ndx],
+            marker='o',
+            markersize=5,
+            color='gray',
+            zorder=-1,
+            label="hover",
+        )
+    
     def drag(self, event):
         modifiers = keyboardModifiers()
         if self.toolbar.mode != "":
@@ -257,17 +274,31 @@ class EnergyPlot(ToolInstance):
         elif modifiers != Qt.NoModifier:
             return
         elif event.button == 1:
+            vis = self.annotation.get_visible()
+            if event.xdata:
+                ndx = max(0, int(round(event.xdata)) - 1)
+                ndx = min(self.structure.num_coordsets - 1, ndx)
+                self.update_hover(ndx)
+                self.update_label(ndx)
+                self.annotation.set_visible(True)
+                self.canvas.draw()
             return self.change_coordset(event)
         elif self.press is None:
             vis = self.annotation.get_visible()
             on_item, ndx = self.nrg_plot.contains(event)
             if on_item:
                 self.update_label(ndx['ind'][0])
+                self.update_hover(ndx['ind'][0])
                 self.annotation.set_visible(True)
                 self.canvas.draw()
             else:
                 if vis:
                     self.annotation.set_visible(False)
+                    ax = self.figure.gca()
+                    for line in ax.lines:
+                        if line.get_label() == "hover":
+                            ax.lines.remove(line)
+                            break
                     self.canvas.draw()
             return
         elif event.button != 2:

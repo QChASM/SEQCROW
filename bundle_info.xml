@@ -280,5 +280,6 @@
 	
 	<DataFiles>
 		<DataDir>docs</DataDir>
+		<DataDir>mouse_modes/icons</DataDir>
 	</DataFiles>
 </BundleInfo>

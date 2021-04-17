@@ -281,9 +281,7 @@ class ConeAngle(ToolInstance):
                 )
             else:
                 comp = Component(
-                    rescol.find(
-                        NotAny(at_center)
-                    ),
+                    rescol.find(NotAny(at_center)),
                     to_center=rescol.find_exact(AtomSpec(center_atom.atomspec)),
                     key_atoms=rescol.find(BondedTo(at_center)),
                 )

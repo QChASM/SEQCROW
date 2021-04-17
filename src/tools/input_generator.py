@@ -959,6 +959,26 @@ class BuildQM(ToolInstance):
         """run job"""
         self.update_theory(update_settings=True)
 
+        # need to convert constraints to atoms so they can be encoded by the 
+        # job manager
+        for job in self.theory.job_type:
+            if isinstance(job, OptimizationJob):
+                if job.constraints:
+                    for key in job.constraints:
+                        if key == "atoms":
+                            if not job.constraints["atoms"]:
+                                continue
+                            job.constraints["atoms"] = [
+                                "%i" % (self.theory.geometry.atoms.index(atom) + 1)
+                                for atom in self.theory.geometry.find(job.constraints["atoms"])
+                            ]
+                        else:
+                            for i, con in enumerate(job.constraints[key]):
+                                job.constraints[key][i] = [
+                                    "%i" % (self.theory.geometry.atoms.index(atom) + 1)
+                                    for atom in self.theory.geometry.find(con)
+                                ]
+
         kw_dict = self.job_widget.getKWDict(update_settings=True)
         other_kw_dict = self.other_keywords_widget.getKWDict(update_settings=True)
         self.settings.save()

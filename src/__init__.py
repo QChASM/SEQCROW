@@ -35,7 +35,12 @@ class _SEQCROW_API(BundleAPI):
                 'ready',
                 lambda *args, ses=session: _SEQCROW_API.register_tutorials(ses)
             )
-        
+
+            session.ui.triggers.add_handler(
+                'ready',
+                lambda *args, ses=session: _SEQCROW_API.register_mouse_modes(ses)
+            )
+
         #apply AARONLIB setting
         if seqcrow_settings.settings.AARONLIB is not None:
             os.environ['AARONLIB'] = seqcrow_settings.settings.AARONLIB
@@ -462,6 +467,11 @@ class _SEQCROW_API(BundleAPI):
         seqcrow_tutorials.setToolTip("Tutorials for the SEQCROW bundle")
         seqcrow_tutorials.triggered.connect(lambda *args: run(session, "help help:seqcrow/tutorials.html"))
         help_menu.addAction(seqcrow_tutorials)
+
+    @staticmethod
+    def register_mouse_modes(session):
+        from SEQCROW.mouse_modes import SelectConnectedMouseMode
+        mice = session.ui.mouse_modes.add_mode(SelectConnectedMouseMode(session))
 
     @staticmethod
     def get_class(name):
