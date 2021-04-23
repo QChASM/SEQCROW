@@ -1,5 +1,5 @@
 from chimerax.atomic import selected_atoms, selected_bonds, AtomicStructure, PseudobondGroup
-from chimerax.core.commands import BoolArg, FloatArg, ColorArg, ObjectsArg, CmdDesc
+from chimerax.core.commands import BoolArg, FloatArg, ColorArg, ObjectsArg, CmdDesc, run
 
 
 tsbond_description = CmdDesc(required=[("selection", ObjectsArg)],  \
@@ -74,4 +74,10 @@ def erase_tsbond(session, selection):
             continue
         for bond in pbg.pseudobonds:
             if all(atom in atoms for atom in bond.atoms) or bond in pbonds:
+                atom1, atom2 = bond.atoms
                 bond.delete()
+                run(
+                    session,
+                    "bond %s %s reasonable true" % (atom1.atomspec, atom2.atomspec),
+                    log=False
+                )

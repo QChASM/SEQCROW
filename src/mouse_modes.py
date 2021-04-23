@@ -9,9 +9,12 @@ from chimerax.atomic.structure import (
     PickedPseudobond,
 )
 from chimerax.core.commands import run
+from chimerax.markers import MarkerSet, create_link
 from chimerax.mouse_modes import MouseMode
 
 from SEQCROW.selectors import get_fragment
+
+import numpy as np
 
 
 class SelectConnectedMouseMode(MouseMode):
@@ -62,7 +65,7 @@ class SelectConnectedMouseMode(MouseMode):
         
         dx, dy = dp
         x, y = event.position()
-        self._dragging = abs(x-dx) + abs(y-dy) > self.minimum_drag_pixels
+        self._dragging = abs(x - dx) + abs(y - dy) > self.minimum_drag_pixels
 
         return self._dragging
 
@@ -179,84 +182,219 @@ class SelectConnectedMouseMode(MouseMode):
             run(self.session, "select clear")
 
 
+class _BondMarkers(MarkerSet):
+    def create_marker(self, atom):
+        mark = super().create_marker(atom.coord, atom.color, 1e-8)
+        return mark
+    
+    def create_marker_from_point(self, *args):
+        mark = super().create_marker(*args)
+        return mark
+
+
+class _TSBondMarkers(MarkerSet):
+    def create_marker(self, atom):
+        mark = super().create_marker(atom.coord, (170, 255, 255, 127), 1e-8)
+        return mark
+
+    def create_marker_from_point(self, pt, rgba, rad):
+        mark = super().create_marker(pt, (170, 255, 255, 127), rad)
+
 class DrawBondMouseMode(MouseMode):
     name = "bond"
+    ms_cls = _BondMarkers
+    scale = 1.0
 
     def __init__(self, session):
         super().__init__(session)
         
+        self._markerset = None
         self._atom1 = None
-    
-    def mouse_up(self, event):
+        self._atom2 = None
+        self._dragging = False
+        self.minimum_drag_pixels = 5
+
+    def mouse_down(self, event):
+        super().mouse_down(event)
         x, y = event.position()
         pick = self.view.picked_object(x, y)
-
-        if event.shift_down() and not pick:
-            self._atom1 = None
-        
-        if isinstance(pick, PickedBond):
-            bond = pick.bond
-            run(self.session, "~bond %s" % bond.atomspec)
-            return
-
         if not isinstance(pick, PickedAtom):
             return
         
-        atom = pick.atom
-        
-        if self._atom1 is None or self._atom1.deleted or self._atom1 is atom:
-            self._atom1 = atom
-            return
-        
-        if atom.structure is self._atom1.structure:
-            run(self.session, "bond %s %s reasonable false" % (
-                atom.atomspec, self._atom1.atomspec
-            ))
-            self._atom1 = None
-        else:
-            self._atom1 = atom
-
-
-class DrawTSBondMouseMode(MouseMode):
-    name = "tsbond"
-
-    def __init__(self, session):
-        super().__init__(session)
-        
-        self._atom1 = None
+        self._atom1 = pick.atom
     
+    def _is_drag(self, event):
+        dp = self.mouse_down_position
+        if dp is None:
+            return False
+        
+        if self._dragging:
+            return True
+        
+        dx, dy = dp
+        x, y = event.position()
+        self._dragging = abs(x - dx) + abs(y - dy) > self.minimum_drag_pixels
+
+        return self._dragging
+
+    def mouse_drag(self, event):
+        if not self._dragging and self._atom1:
+            if self._is_drag(event):
+                self._markerset = self.ms_cls(self.session, "bond")
+                self._markerset.create_marker(self._atom1)
+                self._atom1.structure.add([self._markerset])
+                return
+
+        if self._markerset:
+            x, y = event.position()
+            pick = self.view.picked_object(x, y)
+            if isinstance(pick, PickedAtom) and pick.atom.structure is self._atom1.structure:
+                atom2 = pick.atom
+                if atom2 is self._atom1:
+                    return
+                if self._markerset.num_atoms > 1:
+                    self._markerset.atoms[1].delete()
+                self._atom2 = atom2
+                self._markerset.create_marker(atom2)
+                fake_bond = create_link(*self._markerset.atoms)
+                fake_bond.halfbond = True
+                avg_radius = self.avg_bond_radius(self._atom1, self._atom2)
+                fake_bond.radius = avg_radius
+            
+            elif self._atom1:
+                self._atom2 = None
+                x1, x2 = self.session.main_view.clip_plane_points(x, y)
+                v = x2 - x1
+                v /= np.linalg.norm(v)
+                p = np.dot(self._atom1.scene_coord - x1, v)
+                pt = x1 + p * v + (self._atom1.coord - self._atom1.scene_coord)
+                if self._markerset.num_atoms > 1:
+                    self._markerset.atoms[1].delete()
+
+                avg_radius = self.avg_bond_radius(self._atom1)
+
+                mark = self._markerset.create_marker_from_point(
+                    pt,
+                    self._atom1.color,
+                    avg_radius,
+                )
+                fake_bond = create_link(*self._markerset.atoms)
+                fake_bond.halfbond = True
+
+                fake_bond.radius = avg_radius
+
+    def reset(self):
+        if self._markerset:
+            self._markerset.delete()
+        self._markerset = None
+        self._atom1 = None
+        self._atom = None
+        self._dragging = False
+
+    def avg_bond_radius(self, *args):
+        count = 0
+        avg = 0
+        for atom in args:
+            for bond in atom.bonds:
+                avg += bond.radius
+                count += 1
+        
+        if count:
+            avg /= count
+        else:
+            avg = 0.2
+        
+        return self.scale * avg
+
     def mouse_up(self, event):
+        super().mouse_up(event)
         x, y = event.position()
         pick = self.view.picked_object(x, y)
 
-        if event.shift_down() and not pick:
-            self._atom1 = None
         
-        if isinstance(pick, PickedPseudobond):
+        if isinstance(pick, PickedBond) and not self._markerset:
+            bond = pick.bond
+            run(self.session, "~bond %s" % bond.atomspec)
+            self.reset()
+            return
+
+        if not isinstance(pick, PickedAtom) and not self._atom2:
+            self.reset()
+            return
+
+        if not self._atom1:
+            self.reset()
+            return
+
+        if isinstance(pick, PickedAtom) and pick.atom.structure is self._atom1.structure:
+            atom = pick.atom
+        else:
+            atom = self._atom2
+        
+        if not atom:
+            self.reset()
+            return
+        
+        if atom.structure is self._atom1.structure and atom is not self._atom1:
+            if atom not in self._atom1.neighbors:
+                avg_radius = self.avg_bond_radius(self._atom1, atom)
+                new_bond = atom.structure.new_bond(atom, self._atom1)
+                new_bond.radius = avg_radius
+
+        self.reset()
+
+
+class DrawTSBondMouseMode(DrawBondMouseMode):
+    name = "tsbond"
+    scale = 1.0
+    ms_cls = _TSBondMarkers
+
+    def mouse_up(self, event):
+        MouseMode.mouse_up(self, event)
+        
+        self._dragging = False
+        
+        x, y = event.position()
+        pick = self.view.picked_object(x, y)
+
+        
+        if isinstance(pick, PickedPseudobond) and not self._markerset:
             bond = pick.pbond
             if bond.group.name == "TS bonds":
                 atom1, atom2 = bond.atoms
                 run(self.session, "~tsbond %s %s" % (atom1.atomspec, atom2.atomspec))
-                run(self.session, "bond %s %s reasonable true" % (atom1.atomspec, atom2.atomspec))
-                return
+                self.reset()
+            return
 
-        if isinstance(pick, PickedBond):
+        if isinstance(pick, PickedBond) and not self._markerset:
             bond = pick.bond
             run(self.session, "tsbond %s" % bond.atomspec)
+            self.reset()
             return
 
-        if not isinstance(pick, PickedAtom):
+        if not self._atom1:
             return
-        
-        atom = pick.atom
-        
-        if self._atom1 is None or self._atom1.deleted or self._atom1 is atom:
-            self._atom1 = atom
-            return
-        
-        if atom.structure is self._atom1.structure:
-            run(self.session, "tsbond %s %s" % (atom.atomspec, self._atom1.atomspec))
-            self._atom1 = None
+
+        if isinstance(pick, PickedAtom) and pick.atom.structure is self._atom1.structure:
+            atom = pick.atom
         else:
-            self._atom1 = atom
+            atom = self._atom2
+        
+        if not atom:
+            self.reset()
+            return
+        
+        if atom.structure is self._atom1.structure and atom is not self._atom1:
+            avg_radius = self.avg_bond_radius(self._atom1, atom)
+            
+            run(
+                self.session,
+                "tsbond %s %s radius %.3f" % (
+                    self._atom1.atomspec,
+                    atom.atomspec,
+                    avg_radius,
+                )
+            )
+
+        self.reset()
 

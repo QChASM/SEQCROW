@@ -25,7 +25,7 @@ class Highlight(MarkerSet):
         
         global_triggers = get_triggers()
         self._changes = global_triggers.add_handler("changes", self.check_changes)
-        
+
     def create_marker(self, atom, rgba, scale):
         for a in self.atoms:
             if a._follow is atom:
