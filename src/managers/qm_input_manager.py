@@ -9,7 +9,6 @@ class QMInputManager(ProviderManager):
         super().__init__(*args, **kwargs)
     
     def add_provider(self, bundle_info, name):
-        print("adding %s format" % name)
         if name in self.formats:
             self.session.logger.warning(
                 "file format %s from %s supplanted that from %s" % (

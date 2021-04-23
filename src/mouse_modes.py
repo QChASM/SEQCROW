@@ -5,7 +5,8 @@ from chimerax.atomic.structure import (
     PickedAtom,
     PickedBond, 
     PickedResidue,
-    PickedResidues
+    PickedResidues,
+    PickedPseudobond,
 )
 from chimerax.core.commands import run
 from chimerax.mouse_modes import MouseMode
@@ -17,7 +18,6 @@ class SelectConnectedMouseMode(MouseMode):
     """select everything with a bonding path to clicked atoms"""
     name = "select connected"
     icon_file = "icons/connected.png"
-    _menu_entry_info = []
     
     def __init__(self, session):
         super().__init__(session)
@@ -51,21 +51,19 @@ class SelectConnectedMouseMode(MouseMode):
             self.select_pick(pick, set_sel)
         
         super().mouse_up(event)
-    
-    @classmethod
-    def register_menu_entry(cls, menu_entry):
-        cls._menu_entry_info.append(menu_entry)
-    
+
     def _is_drag(self, event):
         dp = self.mouse_down_position
         if dp is None:
             return False
+        
         if self._dragging:
             return True
+        
         dx, dy = dp
         x, y = event.position()
-        mp = self.minimum_drag_pixels
-        self._dragging = abs(x-dx) + abs(y-dy) > mp
+        self._dragging = abs(x-dx) + abs(y-dy) > self.minimum_drag_pixels
+
         return self._dragging
 
     def _draw_drag_rectangle(self, event):
@@ -75,7 +73,6 @@ class SelectConnectedMouseMode(MouseMode):
         w, h = view.window_size
         view.draw_xor_rectangle(dx, h - dy, x, h - y, self.drag_color)
         self._drawn_rectangle = ((dx, dy), (x, y))
-
 
     def _undraw_drag_rectangle(self):
         dr = self._drawn_rectangle
@@ -89,7 +86,7 @@ class SelectConnectedMouseMode(MouseMode):
     def vr_press(self, event):
         # Virtual reality hand controller button press.
         pick = event.picked_object(self.view)
-        select_pick(self.session, pick, self.mode)
+        self.select_pick(pick, False)
 
     def select_pick(self, pick, set_sel):
         if set_sel:
@@ -148,26 +145,28 @@ class SelectConnectedMouseMode(MouseMode):
 
                 elif isinstance(p, PickedResidues):
                     for res in p.residues:
-                        if res.atoms[0] in atoms:
+                        for atom in res:
+                            if atom in atoms:
+                                continue
+                            connected_atoms = get_fragment(
+                                atom,
+                                max_len=res.structure.num_atoms
+                            )
+                            atoms = atoms.merge(connected_atoms)
+                            if first_selected is None:
+                                first_selected = atoms[0].selected
+
+                elif isinstance(p, PickedResidue):
+                    for atom in p.residue.atoms:
+                        if atoms in atoms:
                             continue
                         connected_atoms = get_fragment(
-                            res.atoms[0],
-                            max_len=res.structure.num_atoms
+                            atom,
+                            max_len=p.residue.structure.num_atoms
                         )
                         atoms = atoms.merge(connected_atoms)
                         if first_selected is None:
                             first_selected = atoms[0].selected
-
-                elif isinstance(p, PickedResidue):
-                    if p.residue.atoms[0] in atoms:
-                        continue
-                    connected_atoms = get_fragment(
-                        p.residue.atoms[0],
-                        max_len=p.residue.structure.num_atoms
-                    )
-                    atoms = atoms.merge(connected_atoms)
-                    if first_selected is None:
-                        first_selected = atoms[0].selected
 
             for atom in atoms:
                 for neighbor, bond in zip(atom.neighbors, atom.bonds):
@@ -178,3 +177,86 @@ class SelectConnectedMouseMode(MouseMode):
                 bonds.selected = not first_selected
         else:
             run(self.session, "select clear")
+
+
+class DrawBondMouseMode(MouseMode):
+    name = "bond"
+
+    def __init__(self, session):
+        super().__init__(session)
+        
+        self._atom1 = None
+    
+    def mouse_up(self, event):
+        x, y = event.position()
+        pick = self.view.picked_object(x, y)
+
+        if event.shift_down() and not pick:
+            self._atom1 = None
+        
+        if isinstance(pick, PickedBond):
+            bond = pick.bond
+            run(self.session, "~bond %s" % bond.atomspec)
+            return
+
+        if not isinstance(pick, PickedAtom):
+            return
+        
+        atom = pick.atom
+        
+        if self._atom1 is None or self._atom1.deleted or self._atom1 is atom:
+            self._atom1 = atom
+            return
+        
+        if atom.structure is self._atom1.structure:
+            run(self.session, "bond %s %s reasonable false" % (
+                atom.atomspec, self._atom1.atomspec
+            ))
+            self._atom1 = None
+        else:
+            self._atom1 = atom
+
+
+class DrawTSBondMouseMode(MouseMode):
+    name = "tsbond"
+
+    def __init__(self, session):
+        super().__init__(session)
+        
+        self._atom1 = None
+    
+    def mouse_up(self, event):
+        x, y = event.position()
+        pick = self.view.picked_object(x, y)
+
+        if event.shift_down() and not pick:
+            self._atom1 = None
+        
+        if isinstance(pick, PickedPseudobond):
+            bond = pick.pbond
+            if bond.group.name == "TS bonds":
+                atom1, atom2 = bond.atoms
+                run(self.session, "~tsbond %s %s" % (atom1.atomspec, atom2.atomspec))
+                run(self.session, "bond %s %s reasonable true" % (atom1.atomspec, atom2.atomspec))
+                return
+
+        if isinstance(pick, PickedBond):
+            bond = pick.bond
+            run(self.session, "tsbond %s" % bond.atomspec)
+            return
+
+        if not isinstance(pick, PickedAtom):
+            return
+        
+        atom = pick.atom
+        
+        if self._atom1 is None or self._atom1.deleted or self._atom1 is atom:
+            self._atom1 = atom
+            return
+        
+        if atom.structure is self._atom1.structure:
+            run(self.session, "tsbond %s %s" % (atom.atomspec, self._atom1.atomspec))
+            self._atom1 = None
+        else:
+            self._atom1 = atom
+

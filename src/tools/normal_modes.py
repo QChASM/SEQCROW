@@ -1427,7 +1427,7 @@ class NormalModes(ToolInstance):
     def show_ir_plot(self, *args, create=True, **kwargs):
         if self.ir_plot is None and create:
             self.ir_plot = self.tool_window.create_child_window("IR Plot", window_class=IRPlot)
-        else:
+        elif self.ir_plot is not None:
             self.ir_plot.refresh_plot()
     
     def highlight_ir_plot(self, *args):

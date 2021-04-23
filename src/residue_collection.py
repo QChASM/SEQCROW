@@ -320,6 +320,7 @@ class Residue(Geometry):
             
         return super().substitute(sub, target, *args, attached_to=attached_to, **kwargs) 
 
+
 class ResidueCollection(Geometry):
     """geometry object used for SEQCROW to easily convert to AaronTools but keep residue info"""
     def __init__(self, molecule, name="new", bonds_matter=True, convert_residues=None, use_scene=False, **kwargs):

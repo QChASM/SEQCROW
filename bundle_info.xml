@@ -31,7 +31,6 @@
             * <b>Job Queue</b>                   - manage QM jobs that are run with SEQCROW
             * <b>Managed Models</b>              - restore models opened through SEQCROW to their original state
             
-            
             ### Structure Analysis
             * <b>Sterimol</b>                    - determine the L, B<sub>1</sub>, and B<sub>5</sub> Sterimol parameters for a selected substituent 
             
@@ -57,12 +56,16 @@
                 <Dependency name="ChimeraX-Core" version="~=1.2.dev"/>
                 <Dependency name="scipy"/>
                 <Dependency name="Send2Trash"/>
-				<!-- wait for numpy to fix fortran stuff in python 3.8
+                <!-- wait for numpy to fix fortran stuff in python 3.8
                 I've tried installing this with just gfortran on windows, but no luck
                 <Dependency name="stripy"/>
-				-->
+                -->
             </Dependencies>
-            
+
+			<Initializations>
+				<InitAfter type="custom" bundle="ChimeraX-MouseModes"/>
+			</Initializations>
+
             <Categories>
                 <Category name="General"/>
                 <Category name="Input/Output"/>
@@ -143,13 +146,13 @@
                 <Provider name="ORCA"/>
                 <Provider name="Psi4"/>
             </Providers>
-			
+            
             <Providers manager="seqcrow_qm_input_manager">
                 <Provider name="Gaussian"/>
                 <Provider name="ORCA"/>
                 <Provider name="Psi4"/>
             </Providers>
-			
+            
             <Providers manager="test_manager">
                 <Provider name="fuseRing_command"/>
                 <Provider name="input_builder"/>
@@ -157,7 +160,34 @@
                 <Provider name="substitute_command"/>
                 <Provider name="buried_volume"/>
             </Providers>
-
+  
+            <Providers manager="toolbar">
+                <Provider tab="Right Mouse"
+                          section="Movement"
+                          name="seqcrow_1"
+                          mouse_mode="select connected"
+                          display_name="Select Fragment" 
+                          description="Select molecular fragment"
+                          icon="connected.png"
+                />
+				<Provider tab="Right Mouse"
+                          section="Structure Modification"
+                          name="seqcrow_2"
+                          mouse_mode="bond"
+                          display_name="Bond" 
+                          description="Draw a new bond"
+                          icon="bond.png"
+                />
+				<Provider tab="Right Mouse"
+                          section="Structure Modification"
+                          name="seqcrow_3"
+                          mouse_mode="tsbond"
+                          display_name="TS Bond" 
+                          description="Draw a forming/breaking bond"
+                          icon="tsbond.png"
+                />
+            </Providers>
+            
             <Classifiers>
                 <PythonClassifier>Development Status :: 2 - Pre-Alpha</PythonClassifier>
                 <PythonClassifier>License :: OSI Approved :: GNU General Public License v3 (GPLv3)</PythonClassifier>
@@ -172,8 +202,8 @@
                 <!--NOTE:
                 including my own Bundle line will prevent anything after it from being loaded
                 ChimeraX's devel build
-				ChimeraXClassifier>ChimeraX :: Bundle :: General,Input/Output,Structure Editing,External Program :: 1,1 :: SEQCROW :: ChimAARON,SEQCRO,SEQCROW :: true</ChimeraXClassifier
-				-->
+                ChimeraXClassifier>ChimeraX :: Bundle :: General,Input/Output,Structure Editing,External Program :: 1,1 :: SEQCROW :: ChimAARON,SEQCRO,SEQCROW :: true</ChimeraXClassifier
+                -->
                 <ChimeraXClassifier>ChimeraX :: Tool :: Build QM Input                 :: AaronTools         :: Create Gaussian, ORCA, or Psi4 input file</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Structure Modification         :: AaronTools         :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Change Substituents            :: Structure Editing  :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
@@ -189,9 +219,9 @@
                 <ChimeraXClassifier>ChimeraX :: Tool :: Bond Editor                    :: Structure Editing  :: Draw or erase bonds</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Change Element                 :: Structure Editing  :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Rotate Atoms                   :: Structure Editing  :: Rotate all or part of a molecular structure</ChimeraXClassifier>
-				<ChimeraXClassifier>ChimeraX :: Tool :: Buried Volume                  :: Structure Analysis :: Calculate percent buried volume</ChimeraXClassifier>
-				<ChimeraXClassifier>ChimeraX :: Tool :: File Info                      :: AaronTools         :: Miscellaneous file data</ChimeraXClassifier>
-				<ChimeraXClassifier>ChimeraX :: Tool :: Cone Angle                     :: Structure Analysis :: Calculate ligand cone angles</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Buried Volume                  :: Structure Analysis :: Calculate percent buried volume</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: File Info                      :: AaronTools         :: Miscellaneous file data</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Cone Angle                     :: Structure Analysis :: Calculate ligand cone angles</ChimeraXClassifier>
                 <!--ChimeraXClassifier>ChimeraX :: Tool :: AARON Input Builder :: AARON :: Build AARON input file</ChimeraXClassifier-->
                 
                 <ChimeraXClassifier>ChimeraX :: Selector :: tm        :: Transition metals</ChimeraXClassifier>
@@ -237,20 +267,16 @@
                 <ChimeraXClassifier>ChimeraX :: Command :: tsbond              :: Structure Editing  :: display a forming/breaking bond as semi-transparent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: ~tsbond             :: Structure Editing  :: remove a forming/breaking bond</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: sterimol            :: Structure Analysis :: calculate L, B1, and B5 Sterimol parameters</ChimeraXClassifier>
-				<ChimeraXClassifier>ChimeraX :: Command :: percentVolumeBuried :: Structure Analysis :: calculate percent volume buried by ligands around a metal center</ChimeraXClassifier>
-				<ChimeraXClassifier>ChimeraX :: Command :: highlight           :: General            :: make some atoms or bonds stand out</ChimeraXClassifier>
-				<ChimeraXClassifier>ChimeraX :: Command :: ~highlight          :: General            :: remove highlights</ChimeraXClassifier>
-				<ChimeraXClassifier>ChimeraX :: Command :: lookDown            :: General            :: reorient molecule along bond</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: percentVolumeBuried :: Structure Analysis :: calculate percent volume buried by ligands around a metal center</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: highlight           :: General            :: make some atoms or bonds stand out</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: ~highlight          :: General            :: remove highlights</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: lookDown            :: General            :: reorient molecule along bond</ChimeraXClassifier>
                 <!--
                 <ChimeraXClassifier>ChimeraX :: Command :: duplicate           :: Structure Editing  :: duplicate selected atoms</ChimeraXClassifier>
                 -->
-	   </Classifiers>
+       </Classifiers>
     
     <AdditionalPackages>
-		<!--
-            <Package name="AaronTools" folder="/home/tony/Documents/QChASM/AaronTools"/>
-            <Package name="AaronTools.test" folder="/home/tony/Documents/QChASM/AaronTools/test"/>
-        -->
         <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools"/>
         <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
     </AdditionalPackages>
@@ -260,9 +286,9 @@
         <DataDir>Substituents</DataDir>
         <DataDir>Rings</DataDir>
         <!--
-		<DataDir>coordination_complex</DataDir>
+        <DataDir>coordination_complex</DataDir>
         -->
-		<DataDir>utils</DataDir>
+        <DataDir>utils</DataDir>
         <DataDir>utils/quad_grids</DataDir>
         <DataDir>theory/valid_methods</DataDir>
         <DataDir>theory/valid_basis_sets</DataDir>
@@ -272,14 +298,14 @@
         <DataFile>README.md</DataFile>
         <DataFile>LICENSE</DataFile>
     </DataFiles>
-	
+    
     <DataFiles package="AaronTools.test">
         <DataDir>test_files</DataDir>
         <DataDir>ref_files</DataDir>
     </DataFiles>
-	
-	<DataFiles>
-		<DataDir>docs</DataDir>
-		<DataDir>mouse_modes/icons</DataDir>
-	</DataFiles>
+    
+    <DataFiles>
+        <DataDir>docs</DataDir>
+        <DataDir>icons</DataDir>
+    </DataFiles>
 </BundleInfo>

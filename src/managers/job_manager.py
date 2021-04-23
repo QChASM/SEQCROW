@@ -23,9 +23,6 @@ JOB_QUEUED = "job changed"
 
 class JobManager(ProviderManager):
     def __init__(self, session, *args, **kwargs):
-        # 1.2 adds an __init__ to ProviderManager that uses the manager name for things
-        # this is not the case in 1.1
-
         self.session = session
         self.local_jobs = []
         self.remote_jobs = []
@@ -45,9 +42,7 @@ class JobManager(ProviderManager):
         self.triggers.add_handler(JOB_QUEUED, self.check_queue)
         self.triggers.add_handler(JOB_QUEUED, self.write_json)
         
-        params = signature(super().__init__).parameters
-        if any("name" in param for param in params):
-            super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def __setattr__(self, attr, val):
         if attr == "paused":
@@ -67,7 +62,6 @@ class JobManager(ProviderManager):
         return any([job.isRunning() for job in self.local_jobs])
 
     def add_provider(self, bundle_info, name):
-        print("adding %s format" % name)
         if name in self.formats:
             self.session.logger.warning(
                 "local job type %s from %s supplanted that from %s" % (

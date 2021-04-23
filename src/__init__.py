@@ -36,10 +36,19 @@ class _SEQCROW_API(BundleAPI):
                 lambda *args, ses=session: _SEQCROW_API.register_tutorials(ses)
             )
 
-            session.ui.triggers.add_handler(
-                'ready',
-                lambda *args, ses=session: _SEQCROW_API.register_mouse_modes(ses)
+            from SEQCROW.mouse_modes import (
+                SelectConnectedMouseMode,
+                DrawBondMouseMode,
+                DrawTSBondMouseMode,
             )
+            session.ui.mouse_modes.add_mode(SelectConnectedMouseMode(session))
+            session.ui.mouse_modes.add_mode(DrawBondMouseMode(session))
+            session.ui.mouse_modes.add_mode(DrawTSBondMouseMode(session))
+
+            # session.ui.triggers.add_handler(
+            #     'ready',
+            #     lambda *args, ses=session: _SEQCROW_API.add_toolbar(ses)
+            # )
 
         #apply AARONLIB setting
         if seqcrow_settings.settings.AARONLIB is not None:
@@ -469,9 +478,20 @@ class _SEQCROW_API(BundleAPI):
         help_menu.addAction(seqcrow_tutorials)
 
     @staticmethod
-    def register_mouse_modes(session):
-        from SEQCROW.mouse_modes import SelectConnectedMouseMode
-        mice = session.ui.mouse_modes.add_mode(SelectConnectedMouseMode(session))
+    def add_toolbar(session):
+        """adds stuff to the toolbar"""
+        from chimerax.toolbar.tool import get_toolbar_singleton
+        from chimerax.ui.widgets.tabbedtoolbar import TabbedToolbar
+        from Qt.QtWidgets import QWidget
+        
+        toolbar = get_toolbar_singleton(session)
+        
+        for child in toolbar.tool_window.ui_area.children():
+            if isinstance(child, TabbedToolbar):
+                tabs = child
+                break
+        
+        tabs.addTab(QWidget(), "test")
 
     @staticmethod
     def get_class(name):
