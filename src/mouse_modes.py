@@ -1,3 +1,6 @@
+from AaronTools.atoms import Atom
+from AaronTools.const import RADII
+
 from chimerax.atomic import Atoms, Bonds
 from chimerax.atomic.structure import (
     PickedAtoms,
@@ -9,10 +12,18 @@ from chimerax.atomic.structure import (
     PickedPseudobond,
 )
 from chimerax.core.commands import run
+from chimerax.core.tools import ToolInstance
 from chimerax.markers import MarkerSet, create_link
 from chimerax.mouse_modes import MouseMode
+from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 
+from Qt.QtWidgets import QPushButton, QComboBox, QFormLayout
+
+from SEQCROW.managers.filereader_manager import apply_seqcrow_preset
+from SEQCROW.finders import AtomSpec
+from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.selectors import get_fragment
+from SEQCROW.widgets import PeriodicTable, ModelComboBox
 
 import numpy as np
 
@@ -200,6 +211,7 @@ class _TSBondMarkers(MarkerSet):
     def create_marker_from_point(self, pt, rgba, rad):
         mark = super().create_marker(pt, (170, 255, 255, 127), rad)
 
+
 class DrawBondMouseMode(MouseMode):
     name = "bond"
     ms_cls = _BondMarkers
@@ -351,12 +363,9 @@ class DrawTSBondMouseMode(DrawBondMouseMode):
 
     def mouse_up(self, event):
         MouseMode.mouse_up(self, event)
-        
-        self._dragging = False
-        
+
         x, y = event.position()
         pick = self.view.picked_object(x, y)
-
         
         if isinstance(pick, PickedPseudobond) and not self._markerset:
             bond = pick.pbond
@@ -398,3 +407,295 @@ class DrawTSBondMouseMode(DrawBondMouseMode):
 
         self.reset()
 
+
+class _ElementPicker(ToolInstance):
+    def __init__(self, *args):
+        super().__init__(*args)
+        
+        self.tool_window = MainToolWindow(self)
+        self._build_ui()
+    
+    def _build_ui(self):
+        layout = QFormLayout()
+        
+        initial_elements = []
+        if ChangeElementMouseMode.element:
+            initial_elements = [ChangeElementMouseMode.element]
+        
+        self.periodic_table = PeriodicTable(
+            select_multiple=False,
+            initial_elements=initial_elements
+        )
+        layout.addRow(self.periodic_table)
+        
+        self.vsepr = QComboBox()
+        self.vsepr.addItems([
+            "do not change",                  # 0
+            
+            "linear (1 bond)",                # 1
+            
+            "linear (2 bonds)",               # 2 
+            "trigonal planar (2 bonds)",      # 3
+            "tetrahedral (2 bonds)",          # 4 
+            
+            "trigonal planar",                # 5
+            "tetrahedral (3 bonds)",          # 6
+            "T-shaped",                       # 7
+            
+            "trigonal pyramidal",             # 8
+            "tetrahedral",                    # 9
+            "sawhorse",                       #10
+            "seesaw",                         #11
+            "square planar",                  #12
+            
+            "trigonal bipyramidal",           #13
+            "square pyramidal",               #14
+            "pentagonal",                     #15
+            
+            "octahedral",                     #16
+            "hexagonal",                      #17
+            "trigonal prismatic",             #18
+            "pentagonal pyramidal",           #19
+            
+            "capped octahedral",              #20
+            "capped trigonal prismatic",      #21
+            "heptagonal",                     #22
+            "hexagonal pyramidal",            #23
+            "pentagonal bipyramidal",         #24
+            
+            "biaugmented trigonal prismatic", #25
+            "cubic",                          #26
+            "elongated trigonal bipyramidal", #27
+            "hexagonal bipyramidal",          #28
+            "heptagonal pyramidal",           #29
+            "octagonal",                      #30
+            "square antiprismatic",           #31
+            "trigonal dodecahedral",          #32
+            
+            "capped cube",                    #33
+            "capped square antiprismatic",    #34
+            "enneagonal",                     #35
+            "heptagonal bipyramidal",         #36
+            "hula-hoop",                      #37
+            "triangular cupola",              #38
+            "tridiminished icosahedral",      #39
+            "muffin",                         #40
+            "octagonal pyramidal",            #41
+            "tricapped trigonal prismatic",   #42
+        ])
+        self.vsepr.setCurrentIndex(9)
+        
+        self.vsepr.insertSeparator(33)
+        self.vsepr.insertSeparator(25)
+        self.vsepr.insertSeparator(20)
+        self.vsepr.insertSeparator(16)
+        self.vsepr.insertSeparator(13)
+        self.vsepr.insertSeparator(8)
+        self.vsepr.insertSeparator(5)
+        self.vsepr.insertSeparator(2)
+        self.vsepr.insertSeparator(1)
+        self.vsepr.insertSeparator(0)
+        layout.addRow("shape:", self.vsepr)
+        
+        do_it = QPushButton("set element and shape")
+        do_it.clicked.connect(self.set_selected)
+        layout.addRow(do_it)
+        
+        self.tool_window.ui_area.setLayout(layout)
+
+        self.tool_window.manage(None)
+    
+    def set_selected(self, *args):
+        element = self.periodic_table.selectedElements()
+        if element:
+            ChangeElementMouseMode.element = element[0]
+            ChangeElementMouseMode.vsepr = self.vsepr.currentText()
+            self.session.logger.status("change element mouse mode set to use %s %s" % (ChangeElementMouseMode.vsepr, ChangeElementMouseMode.element))
+        
+        self.delete()
+
+
+class _ModelSelector(ToolInstance):
+    def __init__(self, session, name, coords):
+        super().__init__(session, name)
+        self._coords = coords
+        self.tool_window = MainToolWindow(self)
+        self._build_ui()
+
+    def _build_ui(self):
+        layout = QFormLayout()
+        
+        self.model_selector = ModelComboBox(self.session, addNew=True)
+        layout.addRow("model:", self.model_selector)
+        
+        do_it = QPushButton(
+            "add %s %s to selected model" % (
+                ChangeElementMouseMode.vsepr,
+                ChangeElementMouseMode.element
+            )
+        )
+        do_it.clicked.connect(self.new_atom)
+        layout.addRow(do_it)
+
+        self.tool_window.ui_area.setLayout(layout)
+
+        self.tool_window.manage(None)
+    
+    def new_atom(self):
+        element = ChangeElementMouseMode.element
+        adjust_bonds = True
+        vsepr = ChangeElementMouseMode.vsepr
+        
+        if vsepr == "do not change":
+            vsepr = False
+        elif vsepr == "linear (1 bond)":
+            vsepr = "linear 1"
+        elif vsepr == "linear (2 bonds)":
+            vsepr = "linear 2"
+        elif vsepr == "trigonal planar (2 bonds)":
+            vsepr = "bent 2 planar"
+        elif vsepr == "tetrahedral (2 bonds)":
+            vsepr = "bent 2 tetrahedral"
+        elif vsepr == "tetrahedral (3 bonds)":
+            vsepr = "bent 3 tetrahedral"
+        
+        if vsepr:
+            atoms = Atom.get_shape(vsepr)
+            atoms[0].element = element
+            for atom in atoms[1:]:
+                atom.element = "H"
+            if adjust_bonds:
+                # this works b/c all atoms are 1 angstrom from the center
+                # just multiply by the distance we want
+                expected_dist = RADII[element] + RADII["H"]
+                for atom in atoms[1:]:
+                    atom.coords *= expected_dist
+            for atom in atoms[1:]:
+                atoms[0].connected.add(atom)
+                atom.connected.add(atoms[0])
+        else:
+            atoms = [Atom(element=element, coords=np.zeros(3))]
+
+        rescol = ResidueCollection(atoms, name="new", refresh_connected=False)
+        rescol.coord_shift(self._coords)
+
+        model = self.model_selector.currentData()
+        if model is None:
+            chix = rescol.get_chimera(self.session)
+            self.session.models.add([chix])
+            apply_seqcrow_preset(chix, fallback="Ball-Stick-Endcap")
+
+        else:
+            res = model.new_residue("new", "a", len(model.residues)+1)
+            rescol.residues[0].update_chix(res)
+            run(self.session, "select add %s" % " ".join([atom.atomspec for atom in res.atoms]))
+
+        self.delete()
+
+    def delete(self):
+        self.model_selector.deleteLater()
+        return super().delete()
+
+    def close(self):
+        self.model_selector.deleteLater()
+        return super().close()
+
+
+class ChangeElementMouseMode(MouseMode):
+    name = "change element"
+    element = None
+    vsepr = None
+    
+    def mouse_up(self, event):
+        if event.shift_down():
+            element_selector = _ElementPicker(self.session, "pick element")
+            return
+            
+        if not self.element:
+            self.session.logger.warning("no element selected; shift-click to set element")
+            self.session.logger.status("no element selected; shift-click to set element")
+            element_selector = _ElementPicker(self.session, "pick element")
+            return
+            
+        x, y = event.position()
+        pick = self.view.picked_object(x, y)
+
+        if not pick:
+            x1, x2 = self.session.main_view.clip_plane_points(x, y)
+            coords = (x1 + x2) / 2
+            new_fragment = _ModelSelector(self.session, "place atom in model", coords)
+            if new_fragment.model_selector.count() == 1:
+                new_fragment.new_atom()
+            return
+        
+        # import cProfile
+        # 
+        # profile = cProfile.Profile()
+        # profile.enable()
+        
+        vsepr = self.vsepr
+        
+        if vsepr == "do not change":
+            vsepr = False
+        elif vsepr == "linear (1 bond)":
+            vsepr = "linear 1"
+            goal = 1
+        elif vsepr == "linear (2 bonds)":
+            vsepr = "linear 2"
+            goal = 2
+        elif vsepr == "trigonal planar (2 bonds)":
+            vsepr = "bent 2 planar"
+            goal = 2
+        elif vsepr == "tetrahedral (2 bonds)":
+            vsepr = "bent 2 tetrahedral"
+            goal = 2
+        elif vsepr == "trigonal planar":
+            goal = 3
+        elif vsepr == "tetrahedral (3 bonds)":
+            vsepr = "bent 3 tetrahedral"
+            goal = 3
+        elif vsepr == "tetrahedral":
+            goal = 4
+        else:
+            goal = len(Atom.get_shape(vsepr)) - 1
+
+        if not isinstance(pick, PickedAtom):
+            return
+        
+        atom = pick.atom
+        # # use built-in ChimeraX command for some of the more common things
+        # # because it's faster for proteins
+        # if False:
+        #     run(
+        #         self.session,
+        #         "build modify %s %s %i geometry %s" % (
+        #             atom.atomspec,
+        #             self.element,
+        #             goal,
+        #             vsepr,
+        #         )
+        #     )
+        # 
+        
+        frag = get_fragment(atom, max_len=atom.structure.num_atoms)
+        
+        rescol = ResidueCollection(atom.structure, convert_residues=set(frag.residues))
+        res = [residue for residue in rescol.residues if residue.chix_residue is atom.residue][0]
+        target = res.find_exact(AtomSpec(atom.atomspec))[0]
+        adjust_hydrogens = vsepr
+        if vsepr is not False:
+            cur_bonds = len(target.connected)
+            change_Hs = goal - cur_bonds
+            adjust_hydrogens = (change_Hs, vsepr)
+
+        res.change_element(
+            target,
+            self.element,
+            adjust_bonds=True,
+            adjust_hydrogens=adjust_hydrogens,
+        )
+        
+        rescol.update_chix(atom.structure)
+        
+        # profile.disable()
+        # profile.print_stats()

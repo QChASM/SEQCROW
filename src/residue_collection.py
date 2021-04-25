@@ -3,7 +3,7 @@ import numpy as np
 import re
 
 from AaronTools.atoms import Atom as AaronToolsAtom
-from AaronTools.const import TMETAL, VDW_RADII, MASS
+from AaronTools.const import METAL, VDW_RADII, MASS
 from AaronTools.geometry import Geometry
 from AaronTools.ring import Ring
 from AaronTools.finders import BondedTo
@@ -187,12 +187,12 @@ class Residue(Geometry):
                 chix_residue.add_atom(new_atom)
                 atom.chix_atom = new_atom
                 known_atoms.append(new_atom)
-                new_atoms.append(new_atom)
+                new_atoms.append((atom, new_atom))
 
             else:
                 if atom.chix_atom.element.name != atom.element:
                     atom.chix_atom.element = Element.get_element(atom.element)
-                    new_atoms.append(atom.chix_atom)
+                    new_atoms.append((atom, atom.chix_atom))
 
                 atom.chix_atom.coord = atom.coords
                 known_atoms.append(atom.chix_atom)
@@ -202,7 +202,7 @@ class Residue(Geometry):
                 #print("deleting %s" % atom.atomspec)
                 atom.delete()
         
-        for atom in new_atoms:
+        for (at_atom, atom) in new_atoms:
             # print("starting name:", atom.name)
             if (
                     [a.name for a in known_atoms].count(atom.name) == 1 and
@@ -233,6 +233,10 @@ class Residue(Geometry):
                 atom.name = atom_name
             else:
                 atom.name = atom.element.name
+    
+            at_atom.chix_name = atom.name
+            at_atom.atomspec = atom.atomspec
+            at_atom.serial_number = atom.serial_number
 
             # print("final name:", atom.name)
 
@@ -243,7 +247,7 @@ class Residue(Geometry):
             if atom.serial_number == -1:
                 atom.serial_number = atom.structure.atoms.index(atom) + 1
         
-        apply_seqcrow_preset(chix_residue.structure, atoms=new_atoms)
+        apply_seqcrow_preset(chix_residue.structure, atoms=[atom[1] for atom in new_atoms])
 
     def refresh_chix_connected(self, chix_residue):
         known_bonds = []
@@ -272,7 +276,7 @@ class Residue(Geometry):
                 if atom1 not in atom2.neighbors:
                     new_bond = chix_residue.structure.new_bond(atom1, atom2)
 
-                    if any([aaron_atom.element in TMETAL for aaron_atom in [aaron_atom1, aaron_atom2]]):
+                    if any([aaron_atom.element in METAL for aaron_atom in [aaron_atom1, aaron_atom2]]):
                         pbg = chix_residue.structure.pseudobond_group(chix_residue.structure.PBG_METAL_COORDINATION, create_type='normal') 
                         pbg.new_pseudobond(atom1, atom2)
                         new_bond.delete()
@@ -410,6 +414,28 @@ class ResidueCollection(Geometry):
         self.atoms = []
         for res in self.residues:
             self.atoms.extend(res.atoms)
+
+    # def refresh_ranks(self, *args, useful=False, **kwargs):
+    #     if useful:
+    #         super().refresh_ranks(*args, **kwargs)
+
+    def copy(self, atoms=None, name=None, comment=None, copy_atoms=True):
+        """
+        creates a new copy of the geometry
+        parameters:
+            atoms (list): defaults to all atoms
+            name (str): defaults to NAME_copy
+        """
+        if name is None:
+            name = self.name
+        if comment is None:
+            comment = self.comment
+        atoms = self._fix_connectivity(atoms)
+        if hasattr(self, "components") and self.components is not None:
+            self.fix_comment()
+        if copy_atoms:
+            return ResidueCollection([a.copy() for a in atoms], name, comment)
+        return ResidueCollection(atoms, name, comment)
 
     def map_ligand(self, *args, **kwargs):
         """map_ligand, then put new atoms in the residue they are closest to"""
@@ -648,6 +674,19 @@ class ResidueCollection(Geometry):
         out = {'geom missing': geom_missing, 'chix missing': chix_missing}
         return out
     
+    def change_element(self, target, *args, **kwargs):
+        target = self.find_exact(target)[0]
+        super().change_element(target, *args, **kwargs)
+        residue = self.find_residue(target)[0]
+        remove_atoms = []
+        for atom in residue.atoms:
+            if atom not in self.atoms:
+                remove_atoms.append(atom)
+        for atom in remove_atoms:
+            residue -= atom
+        residue.atoms.extend([atom for atom in target.connected if not hasattr(atom, "chix_atom")])
+        self._atom_update()
+    
     def update_chix(self, atomic_structure, refresh_connected=True):
         """
         update chimerax atomic structure to match self
@@ -718,6 +757,10 @@ class ResidueCollection(Geometry):
                 else:
                     bond.delete()
 
+        for atom in self.atoms:
+            if not hasattr(atom, "chix_atom"):
+                print(atom, "hasn no chix atom")
+
         for i, aaron_atom1 in enumerate(self.atoms):
             atom1 = [atom for atom in atomic_structure.atoms if aaron_atom1.chix_atom is atom][0]
 
@@ -741,7 +784,7 @@ class ResidueCollection(Geometry):
                 if atom2 not in atom1.neighbors:
                     new_bond = atomic_structure.new_bond(atom1, atom2)
 
-                    if any([aaron_atom.element in TMETAL for aaron_atom in [aaron_atom1, aaron_atom2]]):
+                    if any([aaron_atom.element in METAL for aaron_atom in [aaron_atom1, aaron_atom2]]):
                         pbg = atomic_structure.pseudobond_group(atomic_structure.PBG_METAL_COORDINATION, create_type='normal') 
                         pbg.new_pseudobond(atom1, atom2)
                         new_bond.delete()

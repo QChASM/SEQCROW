@@ -62,9 +62,9 @@
                 -->
             </Dependencies>
 
-			<Initializations>
-				<InitAfter type="custom" bundle="ChimeraX-MouseModes"/>
-			</Initializations>
+            <Initializations>
+                <InitAfter type="custom" bundle="ChimeraX-MouseModes"/>
+            </Initializations>
 
             <Categories>
                 <Category name="General"/>
@@ -170,7 +170,7 @@
                           description="Select molecular fragment"
                           icon="connected.png"
                 />
-				<Provider tab="Right Mouse"
+                <Provider tab="Right Mouse"
                           section="Structure Modification"
                           name="seqcrow_2"
                           mouse_mode="bond"
@@ -178,13 +178,21 @@
                           description="Draw a new bond"
                           icon="bond.png"
                 />
-				<Provider tab="Right Mouse"
+                <Provider tab="Right Mouse"
                           section="Structure Modification"
                           name="seqcrow_3"
                           mouse_mode="tsbond"
                           display_name="TS Bond" 
                           description="Draw a forming/breaking bond"
                           icon="tsbond.png"
+                />
+                <Provider tab="Right Mouse"
+                          section="Structure Modification"
+                          name="seqcrow_4"
+                          mouse_mode="change element"
+                          display_name="Change Element" 
+                          description="Change the element of picked atoms"
+                          icon="element.png"
                 />
             </Providers>
             
@@ -222,6 +230,7 @@
                 <ChimeraXClassifier>ChimeraX :: Tool :: Buried Volume                  :: Structure Analysis :: Calculate percent buried volume</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: File Info                      :: AaronTools         :: Miscellaneous file data</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Cone Angle                     :: Structure Analysis :: Calculate ligand cone angles</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Coordination Complex Generator :: Structure Editing  :: Create coordination complexes with mono- or bidentate ligands</ChimeraXClassifier>
                 <!--ChimeraXClassifier>ChimeraX :: Tool :: AARON Input Builder :: AARON :: Build AARON input file</ChimeraXClassifier-->
                 
                 <ChimeraXClassifier>ChimeraX :: Selector :: tm        :: Transition metals</ChimeraXClassifier>
@@ -285,9 +294,7 @@
         <DataDir>Ligands</DataDir>
         <DataDir>Substituents</DataDir>
         <DataDir>Rings</DataDir>
-        <!--
         <DataDir>coordination_complex</DataDir>
-        -->
         <DataDir>utils</DataDir>
         <DataDir>utils/quad_grids</DataDir>
         <DataDir>theory/valid_methods</DataDir>

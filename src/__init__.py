@@ -40,10 +40,12 @@ class _SEQCROW_API(BundleAPI):
                 SelectConnectedMouseMode,
                 DrawBondMouseMode,
                 DrawTSBondMouseMode,
+                ChangeElementMouseMode,
             )
             session.ui.mouse_modes.add_mode(SelectConnectedMouseMode(session))
             session.ui.mouse_modes.add_mode(DrawBondMouseMode(session))
             session.ui.mouse_modes.add_mode(DrawTSBondMouseMode(session))
+            session.ui.mouse_modes.add_mode(ChangeElementMouseMode(session))
 
             # session.ui.triggers.add_handler(
             #     'ready',
@@ -253,6 +255,10 @@ class _SEQCROW_API(BundleAPI):
         elif ti.name == "Cone Angle":
             from .tools import ConeAngle
             return ConeAngle(session, ti.name)
+        
+        elif ti.name == "Coordination Complex Generator":
+            from .tools import CoordinationComplexVomit
+            return CoordinationComplexVomit(session, ti.name)
         
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)

@@ -63,6 +63,7 @@ class _BondEditorSettings(Settings):
         "bond_radius":         Value(0.16, FloatArg), 
     }
 
+
 class BondEditor(ToolInstance):
 
     help = "https://github.com/QChASM/SEQCROW/wiki/Bond-Editor-Tool"

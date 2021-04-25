@@ -25,7 +25,7 @@ class ElementButton(QPushButton):
         self.setMaximumHeight(int(1.5*self.fontMetrics().boundingRect("QQ").height()))
         
         self.ele_color = tuple(list(element_color(ELEMENTS.index(element)))[:-1])
-        self.setStyleSheet("QPushButton { background: ghostwhite; color: lightgray; font-weight: normal; }")
+        self.setStyleSheet("QPushButton { background: whitesmoke; color: dimgray; font-weight: normal; }")
 
         self.clicked.connect(self._changeState)
     

@@ -1441,8 +1441,11 @@ class NormalModes(ToolInstance):
     
     def close(self):
         self.model_selector.deleteLater()
+    
+    def cleanup(self):
+        self.model_selector.deleteLater()
 
-        return super().close()
+        return super().cleanup()
     
 
 class IRPlot(ChildToolWindow):
