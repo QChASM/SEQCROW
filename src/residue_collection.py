@@ -38,6 +38,29 @@ class Atom(AaronToolsAtom):
         s += " ({:s})".format(self.atomspec) if self.atomspec is not None else "None"
         return s
 
+    def copy(self):
+        rv = Atom()
+        for key, val in self.__dict__.items():
+            if key == "connected":
+                continue
+            if key == "constraint":
+                continue
+            if key == "_hashed":
+                continue
+            if key == "chix_atom":
+                continue
+            try:
+                rv.__dict__[key] = val.copy()
+            except AttributeError:
+                rv.__dict__[key] = val
+                if val.__class__.__module__ != "builtins":
+                    self.LOG.warning(
+                        "No copy method for {}: in-place changes may occur".format(
+                            type(val)
+                        )
+                    )
+        return rv
+
 
 def fromChimAtom(atom=None, *args, use_scene=False, serial_number=None, atomspec=None, **kwargs):
     """get AaronTools Atom object from ChimeraX Atom"""
@@ -142,7 +165,7 @@ class Residue(Geometry):
                 
         return out
     
-    def update_chix(self, chix_residue, refresh_connected=True):
+    def update_chix(self, chix_residue, refresh_connected=True, apply_preset=True):
         """changes chimerax residue to match self"""
         elements = {}
         known_atoms = []
@@ -160,14 +183,14 @@ class Residue(Geometry):
             if not hasattr(atom, "chix_atom") or \
                atom.chix_atom is None or \
                atom.chix_atom.deleted or atom.chix_atom not in chix_residue.atoms:
-                #if not hasattr(atom, "chix_atom"):
-                #    print("no chix atom", atom)
-                #elif atom.chix_atom is None:
-                #    print("no chix atom yet", atom)
-                #elif atom.chix_atom.deleted:
-                #    print("chix_atom deleted", atom)
-                #else:
-                #    print("atoms do not match", atom.chix_atom)
+                # if not hasattr(atom, "chix_atom"):
+                #     print("no chix atom", atom)
+                # elif atom.chix_atom is None:
+                #     print("no chix atom yet", atom)
+                # elif atom.chix_atom.deleted:
+                #     print("chix_atom deleted", atom)
+                # else:
+                #     print("atoms do not match", atom.chix_atom)
                 
                 #print("new chix atom for", atom)
                 
@@ -196,10 +219,10 @@ class Residue(Geometry):
 
                 atom.chix_atom.coord = atom.coords
                 known_atoms.append(atom.chix_atom)
-                
+        
         for atom in chix_residue.atoms:
             if atom not in known_atoms:
-                #print("deleting %s" % atom.atomspec)
+                # print("deleting %s" % atom.atomspec)
                 atom.delete()
         
         for (at_atom, atom) in new_atoms:
@@ -247,12 +270,16 @@ class Residue(Geometry):
             if atom.serial_number == -1:
                 atom.serial_number = atom.structure.atoms.index(atom) + 1
         
-        apply_seqcrow_preset(chix_residue.structure, atoms=[atom[1] for atom in new_atoms])
+        if apply_preset:
+            apply_seqcrow_preset(chix_residue.structure, atoms=[atom[1] for atom in new_atoms])
 
     def refresh_chix_connected(self, chix_residue):
         known_bonds = []
         known_chix_bonds = []
-        residue_bonds = [bond for bond in chix_residue.structure.bonds if bond.atoms[0] in chix_residue.atoms and bond.atoms[1] in chix_residue.atoms]
+        residue_bonds = set()
+        for atom in chix_residue.atoms:
+            for bond in atom.bonds:
+                residue_bonds.add(bond)
         
         for i, aaron_atom1 in enumerate(self.atoms):
             atom1 = [atom for atom in chix_residue.atoms if aaron_atom1.chix_atom == atom][0]
@@ -355,12 +382,16 @@ class ResidueCollection(Geometry):
                 
                 all_atoms.extend(new_res.atoms)
             
+            refresh_ranks = bonds_matter
+            if "refresh_ranks" in kwargs:
+                refresh_ranks = kwargs.pop("refresh_ranks")
+            
             super().__init__(
                 all_atoms, 
                 name=molecule.name, 
                 comment=molecule.comment if hasattr(molecule, "comment") else "", 
                 refresh_connected=False, 
-                refresh_ranks=bonds_matter,
+                refresh_ranks=refresh_ranks,
                 **kwargs,
             )
         
@@ -674,20 +705,26 @@ class ResidueCollection(Geometry):
         out = {'geom missing': geom_missing, 'chix missing': chix_missing}
         return out
     
-    def change_element(self, target, *args, **kwargs):
+    def change_element(self, target, *args, hold_steady=None, **kwargs):
         target = self.find_exact(target)[0]
-        super().change_element(target, *args, **kwargs)
-        residue = self.find_residue(target)[0]
-        remove_atoms = []
-        for atom in residue.atoms:
-            if atom not in self.atoms:
-                remove_atoms.append(atom)
-        for atom in remove_atoms:
-            residue -= atom
-        residue.atoms.extend([atom for atom in target.connected if not hasattr(atom, "chix_atom")])
+        residue = self.find_residue(target)
+        if hold_steady:
+            hold_steady = self.find(hold_steady)
+
+        if len(residue) != 1:
+            raise RuntimeError("multiple or no residues found containing %s" % str(target))
+        else:
+            residue = residue[0]
+
+        residue.change_element(
+            target,
+            *args,
+            hold_steady=hold_steady,
+            **kwargs,
+        )
         self._atom_update()
     
-    def update_chix(self, atomic_structure, refresh_connected=True):
+    def update_chix(self, atomic_structure, refresh_connected=True, apply_preset=True):
         """
         update chimerax atomic structure to match self
         may also change residue numbers for self
@@ -713,7 +750,7 @@ class ResidueCollection(Geometry):
                 res = residue.chix_residue
 
             try:
-                residue.update_chix(res, refresh_connected=False)
+                residue.update_chix(res, refresh_connected=False, apply_preset=apply_preset)
             except RuntimeError:
                 # somtimes I get an error saying the residue has already
                 # been deleted even though I checked if chix_residue.deleted...
@@ -734,6 +771,8 @@ class ResidueCollection(Geometry):
                 if residue in self.convert_residues and not any(residue is res.chix_residue for res in self.residues):
                     residue.delete()
 
+        # if refresh_connected:
+        #     self.refresh_chix_connected(atomic_structure, sanity_check=False)
         self.refresh_chix_connected(atomic_structure, sanity_check=False)
 
     def refresh_chix_connected(self, atomic_structure, sanity_check=True):

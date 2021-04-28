@@ -14,6 +14,9 @@ from send2trash import send2trash
 from SEQCROW.managers.job_manager import JOB_QUEUED, JOB_STARTED, JOB_FINISHED
 from SEQCROW.jobs import LocalJob
 
+from AaronTools.fileIO import read_types
+
+
 class JobQueue(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False
@@ -264,8 +267,10 @@ class JobQueue(ToolInstance):
         ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
         for ndx in ndxs:
             job = jobs[ndx]
-            if hasattr(job, "output_name"):
+            if hasattr(job, "output_name") and job.output_name and job.format_name in read_types:
                 run(job.session, "open \"%s\" coordsets true" % job.output_name, log=False)
+            elif hasattr(job, "output_name") and job.output_name:
+                run(job.session, "open \"%s\"" % job.output_name, log=False)
 
     def open_log(self):
         jobs = self.session.seqcrow_job_manager.jobs

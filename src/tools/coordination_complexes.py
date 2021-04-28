@@ -21,6 +21,7 @@ from Qt.QtWidgets import (
 )
 
 from AaronTools.const import ELEMENTS
+from AaronTools.component import Component
 from AaronTools.geometry import Geometry
 
 from SEQCROW.residue_collection import ResidueCollection
@@ -84,10 +85,15 @@ class CoordinationComplexVomit(ToolInstance):
         
         self.vsepr.setCurrentIndex(7)
         
-        self.vsepr.insertSeparator(12)
-        self.vsepr.insertSeparator(8)
-        self.vsepr.insertSeparator(5)
+        self.vsepr.insertSeparator(11)
+        self.vsepr.insertSeparator(7)
+        self.vsepr.insertSeparator(4)
         layout.addRow("geometry:", self.vsepr)
+        
+        self.minimize = QCheckBox()
+        self.minimize.setCheckState(Qt.Checked)
+        self.minimize.setToolTip("rotate substituents on ligands to mitigate steric clashing")
+        layout.addRow("relax ligands:", self.minimize)
         
         ligand_box = QGroupBox("ligands")
         ligand_layout = QFormLayout(ligand_box)
@@ -128,7 +134,8 @@ class CoordinationComplexVomit(ToolInstance):
             self.tool_window.create_child_window(
                 "select ligand",
                 window_class=LigandSelection,
-                tableWidget=self.ligand_table.item(row, column),
+                nameWidget=self.ligand_table.item(row, 0),
+                symmetryWidget=self.ligand_table.cellWidget(row, 1).layout().itemAt(0).widget(),
             )
     
     def add_ligand(self):
@@ -138,9 +145,11 @@ class CoordinationComplexVomit(ToolInstance):
             ligand_name = QTableWidgetItem()
             name = "<click to choose>"
             is_c2 = Qt.Unchecked
+            enabled = True
             if rows > 0:
                 name = self.ligand_table.item(rows - 1, 0).text()
                 is_c2 = self.ligand_table.cellWidget(rows - 1, 1).layout().itemAt(0).widget().checkState()
+                enabled = self.ligand_table.cellWidget(rows - 1, 1).layout().itemAt(0).widget().isEnabled()
 
             ligand_name.setData(Qt.DisplayRole, name)
             self.ligand_table.setItem(rows, 0, ligand_name)
@@ -148,6 +157,7 @@ class CoordinationComplexVomit(ToolInstance):
             widget_that_lets_me_horizontally_align_a_checkbox = QWidget()
             widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_a_checkbox)
             c2 = QCheckBox()
+            c2.setEnabled(enabled)
             c2.setCheckState(is_c2)
             widget_layout.addWidget(c2, 0, Qt.AlignHCenter)
             widget_layout.setContentsMargins(0, 0, 0, 0)
@@ -175,6 +185,7 @@ class CoordinationComplexVomit(ToolInstance):
     def create_complexes(self):
         c2_symmetric = []
         ligands = []
+        minimize = self.minimize.checkState() == Qt.Checked
         for i in range(0, self.ligand_table.rowCount() - 1):
             ligand_name = self.ligand_table.item(i, 0).text()
             ligands.append(ligand_name)
@@ -188,7 +199,7 @@ class CoordinationComplexVomit(ToolInstance):
             ligands,
             self.vsepr.currentText(),
             c2_symmetric=c2_symmetric,
-            minimize=True,
+            minimize=minimize,
             session=self.session,
         )
         
@@ -201,10 +212,18 @@ class CoordinationComplexVomit(ToolInstance):
 
 
 class LigandSelection(ChildToolWindow):
-    def __init__(self, tool_instance, title, tableWidget=None, **kwargs):
+    def __init__(
+            self,
+            tool_instance,
+            title,
+            nameWidget=None,
+            symmetryWidget=None,
+            **kwargs
+    ):
         super().__init__(tool_instance, title, **kwargs)
         
-        self.tableWidget = tableWidget
+        self.nameWidget = nameWidget
+        self.symmetryWidget = symmetryWidget
         
         self._build_ui()
 
@@ -230,5 +249,18 @@ class LigandSelection(ChildToolWindow):
                 continue
             
             lig_names.append(row.data())
-            
-        self.tableWidget.setData(Qt.DisplayRole, ",".join(lig_names))
+        
+        if not lig_names:
+            return
+        
+        self.nameWidget.setData(Qt.DisplayRole, ",".join(lig_names))
+        comp = Component(lig_names[0])
+        if len(comp.key_atoms) == 2:
+            self.symmetryWidget.setEnabled(True)
+            c2_symmetric = comp.c2_symmetric()
+            if c2_symmetric:
+                self.symmetryWidget.setCheckState(Qt.Checked)
+            else:
+                self.symmetryWidget.setCheckState(Qt.Unchecked)
+        else:
+            self.symmetryWidget.setEnabled(False)

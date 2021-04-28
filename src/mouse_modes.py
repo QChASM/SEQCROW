@@ -30,7 +30,7 @@ import numpy as np
 
 class SelectConnectedMouseMode(MouseMode):
     """select everything with a bonding path to clicked atoms"""
-    name = "select connected"
+    name = "select fragment"
     icon_file = "icons/connected.png"
     
     def __init__(self, session):
@@ -536,10 +536,18 @@ class _ModelSelector(ToolInstance):
         )
         do_it.clicked.connect(self.new_atom)
         layout.addRow(do_it)
+        
+        open_ele_sel = QPushButton("open element picker")
+        open_ele_sel.clicked.connect(self.show_ele_sel)
+        layout.addRow(open_ele_sel)
 
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(None)
+    
+    def show_ele_sel(self, *args):
+        _ElementPicker(self.session, "pick element")
+        self.delete()
     
     def new_atom(self):
         element = ChangeElementMouseMode.element
@@ -677,9 +685,24 @@ class ChangeElementMouseMode(MouseMode):
         #     )
         # 
         
-        frag = get_fragment(atom, max_len=atom.structure.num_atoms)
+        frags = []
+        for neighbor in atom.neighbors:
+            frags.append(get_fragment(neighbor, stop=atom, max_len=atom.structure.num_atoms))
         
-        rescol = ResidueCollection(atom.structure, convert_residues=set(frag.residues))
+        residues = [atom.residue]
+        hold_steady = None
+        for i, frag in enumerate(sorted(frags, key=len)):
+            if i == len(frags) - 1:
+                hold_steady = AtomSpec(frag[0].atomspec)
+                residues.append(frag[0].residue)
+                continue
+            residues.extend(frag.residues)
+        
+        rescol = ResidueCollection(
+            atom.structure,
+            convert_residues=set(residues),
+            refresh_ranks=False
+        )
         res = [residue for residue in rescol.residues if residue.chix_residue is atom.residue][0]
         target = res.find_exact(AtomSpec(atom.atomspec))[0]
         adjust_hydrogens = vsepr
@@ -688,14 +711,16 @@ class ChangeElementMouseMode(MouseMode):
             change_Hs = goal - cur_bonds
             adjust_hydrogens = (change_Hs, vsepr)
 
-        res.change_element(
+        rescol.change_element(
             target,
             self.element,
             adjust_bonds=True,
             adjust_hydrogens=adjust_hydrogens,
+            hold_steady=hold_steady,
         )
         
-        rescol.update_chix(atom.structure)
+        res.update_chix(res.chix_residue, apply_preset=True, refresh_connected=True)
+        rescol.update_chix(atom.structure, apply_preset=False, refresh_connected=False)
         
         # profile.disable()
         # profile.print_stats()

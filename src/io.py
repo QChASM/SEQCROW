@@ -18,6 +18,8 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
         fmt = "xyz"
     elif format_name == "FCHK file":
         fmt = "fchk"
+    elif format_name == "sqm output file":
+        fmt = "sqmout"
 
     fr = FileReader((file_name, fmt, stream), just_geom=False, get_all=True)
 
@@ -74,12 +76,15 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
         a_or_an = "an"
     elif format_name == "FCHK file":
         a_or_an = "an"
+    elif format_name == "sqm output file":
+        a_or_an = "an"
         
     status = "Opened %s as %s %s %s" % (file_name, a_or_an, format_name, "movie" if coordsets else "")
 
     structure.filename = file_name
 
     return [structure], status
+
 
 def save_aarontools(session, path, format_name, **kwargs):
     """ 

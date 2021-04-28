@@ -267,7 +267,7 @@ class _SEQCROW_API(BundleAPI):
     def run_provider(session, name, mgr, **kw):
         if mgr is session.open_command:
             from SEQCROW.io import open_aarontools
-            
+
             if name == "Gaussian input file":
                 class Info(OpenerInfo):
                     def open(self, session, data, file_name, **kw):
@@ -333,6 +333,17 @@ class _SEQCROW_API(BundleAPI):
                         return {}
                         
                 return Info()
+            
+            elif name == "sqm output file":
+                class Info(OpenerInfo):
+                    def open(self, session, data, file_name, **kw):
+                        return open_aarontools(session, data, file_name, format_name="sqm output file")
+            
+                    @property
+                    def open_args(self):
+                        return {'coordsets': BoolArg}
+
+                return Info()
 
         elif mgr is session.save_command:
             from chimerax.save_command import SaverInfo
@@ -367,6 +378,9 @@ class _SEQCROW_API(BundleAPI):
             elif name == "Psi4":
                 from SEQCROW.input_file_formats import Psi4FileInfo
                 return Psi4FileInfo()
+            elif name == "SQM":
+                from SEQCROW.input_file_formats import SQMFileInfo
+                return SQMFileInfo()
 
         elif mgr is session.seqcrow_job_manager:
             if name == "Gaussian":
@@ -378,6 +392,9 @@ class _SEQCROW_API(BundleAPI):
             elif name == "Psi4":
                 from SEQCROW.jobs import Psi4Job
                 return Psi4Job
+            elif name == "SQM":
+                from SEQCROW.jobs import SQMJob
+                return SQMJob
 
         elif mgr is session.test_manager:
             if name == "fuseRing_command":

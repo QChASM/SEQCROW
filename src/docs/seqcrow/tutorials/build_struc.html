@@ -1,192 +1,192 @@
 <!DOCTYPE html>
 <html>
 
-	<head>
-		<meta charset="UTF-8">
-		<title>Building Structures</title>
-		<meta http-equiv="Content-Type" content="text/html">
-		<link rel="icon" href="../images/SEQCROW.png" type="image/png">
-		<link rel="stylesheet" href="../style.css">
-	</head>
-	
-	<div class="head">
-		<object data="../ribbon.html" class="head"></object>
-	</div>
-	
-	<body>
-		<h1>Building Structures</h1>
-			<p>
-				In order to study a reaction using computational methods, you have
-				to have the relevant structures. If you want to study a particular
-				reaction with multiple different substrates, it may also be useful
-				to ensure that atoms are in the same order in the reactants,
-				products, intermediates, and transition state structures. When the
-				atoms are in the same order, it becomes easier to, for example,
-				put a methyl group on the same site in all your structures later.
-			</p>
-		
-		<h2>Reactant and Product of Claisen Rearrangement</h2>
-			<aside>
-				<img src="../images/claisen.png" style="width:256px"/>
-				<br>
-				A Claisen rearrangement is a sigmatropic rearrangement of
-				an allyl vinyl ether that results in a new C-C bond.
-			</aside>
-			<p>
-				In this tutorial, we'll build allyl vinyl ether and
-				4-pentenal, starting with the ether. To make editing
-				these structures later a lot easier, we'll also
-				try to keep the order of the atoms consistent in
-				both structures.
-			</p>
-			<h3>Allyl Vinyl Ether</h3>
-				<p>
-					To begin, open the tool for AaronTools structure
-					modification:
-					<br>
-					<span class="menulike">Tools &rarr; AaronTools &rarr; Structure Modification
-					</span>
-					<br>
-					or run the command:
-					<br>
-					<a class="cxcmd" href="cxcmd:ui tool show &quot;Structure Modification&quot;">
-					ui tool show "Structure Modification"
-					</a>
-				</p>
-				<p>
-					Now, switch to the "change element" tab on the tool window. 
-					This tab lets you change an atom's element or VSEPR shape.
-					We'll start with the vinyl group and work our way around
-					the structure. The first carbon atom ought to have a
-					trigonal planar VSEPR shape. Find this on the "geometry"
-					dropdown menu. These items are sorted by number of bonds,
-					so trigonal planar will be a few entries above the
-					default tetrahedral on this list. Once you've got that
-					selected, press <button>place in</button> with
-					<button>new structure</button> selected. You should
-					now have a trigonal planar CH<sub>3</sub> on the graphics
-					window.
-				</p>
-				<p>
-					Continue building by selecting one of the hydrogens and
-					replacing it with another trigonal planar carbon. You can
-					select with your mouse by <kbd>CTRL</kbd>-clicking or 
-					<kbd>command</kbd>-clicking on the atom. Pressing
-					<button>change selected elements</button> will replace
-					these atoms with a trigonal planar carbon.
-				</p>
-				<p>
-					It is very likely that the CH<sub>2</sub> groups will 
-					not be in the same plane. To rectify this, go over to 
-					the "Right Mouse" tab on the ChimeraX toolbar and pick 
-					"Bond rotation". Starting a right-click drag on the C=C 
-					bond and moving your mouse up and down the screen will 
-					rotate the bond.
-				</p>
-				<aside>
-					<img src="../images/periodic_table.png" style="width:256px"/>
-				</aside>
-				<p>
-					Let's move on to the oxygen. Back on the tool window,
-					click the "element" option's "C" to open a periodic 
-					table. Select oxygen. Change the "geometry" option to
-					"tetrahedral (2 bonds)", which will be a few entries above
-					trigonal planar. Finally, select one of the hydrogens
-					and press <button>change selected elements</button>.
-				</p>
-				<p>
-					Switch the selected element back to carbon by clicking
-					on the element selector and picking carbon on the
-					periodic table. Also change the "geometry" option back
-					to "tetrahedral". Select the hydrogen on the oxygen and
-					turn it into carbon.
-				</p>
-				<aside>
-					<img src="../images/allyl_vinyl_ether.png" style="width:256px"/>
-				</aside>
-				<p>
-					Switch geometry back to "trigonal planar" and add the
-					last two atoms. Rotate bonds as necessary to eliminate
-					any close contacts. 
-				</p>
-				<p>
-					This structure should now be saved to a file. You can 
-					do this in a number of ways: <span class="menulike">
-					File &rarr; Save...</span> on the ribbon at the top of
-					your screen, the "Save" floppy disk on the "Home" tab
-					of the ChimeraX toolbar, the <a class="cxcmd"
-					href="cxcmd:help newTab save">save</a> command,
-					or prepare an optimization job using the input file
-					builder <span class="menulike">Tools &rarr;
-					AaronTools &rarr; Build QM Input</span>.
-				</p>
-			<h3>4-Pentenal</h3>
-				<p>
-					Instead of starting this structure from scratch,
-					we'll just be editing the bonds and VSEPR geometry
-					of our allyl vinyl ether. This has the benefit of
-					keeping all the atoms in the same order, so if
-					we want to, for example, look at this reaction
-					using various substrates later, we'll be able to
-					build them quickly.
-				</p>
-				<p>
-					Open the bond editor tool:
-					<br>
-					<span class="menulike">Tools &rarr; Structure Editing
-					&rarr; Bond Editor</span>
-					<br>
-					or the command:
-					<br>
-					<a class="cxcmd" href="cxcmd:ui tool show &quot;Bond Editor&quot;">
-					ui tool show "Bond Editor"
-					</a>
-				</p>
-				<aside>
-					<img src="../images/allyl_vinyl_bond.png" style="width:256px"/>
-				</aside>
-				<p>
-					We'll add a bond between the CH<sub>2</sub> groups on either
-					end of the allyl vinyl ether. Use the bond rotation 
-					right mouse mode to rotate torsions so that the two
-					ends are closer together. Select the carbons of the 
-					two CH<sub>2</sub>'s and press <button>draw bond
-					between selected atoms</button> on the bond editor
-					tool. Next, select the bond between the oxygen and 
-					the CH<sub>2</sub> next to it. Press <button>erase
-					selected bonds</button> to remove this bond.
-				</p>
-				<p>
-					At the moment, this structure isn't looking very good.
-					But that will buff out quickly. Switch back to the 
-					structure modification tool. One at a time, select
-					the carbon atoms that now have four bonds and set their
-					VSEPR geometry to tetrahedral. That is, select "C" as the
-					element and "tetrahedral" as the geometry on the 
-					"change element" tab of the tool and press <button>
-					change selected elements</button> with either of the
-					carbon atoms selected. Next, select the CH<sub>2</sub>
-					on the end and set its VSEPR geometry to trigonal planar.
-					The structure should now look more like 4-pentenal,
-					and can be saved as before.
-				</p>
-				<img src="../images/pentenal.png" style="width:256px"/>
-				<p>
-					We have basically pretended our allyl vinyl ether went through
-					a transition state structure in order to make our 4-pentenal
-					structure. Note that there are multiple possible transition
-					state structures for this Claisen rearrangement. For a 
-					plain allyl vinyl ether, these do not lead to different
-					products. However, the transition state structures could lead
-					to different products if we start adding substituents. 
-				</p>
-				<p>
-					Although we stuck to the "change element" features
-					of the structure modification tool to build allyl
-					vinyl ether, we could have easily used the "substitute"
-					part as well. This, however, will be left as an excercise
-					for the reader.
-				</p>
+    <head>
+        <meta charset="UTF-8">
+        <title>Building Structures</title>
+        <meta http-equiv="Content-Type" content="text/html">
+        <link rel="icon" href="../images/SEQCROW.png" type="image/png">
+        <link rel="stylesheet" href="../style.css">
+    </head>
+    
+    <div class="head">
+        <object data="../ribbon.html" class="head"></object>
+    </div>
+    
+    <body>
+        <h1>Building Structures</h1>
+            <p>
+                In order to study a reaction using computational methods, you have
+                to have the relevant structures. If you want to study a particular
+                reaction with multiple different substrates, it may also be useful
+                to ensure that atoms are in the same order in the reactants,
+                products, intermediates, and transition state structures. When the
+                atoms are in the same order, it becomes easier to, for example,
+                put a methyl group on the same site in all your structures later.
+            </p>
+        
+        <h2>Reactant and Product of Claisen Rearrangement</h2>
+            <aside>
+                <img src="../images/claisen.png" style="width:256px"/>
+                <br>
+                A Claisen rearrangement is a sigmatropic rearrangement of
+                an allyl vinyl ether that results in a new C-C bond.
+            </aside>
+            <p>
+                In this tutorial, we'll build allyl vinyl ether and
+                4-pentenal, starting with the ether. To make editing
+                these structures later a lot easier, we'll also
+                try to keep the order of the atoms consistent in
+                both structures.
+            </p>
+            <h3>Allyl Vinyl Ether</h3>
+                <p>
+                    To begin, open the tool for AaronTools structure
+                    modification:
+                    <br>
+                    <span class="menulike">Tools &rarr; AaronTools &rarr; Structure Modification
+                    </span>
+                    <br>
+                    or run the command:
+                    <br>
+                    <a class="cxcmd" href="cxcmd:ui tool show &quot;Structure Modification&quot;">
+                    ui tool show "Structure Modification"
+                    </a>
+                </p>
+                <p>
+                    Now, switch to the "change element" tab on the tool window. 
+                    This tab lets you change an atom's element or VSEPR shape.
+                    We'll start with the vinyl group and work our way around
+                    the structure. The first carbon atom ought to have a
+                    trigonal planar VSEPR shape. Find this on the "geometry"
+                    dropdown menu. These items are sorted by number of bonds,
+                    so trigonal planar will be a few entries above the
+                    default tetrahedral on this list. Once you've got that
+                    selected, press <button>place in</button> with
+                    <button>new structure</button> selected. You should
+                    now have a trigonal planar CH<sub>3</sub> on the graphics
+                    window.
+                </p>
+                <p>
+                    Continue building by selecting one of the hydrogens and
+                    replacing it with another trigonal planar carbon. You can
+                    select with your mouse by <kbd>CTRL</kbd>-clicking or 
+                    <kbd>command</kbd>-clicking on the atom. Pressing
+                    <button>change selected elements</button> will replace
+                    these atoms with a trigonal planar carbon.
+                </p>
+                <p>
+                    It is very likely that the CH<sub>2</sub> groups will 
+                    not be in the same plane. To rectify this, go over to 
+                    the "Right Mouse" tab on the ChimeraX toolbar and pick 
+                    "Bond rotation". Starting a right-click drag on the C=C 
+                    bond and moving your mouse up and down the screen will 
+                    rotate the bond.
+                </p>
+                <aside>
+                    <img src="../images/periodic_table.png" style="width:256px"/>
+                </aside>
+                <p>
+                    Let's move on to the oxygen. Back on the tool window,
+                    click the "element" option's "C" to open a periodic 
+                    table. Select oxygen. Change the "geometry" option to
+                    "tetrahedral (2 bonds)", which will be a few entries above
+                    trigonal planar. Finally, select one of the hydrogens
+                    and press <button>change selected elements</button>.
+                </p>
+                <p>
+                    Switch the selected element back to carbon by clicking
+                    on the element selector and picking carbon on the
+                    periodic table. Also change the "geometry" option back
+                    to "tetrahedral". Select the hydrogen on the oxygen and
+                    turn it into carbon.
+                </p>
+                <aside>
+                    <img src="../images/allyl_vinyl_ether.png" style="width:256px"/>
+                </aside>
+                <p>
+                    Switch geometry back to "trigonal planar" and add the
+                    last two atoms. Rotate bonds as necessary to eliminate
+                    any close contacts. 
+                </p>
+                <p>
+                    This structure should now be saved to a file. You can 
+                    do this in a number of ways: <span class="menulike">
+                    File &rarr; Save...</span> on the ribbon at the top of
+                    your screen, the "Save" floppy disk on the "Home" tab
+                    of the ChimeraX toolbar, the <a class="cxcmd"
+                    href="cxcmd:help newTab save">save</a> command,
+                    or prepare an optimization job using the input file
+                    builder <span class="menulike">Tools &rarr;
+                    AaronTools &rarr; Build QM Input</span>.
+                </p>
+            <h3>4-Pentenal</h3>
+                <p>
+                    Instead of starting this structure from scratch,
+                    we'll just be editing the bonds and VSEPR geometry
+                    of our allyl vinyl ether. This has the benefit of
+                    keeping all the atoms in the same order, so if
+                    we want to, for example, look at this reaction
+                    using various substrates later, we'll be able to
+                    build them quickly. You can use either the "Bond 
+                    Editor" tool or the "Bond" mouse mode, which
+                    can be activated on the "Right Mouse" tab of the
+                    ChimeraX toolbar. The bond editor tool can be access via:
+                    <br>
+                    <span class="menulike">Tools &rarr; Structure Editing
+                    &rarr; Bond Editor</span>
+                    <br>
+                    or the command:
+                    <br>
+                    <a class="cxcmd" href="cxcmd:ui tool show &quot;Bond Editor&quot;">
+                    ui tool show "Bond Editor"
+                    </a>
+                </p>
+                <aside>
+                    <img src="../images/allyl_vinyl_bond.png" style="width:256px"/>
+                </aside>
+                <p>
+                    We'll add a bond between the CH<sub>2</sub> groups on either
+                    end of the allyl vinyl ether. Use the bond rotation 
+                    right mouse mode to rotate torsions so that the two
+                    ends are closer together. Select the carbons of the 
+                    two CH<sub>2</sub>'s and press <button>draw bond
+                    between selected atoms</button> on the bond editor
+                    tool. Next, select the bond between the oxygen and 
+                    the CH<sub>2</sub> next to it. Press <button>erase
+                    selected bonds</button> to remove this bond.
+                </p>
+                <p>
+                    At the moment, this structure isn't looking very good.
+                    But that will buff out quickly. Switch back to the 
+                    structure modification tool. One at a time, select
+                    the carbon atoms that now have four bonds and set their
+                    VSEPR geometry to tetrahedral. That is, select "C" as the
+                    element and "tetrahedral" as the geometry on the 
+                    "change element" tab of the tool and press <button>
+                    change selected elements</button> with either of the
+                    carbon atoms selected. Next, select the CH<sub>2</sub>
+                    on the end and set its VSEPR geometry to trigonal planar.
+                    The structure should now look more like 4-pentenal,
+                    and can be saved as before.
+                </p>
+                <img src="../images/pentenal.png" style="width:256px"/>
+                <p>
+                    We have basically pretended our allyl vinyl ether went through
+                    a transition state structure in order to make our 4-pentenal
+                    structure. Note that there are multiple possible transition
+                    state structures for this Claisen rearrangement. For a 
+                    plain allyl vinyl ether, these do not lead to different
+                    products. However, the transition state structures could lead
+                    to different products if we start adding substituents. 
+                </p>
+                <p>
+                    Although we stuck to the "change element" features
+                    of the structure modification tool to build allyl
+                    vinyl ether, we could have easily used the "substitute"
+                    part as well. This, however, will be left as an excercise
+                    for the reader.
+                </p>
 
-	</body>
+    </body>
 </html>

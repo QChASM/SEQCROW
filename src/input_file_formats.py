@@ -54,6 +54,24 @@ class QMInputFileInfo:
     # for how the KeywordOptions can be used to add whatever options they want
     initial_options = dict()
     
+    # whether this software is capable of running parallel threads
+    parallel = True
+    
+    # whether memory can be specified
+    memory = True
+    
+    # whether optimization jobs are available
+    optimization = True
+    
+    # whether TS optimization is available
+    ts_optimization = True
+    
+    # whether constrained optimization is available
+    const_optimization = True
+    
+    # whether frequency jobs are available
+    frequency = True
+    
     # file filter for QFileDialog.getOpenFileName
     # if None, will be disabled when 'read checkpoint' is checked
     save_checkpoint_filter = None
@@ -66,7 +84,7 @@ class QMInputFileInfo:
     basis_file_filter = None
     
     # filter for saving a file in this format
-    save_file_filer = None
+    save_file_filter = None
     
     # whether or not Raman intensities can be computed
     raman_available = False
@@ -468,6 +486,56 @@ class Psi4KeywordOptions(KeywordOptions):
             )
 
 
+class SQMKeywordOptions(KeywordOptions):
+    items = {
+    'settings': "qmmm",
+    'comment': 'comment',
+    }
+
+    previous_option_name = "previous_sqm_options"
+    last_option_name = "last_sqm_options"
+
+    @classmethod
+    def get_options_for(cls, name, last, previous):
+        if name == "settings":
+            if last is None:
+                last_dict = {}
+            else:
+                last_dict = last
+
+            if previous is None:
+                previous_dict = {}
+            else:
+                previous_dict = previous
+
+            return TwoLayerKeyWordOption(
+                "settings",
+                last_dict,
+                previous_dict,
+                "double click to use \"%s %s\"",
+                one_opt_per_kw=True,
+                allow_dup=False,
+            )
+
+        elif name == "comment":
+            if last is None:
+                last_list = []
+            else:
+                last_list = last
+
+            if previous is None:
+                previous_list = []
+            else:
+                previous_list = previous
+
+            return OneLayerKeyWordOption(
+                "comment",
+                last_list,
+                previous_list,
+                multiline=True,
+            )
+
+
 class GaussianFileInfo(QMInputFileInfo):
     name = "Gaussian"
 
@@ -505,7 +573,7 @@ class GaussianFileInfo(QMInputFileInfo):
         }
     }
 
-    save_file_filer = "Gaussian input files (*.com *.gjf)"
+    save_file_filter = "Gaussian input files (*.com *.gjf)"
     basis_file_filter = "Basis Set Files (*.gbs)"
     save_checkpoint_filter = "Gaussian checkpoint files (*.chk)"
     read_checkpoint_filter = "Gaussian checkpoint files (*.chk)"
@@ -639,7 +707,7 @@ class ORCAFileInfo(QMInputFileInfo):
         },
     }
     
-    save_file_filer = "ORCA input files (*.inp)"
+    save_file_filter = "ORCA input files (*.inp)"
     basis_file_filter = "Basis Set Files (*.basis)"
     read_checkpoint_filter = "ORCA orbital files (*.gbw);;ORCA Hessian files (*.hess)"
     raman_available = True
@@ -738,7 +806,7 @@ class ORCAFileInfo(QMInputFileInfo):
 class Psi4FileInfo(QMInputFileInfo):
     name = "Psi4"
     
-    save_file_filer = "Psi4 input files (*.in)"
+    save_file_filter = "Psi4 input files (*.in)"
     basis_file_filter = "Basis Set Files (*.gbs)"
     initial_presets = {
         "quick optimize": {
@@ -842,3 +910,62 @@ class Psi4FileInfo(QMInputFileInfo):
         contents = header + molecule + footer
         warnings = header_warnings + mol_warnings + footer_warnings
         return contents, warnings
+
+
+class SQMFileInfo(QMInputFileInfo):
+    name = "SQM"
+    
+    parallel = False
+    memory = False
+    ts_optimization = False
+    const_optimization = False
+    frequency = False
+    save_file_filter = "AMBER input files (*.mdin)"
+    basis_file_filter = None
+    initial_presets = {
+        "quick optimize" : {
+            "theory": Theory(
+                method="AM1",
+                                job_type=OptimizationJob(),
+            ),
+            "use_other": True,
+            "use_method": True,
+            "use_basis": True,
+            "use_job_type": True,
+        },
+    }
+    
+    initial_options = {
+        "qmmm": {
+            "verbosity": ["0", "1", "2", "3", "4", "5"],
+        }
+    }
+
+    methods = [
+        "PM6",
+        "AM1",
+        "RM1",
+        "PM3",
+    ]
+
+    basis_sets = None
+    keyword_options = SQMKeywordOptions
+
+    def get_job_kw_dict(
+            self,
+            optimize,
+            frequencies,
+            *args,
+    ):
+        if not optimize and not frequencies:
+            return {SQM_QMMM: {"maxcyc": ["0"]}}
+        return dict()
+
+    def get_file_contents(self, theory):
+        """gets contents for amber's sqm input file"""
+        header, header_warnings = theory.make_header(style="sqm", return_warnings=True)
+        molecule, mol_warnings = theory.make_molecule(style="sqm", return_warnings=True)
+        contents = header + molecule
+        warnings = header_warnings + mol_warnings
+        return contents, warnings
+

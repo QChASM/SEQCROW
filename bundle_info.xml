@@ -125,6 +125,13 @@
                           nicknames="fchk" 
                           reference_url="http://theochem.mercer.edu/chm295/g09ur/f_formchk.htm" 
                           synopsis="Formatted Checkpoint file"/>
+
+                <Provider name="sqm output file" 
+                          category="Molecular structure" 
+                          suffixes=".sqmout" 
+                          encoding="utf-8" 
+                          nicknames="sqm" 
+                          synopsis="Amber SQM output file"/>
             </Providers>
             
             <Providers manager="open command">
@@ -134,6 +141,7 @@
                 <Provider name="Psi4 output file" want_path="false"/>
                 <Provider name="XYZ file" want_path="false"/>
                 <Provider name="FCHK file" want_path="false"/>
+                <Provider name="sqm output file" want_path="false"/>
             </Providers>
             
             <!--we can save Gaussian input files, but not with the save command-->
@@ -145,12 +153,14 @@
                 <Provider name="Gaussian"/>
                 <Provider name="ORCA"/>
                 <Provider name="Psi4"/>
+                <Provider name="SQM"/>
             </Providers>
             
             <Providers manager="seqcrow_qm_input_manager">
                 <Provider name="Gaussian"/>
                 <Provider name="ORCA"/>
                 <Provider name="Psi4"/>
+                <Provider name="SQM"/>
             </Providers>
             
             <Providers manager="test_manager">
@@ -165,7 +175,7 @@
                 <Provider tab="Right Mouse"
                           section="Movement"
                           name="seqcrow_1"
-                          mouse_mode="select connected"
+                          mouse_mode="select fragment"
                           display_name="Select Fragment" 
                           description="Select molecular fragment"
                           icon="connected.png"

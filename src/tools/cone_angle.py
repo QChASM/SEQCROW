@@ -34,7 +34,7 @@ from SEQCROW.finders import AtomSpec
 
 class _ConeAngleSettings(Settings):
     AUTO_SAVE = {
-        "cone_option": "Tolman (Asymmetric)",
+        "cone_option": "Tolman (Unsymmetrical)",
         "radii": "UMN",
         "display_cone": True,
         "display_radii": True,
@@ -60,7 +60,7 @@ class ConeAngle(ToolInstance):
         layout = QFormLayout()
 
         self.cone_option = QComboBox()
-        self.cone_option.addItems(["Tolman (Asymmetric)", "Exact"])
+        self.cone_option.addItems(["Tolman (Unsymmetrical)", "Exact"])
         ndx = self.cone_option.findText(self.settings.cone_option, Qt.MatchExactly)
         self.cone_option.setCurrentIndex(ndx)
         layout.addRow("method:", self.cone_option)
@@ -257,7 +257,7 @@ class ConeAngle(ToolInstance):
         self.settings.display_radii = self.display_radii.checkState() == Qt.Checked
         self.settings.display_cone = self.display_cone.checkState() == Qt.Checked
         
-        if self.cone_option.currentText() == "Tolman (Asymmetric)":
+        if self.cone_option.currentText() == "Tolman (Unsymmetrical)":
             method = "tolman"
         else:
             method = self.cone_option.currentText()
