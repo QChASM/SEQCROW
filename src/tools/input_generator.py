@@ -5043,7 +5043,7 @@ class WarningPreview(ChildToolWindow):
         if warnings_list:
             self.preview.setText("\n---------\n".join(warnings_list))
         else:
-            self.preview.setText("looks fine")
+            self.preview.setText("it's probably fine")
 
     def cleanup(self):
         self.tool_instance.warning_window = None

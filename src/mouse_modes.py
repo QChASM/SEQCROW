@@ -17,6 +17,7 @@ from chimerax.markers import MarkerSet, create_link
 from chimerax.mouse_modes import MouseMode
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 
+from Qt.QtCore import Qt
 from Qt.QtWidgets import QPushButton, QComboBox, QFormLayout
 
 from SEQCROW.managers.filereader_manager import apply_seqcrow_preset
@@ -421,6 +422,8 @@ class _ElementPicker(ToolInstance):
         initial_elements = []
         if ChangeElementMouseMode.element:
             initial_elements = [ChangeElementMouseMode.element]
+        else:
+            initial_elements = ["C"]
         
         self.periodic_table = PeriodicTable(
             select_multiple=False,
@@ -496,6 +499,11 @@ class _ElementPicker(ToolInstance):
         self.vsepr.insertSeparator(1)
         self.vsepr.insertSeparator(0)
         layout.addRow("shape:", self.vsepr)
+        
+        if ChangeElementMouseMode.vsepr:
+            ndx = self.vsepr.findText(ChangeElementMouseMode.vsepr, Qt.MatchExactly)
+            if ndx != -1:
+                self.vsepr.setCurrentIndex(ndx)
         
         do_it = QPushButton("set element and shape")
         do_it.clicked.connect(self.set_selected)

@@ -6,7 +6,7 @@ from Qt.QtCore import Qt, QRegularExpression
 from Qt.QtGui import QKeySequence, QClipboard
 from Qt.QtWidgets import QVBoxLayout, QTableWidget, QTableWidgetItem, \
                             QTabWidget, QHeaderView, QSizePolicy, QMenuBar, QAction, \
-                            QFileDialog, QApplication, QLineEdit, QLabel
+                            QFileDialog, QApplication, QLineEdit, QLabel, QWidget
 
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
@@ -14,6 +14,8 @@ from chimerax.core.settings import Settings
 
 from AaronTools.theory import Theory
 from AaronTools.const import UNIT, PHYSICAL
+
+from SEQCROW.tools.normal_modes import FreqTableWidgetItem
 
 
 nrg_infos = [
@@ -89,6 +91,14 @@ class Info(ToolInstance):
         self.file_selector.currentIndexChanged.connect(self.fill_table)
         layout.insertWidget(0, self.file_selector, 0)
         
+        tabs = QTabWidget()
+        self.tabs = tabs
+        layout.insertWidget(1, self.tabs, 1)
+        
+        general_info = QWidget()
+        general_layout = QVBoxLayout(general_info)
+        tabs.addTab(general_info, "general")
+        
         self.table = QTableWidget()
         self.table.setColumnCount(2)
         self.table.setHorizontalHeaderLabels(['Data', 'Value'])
@@ -97,13 +107,33 @@ class Info(ToolInstance):
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
-        layout.insertWidget(1, self.table, 1)
+        general_layout.insertWidget(1, self.table, 1)
         
         self.filter = QLineEdit()
         self.filter.setPlaceholderText("filter data")
         self.filter.textChanged.connect(self.apply_filter)
         self.filter.setClearButtonEnabled(True)
-        layout.insertWidget(2, self.filter, 0)
+        general_layout.insertWidget(2, self.filter, 0)
+        
+        freq_info = QWidget()
+        freq_layout = QVBoxLayout(freq_info)
+        tabs.addTab(freq_info, "frequencies")
+        
+        self.freq_table = QTableWidget()
+        self.freq_table.setColumnCount(3)
+        self.freq_table.setHorizontalHeaderLabels(["Frequency (cm\u207b\u00b9)", "symmetry", "IR intensity"])
+        self.freq_table.setSortingEnabled(True)
+        self.freq_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        for i in range(0, 3):
+            self.freq_table.resizeColumnToContents(i)
+        
+        self.freq_table.horizontalHeader().setStretchLastSection(False)            
+        self.freq_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        self.freq_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)        
+        self.freq_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)        
+        
+        self.freq_table.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
+        freq_layout.insertWidget(1, self.freq_table, 1)        
         
         menu = QMenuBar()
         
@@ -249,25 +279,46 @@ class Info(ToolInstance):
             delim = "\t"
         elif self.settings.delimiter == "semicolon":
             delim = ";"
+
+        if self.tabs.currentIndex() == 0:
+            if self.settings.include_header:
+                s = delim.join(["Data", "Value"])
+                s += "\n"
+            else:
+                s = ""
             
-        if self.settings.include_header:
-            s = delim.join(["Data", "Value"])
-            s += "\n"
-        else:
-            s = ""
-        
-        for i in range(0, self.table.rowCount()):
-            if self.table.isRowHidden(i):
-                continue
-            s += delim.join(
-                [
-                    item.text().replace("<sub>", "").replace("</sub>", "") for item in [
-                        self.table.item(i, j) if self.table.item(i, j) is not None 
-                        else self.table.cellWidget(i, j) for j in range(0, 2)
+            for i in range(0, self.table.rowCount()):
+                if self.table.isRowHidden(i):
+                    continue
+                s += delim.join(
+                    [
+                        item.text().replace("<sub>", "").replace("</sub>", "") for item in [
+                            self.table.item(i, j) if self.table.item(i, j) is not None 
+                            else self.table.cellWidget(i, j) for j in range(0, 2)
+                        ]
                     ]
-                ]
-            )
-            s += "\n"
+                )
+                s += "\n"
+        
+        else:
+            if self.settings.include_header:
+                s = delim.join(["Frequency (cm\u207b\u00b9)", "symmetry", "IR intensity"])
+                s += "\n"
+            else:
+                s = ""
+            
+            for i in range(0, self.freq_table.rowCount()):
+                if self.freq_table.isRowHidden(i):
+                    continue
+                s += delim.join(
+                    [
+                        item.text().replace("<sub>", "").replace("</sub>", "") for item in [
+                            self.freq_table.item(i, j) if self.freq_table.item(i, j) is not None 
+                            else self.freq_table.cellWidget(i, j) for j in range(0, 3)
+                        ]
+                    ]
+                )
+                s += "\n"
         
         return s
     
@@ -291,6 +342,7 @@ class Info(ToolInstance):
     
     def fill_table(self, ndx):
         self.table.setRowCount(0)
+        self.freq_table.setRowCount(0)
         
         if ndx < 0:
             return
@@ -433,11 +485,46 @@ class Info(ToolInstance):
                 value.setData(Qt.DisplayRole, ", ".join(["%.4f" % x for x in vals]))
                 self.table.setItem(row, 1, value)
 
+
+        freq_data = fr.other['frequency'].data
+        
+        for i, mode in enumerate(freq_data):
+            row = self.freq_table.rowCount()
+            self.freq_table.insertRow(row)
             
-                
+            freq = FreqTableWidgetItem()
+            freq.setData(Qt.DisplayRole, "%.2f%s" % (abs(mode.frequency), "i" if mode.frequency < 0 else ""))
+            freq.setData(Qt.UserRole, i)
+            self.freq_table.setItem(row, 0, freq)
+            
+            if mode.symmetry:
+                text = mode.symmetry
+                if re.search("\d", text):
+                    text = re.sub(r"(\d+)", r"<sub>\1</sub>", text)
+                if text.startswith("SG"):
+                    text = "Σ" + text[2:]
+                elif text.startswith("PI"):
+                    text = "Π" + text[2:]
+                elif text.startswith("DLT"):
+                    text = "Δ" + text[3:]
+                if any(text.endswith(char) for char in "vhdugVHDUG"):
+                    text = text[:-1] + "<sub>" + text[-1].lower() + "</sub>"
+
+                label = QLabel(text)
+                label.setAlignment(Qt.AlignCenter)
+                self.freq_table.setCellWidget(row, 1, label)
+
+            intensity = QTableWidgetItem()
+            if mode.intensity is not None:
+                intensity.setData(Qt.DisplayRole, round(mode.intensity, 2))
+            self.freq_table.setItem(row, 2, intensity)
 
         self.table.resizeColumnToContents(0)
         self.table.resizeColumnToContents(1)
+
+        self.freq_table.resizeColumnToContents(0)
+        self.freq_table.resizeColumnToContents(1)
+        self.freq_table.resizeColumnToContents(2)
         
         self.apply_filter()
     
