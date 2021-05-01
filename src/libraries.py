@@ -184,7 +184,7 @@ class LigandTable(QWidget):
  
 
 class SubstituentTable(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, singleSelect=False):
         super().__init__(parent)
         
         layout = QGridLayout(self)
@@ -206,6 +206,8 @@ class SubstituentTable(QWidget):
         
         self.table.setSortingEnabled(True)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        if singleSelect:
+            self.table.setSelectionMode(QTableWidget.SingleSelection)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         
         self.filterEdit = QLineEdit()

@@ -91,6 +91,9 @@ class EnergyPlot(ToolInstance):
             else:
                 info = info[0]
             data.append(info["energy"])
+        
+        if self.structure.num_coordsets > len(data):
+            data.append(fr.other["energy"])
 
         self.ys = data
 
@@ -106,7 +109,7 @@ class EnergyPlot(ToolInstance):
         mins = [min(data) for m in minlocs]        
         
         maxlocs = [self.structure.coordset_ids[i] for i in range(0, self.structure.num_coordsets) if data[i] == max(data)]
-        maxs = [max(data) for m in minlocs]
+        maxs = [max(data) for m in maxlocs]
     
         ax.plot(minlocs, mins, marker='*', c='blue', markersize=5)
         ax.plot(maxlocs, maxs, marker='*', c='red', markersize=5)

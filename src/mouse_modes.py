@@ -18,13 +18,14 @@ from chimerax.mouse_modes import MouseMode
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 
 from Qt.QtCore import Qt
-from Qt.QtWidgets import QPushButton, QComboBox, QFormLayout
+from Qt.QtWidgets import QPushButton, QComboBox, QFormLayout, QCheckBox, QLineEdit
 
 from SEQCROW.managers.filereader_manager import apply_seqcrow_preset
 from SEQCROW.finders import AtomSpec
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.selectors import get_fragment
 from SEQCROW.widgets import PeriodicTable, ModelComboBox
+from SEQCROW.libraries import SubstituentTable
 
 import numpy as np
 
@@ -321,6 +322,7 @@ class DrawBondMouseMode(MouseMode):
 
     def mouse_up(self, event):
         super().mouse_up(event)
+
         x, y = event.position()
         pick = self.view.picked_object(x, y)
 
@@ -429,6 +431,7 @@ class _ElementPicker(ToolInstance):
             select_multiple=False,
             initial_elements=initial_elements
         )
+        self.periodic_table.elementSelectionChanged.connect(self.element_changed)
         layout.addRow(self.periodic_table)
         
         self.vsepr = QComboBox()
@@ -498,7 +501,11 @@ class _ElementPicker(ToolInstance):
         self.vsepr.insertSeparator(2)
         self.vsepr.insertSeparator(1)
         self.vsepr.insertSeparator(0)
+        self.vsepr.currentTextChanged.connect(self.element_changed)
         layout.addRow("shape:", self.vsepr)
+        
+        self.keep_open = QCheckBox()
+        layout.addRow("keep table open:", self.keep_open)
         
         if ChangeElementMouseMode.vsepr:
             ndx = self.vsepr.findText(ChangeElementMouseMode.vsepr, Qt.MatchExactly)
@@ -508,10 +515,22 @@ class _ElementPicker(ToolInstance):
         do_it = QPushButton("set element and shape")
         do_it.clicked.connect(self.set_selected)
         layout.addRow(do_it)
-        
+
+        self.keep_open.stateChanged.connect(lambda state: do_it.setVisible(state != Qt.Checked))
+        self.keep_open.stateChanged.connect(self.element_changed)
+
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(None)
+    
+    def element_changed(self):
+        if self.keep_open.checkState() != Qt.Checked:
+            return
+        element = self.periodic_table.selectedElements()
+        if element:
+            ChangeElementMouseMode.element = element[0]
+            ChangeElementMouseMode.vsepr = self.vsepr.currentText()
+            self.session.logger.status("change element mouse mode set to use %s %s" % (ChangeElementMouseMode.vsepr, ChangeElementMouseMode.element))
     
     def set_selected(self, *args):
         element = self.periodic_table.selectedElements()
@@ -520,7 +539,8 @@ class _ElementPicker(ToolInstance):
             ChangeElementMouseMode.vsepr = self.vsepr.currentText()
             self.session.logger.status("change element mouse mode set to use %s %s" % (ChangeElementMouseMode.vsepr, ChangeElementMouseMode.element))
         
-        self.delete()
+        if self.keep_open.checkState() != Qt.Checked:
+            self.delete()
 
 
 class _ModelSelector(ToolInstance):
@@ -732,3 +752,134 @@ class ChangeElementMouseMode(MouseMode):
         
         # profile.disable()
         # profile.print_stats()
+
+
+class EraserMouseMode(MouseMode):
+    name = "atom eraser"
+
+    def mouse_drag(self, event):
+        self.do_erase(event)
+
+    def mouse_up(self, event):
+        super().mouse_up(event)
+        self.do_erase(event)
+    
+    def do_erase(self, event):
+        x, y = event.position()
+        pick = self.view.picked_object(x, y)
+        
+        if isinstance(pick, PickedBond):
+            pick.bond.delete()
+        
+        elif isinstance(pick, PickedAtom):
+            pick.atom.delete()
+        
+        elif isinstance(pick, PickedPseudobond):
+            pick.pbond.delete()
+
+
+class _SubstituentSelector(ToolInstance):
+    def __init__(self, session, name):
+        super().__init__(session, name)
+        self.tool_window = MainToolWindow(self)
+        self._build_ui()
+
+    def _build_ui(self):
+        layout = QFormLayout()
+        
+        self.substituent_table = SubstituentTable(singleSelect=True)
+        layout.addRow(self.substituent_table)
+
+        self.new_residue = QCheckBox()
+        self.new_residue.setCheckState(Qt.Checked if SubstituteMouseMode.newRes else Qt.Unchecked)
+        layout.addRow("new residue:", self.new_residue)
+        
+        self.res_name = QLineEdit()
+        self.res_name.setPlaceholderText("leave blank to keep current")
+        layout.addRow("set residue name:", self.res_name)
+
+        self.distance_names = QCheckBox()
+        self.distance_names.setCheckState(Qt.Checked if SubstituteMouseMode.useRemoteness else Qt.Unchecked)
+        layout.addRow("distance atom names:", self.distance_names)
+
+        do_it = QPushButton("set substituent")
+        do_it.clicked.connect(self.set_sub)
+        layout.addRow(do_it)
+
+        self.tool_window.ui_area.setLayout(layout)
+
+        self.tool_window.manage(None)
+
+    def set_sub(self):
+        sub_names = []
+        for row in self.substituent_table.table.selectionModel().selectedRows():
+            if self.substituent_table.table.isRowHidden(row.row()):
+                continue
+            
+            sub_names.append(row.data())
+        
+        if sub_names:
+            SubstituteMouseMode.substituent = sub_names[0]
+            SubstituteMouseMode.newRes = self.new_residue.checkState() == Qt.Checked
+            SubstituteMouseMode.useRemoteness = self.distance_names.checkState() == Qt.Checked
+            sub_name = self.res_name.text()
+            SubstituteMouseMode.resName = sub_name
+
+            self.delete()
+    
+    def close(self):
+        sub_names = []
+        for row in self.substituent_table.table.selectionModel().selectedRows():
+            if self.substituent_table.table.isRowHidden(row.row()):
+                continue
+            
+            sub_names.append(row.data())
+        
+        if sub_names:
+            SubstituteMouseMode.substituent = sub_names[0]
+            SubstituteMouseMode.newRes = self.new_residue.checkState() == Qt.Checked
+            SubstituteMouseMode.useRemoteness = self.distance_names.checkState() == Qt.Checked
+            sub_name = self.res_name.text()
+            SubstituteMouseMode.resName = sub_name
+
+        super().close()
+
+
+class SubstituteMouseMode(MouseMode):
+    name = "substitute"
+    newRes = False
+    resName = None
+    substituent = None
+    useRemoteness = False
+    
+    def mouse_up(self, event):
+        x, y = event.position()
+        pick = self.view.picked_object(x, y)
+        
+        if not self.substituent or event.shift_down() or not pick:
+            _SubstituentSelector(self.session, "pick substituent")
+            return
+
+        if isinstance(pick, PickedAtom):
+            atom = pick.atom
+            if SubstituteMouseMode.resName:
+                run(
+                    self.session,
+                    "substitute %s substituent %s minimize true newName %s newResidue %s useRemoteness %s" % (
+                        atom.atomspec,
+                        self.substituent,
+                        self.resName,
+                        repr(self.newRes),
+                        repr(self.useRemoteness),
+                    )
+                )
+            else:
+                run(
+                    self.session,
+                    "substitute %s substituent %s minimize true newResidue %s useRemoteness %s" % (
+                        atom.atomspec,
+                        self.substituent,
+                        repr(self.newRes),
+                        repr(self.useRemoteness),
+                    )
+                )

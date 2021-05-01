@@ -36,22 +36,27 @@ class _SEQCROW_API(BundleAPI):
                 lambda *args, ses=session: _SEQCROW_API.register_tutorials(ses)
             )
 
-            from SEQCROW.mouse_modes import (
-                SelectConnectedMouseMode,
-                DrawBondMouseMode,
-                DrawTSBondMouseMode,
-                ChangeElementMouseMode,
-            )
-            session.ui.mouse_modes.add_mode(SelectConnectedMouseMode(session))
-            session.ui.mouse_modes.add_mode(DrawBondMouseMode(session))
-            session.ui.mouse_modes.add_mode(DrawTSBondMouseMode(session))
-            session.ui.mouse_modes.add_mode(ChangeElementMouseMode(session))
-
             # session.ui.triggers.add_handler(
             #     'ready',
             #     lambda *args, ses=session: _SEQCROW_API.add_toolbar(ses)
             # )
 
+            from SEQCROW.mouse_modes import (
+                SelectConnectedMouseMode,
+                DrawBondMouseMode,
+                DrawTSBondMouseMode,
+                ChangeElementMouseMode,
+                EraserMouseMode,
+                SubstituteMouseMode,
+            )
+    
+            session.ui.mouse_modes.add_mode(SelectConnectedMouseMode(session))
+            session.ui.mouse_modes.add_mode(DrawBondMouseMode(session))
+            session.ui.mouse_modes.add_mode(DrawTSBondMouseMode(session))
+            session.ui.mouse_modes.add_mode(ChangeElementMouseMode(session))
+            session.ui.mouse_modes.add_mode(EraserMouseMode(session))
+            session.ui.mouse_modes.add_mode(SubstituteMouseMode(session))
+        
         #apply AARONLIB setting
         if seqcrow_settings.settings.AARONLIB is not None:
             os.environ['AARONLIB'] = seqcrow_settings.settings.AARONLIB
@@ -506,9 +511,9 @@ class _SEQCROW_API(BundleAPI):
         from chimerax.toolbar.tool import get_toolbar_singleton
         from chimerax.ui.widgets.tabbedtoolbar import TabbedToolbar
         from Qt.QtWidgets import QWidget
-        
+
         toolbar = get_toolbar_singleton(session)
-        
+
         for child in toolbar.tool_window.ui_area.children():
             if isinstance(child, TabbedToolbar):
                 tabs = child

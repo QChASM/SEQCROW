@@ -27,10 +27,30 @@ from matplotlib import rcParams
 
 from Qt.QtCore import Qt, QRect, QItemSelectionModel 
 from Qt.QtGui import QValidator, QFont, QIcon
-from Qt.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, QTabWidget, QComboBox, \
-                            QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, \
-                            QFormLayout, QCheckBox, QHeaderView, QMenuBar, QAction, QFileDialog, QStyle, \
-                            QGroupBox, QLabel, QToolBox, QHBoxLayout
+from Qt.QtWidgets import (
+    QSpinBox,
+    QDoubleSpinBox,
+    QGridLayout,
+    QPushButton,
+    QTabWidget,
+    QComboBox,
+    QTableWidget,
+    QTableView,
+    QWidget,
+    QVBoxLayout,
+    QTableWidgetItem,
+    QFormLayout,
+    QCheckBox,
+    QHeaderView,
+    QMenuBar,
+    QAction,
+    QFileDialog,
+    QStyle,
+    QGroupBox,
+    QLabel,
+    QToolBox,
+    QHBoxLayout,
+)
 
 from SEQCROW.tools.per_frame_plot import NavigationToolbar
 from SEQCROW.utils import iter2str
@@ -1400,7 +1420,7 @@ class NormalModes(ToolInstance):
             if isinstance(tool, CoordinateSetSlider):
                 if tool.structure is model:
                     tool.delete()
-    
+
         pause_frames = (60 // anim_fps)
 
         slider =  CoordinateSetSlider(self.session, model, movie_framerate=anim_fps, pause_frames=pause_frames)
@@ -1763,7 +1783,29 @@ class IRPlot(ChildToolWindow):
         filename, _ = QFileDialog.getSaveFileName(filter="CSV Files (*.csv)")
         if filename:
             s = "frequency (cm^-1),IR intensity\n"
-            data = self.get_data()
+
+        
+            fr = self.tool_instance.model_selector.currentData()
+            if fr is None:
+                return
+    
+            freq = fr.other["frequency"]
+        
+            fwhm = self.fwhm.value()
+            peak_type = self.peak_type.currentText()
+            plot_type = self.tool_instance.plot_type.currentText()
+            voigt_mixing = self.voigt_mix.value()
+            linear = self.linear.value()
+            quadratic = self.quadratic.value()
+            
+            data = freq.get_ir_data(
+                plot_type=plot_type,
+                peak_type=peak_type,
+                fwhm=fwhm,
+                voigt_mixing=voigt_mixing,
+                linear_scale=linear,
+                quadratic_scale=quadratic,
+            )
             x_values, y_values = data
             for x, y in zip(x_values, y_values):
                 s += "%f,%f\n" % (x, y)

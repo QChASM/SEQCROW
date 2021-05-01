@@ -171,16 +171,31 @@
                 <Provider name="buried_volume"/>
             </Providers>
   
+            <!--
+            mouse modes don't fit well if you have a smaller
+            screen (laptop)
+            add a new tab for SEQCROW mouse modes
+            -->
             <Providers manager="toolbar">
-                <Provider tab="Right Mouse"
-                          section="Movement"
+                <!--
+                <Provider tab="More Right Mouse"
+                          section="Select"
+                          name="mm1"
+                          mouse_mode="select"
+                          display_name="Select" 
+                          description="Select items"
+                          icon="select.png"
+                />
+                -->
+                <Provider tab="More Right Mouse"
+                          section="Select"
                           name="seqcrow_1"
                           mouse_mode="select fragment"
                           display_name="Select Fragment" 
                           description="Select molecular fragment"
                           icon="connected.png"
                 />
-                <Provider tab="Right Mouse"
+                <Provider tab="More Right Mouse"
                           section="Structure Modification"
                           name="seqcrow_2"
                           mouse_mode="bond"
@@ -188,7 +203,7 @@
                           description="Draw a new bond"
                           icon="bond.png"
                 />
-                <Provider tab="Right Mouse"
+                <Provider tab="More Right Mouse"
                           section="Structure Modification"
                           name="seqcrow_3"
                           mouse_mode="tsbond"
@@ -196,13 +211,29 @@
                           description="Draw a forming/breaking bond"
                           icon="tsbond.png"
                 />
-                <Provider tab="Right Mouse"
+                <Provider tab="More Right Mouse"
                           section="Structure Modification"
                           name="seqcrow_4"
                           mouse_mode="change element"
                           display_name="Change Element" 
                           description="Change the element of picked atoms"
                           icon="element.png"
+                />
+                <Provider tab="More Right Mouse"
+                          section="Structure Modification"
+                          name="seqcrow_5"
+                          mouse_mode="atom eraser"
+                          display_name="Erase Atoms" 
+                          description="Erase atomic structures"
+                          icon="eraser.png"
+                />
+                <Provider tab="More Right Mouse"
+                          section="Structure Modification"
+                          name="seqcrow_6"
+                          mouse_mode="substitute"
+                          display_name="Substitute" 
+                          description="Add or change substituents"
+                          icon="substitute.png"
                 />
             </Providers>
             
