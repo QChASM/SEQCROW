@@ -755,7 +755,7 @@ class ChangeElementMouseMode(MouseMode):
 
 
 class EraserMouseMode(MouseMode):
-    name = "atom eraser"
+    name = "structure eraser"
 
     def mouse_drag(self, event):
         self.do_erase(event)

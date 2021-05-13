@@ -222,8 +222,8 @@
                 <Provider tab="More Right Mouse"
                           section="Structure Modification"
                           name="seqcrow_5"
-                          mouse_mode="atom eraser"
-                          display_name="Erase Atoms" 
+                          mouse_mode="structure eraser"
+                          display_name="Erase Structure" 
                           description="Erase atomic structures"
                           icon="eraser.png"
                 />
@@ -321,6 +321,7 @@
                 <ChimeraXClassifier>ChimeraX :: Command :: highlight           :: General            :: make some atoms or bonds stand out</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: ~highlight          :: General            :: remove highlights</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: lookDown            :: General            :: reorient molecule along bond</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: pointGroup          :: General            :: print the point group of atomic structures to the log</ChimeraXClassifier>
                 <!--
                 <ChimeraXClassifier>ChimeraX :: Command :: duplicate           :: Structure Editing  :: duplicate selected atoms</ChimeraXClassifier>
                 -->

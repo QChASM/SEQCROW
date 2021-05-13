@@ -152,6 +152,7 @@ def seqcrow_s(session, models=None, atoms=None):
     from AaronTools.const import RADII, VDW_RADII, TMETAL
     from chimerax.atomic import AtomicStructure, Atom, Bond
     from chimerax.atomic.colors import element_color
+    from SEQCROW.selectors import get_fragment
 
     if models is None or atoms is None:
         apply_seqcrow_s_lighting(session)
@@ -163,7 +164,7 @@ def seqcrow_s(session, models=None, atoms=None):
             models = list(set([atom.structure for atom in atoms]))
     elif isinstance(models, AtomicStructure):
         models = [models]
-    
+
     for m in models:
         if atoms is None:
             m.ball_scale = 0.625
@@ -178,7 +179,7 @@ def seqcrow_s(session, models=None, atoms=None):
                 bond.halfbond = True
                 bond.radius = 0.25
                 bond.hide = False
-        
+
         tm_bonds = m.pseudobond_group(m.PBG_METAL_COORDINATION, create_type=None)
         ts_bonds = m.pseudobond_group("TS bonds", create_type=None)
         h_bonds = m.pseudobond_group("hydrogen bonds", create_type=None)
@@ -213,22 +214,46 @@ def seqcrow_s(session, models=None, atoms=None):
 
                 if not display:
                     for bonded_atom in atom.neighbors:
-                        # do not display H's on C unless it's a terminus
                         if "C" != bonded_atom.element.name or (
                             (
                                 bonded_atom.element.name == "C" and (
+                                    # show H's on terminal carbons that aren't RCH3's
                                     sum(len(a.neighbors) == 1 for a in bonded_atom.neighbors) >= bonded_atom.num_bonds - 1
                                     and not (
                                         sum(int(a.element.name == "H") for a in bonded_atom.neighbors) == 3
                                         and len(bonded_atom.neighbors) == 4
                                     )
+                                    # show H's in TS bonds or on atoms that are coordinated to a metal
                                     or (ts_bonds and any(bonded_atom in bond.atoms for bond in ts_bonds.pseudobonds))
                                     or (tm_bonds and any(bonded_atom in bond.atoms for bond in tm_bonds.pseudobonds))
                                 )
                             )
+                            # show H's that are on chiral carbons
+                            # this is a really lazy check and doesn't get everything
+                            or (
+                                sum(a.element.name == "H" for a in bonded_atom.neighbors) == 1 and (
+                                    len(set(sum(
+                                        get_fragment(a, bonded_atom).elements.masses) for a in bonded_atom.neighbors
+                                    )) == 4 # or any(a.element.name not in "CH" for a in bonded_atom.neighbors)
+                                ) and bonded_atom.num_bonds == 4
+                            )
                         ): 
                             display = True
                             break
+                        
+                        # show H's on trigonal carbons adjacent to terminal trigonal carbons
+                        if "C" == bonded_atom.element.name and bonded_atom.num_bonds < 4:
+                            for bonded_atom2 in bonded_atom.neighbors:
+                                if bonded_atom2.element.name == "C" and (
+                                    sum(len(a.neighbors) == 1 for a in bonded_atom2.neighbors) >= bonded_atom2.num_bonds - 1
+                                    and not (
+                                        sum(int(a.element.name == "H") for a in bonded_atom2.neighbors) == 3
+                                        and len(bonded_atom2.neighbors) == 4
+                                    )
+                                ):
+                                    display = True
+                                    break
+ 
                 
                 atom.display = display
 

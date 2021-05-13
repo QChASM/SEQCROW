@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+
+	<head>
+		<meta charset="UTF-8">
+		<title>Expanding Libraries</title>
+		<meta http-equiv="Content-Type" content="text/html">
+		<link rel="icon" href="../images/SEQCROW.png" type="image/png">
+		<link rel="stylesheet" href="../style.css">
+	</head>
+	
+	<div class="head">
+		<object data="../ribbon.html" class="head"></object>
+	</div>
+	
+	<body>
+		<h1>ChimeraX Orientation</h1>
+        <p>ChimeraX is a feature-rich application, but knowledge of all
+        ChimeraX's utilities is not necessary to interact with 
+        SEQCROW's tools. This ChimeraX orientation will highlight
+        a few of the ChimeraX things that are useful for
+        SEQCROW users to be aware of. 
+        </p>
+        <p>A useful tidbit for this
+        page and other tutorials is that hyperlinks can run ChimeraX
+        commands. For SEQCROW tutorials, these links are styled like this:
+        <br>
+        <a class="cxcmd" href="cxcmd:help newTab open">help newTab open</a>
+        </p>
+
+        <h2>Getting Help</h2>
+        <aside>
+            <img src="../images/context.png"/>
+        </aside>
+        <p>
+        ChimeraX has a good amount of documentation, much of which can be found
+        on the <span class="menulike">Help</span> menu (i.e. the way
+        you got to SEQCROW's tutorials).
+        But there are more ways to quickly access the documentation for a particular tool
+        or command.
+        </p>
+        <p>
+        For tools, you can right click (or <kbd>control</kbd>+click if you only have one
+        mouse button) on the tool to show a context menu.
+        One of the options will be "Help".
+        This will pull up the tool's documentation in the ChimeraX browser.
+        If the help option is grayed out, the tool's developer hasn't added
+        the documentation for it, but you might be able to find documentation elsewhere.
+        </p>
+        <p>
+        For commands, there is the <a class="cxcmd" href="cxcmd:help newTab help">help</a>
+        command. 
+        You can give this another command, and it will pull up the documentation
+        in the browser or show you the usage in the Log tool.
+        </p>
+        <p>
+        If you want to see what features a 3<sup>rd</sup> party bundle adds,
+        check the toolshed.
+        All commands commands, tools, etc. that a bundle adds will be listed
+        under the "Release History" tab on the bundle's page.
+        Note that this is just a list - usage information is not necessarily
+        on the toolshed.
+        </p>
+
+		<h2>Opening Structures</h2>
+        <p>
+        There's a few ways to open a structure in ChimeraX:
+        
+        <ol>
+            <li><span class="menulike">File &rarr; Open</span> on the ribbon at the top of the screen</li>
+            <li>"Open" button on the "Home" tab of ChimeraX's toolbar</li>
+            <li><span class="cxcmd">open</span> command</li>
+        </ol>
+        <p>
+        The first two options allow you to open files using an interactive file explorer.
+        The open command can make use of a path to a file, but it can do a bit more than that.
+        If you run <a class="cxcmd" href="cxcmd:open 2v6a">open 2v6a</a>, it will open the structure for
+        PDB ID 2v6a. You can also open structures from a URL, other online databases, or from a SMILES string:
+        <br>
+        <a class="cxcmd" href="cxcmd:open smiles:CC=CCC=O">open smiles:CC=CCC=O</a>
+        <br>
+        See <a href="https://www.cgl.ucsf.edu/chimerax/docs/user/commands/open.html#fetch" target="_blank">
+        the ChimeraX documentation</a> for more details on this. 
+        </p>
+  
+        <h2>Mouse Modes</h2>
+        <p>
+        Objects open in ChimeraX can be manipulated or measured using your mouse pointer.
+        </p>
+        <p>
+        By default, the left mouse button can rotate the view.
+        You can also select atoms or other objects by <kbd>control</kbd>+clicking
+        to set your selection to that object, or <kbd>control</kbd>+<kbd>shift</kbd>+clicking
+        to toggle whether that object is selected.
+        Selected items have a subtle green outline. 
+        </p>
+        <p>
+        The default right mouse button will move the view side to side or up and down. 
+        You can change this to something else on the "Right Mouse" tab of the ChimeraX
+        toolbar.
+        </p>
+        <p>
+        If you only have one mouse button, you can use <kbd>command</kbd>+click or 
+        <kbd>Alt</kbd>+click instead of right clicking.
+        </p>
+      
+        <h2>Model Panel</h2>
+        <p>
+        Anything that appears in the ChimeraX graphics window will also appear on the
+        "Models" tool (model is the umbrella term for atomic structures, density maps,
+        surfaces, generic shape data, etc.). 
+        <br>
+        <img src="../images/model_panel.png"/>
+        </p>
+        <p>
+        The Models tool shows you the name of each model, its ID, color, whether it is visible, and whether it is selected.
+        It also allows you to change the color of the entire model, hide or show the model, and select or deselect the entire model.
+        The next section has more on the model ID.
+
+        <h2>Specifiers and Selectors</h2>
+         <p>
+        Every object shown in the graphics window has a specifier associated with it.
+        These specifiers can be used to set the scope of a command or tool to certain atoms or models.
+        Selectors are similar, but can be used to select atoms or parts of models meeting certain criteria.
+        A good way to play around with these is the <a class="cxcmd">select</a> command.
+        </p>
+        <h3>Atomic Structure Specifiers</h3>
+        <p>
+        For an entire model, the specifier is &quot;#<i>&lt;model ID&gt;</i>&quot;. For example, 
+        you can select a model with ID 1 with <a href="cxcmd:select #1" class="cxcmd">select #1</a>.
+        </p>
+        <p>
+        An atom's specifier is &quot;@<i>&lt;atom name&gt;</i>&quot;.
+        You can figure out an atom's name (or even its specifier, depending on your settings) by hovering your mouse over it.
+        For example, to select all atoms named "C1" across all models, run:
+        <br>
+        <a href="cxcmd:select @C1" class="cxcmd">select @C1</a>
+        </p>
+        <p>
+        If you only want to select atoms named "C1" on model #1, you can combine the atom specifier with the model specifier:
+        <br>
+        <a href="cxcmd:select #1@C1" class="cxcmd">select #1@C1</a>
+        </p>
+        <p>
+        These can get more advanced. For full details, see
+        <a href="https://www.cgl.ucsf.edu/chimerax/docs/user/commands/atomspec.html#hierarchy" target="_blank">
+        the ChimeraX documentation</a>.
+        </p>
+        <h3>Selectors</h3>
+        <p>
+        There are also "selectors" that can be invoked to select groups of atoms.
+        These range in simplicity from element symbol to more complex things like functional groups.
+        You can find selectors on ChimeraX's ribbon under "Select", though these work with the <span class="cxcmd">select</span> command as well.
+        For example, to select all carbons you can either:
+        <ul>
+        <li>use the menu: <span class="menulike">Select &rarr; Chemistry &rarr; Element &rarr; C</span></li>
+        <li>use the command <a href="cxcmd:select C" class="cxcmd">select C</a></li>
+        </ul>
+        </p>
+        <p>
+        There are also numerous functional group selectors in ChimeraX.
+        SEQCROW expands this with related substituent selectors.
+        These are under <span class="menulike">Select &rarr; Chemistry &rarr; Functional Group</span>
+        and <span class="menulike">Select &rarr; Chemistry &rarr; Substituents</span>, respectively.
+        </p>
+        <p>
+        There's also a "sel" selector, which is for the current selection. 
+        This may be useful if it's faster to pick atoms by clicking on them than
+        to figure out what selectors or specifiers to use.
+        For example, you can select two atoms with your mouse and run:
+        <br>
+        <a href="cxcmd:distance sel" class="cxcmd">distance sel</a>
+        <br>
+        to print the distance between those atoms to the log.
+        </p>
+
+        <h2>Saving Images</h2>
+        <p>
+        You can save an image of ChimeraX's graphics window in a couple ways:
+        <br>
+        <ul>
+            <li><span class="menulike">File &rarr; Save...</span> and choosing an
+            image format (e.g. PNG, JPEG, TIFF) file type
+            </li>
+            <li>
+            clicking the "Snapshot" button with the camera icon on the "Home"
+            tab of the ChimeraX toolbar
+            </li>
+            <li>
+            the <span class="cxcmd">save</span> command
+            </li>
+        </ul>
+        </p>
+        <p>
+        The <span class="menulike">File &rarr; Save...</span> and 
+        <span class="cxcmd">save</span> command
+        options are more flexible than snapshots. You can choose the image size,
+        super sampling, and whether the background should be transparent (if the file
+        type supports this).
+        </p>
+        <p>
+        You might want to look at the graphical presets that are available under
+        <span class="menulike">Presets</span> to see if you like any of them. 
+        One thing worth noting: the selection outline will appear in any saved images.
+        If you're trying to use the selection to make certain atoms or bonds
+        stand out more, try using SEQCROW's <span class="cxcmd">highlight</span>
+        command instead.
+        </p>
+
+        <h2>Settings</h2>
+        <p>
+        You can change some default values in the ChimeraX settings.
+        For example, you might want to change the default color of distance labels
+        from yellow to black.
+        These can be found under <span class="menulike">Favorites &rarr; Settings...</span>
+        or <span class="menulike">Preferences &rarr; Settings...</span> (depending on
+        your operating system) on the ChimeraX ribbon at the top of the screen.
+        Explore these to discover what you might want to change.
+        You will have to press <button>Save</button>, or else the changes won't stick.
+        </p>
+  
+
+	</body>
+</html>

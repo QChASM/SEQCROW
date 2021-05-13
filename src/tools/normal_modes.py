@@ -1,6 +1,7 @@
 from io import BytesIO
 from os.path import basename
 import re
+from json import loads, dumps
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -50,6 +51,7 @@ from Qt.QtWidgets import (
     QLabel,
     QToolBox,
     QHBoxLayout,
+    QLineEdit,
 )
 
 from SEQCROW.tools.per_frame_plot import NavigationToolbar
@@ -78,6 +80,7 @@ class _NormalModeSettings(Settings):
         'figure_width': 2,
         'figure_height': 2,
         "fixed_size": False,
+        "scales": "{}",
     }
 
 
@@ -1093,7 +1096,9 @@ class NormalModes(ToolInstance):
         #table that lists frequencies
         table = QTableWidget()
         table.setColumnCount(3)
-        table.setHorizontalHeaderLabels(["Frequency (cm\u207b\u00b9)", "symmetry", "IR intensity"])
+        table.setHorizontalHeaderLabels(
+            ["Frequency (cm\u207b\u00b9)", "symmetry", "IR intensity"]
+        )
         table.setSortingEnabled(True)
         table.setSelectionBehavior(QTableView.SelectRows)
         table.setSelectionMode(QTableView.SingleSelection)
@@ -1240,19 +1245,46 @@ class NormalModes(ToolInstance):
         if fr is None:
             return 
 
-        freq_data = fr.other['frequency'].data
+        freq = fr.other['frequency']
+        if freq.anharm_data:
+            self.table.setColumnCount(4)
+            self.table.setHorizontalHeaderLabels([
+                "Fundamental (cm\u207b\u00b9)",
+                "Δ\u2090\u2099\u2095",
+                "symmetry",
+                "IR intensity",
+            ])
+            freq_data = sorted(freq.anharm_data, key=lambda x: x.harmonic_frequency)
+        else:
+            self.table.setColumnCount(3)
+            self.table.setHorizontalHeaderLabels([
+                "Frequency (cm\u207b\u00b9)",
+                "symmetry",
+                "IR intensity",
+            ])
+            freq_data = freq.data
         
         for i, mode in enumerate(freq_data):
             row = self.table.rowCount()
             self.table.insertRow(row)
             
-            freq = FreqTableWidgetItem()
-            freq.setData(Qt.DisplayRole, "%.2f%s" % (abs(mode.frequency), "i" if mode.frequency < 0 else ""))
-            freq.setData(Qt.UserRole, i)
-            self.table.setItem(row, 0, freq)
-            
-            if mode.symmetry:
-                text = mode.symmetry
+            freq_cm = FreqTableWidgetItem()
+            freq_cm.setData(Qt.DisplayRole, "%.2f%s" % (abs(mode.frequency), "i" if mode.frequency < 0 else ""))
+            freq_cm.setData(Qt.UserRole, i)
+            self.table.setItem(row, 0, freq_cm)
+
+            if isinstance(mode, freq.Data):
+                symm = mode.symmetry
+                offset = 0
+            else:
+                symm = mode.harmonic.symmetry
+                delta_anh = QTableWidgetItem()
+                delta_anh.setData(Qt.DisplayRole, round(mode.delta_anh, 2))
+                offset = 1
+                self.table.setItem(row, 1, delta_anh)
+
+            if symm:
+                text = symm
                 if re.search("\d", text):
                     text = re.sub(r"(\d+)", r"<sub>\1</sub>", text)
                 if text.startswith("SG"):
@@ -1261,17 +1293,26 @@ class NormalModes(ToolInstance):
                     text = "Π" + text[2:]
                 elif text.startswith("DLT"):
                     text = "Δ" + text[3:]
+                    if text[1:] == "A":
+                        text = text[0]
                 if any(text.endswith(char) for char in "vhdugVHDUG"):
                     text = text[:-1] + "<sub>" + text[-1].lower() + "</sub>"
 
                 label = QLabel(text)
                 label.setAlignment(Qt.AlignCenter)
-                self.table.setCellWidget(row, 1, label)
+                self.table.setCellWidget(row, 1 + offset, label)
 
             intensity = QTableWidgetItem()
             if mode.intensity is not None:
                 intensity.setData(Qt.DisplayRole, round(mode.intensity, 2))
-            self.table.setItem(row, 2, intensity)
+            self.table.setItem(row, 2 + offset, intensity)
+        
+        if freq.anharm_data:
+            for i in range(0, 4):
+                self.table.resizeColumnToContents(i)
+        else:
+            for i in range(0, 3):
+                self.table.resizeColumnToContents(i)
         
         self.table.setSelection(QRect(0, 0, 2, 1), QItemSelectionModel.Select)
     
@@ -1581,6 +1622,10 @@ class IRPlot(ChildToolWindow):
         self.voigt_mix.setEnabled(self.peak_type.currentText() == "pseudo-Voigt")
         self.peak_type.currentTextChanged.connect(lambda text, widget=self.voigt_mix: widget.setEnabled(text == "pseudo-Voigt"))
         
+        self.anharm = QCheckBox()
+        self.anharm.setCheckState(Qt.Checked)
+        peak_layout.addRow("anharmonic:", self.anharm)
+        
         toolbox.addTab(peak_widget, "peak settings")
         
         # plot experimental data alongside computed
@@ -1632,6 +1677,10 @@ class IRPlot(ChildToolWindow):
         self.quadratic.setValue(0.)
         scaling_layout.addRow("c<sub>2</sub> =", self.quadratic)
         
+        save_scales = QPushButton("save current scale factors...")
+        save_scales.clicked.connect(self.open_save_scales)
+        scaling_layout.addRow(save_scales)
+        
         set_zero = QPushButton("set scales to 0")
         set_zero.clicked.connect(lambda *args: self.linear.setValue(0.))
         set_zero.clicked.connect(lambda *args: self.quadratic.setValue(0.))
@@ -1643,16 +1692,15 @@ class IRPlot(ChildToolWindow):
         lookup_layout = QFormLayout(lookup_scale)
         
         self.library = QComboBox()
-        self.library.addItems(SCALE_LIBS.keys())
         lookup_layout.addRow("database:", self.library)
         
         self.method = QComboBox()
-        self.method.addItems(SCALE_LIBS[self.library.currentText()][1].keys())
         lookup_layout.addRow("method:", self.method)
         
         self.basis = QComboBox()
-        self.basis.addItems(SCALE_LIBS[self.library.currentText()][1][self.method.currentText()].keys())
         lookup_layout.addRow("basis set:", self.basis)
+        
+        self.fill_lib_options()
         
         desc = QLabel("")
         desc.setText("view database online <a href=\"test\" style=\"text-decoration: none;\">here</a>")
@@ -1702,6 +1750,8 @@ class IRPlot(ChildToolWindow):
         # toolbox.setMinimumWidth(int(1.1 * plot_widget.size().width()))
         # toolbox.setMinimumHeight(int(1.2 * plot_widget.size().height()))
 
+        self.tool_instance.model_selector.currentIndexChanged.connect(self.check_anharm)
+
         #menu bar for saving stuff
         menu = QMenuBar()
         file = menu.addMenu("&Export")
@@ -1714,6 +1764,68 @@ class IRPlot(ChildToolWindow):
         layout.setMenuBar(menu)        
         self.ui_area.setLayout(layout)
         self.manage(None)
+
+    def fill_lib_options(self):
+        cur_lib = self.library.currentIndex()
+        cur_method = self.method.currentText()
+        cur_basis = self.basis.currentText()
+        self.library.blockSignals(True)
+        self.method.blockSignals(True)
+        self.basis.blockSignals(True)
+        self.library.clear()
+        self.method.clear()
+        self.basis.clear()
+        lib_names = list(SCALE_LIBS.keys())
+        user_def = loads(self.tool_instance.settings.scales)
+        if user_def:
+            lib_names.append("user-defined")
+        
+        self.library.addItems(lib_names)
+        if cur_lib >= 0:
+            self.library.setCurrentIndex(cur_lib)
+
+        if self.library.currentText() != "user-defined":
+            self.method.addItems(
+                SCALE_LIBS[self.library.currentText()][1].keys()
+            )
+
+            self.basis.addItems(
+                SCALE_LIBS[lib_names[0]][1][self.method.currentText()].keys()
+            )
+
+        else:
+            user_def = loads(self.tool_instance.settings.scales)
+            self.method.addItems(user_def.keys())
+            ndx = self.method.findText(cur_method, Qt.MatchExactly)
+        
+        ndx = self.method.findText(cur_method, Qt.MatchExactly)
+        if ndx >= 0:
+            self.method.setCurrentIndex(ndx)
+
+        ndx = self.basis.findText(cur_basis, Qt.MatchExactly)
+        if ndx >= 0:
+            self.basis.setCurrentIndex(ndx)
+        
+        self.library.blockSignals(False)
+        self.method.blockSignals(False)
+        self.basis.blockSignals(False)
+
+    def open_save_scales(self):
+        c1 = self.linear.value()
+        c2 = self.quadratic.value()
+        self.tool_instance.tool_window.create_child_window(
+            "saving frequency scales",
+            window_class=SaveScales,
+            c1=c1,
+            c2=c2,
+        )
+
+    def check_anharm(self):
+        data = self.tool_instance.model_selector.currentData()
+        if not data:
+            return
+        freq = data.other["frequency"]
+        self.anharm.setEnabled(bool(freq.anharm_data))
 
     def change_figure_size(self, *args):
         if self.fixed_size.checkState() == Qt.Checked:
@@ -1797,7 +1909,8 @@ class IRPlot(ChildToolWindow):
             voigt_mixing = self.voigt_mix.value()
             linear = self.linear.value()
             quadratic = self.quadratic.value()
-            
+            anharmonic = freq.anharm_data and self.anharm.checkState() == Qt.Checked
+
             data = freq.get_ir_data(
                 plot_type=plot_type,
                 peak_type=peak_type,
@@ -1805,6 +1918,7 @@ class IRPlot(ChildToolWindow):
                 voigt_mixing=voigt_mixing,
                 linear_scale=linear,
                 quadratic_scale=quadratic,
+                anharmonic=anharmonic,
             )
             x_values, y_values = data
             for x, y in zip(x_values, y_values):
@@ -1820,7 +1934,10 @@ class IRPlot(ChildToolWindow):
         run(self.session, "open https://doi.org/10.1021/acs.jpca.5b11386")
 
     def open_scale_library_link(self, *args):
-        run(self.session, "open %s" % SCALE_LIBS[self.library.currentText()][0])
+        if self.library.currentText() != "user-defined":
+            run(self.session, "open %s" % SCALE_LIBS[self.library.currentText()][0])
+        else:
+            self.session.logger.info("that's your database")
 
     def change_scale_lib(self, lib):
         cur_method = self.method.currentText()
@@ -1829,29 +1946,43 @@ class IRPlot(ChildToolWindow):
         self.method.blockSignals(True)
         self.method.clear()
         self.method.blockSignals(False)
-        self.method.addItems(SCALE_LIBS[lib][1].keys())
-        ndx = self.method.findText(cur_method, Qt.MatchExactly)
-        if ndx >= 0:
-            self.method.setCurrentIndex(ndx)
-        
-        ndx = self.basis.findText(cur_basis, Qt.MatchExactly)
-        if ndx >= 0:
-            self.basis.setCurrentIndex(ndx)
+        if lib in SCALE_LIBS:
+            self.basis.setEnabled(True)
+            self.method.addItems(SCALE_LIBS[lib][1].keys())
+            ndx = self.method.findText(cur_method, Qt.MatchExactly)
+            if ndx >= 0:
+                self.method.setCurrentIndex(ndx)
+            
+            ndx = self.basis.findText(cur_basis, Qt.MatchExactly)
+            if ndx >= 0:
+                self.basis.setCurrentIndex(ndx)
+        else:
+            self.basis.setEnabled(False)
+            user_def = loads(self.tool_instance.settings.scales)
+            self.method.addItems(user_def.keys())
     
     def change_method(self, method):
         cur_basis = self.basis.currentText()
         self.basis.blockSignals(True)
         self.basis.clear()
         self.basis.blockSignals(False)
-        if isinstance(SCALE_LIBS[self.library.currentText()][1][method], dict):
-            self.basis.addItems(SCALE_LIBS[self.library.currentText()][1][method].keys())
-            ndx = self.basis.findText(cur_basis, Qt.MatchExactly)
-            if ndx >= 0:
-                self.basis.setCurrentIndex(ndx)
-        else:
-            scale = SCALE_LIBS[self.library.currentText()][1][method]
-            self.linear.setValue(1 - scale)
-            self.quadratic.setValue(0.)
+        if self.library.currentText() in SCALE_LIBS:
+            if isinstance(SCALE_LIBS[self.library.currentText()][1][method], dict):
+                self.basis.addItems(
+                    SCALE_LIBS[self.library.currentText()][1][method].keys()
+                )
+                ndx = self.basis.findText(cur_basis, Qt.MatchExactly)
+                if ndx >= 0:
+                    self.basis.setCurrentIndex(ndx)
+            else:
+                scale = SCALE_LIBS[self.library.currentText()][1][method]
+                self.linear.setValue(1 - scale)
+                self.quadratic.setValue(0.)
+        elif method:
+            user_def = loads(self.tool_instance.settings.scales)
+            c1, c2 = user_def[method]
+            self.linear.setValue(c1)
+            self.quadratic.setValue(c2)
 
     def change_basis(self, basis):
         scale = SCALE_LIBS[self.library.currentText()][1][self.method.currentText()][basis]
@@ -1939,6 +2070,7 @@ class IRPlot(ChildToolWindow):
         self.tool_instance.voigt_mix = voigt_mixing
         linear = self.linear.value()
         quadratic = self.quadratic.value()
+        anharmonic = freq.anharm_data and self.anharm.checkState() == Qt.Checked
         
         centers = None
         widths = None
@@ -1961,6 +2093,7 @@ class IRPlot(ChildToolWindow):
             voigt_mixing=voigt_mixing,
             linear_scale=linear,
             quadratic_scale=quadratic,
+            anharmonic=anharmonic,
         )
 
         self.canvas.draw()
@@ -1984,7 +2117,15 @@ class IRPlot(ChildToolWindow):
                 if item.column() == 0:
                     row = item.data(Qt.UserRole)
             
-            frequency = [freq.frequency for freq in fr.other['frequency'].data][row]
+            freq = fr.other['frequency']
+            if freq.anharm_data and self.anharm.checkState() == Qt.Checked:
+                frequencies = sorted(freq.anharm_data, key=lambda x: x.harmonic_frequency)
+            elif freq.anharm_data:
+                frequencies = sorted(freq.anharm_data, key=lambda x: x.harmonic_frequency)
+                frequencies = [x.harmonic for x in frequencies]
+            else:
+                frequencies = sorted(freq.data, key=lambda x: x.frequency)
+            frequency = frequencies[row].frequency
             if frequency < 0:
                 self.canvas.draw()
                 continue
@@ -2036,7 +2177,9 @@ class IRPlot(ChildToolWindow):
 
     def show_match_peaks(self, *args):
         if self.tool_instance.match_peaks is None:
-            self.tool_instance.match_peaks = self.tool_instance.tool_window.create_child_window("match peaks", window_class=MatchPeaks)
+            self.tool_instance.match_peaks = self.tool_instance.tool_window.create_child_window(
+                "match peaks", window_class=MatchPeaks
+            )
 
     def cleanup(self):
         self.tool_instance.ir_plot = None
@@ -2162,3 +2305,47 @@ class MatchPeaks(ChildToolWindow):
         self.tool_instance.match_peaks = None
         
         super().cleanup()
+
+
+class SaveScales(ChildToolWindow):
+    def __init__(self, tool_instance, title, *args, c1=0.0, c2=0.0, **kwargs):
+        super().__init__(tool_instance, title, *args, **kwargs)
+        
+        self.c1 = c1
+        self.c2 = c2
+        self._build_ui()
+    
+    def _build_ui(self):
+        layout = QFormLayout()
+        
+        self.scale_name = QLineEdit()
+        layout.addRow("name:", self.scale_name)
+        
+        do_it = QPushButton("save scales")
+        do_it.clicked.connect(self.save_scales)
+        layout.addRow(do_it)
+        
+        self.ui_area.setLayout(layout)
+        self.manage(None)
+    
+    def save_scales(self):
+        name = self.scale_name.text()
+        if not name:
+            self.session.logger.warning("no name entered")
+            return
+        
+        current = loads(self.tool_instance.settings.scales)
+        current[name] = (self.c1, self.c2)
+        self.tool_instance.settings.scales = dumps(current)
+        if self.tool_instance.ir_plot:
+            self.tool_instance.ir_plot.fill_lib_options()
+        
+        self.session.logger.info(
+            "saved frequency scale factors to user-defined database"
+        )
+        self.session.logger.status(
+            "saved frequency scale factors to user-defined database"
+        )
+
+        self.destroy()
+    

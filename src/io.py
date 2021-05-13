@@ -32,7 +32,7 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
         format_name = "ORCA output file"
 
     try:
-        geom = ResidueCollection(fr)
+        geom = ResidueCollection(fr, refresh_ranks=False)
     except Exception as e:
         s = "could not open %s" % file_name
         if "error" in fr.other and fr.other["error"]:

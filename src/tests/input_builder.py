@@ -286,7 +286,7 @@ SDD
             self.assertTrue(False)
         
         ref_file = """#benzene_1-NO2_4-Cl.xyz 12,11=>H
-! M062X D3 Grid7 FinalGrid7 def2-TZVP Opt
+! M062X D3ZERO Grid7 FinalGrid7 def2-TZVP Opt
 
 *xyz 0 1
 C    -1.976956  -2.327177   0.001258
