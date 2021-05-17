@@ -78,6 +78,19 @@ class LocalJob(QThread):
 
         return d
 
+    def update_structure(self, structure):
+        """
+        overwrite to update structure (AtomicStructure) with the
+        coordinates from this job's output file
+        required for "update structure" option to work when launching
+        a job if the output file is not parsable by AaronTools
+        """
+        raise NotImplementedError(
+            "no update_structure method for %s" % (
+                self.__class__.name
+            )
+        )
+
 
 class ORCAJob(LocalJob):
     format_name = "out"

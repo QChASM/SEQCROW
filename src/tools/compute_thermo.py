@@ -9,12 +9,36 @@ from chimerax.core.commands.cli import FloatArg, BoolArg, StringArg, IntArg
 
 from numpy import isclose
 
-from Qt.QtCore import Qt, QSize, Signal
+from Qt.QtCore import Qt, QSize, Signal, QRegularExpression
 from Qt.QtGui import QKeySequence, QClipboard, QIcon
-from Qt.QtWidgets import QLabel, QGridLayout, QComboBox, QSplitter, QLineEdit, QDoubleSpinBox, \
-                            QMenuBar, QFileDialog, QAction, QApplication, QWidget, QGroupBox, QStatusBar, \
-                            QTabWidget, QTreeWidget, QSizePolicy, QPushButton, QHeaderView, QHBoxLayout, \
-                            QTreeWidgetItem, QStyle
+from Qt.QtWidgets import (
+    QLabel,
+    QGridLayout,
+    QComboBox,
+    QSplitter,
+    QLineEdit,
+    QDoubleSpinBox,
+    QMenuBar,
+    QFileDialog,
+    QAction,
+    QApplication,
+    QWidget,
+    QGroupBox,
+    QStatusBar,
+    QTabWidget,
+    QTreeWidget,
+    QSizePolicy,
+    QPushButton,
+    QHeaderView,
+    QHBoxLayout,
+    QTreeWidgetItem,
+    QStyle,
+    QFormLayout,
+    QTableWidget,
+    QTableWidgetItem,
+    QStyleOptionHeader,
+    QTextBrowser,
+)
 
 from os.path import basename
 
@@ -36,6 +60,22 @@ class _ComputeThermoSettings(Settings):
         'other_col_1': Value(150, IntArg), 
         'other_col_2': Value(150, IntArg), 
     }
+
+
+class ReadOnlyTableItem(QTableWidgetItem):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setFlags(self.flags() & ~Qt.ItemIsEditable)
+
+
+class SmallLineEdit(QLineEdit):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if args:
+            text = args[0]
+            self.setMinimumWidth(int(1.5*self.fontMetrics().boundingRect(text).width()))
+            self.setMaximumWidth(int(1.5*self.fontMetrics().boundingRect(text).width()))
+        self.setAlignment(Qt.AlignCenter)
 
 
 class Thermochem(ToolInstance):
@@ -73,6 +113,8 @@ class Thermochem(ToolInstance):
         self.nrg_fr = {}
         self.thermo_fr = {}
         self.thermo_co = {}
+        self._headers = []
+        self._data = []
 
         self._build_ui()
         
@@ -96,43 +138,31 @@ class Thermochem(ToolInstance):
 
         #box for sp
         sp_area_widget = QGroupBox("Single-point")
-        sp_layout = QGridLayout(sp_area_widget)
+        sp_layout = QFormLayout(sp_area_widget)
 
         self.sp_selector = FilereaderComboBox(self.session, otherItems=['energy'])
         self.sp_selector.currentIndexChanged.connect(self.set_sp)
-        sp_layout.addWidget(self.sp_selector, 0, 0, 1, 3, Qt.AlignTop)
+        sp_layout.addRow(self.sp_selector)
         
-        nrg_label = QLabel("E =")
-        sp_layout.addWidget(nrg_label, 1, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
-        
-        self.sp_nrg_line = QLineEdit()
-        self.sp_nrg_line.setReadOnly(True)
-        self.sp_nrg_line.setToolTip("electronic energy")
-        sp_layout.addWidget(self.sp_nrg_line, 1, 1, 1, 1, Qt.AlignTop)
-        
-        sp_layout.addWidget(QLabel("E<sub>h</sub>"), 1, 2, 1, 1, Qt.AlignVCenter)
-        
-        sp_layout.addWidget(QWidget(), 2, 0)
-        
-        sp_layout.setColumnStretch(0, 0)
-        sp_layout.setColumnStretch(1, 1)
-        sp_layout.setRowStretch(0, 0)
-        sp_layout.setRowStretch(1, 0)
-        sp_layout.setRowStretch(2, 1)
-        
+        self.sp_table = QTableWidget()
+        self.sp_table.setColumnCount(3)
+        self.sp_table.setShowGrid(False)
+        self.sp_table.horizontalHeader().hide()
+        self.sp_table.verticalHeader().hide()
+        self.sp_table.setFrameShape(QTableWidget.NoFrame)
+        self.sp_table.setSelectionMode(QTableWidget.NoSelection)
+        self.sp_table.insertRow(0)
+        sp_layout.addRow(self.sp_table)
+
 
         row = 0
         #box for thermo
         therm_area_widget = QGroupBox("Thermal corrections")
-        thermo_layout = QGridLayout(therm_area_widget)
+        thermo_layout = QFormLayout(therm_area_widget)
 
         self.thermo_selector = FilereaderComboBox(self.session, otherItems=['frequency'])
         self.thermo_selector.currentIndexChanged.connect(self.set_thermo_mdl)
-        thermo_layout.addWidget(self.thermo_selector, row, 0, 1, 3, Qt.AlignTop)
-
-        row += 1
-
-        thermo_layout.addWidget(QLabel("T ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
+        thermo_layout.addRow(self.thermo_selector)
         
         self.temperature_line = QDoubleSpinBox()
         self.temperature_line.setMaximum(2**31 - 1)
@@ -141,12 +171,8 @@ class Thermochem(ToolInstance):
         self.temperature_line.setSuffix(" K")
         self.temperature_line.setMinimum(0)
         self.temperature_line.valueChanged.connect(self.set_thermo)
-        thermo_layout.addWidget(self.temperature_line, row, 1, 1, 2, Qt.AlignTop)
-        
-        row += 1
-        
-        thermo_layout.addWidget(QLabel("𝜔<sub>0</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
-        
+        thermo_layout.addRow("T =", self.temperature_line)
+
         self.v0_edit = QDoubleSpinBox()
         self.v0_edit.setMaximum(4000)
         self.v0_edit.setValue(self.settings.w0)
@@ -155,166 +181,39 @@ class Thermochem(ToolInstance):
         self.v0_edit.valueChanged.connect(self.set_thermo)
         self.v0_edit.setMinimum(0)
         self.v0_edit.setToolTip("frequency parameter for quasi treatments of entropy")
-        thermo_layout.addWidget(self.v0_edit, row, 1, 1, 2, Qt.AlignTop)
-        
-        row += 1
-    
-        thermo_layout.addWidget(QLabel("𝛿ZPE ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
+        thermo_layout.addRow("𝜔<sub>0</sub> =", self.v0_edit)
 
-        self.zpe_line = QLineEdit()
-        self.zpe_line.setReadOnly(True)
-        self.zpe_line.setToolTip("zero-point energy correction")
-        thermo_layout.addWidget(self.zpe_line, row, 1, 1, 1, Qt.AlignTop)
-        
-        thermo_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignVCenter)  
-        
-        row += 1
+        self.thermo_table = QTableWidget()
+        self.thermo_table.setColumnCount(3)
+        self.thermo_table.setShowGrid(False)
+        self.thermo_table.horizontalHeader().hide()
+        self.thermo_table.verticalHeader().hide()
+        self.thermo_table.setFrameShape(QTableWidget.NoFrame)
+        self.thermo_table.setSelectionMode(QTableWidget.NoSelection)
+        thermo_layout.addRow(self.thermo_table)
 
-        thermo_layout.addWidget(QLabel("𝛿H<sub>RRHO</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
 
-        self.enthalpy_line = QLineEdit()
-        self.enthalpy_line.setReadOnly(True)
-        self.enthalpy_line.setToolTip("RRHO enthalpy correction")
-        thermo_layout.addWidget(self.enthalpy_line, row, 1, 1, 1, Qt.AlignTop)
-        
-        thermo_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignVCenter)        
-
-        row += 1
-
-        thermo_layout.addWidget(QLabel("𝛿G<sub>RRHO</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
-
-        self.rrho_g_line = QLineEdit()
-        self.rrho_g_line.setReadOnly(True)
-        self.rrho_g_line.setToolTip("""RRHO free energy correction\nRotational motion is completely independent from vibrations\nNormal mode vibrations behave like harmonic oscillators""")
-        thermo_layout.addWidget(self.rrho_g_line, row, 1, 1, 1, Qt.AlignTop)
-        
-        thermo_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignVCenter)        
-        
-        row += 1
-        
-        dqrrho_g_label = QLabel()
-        dqrrho_g_label.setText("<a href=\"Grimme's Quasi-RRHO\" style=\"text-decoration: none;\">𝛿G<sub>Quasi-RRHO</sub></a> =")
-        dqrrho_g_label.setTextFormat(Qt.RichText)
-        dqrrho_g_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
-        dqrrho_g_label.linkActivated.connect(self.open_link)
-        dqrrho_g_label.setToolTip("click to open a relevant reference\n" + \
-                                  "see the \"Computation of internal (gas‐phase) entropies\" section for a description of the method")
-        
-        thermo_layout.addWidget(dqrrho_g_label, row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
-        
-        self.qrrho_g_line = QLineEdit()
-        self.qrrho_g_line.setReadOnly(True)
-        self.qrrho_g_line.setToolTip("Quasi-RRHO free energy correction\n" + \
-        "Vibrational entropy of each mode is weighted and complemented with rotational entropy\n" + \
-        "The weighting is much lower for modes with frequencies less than 𝜔\u2080")        
-        thermo_layout.addWidget(self.qrrho_g_line, row, 1, 1, 1, Qt.AlignTop)
-        
-        thermo_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignVCenter)        
-        
-        row += 1
-        
-        dqharm_g_label = QLabel("")
-        dqharm_g_label.setText("<a href=\"Truhlar's Quasi-Harmonic\" style=\"text-decoration: none;\">𝛿G<sub>Quasi-Harmonic</sub></a> =")
-        dqharm_g_label.setTextFormat(Qt.RichText)
-        dqharm_g_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
-        dqharm_g_label.linkActivated.connect(self.open_link)
-        dqharm_g_label.setToolTip("click to open a relevant reference\n" + \
-                                  "see the \"Computations\" section for a description of the method")
-        
-        thermo_layout.addWidget(dqharm_g_label, row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
-        
-        self.qharm_g_line = QLineEdit()
-        self.qharm_g_line.setReadOnly(True)
-        self.qharm_g_line.setToolTip("Quasi-hamonic free energy correction\n" + \
-        "For entropy, real vibrational modes lower than 𝜔\u2080 are treated as 𝜔\u2080")
-        thermo_layout.addWidget(self.qharm_g_line, row, 1, 1, 1, Qt.AlignTop)
-        
-        thermo_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignVCenter)
-
-        thermo_layout.addWidget(QWidget(), row + 1, 0)
-
-        thermo_layout.setColumnStretch(0, 0)
-        thermo_layout.setColumnStretch(1, 1)
-        for i in range(0, row):
-            thermo_layout.setRowStretch(i, 0)
-        
-        thermo_layout.setRowStretch(row + 1, 1)        
-        
-        
-        row = 0
         # for for total
         sum_area_widget = QGroupBox("Thermochemistry")
-        sum_layout = QGridLayout(sum_area_widget)
+        sum_layout = QFormLayout(sum_area_widget)
 
-        sum_layout.addWidget(QLabel("ZPE ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
-        
-        self.zpe_sum_line = QLineEdit()
-        self.zpe_sum_line.setReadOnly(True)
-        self.zpe_sum_line.setToolTip("sum of electronic energy and ZPE correction")
-        sum_layout.addWidget(self.zpe_sum_line, row, 1, 1, 1, Qt.AlignTop)
-        
-        sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignVCenter)      
-        
-        row += 1
+        self.sum_table = QTableWidget()
+        self.sum_table.setColumnCount(3)
+        self.sum_table.setShowGrid(False)
+        self.sum_table.horizontalHeader().hide()
+        self.sum_table.verticalHeader().hide()
+        self.sum_table.setFrameShape(QTableWidget.NoFrame)
+        self.sum_table.setSelectionMode(QTableWidget.NoSelection)
+        sum_layout.addRow(self.sum_table)
 
-        sum_layout.addWidget(QLabel("H<sub>RRHO</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
-        
-        self.h_sum_line = QLineEdit()
-        self.h_sum_line.setReadOnly(True)
-        self.h_sum_line.setToolTip("sum of electronic energy and RRHO enthalpy correction")
-        sum_layout.addWidget(self.h_sum_line, row, 1, 1, 1, Qt.AlignTop)
-        
-        sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignVCenter)      
-        
-        row += 1
-        
-        sum_layout.addWidget(QLabel("G<sub>RRHO</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
-        
-        self.rrho_g_sum_line = QLineEdit()
-        self.rrho_g_sum_line.setReadOnly(True)
-        self.rrho_g_sum_line.setToolTip("sum of electronic energy and RRHO free energy correction\nRotational motion is completely independent from vibrations\nNormal mode vibrations behave like harmonic oscillators")
-        sum_layout.addWidget(self.rrho_g_sum_line, row, 1, 1, 1, Qt.AlignTop)
-        
-        sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignVCenter)        
-        
-        row += 1
-        
-        sum_layout.addWidget(QLabel("G<sub>Quasi-RRHO</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
-        
-        self.qrrho_g_sum_line = QLineEdit()
-        self.qrrho_g_sum_line.setReadOnly(True)
-        self.qrrho_g_sum_line.setToolTip("Sum of electronic energy and quasi-RRHO free energy correction\n" + \
-        "Vibrational entropy of each mode is weighted and complemented with rotational entropy\n" + \
-        "The weighting is much lower for modes with frequencies less than 𝜔\u2080")
-        sum_layout.addWidget(self.qrrho_g_sum_line, row, 1, 1, 1, Qt.AlignTop)
-        
-        sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignVCenter)  
-        
-        row += 1
-        
-        sum_layout.addWidget(QLabel("G<sub>Quasi-Harmonic</sub> ="), row, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
-        
-        self.qharm_g_sum_line = QLineEdit()
-        self.qharm_g_sum_line.setReadOnly(True)
-        self.qharm_g_sum_line.setToolTip("Sum of electronic energy and quasi-harmonic free energy correction\n" + \
-        "For entropy, real vibrational modes lower than 𝜔\u2080 are treated as 𝜔\u2080")
-        sum_layout.addWidget(self.qharm_g_sum_line, row, 1, 1, 1, Qt.AlignTop)
-        
-        sum_layout.addWidget(QLabel("E<sub>h</sub>"), row, 2, 1, 1, Qt.AlignVCenter)
-
-        sum_layout.addWidget(QWidget(), row + 1, 0)
-        
-        sum_layout.setColumnStretch(0, 0)
-        for i in range(0, row):
-            sum_layout.setRowStretch(i, 0)
-
-        sum_layout.setRowStretch(row + 1, 1)
         
         splitter = QSplitter(Qt.Horizontal)
         splitter.setChildrenCollapsible(False)
         splitter.addWidget(sp_area_widget)
         splitter.addWidget(therm_area_widget)
         splitter.addWidget(sum_area_widget)
+        
+        
         
         absolute_layout.addWidget(splitter)
 
@@ -358,47 +257,22 @@ class Thermochem(ToolInstance):
         self.relative_v0.setToolTip("frequency parameter for quasi treatments of entropy")
         self.relative_v0.valueChanged.connect(self.calc_relative_thermo)
         relative_layout.addWidget(QLabel("𝜔<sub>0</sub> ="), 2, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
+        
         relative_layout.addWidget(self.relative_v0, 2, 1, 1, 5, Qt.AlignLeft | Qt.AlignVCenter)
 
         relative_layout.addWidget(QLabel("Boltzmann-weighted relative energies in kcal/mol:"), 3, 0, 1, 6, Qt.AlignVCenter | Qt.AlignLeft)
         
-        relative_layout.addWidget(QLabel("ΔE"), 4, 0, Qt.AlignTop | Qt.AlignVCenter)
-        self.relative_dE = QLineEdit()
-        self.relative_dE.setReadOnly(True)
-        relative_layout.addWidget(self.relative_dE, 5, 0, Qt.AlignTop | Qt.AlignVCenter)
-        
-        relative_layout.addWidget(QLabel("ΔZPE"), 4, 1, Qt.AlignTop | Qt.AlignVCenter)
-        self.relative_dZPVE = QLineEdit() 
-        self.relative_dZPVE.setReadOnly(True)        
-        relative_layout.addWidget(self.relative_dZPVE, 5, 1, Qt.AlignTop | Qt.AlignVCenter)
-
-        relative_layout.addWidget(QLabel("ΔH<sub>RRHO</sub>"), 4, 2, Qt.AlignTop | Qt.AlignVCenter)
-        self.relative_dH = QLineEdit()
-        self.relative_dH.setReadOnly(True)
-        relative_layout.addWidget(self.relative_dH, 5, 2, Qt.AlignTop | Qt.AlignVCenter)
-
-        relative_layout.addWidget(QLabel("ΔG<sub>RRHO</sub>"), 4, 3, Qt.AlignTop | Qt.AlignVCenter)
-        self.relative_dG = QLineEdit()
-        self.relative_dG.setReadOnly(True)
-        relative_layout.addWidget(self.relative_dG, 5, 3, Qt.AlignTop | Qt.AlignVCenter)
-
-        relative_layout.addWidget(QLabel("ΔG<sub>Quasi-RRHO</sub>"), 4, 4, Qt.AlignTop | Qt.AlignVCenter)
-        self.relative_dQRRHOG = QLineEdit()
-        self.relative_dQRRHOG.setReadOnly(True)
-        relative_layout.addWidget(self.relative_dQRRHOG, 5, 4, Qt.AlignTop | Qt.AlignVCenter)
-
-        relative_layout.addWidget(QLabel("ΔG<sub>Quasi-Harmonic</sub>"), 4, 5, Qt.AlignTop | Qt.AlignVCenter)
-        self.relative_dQHARMG = QLineEdit()
-        self.relative_dQHARMG.setReadOnly(True)
-        relative_layout.addWidget(self.relative_dQHARMG, 5, 5, Qt.AlignTop | Qt.AlignVCenter)
-
+        self.relative_table = QTextBrowser()
+        self.relative_table.setMaximumHeight(
+            4 * self.relative_table.fontMetrics().boundingRect("Q").height()
+        )
+        relative_layout.addWidget(self.relative_table, 4, 0, 1, 6, Qt.AlignTop)
         
         relative_layout.setRowStretch(0, 1)
         relative_layout.setRowStretch(1, 0)
         relative_layout.setRowStretch(2, 0)
         relative_layout.setRowStretch(3, 0)
         relative_layout.setRowStretch(4, 0)
-        relative_layout.setRowStretch(5, 0)
         
         self.tab_widget.addTab(relative_widget, "relative")
         
@@ -482,12 +356,18 @@ class Thermochem(ToolInstance):
             for the items in nrg_list and co_list at temperature T
             and frequency parameter w0"""
             ZPVEs = []
+            if all(co.frequency.anharm_data for co_group in co_list for co in co_group):
+                anharm_ZVPEs = []
+            else:
+                anharm_ZVPEs = None
             Hs = []
             Gs = []
             RRHOG = []
             QHARMG = []
             for i in range(0, len(nrg_list)):
                 ZPVEs.append([])
+                if anharm_ZVPEs is not None:
+                    anharm_ZVPEs.append([])
                 Hs.append([])
                 Gs.append([])
                 RRHOG.append([])
@@ -495,6 +375,10 @@ class Thermochem(ToolInstance):
                 for nrg, co in zip(nrg_list[i], co_list[i]):
                     ZPVE = co.ZPVE
                     ZPVEs[-1].append(nrg + ZPVE)
+                    
+                    if anharm_ZVPEs is not None:
+                        zpve_anharm = co.calc_zpe(anharmonic=True)
+                        anharm_ZVPEs[-1].append(nrg + zpve_anharm)
                     
                     dH = co.therm_corr(T, w0, CompOutput.RRHO)[1]
                     Hs[-1].append(nrg + dH)
@@ -508,7 +392,7 @@ class Thermochem(ToolInstance):
                     dQHARMG = co.calc_G_corr(temperature=T, v0=w0, method=CompOutput.QUASI_HARMONIC)
                     QHARMG[-1].append(nrg + dQHARMG)
             
-            return ZPVEs, Hs, Gs, RRHOG, QHARMG
+            return ZPVEs, anharm_ZVPEs, Hs, Gs, RRHOG, QHARMG
         
         def boltzmann_weight(energies1, energies2, T):
             """
@@ -547,37 +431,14 @@ class Thermochem(ToolInstance):
 
         ref_Es = self.ref_group.energies()
         ref_cos = self.ref_group.compOutputs()
-        
-        empty_groups = []
-        for i, group in enumerate(ref_cos):
-            if len(group) == 0:
-                empty_groups.append(i)
-        
-        for ndx in empty_groups[::-1]:
-            ref_Es.pop(ndx)
-            ref_cos.pop(ndx)
-        
+
         other_Es = self.other_group.energies()
         other_cos = self.other_group.compOutputs()
-        
-        empty_groups = []
-        for i, group in enumerate(other_cos):
-            if len(group) == 0:
-                empty_groups.append(i)
-        
-        for ndx in empty_groups[::-1]:
-            other_Es.pop(ndx)
-            other_cos.pop(ndx)
 
-        if any(len(x) == 0  or all(len(x) == 0 for y in x) for x in [ref_Es, other_Es, ref_cos, other_cos]):
-            self.relative_dE.setText("")
-            self.relative_dZPVE.setText("")
-            self.relative_dH.setText("")
-            self.relative_dG.setText("")
-            self.relative_dQRRHOG.setText("")
-            self.relative_dQHARMG.setText("")
+        if any(len(x) == 0  or all(len(y) == 0 for y in x) for x in [ref_Es, other_Es]):
+            self.relative_table.setText("not enough data")
             return
-        
+
         T = self.relative_temperature.value()
         self.settings.rel_temp = T
         w0 = self.relative_v0.value()
@@ -585,22 +446,86 @@ class Thermochem(ToolInstance):
         if w0 != self.settings.w0:
             self.settings.w0 = w0
 
-        ref_ZPVEs, ref_Hs, ref_Gs, ref_QRRHOGs, ref_QHARMGs = calc_free_energies(ref_Es, ref_cos, T, w0)
-        other_ZPVEs, other_Hs, other_Gs, other_QRRHOGs, other_QHARMGs = calc_free_energies(other_Es, other_cos, T, w0)
-        
         rel_E = boltzmann_weight(ref_Es, other_Es, T)
-        rel_ZPVE = boltzmann_weight(ref_ZPVEs, other_ZPVEs, T)
-        rel_H = boltzmann_weight(ref_Hs, other_Hs, T)
-        rel_G = boltzmann_weight(ref_Gs, other_Gs, T)
-        rel_QRRHOG = boltzmann_weight(ref_QRRHOGs, other_QRRHOGs, T)
-        rel_QHARMG = boltzmann_weight(ref_QHARMGs, other_QHARMGs, T)
+        headers = ["ΔE"]
+        data = [rel_E]
+
+        empty_groups = []
+        for i, group in enumerate(ref_cos):
+            if len(group) == 0:
+                empty_groups.append(i)
+        for ndx in empty_groups[::-1]:
+            ref_Es.pop(ndx)
+            ref_cos.pop(ndx)
+
+        empty_groups = []
+        for i, group in enumerate(other_cos):
+            if len(group) == 0:
+                empty_groups.append(i)
+
+        for ndx in empty_groups[::-1]:
+            other_Es.pop(ndx)
+            other_cos.pop(ndx)
+
+        if not any(len(x) == 0  or all(len(y) == 0 for y in x) for x in [ref_cos, other_cos]):
+            rel_E = boltzmann_weight(ref_Es, other_Es, T)
+            data = [rel_E]
+
+            ref_ZPVEs, ref_anharm_zpve, ref_Hs, ref_Gs, ref_QRRHOGs, ref_QHARMGs = calc_free_energies(
+                ref_Es, ref_cos, T, w0
+            )
+            other_ZPVEs, other_anharm_zpve, other_Hs, other_Gs, other_QRRHOGs, other_QHARMGs = calc_free_energies(
+                other_Es, other_cos, T, w0
+            )
+
+            rel_ZPVE = boltzmann_weight(ref_ZPVEs, other_ZPVEs, T)
+            rel_H = boltzmann_weight(ref_Hs, other_Hs, T)
+            rel_G = boltzmann_weight(ref_Gs, other_Gs, T)
+            rel_QRRHOG = boltzmann_weight(ref_QRRHOGs, other_QRRHOGs, T)
+            rel_QHARMG = boltzmann_weight(ref_QHARMGs, other_QHARMGs, T)
+    
+            if ref_anharm_zpve and other_anharm_zpve:
+                rel_anharm_ZPVE = boltzmann_weight(ref_anharm_zpve, other_anharm_zpve, T)
+                headers.extend([
+                    "ΔZPE", "ΔZPE<sub>anh</sub>", "ΔH<sub>RRHO</sub>", "ΔG<sub>RRHO</sub>",
+                    "ΔG<sub>Quasi-RRHO</sub>", "ΔG<sub>Quasi-Harmonic</sub>",
+                ])
+                data.extend([
+                    rel_ZPVE,
+                    rel_anharm_ZPVE,
+                    rel_H,
+                    rel_G,
+                    rel_QRRHOG,
+                    rel_QHARMG,
+                ])
+            else:
+                headers.extend([
+                    "ΔZPE", "ΔH<sub>RRHO</sub>", "ΔG<sub>RRHO</sub>",
+                    "ΔG<sub>Quasi-RRHO</sub>", "ΔG<sub>Quasi-Harmonic</sub>",
+                ])
+                data.extend([
+                    rel_ZPVE,
+                    rel_H,
+                    rel_G,
+                    rel_QRRHOG,
+                    rel_QHARMG,
+                ])
+
+        self._headers = headers
+        self._data = data
+
+        s = "<table style=\"border: 1px solid ghostwhite;\">\n"
+        s += "\t<tr>\n"
+        for header in headers:
+            s += "\t\t<th style=\"text-align: center; border: 1px solid ghostwhite; padding-left: 5px;  padding-right: 5px\">%s</th>\n" % header
+        s += "\t</tr>\n"
+        s += "\t<tr>\n"
+        for val in data:
+            s += "\t\t<td style=\"text-align: center; border: 1px solid ghostwhite; padding-left: 5px;  padding-right: 5px\">%.1f</td>\n" % val
+        s += "\t</tr>\n"
+        s += "</table>"
         
-        self.relative_dE.setText("%.1f" % rel_E)
-        self.relative_dZPVE.setText("%.1f" % rel_ZPVE)
-        self.relative_dH.setText("%.1f" % rel_H)
-        self.relative_dG.setText("%.1f" % rel_G)
-        self.relative_dQRRHOG.setText("%.1f" % rel_QRRHOG)
-        self.relative_dQHARMG.setText("%.1f" % rel_QHARMG)
+        self.relative_table.setText(s)
 
     def open_link(self, theory):
         """open the oft-cited QRRHO or QHARM reference"""
@@ -638,61 +563,61 @@ class Thermochem(ToolInstance):
             delim = ";"
 
         if self.tab_widget.currentIndex() == 0:
+            s = ""
             if self.settings.include_header:
-                s = delim.join(["E" , "ZPE", "H(RRHO)", "G(RRHO)", "G(Quasi-RRHO)", "G(Quasi-harmonic)", \
-                                "dZPE", "dH(RRHO)", "dG(RRHO)", "dG(Quasi-RRHO)", "dG(Quasi-harmonic)", \
-                                "SP File", "Thermo File"])
-                
-                s += "\n"
-            else:
-                s = ""
-            
-            float_fmt = "%.12f" + delim
-            str_dmt = "%s" + delim + "%s"
-            
-            fmt = 11*float_fmt + str_dmt + "\n"
-            
-            E    = float(self.sp_nrg_line.text())
-            
-            dZPE = float(self.zpe_line.text())
-            dH       = float(self.enthalpy_line.text())
-            rrho_dG  = float(self.rrho_g_line.text())
-            qrrho_dG = float(self.qrrho_g_line.text())
-            qharm_dG = float(self.qharm_g_line.text())            
-            
-            ZPE = float(self.zpe_sum_line.text())
-            H       = float(self.h_sum_line.text())
-            rrho_G  = float(self.rrho_g_sum_line.text())
-            qrrho_G = float(self.qrrho_g_sum_line.text())
-            qharm_G = float(self.qharm_g_sum_line.text())
-            
+                link_re = QRegularExpression("<a[\d\D]*>(𝛿?Δ?[\d\D]*)</a>")
+                # get header labels from the tables
+                for table in [self.sp_table, self.thermo_table, self.sum_table]:
+                    for row in range(0, table.rowCount()):
+                        item = table.cellWidget(row, 0)
+                        text = item.text()
+                        text = text.replace(" =", "")
+                        text = text.replace("<sub>", "(")
+                        text = text.replace("</sub>", ")")
+                        # if there's a link like for QRRHO G, remove the link
+                        if "href=" in text:
+                            match = link_re.match(text)
+                            text = match.captured(1)
+                        text = text.replace("𝛿", "d")
+                        s += "%s%s" % (text, delim)
+
+                s += "SP_File%sThermo_File\n" % delim
+
+            # get values from tables
+            for table in [self.sp_table, self.thermo_table, self.sum_table]:
+                for row in range(0, table.rowCount()):
+                    item = table.cellWidget(row, 1)
+                    s += "%s%s" % (item.text(), delim)
+
             sp_mdl = self.sp_selector.currentData()
             sp_name = sp_mdl.name
-                        
             therm_mdl = self.thermo_selector.currentData()
-            therm_name = therm_mdl.name
-            
-            s += fmt % (E, ZPE, H, rrho_G, qrrho_G, qharm_G, dZPE, dH, rrho_dG, qrrho_dG, qharm_dG, sp_name, therm_name)
-        
+
+            s += "%s" % sp_name
+            if therm_mdl:
+                therm_name = therm_mdl.name
+                s += "%s%s" % (delim, therm_name)
+            s += "\n"
+
         elif self.tab_widget.currentIndex() == 1:
+            s = ""
             if self.settings.include_header:
-                s = delim.join(["ΔE", "ΔZPE", "ΔH(RRHO)", "ΔG(RRHO)", "ΔG(Quasi-RRHO)", "ΔG(Quasi-Harmonic)"])
-                s+= "\n"
-            else:
-                s = ""
-            
-            float_fmt = "%.1f" + delim
-            fmt = 6 * float_fmt
-            try:
-                dE = float(self.relative_dE.text())
-                dZPVE = float(self.relative_dZPVE.text())
-                dH = float(self.relative_dH.text())
-                dG = float(self.relative_dG.text())
-                dQRRHOG = float(self.relative_dQRRHOG.text())
-                dQHARMG = float(self.relative_dQHARMG.text())
-                s += fmt % (dE, dZPVE, dH, dG, dQRRHOG, dQHARMG)
-            except ValueError:
-                pass
+                link_re = QRegularExpression("<a[\d\D]*>(𝛿?Δ?[\d\D]*)</a>")
+                # get header labels from the tables
+                for text in self._headers:
+                    text = text.replace(" =", "")
+                    text = text.replace("<sub>", "(")
+                    text = text.replace("</sub>", ")")
+                    # if there's a link like for QRRHO G, remove the link
+                    if "href=" in text:
+                        match = link_re.match(text)
+                        text = match.captured(1)
+                    text = text.replace("𝛿", "d")
+                    s += "%s%s" % (text, delim)
+
+            s = s.rstrip(delim)
+            s += "\n"
+            s += delim.join(["%.1f" % val for val in self._data])
         
         return s
     
@@ -705,20 +630,40 @@ class Thermochem(ToolInstance):
     
     def set_sp(self):
         """set energy entry for when sp model changes"""
+        self.sp_table.setRowCount(0)
         if self.sp_selector.currentIndex() >= 0:
             fr = self.sp_selector.currentData()
 
             self.check_geometry_rmsd("SP")
 
-            self.sp_nrg_line.setText("%.6f" % fr.other['energy'])
-        else:
-            self.sp_nrg_line.setText("")
+            self.sp_table.insertRow(0)
+            
+            nrg_label = QLabel("E =")
+            nrg_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.sp_table.setCellWidget(0, 0, nrg_label)
+            
+            unit_label = ReadOnlyTableItem()
+            unit_label.setData(Qt.DisplayRole, "E\u2095")
+            unit_label.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            self.sp_table.setItem(0, 2, unit_label)
+
+            sp_nrg = SmallLineEdit("%.6f" % fr.other['energy'])
+            sp_nrg.setReadOnly(True)
+            sp_nrg.setFrame(False)
+            self.sp_table.setCellWidget(0, 1, sp_nrg)
+            
+            self.sp_table.resizeRowToContents(0)
+            self.sp_table.resizeColumnToContents(0)
+            self.sp_table.resizeColumnToContents(1)
+            self.sp_table.resizeColumnToContents(2)
 
         self.update_sum()
 
     def set_thermo_mdl(self):
-        """frequencies filereader has changed on the absolute tab
-        also changes the temperature option (on the absolute tab only)"""
+        """
+        frequencies filereader has changed on the absolute tab
+        also changes the temperature option (on the absolute tab only)
+        """
         if self.thermo_selector.currentIndex() >= 0:
             fr = self.thermo_selector.currentData()
             
@@ -755,6 +700,7 @@ class Thermochem(ToolInstance):
     def set_thermo(self):
         """computes thermo corrections and sets thermo entries for when thermo model changes"""
         #index of combobox is -1 when combobox has no entries
+        self.thermo_table.setRowCount(0)
         if self.thermo_selector.currentIndex() >= 0:
             fr = self.thermo_selector.currentData()
             if fr not in self.thermo_co:
@@ -779,57 +725,142 @@ class Thermochem(ToolInstance):
             qrrho_dg = co.calc_G_corr(v0=v0, temperature=T, method="QRRHO")
             qharm_dg = co.calc_G_corr(v0=v0, temperature=T, method="QHARM")
             
-            self.zpe_line.setText("%.6f" % dZPE)
-            self.enthalpy_line.setText("%.6f" % dH)
-            self.rrho_g_line.setText("%.6f" % rrho_dg)
-            self.qrrho_g_line.setText("%.6f" % qrrho_dg)
-            self.qharm_g_line.setText("%.6f" % qharm_dg)
-        else:
-            self.zpe_line.setText("")
-            self.enthalpy_line.setText("")
-            self.rrho_g_line.setText("")
-            self.qrrho_g_line.setText("")
-            self.qharm_g_line.setText("")
-        
+            items = [(
+                "𝛿ZPE =",
+                dZPE,
+                None,
+                "lowest energy the molecule can have\n"
+                "no rotational or vibrational modes populated\n"
+                "equal to enthalpy at 0 K",
+            )]
+
+            if fr.other["frequency"].anharm_data:
+                dZPE_anh = co.calc_zpe(anharmonic=True)
+                items.append((
+                    "𝛿ZPE<sub>anh</sub> =",
+                    dZPE_anh,
+                    None,
+                    "lowest energy the molecule can have\n"
+                    "no rotational or vibrational modes populated\n"
+                    "includes corrections for anharmonic vibrations",
+                ))
+            
+            items.extend([
+                (
+                    "𝛿H<sub>RRHO</sub> =",
+                    dH,
+                    None,
+                    "enthalpy of formation",
+                ), (
+                    "𝛿G<sub>RRHO</sub> =",
+                    rrho_dg,
+                    None,
+                    "energy relative after taking into account the average\n"
+                    "population of vibrational, rotational, and translational\n"
+                    "degrees of freedom",
+                ), (
+                    "𝛿G<sub>Quasi-RRHO</sub> =",
+                    qrrho_dg,
+                    "Grimme's Quasi-RRHO",
+                    "vibrational entropy of each real mode is damped and complemented\n"
+                    "with rotational entropy, with the damping function being stronger for\n"
+                    "frequencies < 𝜔\u2080\n"
+                    "can mitigate error from inaccuracies in the harmonic oscillator\n"
+                    "approximation for low-frequency vibrations",
+                ), (
+                    "𝛿G<sub>Quasi-Harmonic</sub> =",
+                    qharm_dg,
+                    "Truhlar's Quasi-Harmonic",
+                    "real vibrational frequencies below 𝜔\u2080 are treated as 𝜔\u2080\n"
+                    "can mitigate error from inaccuracies in the harmonic oscillator\n"
+                    "approximation for low-frequency vibrations",
+                ),
+            ])
+            
+            for i, (label_text, val, link, tooltip) in enumerate(items):
+                self.thermo_table.insertRow(i)
+                
+                label = QLabel(label_text)
+                if link:
+                    label = QLabel()
+                    label.setText("<a href=\"%s\" style=\"text-decoration: none;\">%s</a>" % (link, label_text))
+                    label.setTextFormat(Qt.RichText)
+                    label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+                    label.linkActivated.connect(self.open_link)
+
+                label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                label.setToolTip(tooltip)
+
+                self.thermo_table.setCellWidget(i, 0, label)
+
+                unit_label = ReadOnlyTableItem()
+                unit_label.setData(Qt.DisplayRole, "E\u2095")
+                unit_label.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                unit_label.setToolTip(tooltip)
+                self.thermo_table.setItem(i, 2, unit_label)
+
+                d_nrg = SmallLineEdit("%.6f" % val)
+                d_nrg.setReadOnly(True)
+                d_nrg.setFrame(False)
+                d_nrg.setToolTip(tooltip)
+                self.thermo_table.setCellWidget(i, 1, d_nrg)
+
+                self.thermo_table.resizeRowToContents(i)
+            
+            self.thermo_table.resizeColumnToContents(0)
+            self.thermo_table.resizeColumnToContents(1)
+            self.thermo_table.resizeColumnToContents(2)
+
         self.update_sum()
 
     def update_sum(self):
         """updates the sum of energy and thermo corrections"""
-        dZPE = self.zpe_line.text()
-        dH = self.enthalpy_line.text()
-        dG = self.rrho_g_line.text()
-        dG_qrrho = self.qrrho_g_line.text()
-        dG_qharm = self.qharm_g_line.text()
-        
-        nrg = self.sp_nrg_line.text()
-        
-        if len(dH) == 0 or len(nrg) == 0:
-            self.zpe_sum_line.setText("")
-            self.h_sum_line.setText("")
-            self.rrho_g_sum_line.setText("")
-            self.qrrho_g_sum_line.setText("")
-            self.qharm_g_sum_line.setText("")
+        self.sum_table.setRowCount(0)
+
+        if not self.sp_table.rowCount():
             return
-        else:
-            dZPE = float(dZPE)
-            dH = float(dH)
-            dG = float(dG)
-            dG_qrrho = float(dG_qrrho)
-            dG_qharm = float(dG_qharm)
-            
-            nrg = float(nrg)
-            
-            zpe = nrg + dZPE
-            enthalpy = nrg + dH
-            rrho_g = nrg + dG
-            qrrho_g = nrg + dG_qrrho
-            qharm_g = nrg + dG_qharm
-            
-            self.zpe_sum_line.setText("%.6f" % zpe)
-            self.h_sum_line.setText("%.6f" % enthalpy)
-            self.rrho_g_sum_line.setText("%.6f" % rrho_g)
-            self.qrrho_g_sum_line.setText("%.6f" % qrrho_g)
-            self.qharm_g_sum_line.setText("%.6f" % qharm_g)
+
+        sp_nrg = float(self.sp_table.cellWidget(0, 1).text())
+
+        for row in range(0, self.thermo_table.rowCount()):
+            self.sum_table.insertRow(row)
+
+            label = self.thermo_table.cellWidget(row, 0)
+            tooltip = label.toolTip()
+            text = label.text().replace("𝛿", "")
+            sum_label = QLabel(text)
+            if "href=" in text:
+                sum_label = QLabel()
+                sum_label.setText(text)
+                sum_label.setTextFormat(Qt.RichText)
+                sum_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+                sum_label.linkActivated.connect(self.open_link)
+
+            sum_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            sum_label.setToolTip(tooltip)
+
+            self.sum_table.setCellWidget(row, 0, sum_label)
+
+            thermo = float(self.thermo_table.cellWidget(row, 1).text())
+
+            total = sp_nrg + thermo
+            total_nrg = SmallLineEdit("%.6f" % total)
+            total_nrg.setFrame(False)
+            total_nrg.setReadOnly(True)
+            total_nrg.setToolTip(tooltip)
+            self.sum_table.setCellWidget(row, 1, total_nrg)
+
+            unit_label = ReadOnlyTableItem()
+            unit_label.setData(Qt.DisplayRole, "E\u2095")
+            unit_label.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            unit_label.setToolTip(tooltip)
+            self.sum_table.setItem(row, 2, unit_label)
+
+            self.sum_table.resizeRowToContents(row)
+        
+        self.sum_table.resizeColumnToContents(0)
+        self.sum_table.resizeColumnToContents(1)
+        self.sum_table.resizeColumnToContents(2)
     
     def display_help(self):
         """Show the help for this tool in the help viewer."""
@@ -901,7 +932,7 @@ class ThermoGroup(QWidget):
         
         root_item = self.tree.invisibleRootItem()
         plus = QTreeWidgetItem(root_item)
-        plus_button = QPushButton("add molecule group")
+        plus_button = QPushButton("add molecule")
         plus_button.setFlat(True)
         plus_button.clicked.connect(self.add_mol_group)        
         plus_button2 = QPushButton("")

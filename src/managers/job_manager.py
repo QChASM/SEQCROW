@@ -253,20 +253,29 @@ class JobManager(ProviderManager):
                         job.theory.geometry.chix_atomicstructure.active_coordset_id = job.theory.geometry.chix_atomicstructure.num_coordsets
 
                 except Exception:
-                    self.session.logger.warning("can only update the structure of AaronTools file formats")
-                    if hasattr(job, "output_name") and job.output_name and os.path.exists(job.output_name):
-                        if job.format_name:
-                            run(
-                                job.session,
-                                "open \"%s\" format %s" % (
-                                    job.output_name,
-                                    job.format_name
-                                )
-                            )
-                        else:
-                            run(job.session, "open \"%s\"" % job.output_name)
+                    if job.__class__.update_structure is not LocalJob.update_structure:
+                        job.update_structure(job.theory.geometry.chix_atomicstructure)
+                    
                     else:
-                        self.session.logger.error("could not open output of %s" % repr(job))
+                        self.session.logger.warning(
+                            "can only update the structure of AaronTools file formats"
+                        )
+                        if (
+                                hasattr(job, "output_name") and
+                                job.output_name and os.path.exists(job.output_name)
+                        ):
+                            if job.format_name:
+                                run(
+                                    job.session,
+                                    "open \"%s\" format %s" % (
+                                        job.output_name,
+                                        job.format_name
+                                    )
+                                )
+                            else:
+                                run(job.session, "open \"%s\"" % job.output_name)
+                        else:
+                            self.session.logger.error("could not open output of %s" % repr(job))
 
 
         elif job.auto_open or job.auto_update:

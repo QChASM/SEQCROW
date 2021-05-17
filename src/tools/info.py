@@ -622,8 +622,8 @@ class Info(ToolInstance):
                 item = QTableWidgetItem()
                 info_name = info.replace("_", " ")
                 vals = fr.other[info]
-                if info == "rotational_temperature":
-                    info_name = "rotational constants (%s)" % self.settings.rot_const
+                if "rotational_temperature" in info:
+                    info_name = info_name.replace("temperature", "constants (%s)" % self.settings.rot_const)
                     if self.settings.rot_const == "GHz":
                         vals = [x * PHYSICAL.KB / (PHYSICAL.PLANCK * (10 ** 9)) for x in vals]
                 

@@ -261,6 +261,7 @@ def indexLabel(session, models=None):
     from chimerax.core.objects import Objects
     from chimerax.atomic import AtomicStructure, Atoms
     from chimerax.label.label3d import label
+    from SEQCROW.utils import contrast_bw
     
     if models is None:
         models = session.models.list(type=AtomicStructure)
@@ -270,6 +271,19 @@ def indexLabel(session, models=None):
     for m in models:
         for i, atom in enumerate(m.atoms):
             l = str(i+1)
-            label(session, objects=Objects(atoms=Atoms([atom])), object_type='atoms', \
-                text=l, offset=(-0.11*len(l),-0.2,-0.2), height=0.4, on_top=True)
+            ele_color = atom.color[:-1]
+            if contrast_bw(ele_color) == "black":
+                label_color = (0, 0, 0, 255)
+            else:
+                label_color = (255, 255, 255, 255)
+            label(
+                session,
+                objects=Objects(atoms=Atoms([atom])),
+                object_type='atoms',
+                text=l,
+                offset=(-0.11*len(l),-0.2,-0.2),
+                height=0.4,
+                on_top=True,
+                color=label_color,
+            )
 

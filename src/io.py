@@ -60,9 +60,9 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
                 slider = CoordinateSetSlider(session, structure)
 
                 if len(fr.all_geom) > 1:
-                    structure.active_coordset_id = len(fr.all_geom)
+                    structure.active_coordset_id = structure.num_coordsets
                     if coordsets:
-                        slider.set_slider(len(fr.all_geom))
+                        slider.set_slider(structure.num_coordsets)
 
     if format_name == "Gaussian input file":
         a_or_an = "a"

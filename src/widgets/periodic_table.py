@@ -5,6 +5,7 @@ from Qt.QtWidgets import QPushButton, QGridLayout, QWidget, QStyle
 
 from AaronTools.const import ELEMENTS, TMETAL
 
+from SEQCROW.utils import contrast_bw
 
 class ElementButton(QPushButton):
     Unchecked = 0
@@ -46,10 +47,7 @@ class ElementButton(QPushButton):
             self.setStyleSheet(
                 "QPushButton { background: rgb(%i, %i, %i); color: %s; font-weight: bold; }" % (
                     *self.ele_color,
-                    'white' if sum(
-                        int(x < 130) - int(x > 225) for x in self.ele_color
-                    ) - int(self.ele_color[1] > 225) +
-                    int(self.ele_color[2] > 200) >= 2 else 'black'
+                    contrast_bw(self.ele_color),
                 )
             )
         elif self.state == self.Excluded:
@@ -314,7 +312,7 @@ class PeriodicTable(QWidget):
     def _select_all(self):
         self.blockSignals(True)
         for ele in self._elements.keys():
-                self._elements[ele].setState(ElementButton.Checked)
+            self._elements[ele].setState(ElementButton.Checked)
         
         self.blockSignals(False)
         self.elementSelectionChanged.emit()
