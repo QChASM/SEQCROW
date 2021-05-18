@@ -25,4 +25,3 @@ class QMInputManager(ProviderManager):
                 self
             )
         return self.file_info[name]
-    

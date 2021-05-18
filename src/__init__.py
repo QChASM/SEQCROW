@@ -8,9 +8,14 @@ from chimerax.core.commands import BoolArg, ModelsArg, StringArg, register
 class _SEQCROW_API(BundleAPI):
 
     api_version = 1
-    
+
     @staticmethod
     def initialize(session, bundle_info):
+        """
+        custom initialization sets settings, applies AaronTools environment
+        variables, registers substituent selectors, menu stuff, 
+        mouse modes, and changes the output destination for AaronTools loggers
+        """
         from SEQCROW import settings as seqcrow_settings
         seqcrow_settings.settings = settings._SEQCROWSettings(session, "SEQCROW")
         if session.ui.is_gui:
@@ -49,14 +54,14 @@ class _SEQCROW_API(BundleAPI):
                 EraserMouseMode,
                 SubstituteMouseMode,
             )
-    
+
             session.ui.mouse_modes.add_mode(SelectConnectedMouseMode(session))
             session.ui.mouse_modes.add_mode(DrawBondMouseMode(session))
             session.ui.mouse_modes.add_mode(DrawTSBondMouseMode(session))
             session.ui.mouse_modes.add_mode(ChangeElementMouseMode(session))
             session.ui.mouse_modes.add_mode(EraserMouseMode(session))
             session.ui.mouse_modes.add_mode(SubstituteMouseMode(session))
-        
+
         #apply AARONLIB setting
         if seqcrow_settings.settings.AARONLIB is not None:
             os.environ['AARONLIB'] = seqcrow_settings.settings.AARONLIB
@@ -68,22 +73,22 @@ class _SEQCROW_API(BundleAPI):
 
         #register selectors from the user's personal library
         for sub in Substituent.list():
-                if sub in ELEMENTS:
-                    # print(sub, "in ELEMENTS")
-                    continue
-                if not sub[0].isalpha():
-                    # print(sub, "startswith non-alpha")
-                    continue
-                if len(sub) > 1 and any(not (c.isalnum() or c in "+-") for c in sub[1:]):
-                    # print(sub, "contains non-alphanumeric character")
-                    continue
-                if not any([selector.name == sub for selector in bundle_info.selectors]):
-                    si = SelectorInfo(sub, atomic=True, synopsis="%s substituent" % sub)
-                    bundle_info.selectors.append(si)
+            if sub in ELEMENTS:
+                # print(sub, "in ELEMENTS")
+                continue
+            if not sub[0].isalpha():
+                # print(sub, "startswith non-alpha")
+                continue
+            if len(sub) > 1 and any(not (c.isalnum() or c in "+-") for c in sub[1:]):
+                # print(sub, "contains non-alphanumeric character")
+                continue
+            if not any([selector.name == sub for selector in bundle_info.selectors]):
+                si = SelectorInfo(sub, atomic=True, synopsis="%s substituent" % sub)
+                bundle_info.selectors.append(si)
 
         #need to reregister selectors b/c ^ that bypassed the bundle_info.xml or something
         bundle_info._register_selectors(session.logger)
-        
+
         # set stream of AaronTools logger to the ChimeraX log
         from SEQCROW.logging_logger import LoggingLogger
         from AaronTools.geometry import Geometry
@@ -91,9 +96,9 @@ class _SEQCROW_API(BundleAPI):
         from AaronTools.fileIO import Frequency
         from AaronTools.config import Config
         from AaronTools.atoms import Atom
-        
+
         log = LoggingLogger(session)
-        
+
         for hdlr in Geometry.LOG.handlers:
             hdlr.setStream(log)
         for hdlr in Substituent.LOG.handlers:
@@ -111,28 +116,33 @@ class _SEQCROW_API(BundleAPI):
     def open_file(session, path, format_name, coordsets=False):
         """
         open an AaronTools-readable structure (see AaronTools.fileIO.read_types)
-        session     - chimerax Session 
+        session     - chimerax Session
         path        - str, path to file
         format_name - str, file format
         coordsets   - bool, load as trajectory
         """
         from .io import open_aarontools
-        
+
         session.logger.info("loading %s file" % format_name)
 
         return open_aarontools(session, path, format_name=format_name, coordsets=coordsets)
 
     @staticmethod
     def save_file(session, path, format_name, **kw):
+        """
+        save an XYZ file
+        """
         from .io import save_aarontools
         if format_name != "XYZ":
             raise NotImplementedError("SEQCROW can only save XYZ files, not %s files" % format_name)
-            
-        elif format_name == "XYZ":
-            return save_aarontools(session, path, format_name, **kw)
+
+        return save_aarontools(session, path, format_name, **kw)
 
     @staticmethod
     def register_selector(bundle_info, selector_info, logger):
+        """
+        register selectors
+        """
         from .selectors import register_selectors
         register_selectors(logger, selector_info.name)
 
@@ -156,19 +166,22 @@ class _SEQCROW_API(BundleAPI):
 
         else:
             raise RuntimeError("manager named '%s' is unknown to SEQCROW" % name)
-  
+
     @staticmethod
     def start_tool(session, bi, ti):
+        """
+        start tools
+        """
         if ti.name == "Browse AaronTools Libraries":
             from .tools import AaronTools_Library
             tool = AaronTools_Library(session, ti.name)
-            return tool        
-        
+            return tool
+
         elif ti.name == "Visualize Normal Modes":
             from .tools import NormalModes
             tool = NormalModes(session, ti.name)
-            return tool        
-        
+            return tool
+
         elif ti.name == "Substituent Sterimol":
             from .tools import Sterimol
             for tool in session.tools.list():
@@ -178,7 +191,7 @@ class _SEQCROW_API(BundleAPI):
             else:
                 tool = Sterimol(session, ti.name)
                 return tool
-        
+
         elif any(ti.name == name for name in [
                 "Structure Modification",
                 "Change Substituents",
@@ -191,11 +204,11 @@ class _SEQCROW_API(BundleAPI):
                 if isinstance(tool, EditStructure):
                     tool.display(True)
                     if ti.name == "Change Substituents":
-                        tool.alchemy_tabs.setCurrentIndex(0)                    
+                        tool.alchemy_tabs.setCurrentIndex(0)
                     elif ti.name == "Swap Transition Metal Ligands":
                         tool.alchemy_tabs.setCurrentIndex(1)
                     elif ti.name == "Fuse Ring":
-                        tool.alchemy_tabs.setCurrentIndex(2)                    
+                        tool.alchemy_tabs.setCurrentIndex(2)
                     elif ti.name == "Change Element":
                         tool.alchemy_tabs.setCurrentIndex(3)
                     break
@@ -207,48 +220,48 @@ class _SEQCROW_API(BundleAPI):
                 elif ti.name == "Swap Transition Metal Ligands":
                     tool.alchemy_tabs.setCurrentIndex(1)
                 elif ti.name == "Fuse Ring":
-                    tool.alchemy_tabs.setCurrentIndex(2)                
+                    tool.alchemy_tabs.setCurrentIndex(2)
                 elif ti.name == "Change Element":
                     tool.alchemy_tabs.setCurrentIndex(3)
 
-                return tool        
-        
+                return tool
+
         elif ti.name == "Add to Personal Library":
             from .tools import LibAdd
             tool = LibAdd(session, ti.name)
             return tool
-        
+
         elif ti.name == "Managed Models":
             from .tools import FileReaderPanel
             tool = FileReaderPanel(session, ti.name)
-            return tool        
-        
+            return tool
+
         elif ti.name == "Process QM Thermochemistry":
             from .tools import Thermochem
             tool = Thermochem(session, ti.name)
             return tool
-        
+
         elif ti.name == "Build QM Input":
             from .tools import BuildQM
             tool = BuildQM(session, ti.name)
             return tool
-        
+
         elif ti.name == "Job Queue":
             from .tools import JobQueue
             return JobQueue(session, ti.name)
-        
+
         elif ti.name == "AARON Input Builder":
             from .tools import AARONInputBuilder
             return AARONInputBuilder(session, ti.name)
-        
+
         elif ti.name == "Bond Editor":
             from .tools import BondEditor
             return BondEditor(session, ti.name)
-                
+
         elif ti.name == "Rotate Atoms":
             from .tools import PrecisionRotate
             return PrecisionRotate(session, ti.name)
-        
+
         elif ti.name == "Buried Volume":
             from .tools import PercentVolumeBuried
             return PercentVolumeBuried(session, ti.name)
@@ -260,90 +273,138 @@ class _SEQCROW_API(BundleAPI):
         elif ti.name == "Cone Angle":
             from .tools import ConeAngle
             return ConeAngle(session, ti.name)
-        
+
         elif ti.name == "Coordination Complex Generator":
             from .tools import CoordinationComplexVomit
             return CoordinationComplexVomit(session, ti.name)
-        
+
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)
 
     @staticmethod
     def run_provider(session, name, mgr, **kw):
+        """
+        run providers
+        provider might be open_command, save_command,
+        QM input or job-related stuff, or the 
+        test manager
+        """
         if mgr is session.open_command:
             from SEQCROW.io import open_aarontools
 
             if name == "Gaussian input file":
                 class Info(OpenerInfo):
                     def open(self, session, data, file_name, **kw):
-                        return open_aarontools(session, data, file_name, format_name="Gaussian input file", **kw)
-            
+                        return open_aarontools(
+                            session,
+                            data,
+                            file_name,
+                            format_name="Gaussian input file",
+                            **kw
+                        )
+
                     @property
                     def open_args(self):
                         return {}
-                        
+
                 return Info()
-                
+
             elif name == "Gaussian output file":
                 class Info(OpenerInfo):
                     def open(self, session, data, file_name, **kw):
-                        return open_aarontools(session, data, file_name, format_name="Gaussian output file", **kw)
-            
+                        return open_aarontools(
+                            session,
+                            data,
+                            file_name,
+                            format_name="Gaussian output file",
+                            **kw
+                        )
+
                     @property
                     def open_args(self):
                         return {'coordsets': BoolArg}
-                        
+
                 return Info()
 
             elif name == "ORCA output file":
                 class Info(OpenerInfo):
                     def open(self, session, data, file_name, **kw):
-                        return open_aarontools(session, data, file_name, format_name="ORCA output file", **kw)
-            
+                        return open_aarontools(
+                            session,
+                            data,
+                            file_name,
+                            format_name="ORCA output file",
+                            **kw
+                        )
+
                     @property
                     def open_args(self):
                         return {'coordsets': BoolArg}
-                        
+
                 return Info()
-                
+
             elif name == "Psi4 output file":
                 class Info(OpenerInfo):
                     def open(self, session, data, file_name, **kw):
-                        return open_aarontools(session, data, file_name, format_name="Psi4 output file", **kw)
-            
+                        return open_aarontools(
+                            session,
+                            data,
+                            file_name,
+                            format_name="Psi4 output file",
+                            **kw
+                        )
+
                     @property
                     def open_args(self):
                         return {'coordsets': BoolArg}
-                        
+
                 return Info()
 
             elif name == "XYZ file":
                 class Info(OpenerInfo):
                     def open(self, session, data, file_name, **kw):
-                        return open_aarontools(session, data, file_name, format_name="XYZ file", **kw)
-            
+                        return open_aarontools(
+                            session,
+                            data,
+                            file_name,
+                            format_name="XYZ file",
+                            **kw
+                        )
+
                     @property
                     def open_args(self):
                         return {'coordsets': BoolArg}
-                        
-                return Info()            
-            
+
+                return Info()
+
             elif name == "FCHK file":
                 class Info(OpenerInfo):
                     def open(self, session, data, file_name, **kw):
-                        return open_aarontools(session, data, file_name, format_name="FCHK file", **kw)
-            
+                        return open_aarontools(
+                            session,
+                            data,
+                            file_name,
+                            format_name="FCHK file",
+                            **kw
+                        )
+
                     @property
                     def open_args(self):
                         return {}
-                        
+
                 return Info()
-            
+
             elif name == "sqm output file":
                 class Info(OpenerInfo):
                     def open(self, session, data, file_name, **kw):
-                        return open_aarontools(session, data, file_name, format_name="sqm output file")
-            
+                        return open_aarontools(
+                            session,
+                            data,
+                            file_name,
+                            format_name="sqm output file",
+                            **kw
+                        )
+
                     @property
                     def open_args(self):
                         return {'coordsets': BoolArg}
@@ -353,26 +414,26 @@ class _SEQCROW_API(BundleAPI):
         elif mgr is session.save_command:
             from chimerax.save_command import SaverInfo
             from SEQCROW.io import save_aarontools
-            
+
             if name == "XYZ file":
                 class Info(SaverInfo):
                     def save(self, session, path, **kw):
                         #save_aarontools doesn't actually pay attention to format_name yet
                         save_aarontools(session, path, "XYZ file", **kw)
-                        
+
                     @property
                     def save_args(self):
                         return {'models': ModelsArg, 'comment': StringArg}
-                    
+
                     def save_args_widget(self, session):
                         from .widgets import ModelComboBox
                         return ModelComboBox(session, autoUpdate=False)
-                    
+
                     def save_args_string_from_widget(self, widget):
                         return widget.options_string()
-                        
+
                 return Info()
-        
+
         elif mgr is session.seqcrow_qm_input_manager:
             if name == "Gaussian":
                 from SEQCROW.input_file_formats import GaussianFileInfo
@@ -405,7 +466,7 @@ class _SEQCROW_API(BundleAPI):
             if name == "fuseRing_command":
                 from .tests.fuseRing_command import FuseRingCmdTest
                 return FuseRingCmdTest
-                
+
             elif name == "normal_modes":
                 from .tests.normal_modes import NormalModesToolTest
                 return NormalModesToolTest
@@ -413,21 +474,24 @@ class _SEQCROW_API(BundleAPI):
             elif name == "substitute_command":
                 from .tests.substitute_command import SubstituteCmdTest
                 return SubstituteCmdTest
-    
+
             elif name == "input_builder":
                 from .tests.input_builder import QMInputBuilderToolTest
                 return QMInputBuilderToolTest
-            
+
             elif name == "buried_volume":
                 from .tests.buried_volume import BuriedVolumeToolTest
                 return BuriedVolumeToolTest
-    
+
     @staticmethod
     def register_command(bundle_info, command_info, logger):
+        """
+        register commands
+        """
         if command_info.name == "rmsdAlign":
             from .commands.rmsdAlign import rmsdAlign, rmsdAlign_description
             register("rmsdAlign", rmsdAlign_description, rmsdAlign)
-        
+
         elif command_info.name == "substitute":
             from .commands.substitute import substitute, substitute_description
             register("substitute", substitute_description, substitute)
@@ -438,8 +502,8 @@ class _SEQCROW_API(BundleAPI):
 
         elif command_info.name == "tsbond":
             from .commands.tsbond import tsbond, tsbond_description
-            register("tsbond", tsbond_description, tsbond)        
-        
+            register("tsbond", tsbond_description, tsbond)
+
         elif command_info.name == "~tsbond":
             from .commands.tsbond import erase_tsbond, erase_tsbond_description
             register("~tsbond", erase_tsbond_description, erase_tsbond)
@@ -450,16 +514,12 @@ class _SEQCROW_API(BundleAPI):
 
         elif command_info.name == "percentVolumeBuried":
             from .commands.percent_Vbur import percent_vbur, vbur_description
-            register("percentVolumeBuried", vbur_description, percent_vbur)        
-        
-        elif command_info.name == "duplicate":
-            from .commands.duplicate import duplicate, duplicate_description
-            register("duplicate", duplicate_description, duplicate)
-        
+            register("percentVolumeBuried", vbur_description, percent_vbur)
+
         elif command_info.name == "highlight":
             from .commands.highlight import highlight, highlight_description
             register("highlight", highlight_description, highlight)
-        
+
         elif command_info.name == "~highlight":
             from .commands.highlight import erase_highlight, erase_highlight_description
             register("~highlight", erase_highlight_description, erase_highlight)
@@ -474,11 +534,15 @@ class _SEQCROW_API(BundleAPI):
 
     @staticmethod
     def register_selector_menus(session):
+        """
+        add selector menus
+        """
         from Qt.QtWidgets import QAction
 
         from AaronTools.const import ELEMENTS
         from AaronTools.substituent import Substituent
 
+        # substituent selectors
         add_submenu = session.ui.main_window.add_select_submenu
         add_selector = session.ui.main_window.add_menu_selector
         substituent_menu = add_submenu(['Che&mistry'], 'Substituents')
@@ -493,20 +557,26 @@ class _SEQCROW_API(BundleAPI):
                 # print(sub, "contains non-alphanumeric character")
                 continue
             add_selector(substituent_menu, sub, sub)
-        
+
+        # connected selector
         mw = session.ui.main_window
         structure_menu = add_submenu([], '&Structure')
         structure_menu.addAction(QAction("Connected", mw))
 
     @staticmethod
     def register_tutorials(session):
+        """
+        add tutorial to help menu
+        """
         from Qt.QtWidgets import QMenu, QAction
         from chimerax.core.commands import run
         mb = session.ui.main_window.menuBar()
         help_menu = mb.findChild(QMenu, "Help")
         seqcrow_tutorials = QAction("SEQCROW Tutorials", session.ui.main_window)
         seqcrow_tutorials.setToolTip("Tutorials for the SEQCROW bundle")
-        seqcrow_tutorials.triggered.connect(lambda *args: run(session, "help help:seqcrow/tutorials.html"))
+        seqcrow_tutorials.triggered.connect(
+            lambda *args: run(session, "help help:seqcrow/tutorials.html")
+        )
         help_menu.addAction(seqcrow_tutorials)
 
     @staticmethod
@@ -522,11 +592,12 @@ class _SEQCROW_API(BundleAPI):
             if isinstance(child, TabbedToolbar):
                 tabs = child
                 break
-        
+
         tabs.addTab(QWidget(), "test")
 
     @staticmethod
     def get_class(name):
+        """get tool classes"""
         if name == "BondEditor":
             from .tools import BondEditor
             return BondEditor
@@ -566,6 +637,7 @@ class _SEQCROW_API(BundleAPI):
 
     @staticmethod
     def finish(session, bundle_info):
+        """remove managers"""
         del session.filereader_manager
         del session.seqcrow_qm_input_manager
         del session.seqcrow_job_manager

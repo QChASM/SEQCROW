@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="1.0a1">
+            version="1.0a2">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -238,7 +238,7 @@
             </Providers>
             
             <Classifiers>
-                <PythonClassifier>Development Status :: 2 - Pre-Alpha</PythonClassifier>
+                <PythonClassifier>Development Status :: 4 - Beta</PythonClassifier>
                 <PythonClassifier>License :: OSI Approved :: GNU General Public License v3 (GPLv3)</PythonClassifier>
                 <PythonClassifier>Framework :: ChimeraX</PythonClassifier>
                 <PythonClassifier>Intended Audience :: Science/Research</PythonClassifier>
