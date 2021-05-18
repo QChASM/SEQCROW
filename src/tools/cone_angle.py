@@ -44,6 +44,9 @@ class _ConeAngleSettings(Settings):
 
 
 class ConeAngle(ToolInstance):
+    
+    help = "https://github.com/QChASM/SEQCROW/wiki/Cone-Angle-Tool"
+    
     def __init__(self, session, name):       
         super().__init__(session, name)
         

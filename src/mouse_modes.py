@@ -791,7 +791,9 @@ class _SubstituentSelector(ToolInstance):
         layout.addRow(self.substituent_table)
 
         self.new_residue = QCheckBox()
-        self.new_residue.setCheckState(Qt.Checked if SubstituteMouseMode.newRes else Qt.Unchecked)
+        self.new_residue.setCheckState(
+            Qt.Checked if SubstituteMouseMode.newRes else Qt.Unchecked
+        )
         layout.addRow("new residue:", self.new_residue)
         
         self.res_name = QLineEdit()
@@ -799,25 +801,42 @@ class _SubstituentSelector(ToolInstance):
         layout.addRow("set residue name:", self.res_name)
 
         self.distance_names = QCheckBox()
-        self.distance_names.setCheckState(Qt.Checked if SubstituteMouseMode.useRemoteness else Qt.Unchecked)
+        self.distance_names.setCheckState(
+            Qt.Checked if SubstituteMouseMode.useRemoteness else Qt.Unchecked
+        )
         layout.addRow("distance atom names:", self.distance_names)
+
+        self.keep_open = QCheckBox()
+        layout.addRow("keep list open:", self.keep_open)
 
         do_it = QPushButton("set substituent")
         do_it.clicked.connect(self.set_sub)
         layout.addRow(do_it)
 
+        self.keep_open.stateChanged.connect(lambda state: do_it.setVisible(state != Qt.Checked))
+        self.keep_open.stateChanged.connect(self.sub_changed)
+
+        self.substituent_table.table.itemSelectionChanged.connect(self.sub_changed)
+        self.new_residue.stateChanged.connect(self.sub_changed)
+        self.res_name.textChanged.connect(self.sub_changed)
+        self.distance_names.stateChanged.connect(self.sub_changed)
+
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(None)
+    
+    def sub_changed(self):
+        if self.keep_open.checkState() == Qt.Checked:
+            self.set_sub()
 
     def set_sub(self):
         sub_names = []
         for row in self.substituent_table.table.selectionModel().selectedRows():
             if self.substituent_table.table.isRowHidden(row.row()):
                 continue
-            
+
             sub_names.append(row.data())
-        
+
         if sub_names:
             SubstituteMouseMode.substituent = sub_names[0]
             SubstituteMouseMode.newRes = self.new_residue.checkState() == Qt.Checked
@@ -825,16 +844,17 @@ class _SubstituentSelector(ToolInstance):
             sub_name = self.res_name.text()
             SubstituteMouseMode.resName = sub_name
 
+        if self.keep_open.checkState() != Qt.Checked:
             self.delete()
-    
+
     def close(self):
         sub_names = []
         for row in self.substituent_table.table.selectionModel().selectedRows():
             if self.substituent_table.table.isRowHidden(row.row()):
                 continue
-            
+
             sub_names.append(row.data())
-        
+
         if sub_names:
             SubstituteMouseMode.substituent = sub_names[0]
             SubstituteMouseMode.newRes = self.new_residue.checkState() == Qt.Checked
