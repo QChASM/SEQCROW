@@ -16,6 +16,7 @@ lookDown_description = CmdDesc(
     ],
     required_arguments=["atom2"],
     synopsis="orient the molecule such that the atom1-atom2 vector is out of the screen",
+    url="https://github.com/QChASM/SEQCROW/wiki/Commands#lookdown",
 )
 
 def lookDown(session, atom1, atom2, axis="z", printRotation=False):

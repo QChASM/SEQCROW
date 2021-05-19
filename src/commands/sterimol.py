@@ -21,7 +21,8 @@ sterimol_description = CmdDesc(
         ("showRadii", BoolArg), 
         ("oldL", BoolArg), 
     ],
-    synopsis="calculate Sterimol B1, B5, and L"
+    synopsis="calculate Sterimol B1-B5, and L",
+    url="https://github.com/QChASM/SEQCROW/wiki/Commands#sterimol",
 )
 
 def sterimol(

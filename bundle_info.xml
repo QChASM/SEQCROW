@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="1.0a2">
+            version="1.0">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -20,40 +20,53 @@
             
             ## Tools
             ### AaronTools
-            * <b>Add to Personal Library</b>     - add substituents, ligands, or rings to your personal AaronTools library
-            * <b>Browse AaronTools</b>           - browse substituents, ligands, and rings in the AaronTools library
-            * <b>Build QM Input</b>              - build Gaussian, ORCA, or Psi4 input files
-            * <b>Process QM Thermochemistry</b>  - compute thermal corrections for models with vibrational mode information
-            * <b>Structure Modification</b>      - modify your structure using components from the AaronTools libraries (substituents, ligands, ring fragments)
-            * <b>Visualize Normal Modes</b>      - display normal modes for models with vibrational mode information as vectors or an animation
+            * <b>Add to Personal Library</b> - add substituents, ligands, or rings to your personal AaronTools library
+            * <b>Browse AaronTools</b> - browse substituents, ligands, and rings in the AaronTools library
+            * <b>Build QM Input</b> - build Gaussian, ORCA, Psi4, or SQM input files
+            * <b>Process QM Thermochemistry</b> - compute thermal corrections for models with vibrational mode information
+            * <b>Structure Modification</b> - modify your structure using components from the AaronTools libraries (substituents, ligands, ring fragments)
+            * <b>Visualize Normal Modes</b> - display normal modes for models with vibrational mode information as vectors or an animation
+            * <b>File Info</b> - list most of the info AaronTools parses from output files
             
             ### SEQCROW
-            * <b>Job Queue</b>                   - manage QM jobs that are run with SEQCROW
-            * <b>Managed Models</b>              - restore models opened through SEQCROW to their original state
+            * <b>Job Queue</b> - manage QM jobs that are run with SEQCROW
+            * <b>Managed Models</b> - restore models opened through SEQCROW to their original state
+            
+            ### Structure Editing
+            * <b>Bond Editor</b> - draw or erase bonds and TS bonds, and change bond lengths
+            * <b>Coordination Complex Generator</b> - Generate coordination complexes
             
             ### Structure Analysis
-            * <b>Sterimol</b>                    - determine the L, B<sub>1</sub>, and B<sub>5</sub> Sterimol parameters for a selected substituent 
+            * <b>Sterimol</b> - determine the L, B<sub>1</sub>-B<sub>5</sub> Sterimol parameters for a selected substituent 
+            * <b>Cone Angle</b> - determine the cone angle for ligands 
+            * <b>Buried Volume</b> - calculate buried volume around a reaction center
             
             ### Selectors
-            * <b>tm</b>                          - select all transition metals
+            * <b>tm</b> - select all transition metals
             * several substituent selectors, including <b>Me</b>, <b>Ph</b>, and <b>iPr</b>
             
             ## Graphical Presets
-            * <b>ball-stick-endcap</b>           - all non-H atoms are represented as balls and sticks; H atoms are represented as sticks/endcaps
-            * <b>index labels</b>                - label each atom with its index (1-indexed)
-            * <b>sticks</b>                      - all atoms are represented as sticks/endcaps
+            * <b>ball-stick-endcap</b> - all non-H atoms are represented as balls and sticks; H atoms are represented as sticks/endcaps
+            * <b>index labels</b> - label each atom with its index (1-indexed)
+            * <b>sticks</b> - all atoms are represented as sticks/endcaps
+            * <b>vdw</b> - space filling representation
             
             ## Commands
-            * <b>rmsdAlign</b>                   - calculate RMSD and align molecular structures, similar to ChimeraX's built-in `align` command
-            * <b>substitute</b>                  - add or change substituents
-            * <b>fuseRing</b>                    - attach a ring to a structure
-            * <b>angle</b>                       - print the angle defined by three atoms to the log
-            * <b>dihedral</b>                    - print the torsional angle defined by four atoms to the log
-            * <b>tsbond</b>                      - display forming/breaking bond as semi-transparent
+            * <b>rmsdAlign</b> - calculate RMSD and align molecular structures, similar to ChimeraX's built-in `align` command
+            * <b>substitute</b> - add or change substituents
+            * <b>fuseRing</b> - attach a ring to a structure
+            * <b>angle</b> - print the angle defined by three atoms to the log
+            * <b>dihedral</b> - print the torsional angle defined by four atoms to the log
+            * <b>tsbond</b> - display forming/breaking bond as semi-transparent
+            * <b>highlight</b> - outline atoms or bonds
+            * <b>lookDown</b> - align the vector between two atoms along the x, y, or z axis
+            * <b>percentBuriedVolume</b> - calculate percent buried volume around a reaction center
+            * <b>pointGroup</b> - determine point group of an atomic structure
+            * <b>sterimol</b> - calculate sterimol parameters for substituents
             </Description>
             
             <Dependencies>
-                <Dependency name="ChimeraX-Core" version="~=1.2.dev"/>
+                <Dependency name="ChimeraX-Core" version="~=1.2"/>
                 <Dependency name="scipy"/>
                 <Dependency name="Send2Trash"/>
                 <!-- wait for numpy to fix fortran stuff in python 3.8
@@ -87,28 +100,32 @@
                           encoding="utf-8" 
                           nicknames="com" 
                           reference_url="http://gaussian.com/input/"
-                          synopsis="Gaussian input file"/>
+                          synopsis="Gaussian input file"
+                />
                           
                 <Provider name="Gaussian output file" 
                           category="Molecular structure" 
                           suffixes=".log" 
                           encoding="utf-8" 
                           nicknames="log" 
-                          synopsis="Gaussian output file"/>
+                          synopsis="Gaussian output file"
+                />
                           
                 <Provider name="ORCA output file" 
                           category="Molecular structure" 
                           suffixes=".out" 
                           encoding="utf-8" 
                           nicknames="out" 
-                          synopsis="ORCA output file"/>
+                          synopsis="ORCA output file"
+                />
                           
                 <Provider name="Psi4 output file" 
                           category="Molecular structure" 
                           suffixes=".dat,.out" 
                           encoding="utf-8" 
                           nicknames="dat" 
-                          synopsis="Psi4 output file"/>
+                          synopsis="Psi4 output file"
+                />
                 
                 <Provider name="XYZ file" 
                           category="Molecular structure" 
@@ -116,7 +133,8 @@
                           encoding="utf-8" 
                           nicknames="xyz" 
                           reference_url="https://en.wikipedia.org/wiki/XYZ_file_format" 
-                          synopsis="XYZ coordinate file"/>                
+                          synopsis="XYZ coordinate file"
+                />                
                 
                 <Provider name="FCHK file" 
                           category="Molecular structure" 
@@ -124,14 +142,16 @@
                           encoding="utf-8" 
                           nicknames="fchk" 
                           reference_url="http://theochem.mercer.edu/chm295/g09ur/f_formchk.htm" 
-                          synopsis="Formatted Checkpoint file"/>
+                          synopsis="Formatted Checkpoint file"
+                />
 
                 <Provider name="sqm output file" 
                           category="Molecular structure" 
                           suffixes=".sqmout" 
                           encoding="utf-8" 
                           nicknames="sqm" 
-                          synopsis="Amber SQM output file"/>
+                          synopsis="Amber SQM output file"
+                />
             </Providers>
             
             <Providers manager="open command">
@@ -348,10 +368,12 @@
         <DataFile>LICENSE</DataFile>
     </DataFiles>
     
+    <!--
     <DataFiles package="AaronTools.test">
         <DataDir>test_files</DataDir>
         <DataDir>ref_files</DataDir>
     </DataFiles>
+    -->
     
     <DataFiles>
         <DataDir>docs</DataDir>

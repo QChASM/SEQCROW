@@ -26,7 +26,8 @@ pointGroup_description = CmdDesc(
         ("axisTolerance", FloatArg),
         ("maxRotation", IntArg),
     ],
-    synopsis="print the point group of atomic structures to the log"
+    synopsis="print the point group of atomic structures to the log",
+    url="https://github.com/QChASM/SEQCROW/wiki/Commands#pointGroup",
 )
 
 

@@ -19,6 +19,7 @@ from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.selectors import get_fragment
 from SEQCROW.widgets import PeriodicTable
 from SEQCROW.tools.structure_editing import PTable
+from SEQCROW.utils import contrast_bw
 
 from AaronTools.finders import AnyTransitionMetal
 from AaronTools.atoms import BondOrder
@@ -210,8 +211,8 @@ class BondEditor(ToolInstance):
         erase_tm_bonds.clicked.connect(self.del_tm_bond)
         tm_bond_options.addRow(erase_tm_bonds)
         self.erase_tm_bonds = erase_tm_bonds
-        
-        
+
+
         bond_length_tab = QWidget()
         bond_length_layout = QFormLayout(bond_length_tab)
         
@@ -243,11 +244,7 @@ class BondEditor(ToolInstance):
         ele_color = tuple(list(element_color(ELEMENTS.index("C")))[:-1])
         self.ele1.setStyleSheet(
             "QPushButton { background: rgb(%i, %i, %i); color: %s; font-weight: bold; }" % (
-                *ele_color,
-                'white' if sum(
-                    int(x < 130) - int(x > 225) for x in ele_color
-                ) - int(ele_color[1] > 225) +
-                int(ele_color[2] > 200) >= 2 else 'black'
+                *ele_color, contrast_bw(ele_color)
             )
         )
         self.ele1.clicked.connect(lambda *args, button=self.ele1: self.open_ptable(button))
@@ -264,11 +261,7 @@ class BondEditor(ToolInstance):
         ele_color = tuple(list(element_color(ELEMENTS.index("C")))[:-1])
         self.ele2.setStyleSheet(
             "QPushButton { background: rgb(%i, %i, %i); color: %s; font-weight: bold; }" % (
-                *ele_color,
-                'white' if sum(
-                    int(x < 130) - int(x > 225) for x in ele_color
-                ) - int(ele_color[1] > 225) +
-                int(ele_color[2] > 200) >= 2 else 'black'
+                *ele_color, contrast_bw(ele_color)
             )
         )
         self.ele2.clicked.connect(lambda *args, button=self.ele2: self.open_ptable(button))

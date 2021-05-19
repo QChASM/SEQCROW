@@ -16,10 +16,11 @@ substitute_description = CmdDesc(
             "substituents",
             ListOf(
                 DynamicEnum(
-                    Substituent.list, \
-                    name="substituent", \
-                    case_sensitive=True, \
-                    url="http://catalysttrends.wheelergroupresearch.com/AaronTools/substituents.php")
+                    Substituent.list,
+                    name="substituent",
+                    case_sensitive=True,
+                    url="http://catalysttrends.wheelergroupresearch.com/AaronTools/substituents.php"
+                )
             )
         ), 
         ("newName", ListOf(StringArg)), 
@@ -30,7 +31,8 @@ substitute_description = CmdDesc(
         ("useRemoteness", BoolArg),
         ("available", NoArg),
     ],
-    synopsis="modify substituents"
+    synopsis="modify substituents",
+    url="https://github.com/QChASM/SEQCROW/wiki/Commands#substitute",
 )
 
 

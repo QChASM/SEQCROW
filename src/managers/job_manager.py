@@ -62,12 +62,12 @@ class JobManager(ProviderManager):
         return any([job.isRunning() for job in self.local_jobs])
 
     def add_provider(self, bundle_info, name):
-        if name in self.formats:
-            self.session.logger.warning(
-                "local job type %s from %s supplanted that from %s" % (
-                    name, bundle_info.name, self.formats[name].name
-                )
-            )
+        # if name in self.formats:
+        #     self.session.logger.warning(
+        #         "local job type %s from %s supplanted that from %s" % (
+        #             name, bundle_info.name, self.formats[name].name
+        #         )
+        #     )
         self.formats[name] = bundle_info
 
     def init_queue(self):
