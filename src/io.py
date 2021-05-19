@@ -18,6 +18,8 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
         fmt = "xyz"
     elif format_name == "FCHK file":
         fmt = "fchk"
+    elif format_name == "sqm output file":
+        fmt = "sqmout"
 
     fr = FileReader((file_name, fmt, stream), just_geom=False, get_all=True)
 
@@ -30,7 +32,7 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
         format_name = "ORCA output file"
 
     try:
-        geom = ResidueCollection(fr)
+        geom = ResidueCollection(fr, refresh_ranks=False)
     except Exception as e:
         s = "could not open %s" % file_name
         if "error" in fr.other and fr.other["error"]:
@@ -48,18 +50,19 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
         from chimerax.std_commands.coordset_gui import CoordinateSetSlider
         from SEQCROW.tools import EnergyPlot
         
-        slider = CoordinateSetSlider(session, structure)
         if "energy" in fr.other:
             nrg_plot = EnergyPlot(session, structure, fr)
             if not nrg_plot.opened:
                 warn("energy plot could not be opened\n" + \
                      "there might be a mismatch between energy entries and structure entries in %s" % file_name)
-                nrg_plot.delete()                    
+                nrg_plot.delete()
+            else:
+                slider = CoordinateSetSlider(session, structure)
 
-    if fr.all_geom is not None and len(fr.all_geom) > 1:
-        structure.active_coordset_id = len(fr.all_geom)
-        if coordsets:
-            slider.set_slider(len(fr.all_geom))
+                if len(fr.all_geom) > 1:
+                    structure.active_coordset_id = structure.num_coordsets
+                    if coordsets:
+                        slider.set_slider(structure.num_coordsets)
 
     if format_name == "Gaussian input file":
         a_or_an = "a"
@@ -73,12 +76,15 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
         a_or_an = "an"
     elif format_name == "FCHK file":
         a_or_an = "an"
+    elif format_name == "sqm output file":
+        a_or_an = "an"
         
     status = "Opened %s as %s %s %s" % (file_name, a_or_an, format_name, "movie" if coordsets else "")
 
     structure.filename = file_name
 
     return [structure], status
+
 
 def save_aarontools(session, path, format_name, **kwargs):
     """ 

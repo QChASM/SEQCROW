@@ -78,6 +78,20 @@ class LocalJob(QThread):
 
         return d
 
+    def update_structure(self, structure):
+        """
+        overwrite to update structure (AtomicStructure) with the
+        coordinates from this job's output file
+        required for "update structure" option to work when launching
+        a job if the output file is not parsable by AaronTools
+        """
+        raise NotImplementedError(
+            "no update_structure method for %s" % (
+                self.__class__.name
+            )
+        )
+
+
 class ORCAJob(LocalJob):
     format_name = "out"
     def __repr__(self):
@@ -197,9 +211,9 @@ class Psi4Job(LocalJob):
         self.start_time = asctime(localtime())
 
         self.scratch_dir = os.path.join(
-                        os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
-                        "%s %s" % (self.name, self.start_time.replace(':', '.')), \
-                    )
+            os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
+            "%s %s" % (self.name, self.start_time.replace(':', '.')), \
+        )
 
         cwd = os.getcwd()
 
@@ -234,4 +248,54 @@ class Psi4Job(LocalJob):
     def get_json(self):
         d = super().get_json()
         d["format"] = "Psi4"
+        return d
+
+
+class SQMJob(LocalJob):
+    format_name = "sqmout"
+
+    def __repr__(self):
+        return "local sqm job \"%s\"" % self.name
+
+    def run(self):
+        import sys
+        self.start_time = asctime(localtime())
+
+        self.scratch_dir = os.path.join(
+                        os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
+                        "%s %s" % (self.name, self.start_time.replace(':', '.')), \
+                    )
+
+        cwd = os.getcwd()
+
+        if not os.path.exists(self.scratch_dir):
+            os.makedirs(self.scratch_dir)
+
+        infile = self.name + '.mdin'
+        infile_path = os.path.join(self.scratch_dir, infile)
+        self.theory.geometry.write(theory=self.theory, outfile=infile_path, style="sqm")
+
+        exec_dir = os.path.dirname(sys.executable)
+        sqm_exe = os.path.join(exec_dir, "amber20", "bin", "sqm")
+        if not os.path.exists(sqm_exe):
+            sqm_exe += ".exe"
+
+        self.output_name = os.path.join(self.scratch_dir, self.name + '.sqmout')
+
+        args = [sqm_exe, "-i", infile_path, "-o", self.output_name]
+
+        log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
+        log.write("executing:\n%s\n\n" % " ".join(args))
+
+        if platform == "win32":
+            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+        else:
+            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log)
+
+        self.process.communicate()
+        self.process = None
+
+    def get_json(self):
+        d = super().get_json()
+        d["format"] = "SQM"
         return d

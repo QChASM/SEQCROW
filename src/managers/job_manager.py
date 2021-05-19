@@ -1,6 +1,6 @@
 import os
 
-from AaronTools.fileIO import FileReader
+from AaronTools.fileIO import FileReader, read_types
 from AaronTools.json_extension import ATDecoder, ATEncoder
 
 from chimerax.core.toolshed import ProviderManager
@@ -9,7 +9,7 @@ from chimerax.core.commands import run
 
 from json import load, dump
 
-from PyQt5.QtWidgets import QMessageBox, QApplication
+from Qt.QtWidgets import QMessageBox, QApplication
 
 from SEQCROW.jobs import LocalJob, GaussianJob, ORCAJob, Psi4Job
 from SEQCROW.managers import ADD_FILEREADER
@@ -23,16 +23,13 @@ JOB_QUEUED = "job changed"
 
 class JobManager(ProviderManager):
     def __init__(self, session, *args, **kwargs):
-        # 1.2 adds an __init__ to ProviderManager that uses the manager name for things
-        # this is not the case in 1.1
-
+        super().__setattr__("initialized", False)
         self.session = session
         self.local_jobs = []
         self.remote_jobs = []
         self.unknown_status_jobs = []
         self.paused = False
         self._thread = None
-        self.initialized = False
         self.queue_dict = {}
         self.formats = {}
 
@@ -45,18 +42,14 @@ class JobManager(ProviderManager):
         self.triggers.add_handler(JOB_QUEUED, self.check_queue)
         self.triggers.add_handler(JOB_QUEUED, self.write_json)
         
-        params = signature(super().__init__).parameters
-        if any("name" in param for param in params):
-            super().__init__(*args, **kwargs)
-        else:
-            super().__init__()
+        super().__init__(*args, **kwargs)
 
     def __setattr__(self, attr, val):
-        if attr == "paused":
+        if attr == "paused" and self.initialized:
             if val:
-                print("paused SEQCROW queue")
+                self.session.logger.info("paused SEQCROW queue")
             else:
-                print("resumed SEQCROW queue")
+                self.session.logger.info("resumed SEQCROW queue")
         
         super().__setattr__(attr, val)
 
@@ -69,13 +62,12 @@ class JobManager(ProviderManager):
         return any([job.isRunning() for job in self.local_jobs])
 
     def add_provider(self, bundle_info, name):
-        print("adding %s format" % name)
-        if name in self.formats:
-            self.session.logger.warning(
-                "local job type %s from %s supplanted that from %s" % (
-                    name, bundle_info.name, self.formats[name].name
-                )
-            )
+        # if name in self.formats:
+        #     self.session.logger.warning(
+        #         "local job type %s from %s supplanted that from %s" % (
+        #             name, bundle_info.name, self.formats[name].name
+        #         )
+        #     )
         self.formats[name] = bundle_info
 
     def init_queue(self):
@@ -108,7 +100,7 @@ class JobManager(ProviderManager):
                                 )
                                 
                                 if section == "check":
-                                    if 'output' in job and os.path.exists(job['output']):
+                                    if 'output' in job and job['output'] and os.path.exists(job['output']):
                                         fr = FileReader(job['output'], just_geom=False)
                                         if 'finished' in fr.other and fr.other['finished']:
                                             local_job.isFinished = lambda *args, **kwargs: True
@@ -139,7 +131,7 @@ class JobManager(ProviderManager):
                                 local_job.scratch_dir = job['scratch']
                                 
                                 self.local_jobs.append(local_job)
-                                self.session.logger.info("added %s (%s job) from previous session" % (job['name'], job['format']))
+                                # self.session.logger.info("added %s (%s job) from previous session" % (job['name'], job['format']))
                                 break
                         else:
                             self.session.logger.warning(
@@ -164,22 +156,28 @@ class JobManager(ProviderManager):
         d = {'finished':[], 'queued':[], 'check':[], 'error':[], 'killed':[]}
         job_running = False
         for job in self.jobs:
+            # print(job.name)
             if not job.killed:
                 if not job.isFinished() and not job.isRunning():
                     d['queued'].append(job.get_json())
-
+                    # print("queued")
+                    
                 elif job.isFinished() and not job.error:
                     d['finished'].append(job.get_json())
-                
+                    # print("finished")
+
                 elif job.isFinished() and job.error:
                     d['error'].append(job.get_json())
+                    # print("error")
 
                 elif job.isRunning():
                     d['check'].append(job.get_json())
                     job_running = True
-            
+                    # print("check")
+
             elif job.isFinished():
                 d['killed'].append(job.get_json())
+                # print("killed")
 
         d['job_running'] = job_running
 
@@ -207,14 +205,19 @@ class JobManager(ProviderManager):
         if isinstance(job, LocalJob):
             self._thread = None
             if not hasattr(job, "output_name") or \
+               not job.output_name or \
                not os.path.exists(job.output_name):
                 job.error = True
             
             else:
-                fr = FileReader(job.output_name, just_geom=False)
-                #XXX: finished is not added to the FileReader for ORCA and Psi4 when finished = False
-                if 'finished' not in fr.other or not fr.other['finished']:
-                    job.error = True
+                try:
+                    fr = FileReader(job.output_name, just_geom=False)
+                    if 'finished' not in fr.other or not fr.other['finished']:
+                        job.error = True
+                except NotImplementedError:
+                    pass
+        
+        self.triggers.activate_trigger(JOB_QUEUED, trigger_name)
 
         if job.auto_update and (
                 job.theory.geometry.chix_atomicstructure is not None and
@@ -234,34 +237,59 @@ class JobManager(ProviderManager):
         
                         rescol = ResidueCollection(fr)
                         rescol.update_chix(job.theory.geometry.chix_atomicstructure)
-                
-                except:
-                    job.update_structure()
 
-            if fr.all_geom is not None and len(fr.all_geom) > 1:
-                coordsets = rescol.all_geom_coordsets(fr)
+                    if fr.all_geom is not None and len(fr.all_geom) > 1:
+                        coordsets = rescol.all_geom_coordsets(fr)
+        
+                        job.theory.geometry.chix_atomicstructure.remove_coordsets()
+                        job.theory.geometry.chix_atomicstructure.add_coordsets(coordsets)
+        
+                        for i, coordset in enumerate(coordsets):
+                            job.theory.geometry.chix_atomicstructure.active_coordset_id = i + 1
+                            
+                            for atom, coord in zip(job.theory.geometry.chix_atomicstructure.atoms, coordset):
+                                atom.coord = coord
+        
+                        job.theory.geometry.chix_atomicstructure.active_coordset_id = job.theory.geometry.chix_atomicstructure.num_coordsets
 
-                job.theory.geometry.chix_atomicstructure.remove_coordsets()
-                job.theory.geometry.chix_atomicstructure.add_coordsets(coordsets)
-
-                for i, coordset in enumerate(coordsets):
-                    job.theory.geometry.chix_atomicstructure.active_coordset_id = i + 1
+                except Exception:
+                    if job.__class__.update_structure is not LocalJob.update_structure:
+                        job.update_structure(job.theory.geometry.chix_atomicstructure)
                     
-                    for atom, coord in zip(job.theory.geometry.chix_atomicstructure.atoms, coordset):
-                        atom.coord = coord
+                    else:
+                        self.session.logger.warning(
+                            "can only update the structure of AaronTools file formats"
+                        )
+                        if (
+                                hasattr(job, "output_name") and
+                                job.output_name and os.path.exists(job.output_name)
+                        ):
+                            if job.format_name:
+                                run(
+                                    job.session,
+                                    "open \"%s\" format %s" % (
+                                        job.output_name,
+                                        job.format_name
+                                    )
+                                )
+                            else:
+                                run(job.session, "open \"%s\"" % job.output_name)
+                        else:
+                            self.session.logger.error("could not open output of %s" % repr(job))
 
-                job.theory.geometry.chix_atomicstructure.active_coordset_id = job.theory.geometry.chix_atomicstructure.num_coordsets
 
         elif job.auto_open or job.auto_update:
-            if hasattr(job, "output_name") and os.path.exists(job.output_name):
+            if hasattr(job, "output_name") and job.output_name and os.path.exists(job.output_name):
                 if job.format_name:
-                    run(job.session, "open \"%s\" coordsets true format %s" % (job.output_name, job.format_name))
+                    if job.format_name in read_types:
+                        run(job.session, "open \"%s\" coordsets true format %s" % (job.output_name, job.format_name))
+                    else:
+                        run(job.session, "open \"%s\" format %s" % (job.output_name, job.format_name))
                 else:
                     run(job.session, "open \"%s\" coordsets true" % job.output_name)
             else:
                 self.session.logger.error("could not open output of %s" % repr(job))
 
-        self.triggers.activate_trigger(JOB_QUEUED, trigger_name)
         pass
 
     def job_started(self, trigger_name, job):

@@ -1,18 +1,23 @@
 from chimerax.atomic import selected_atoms, selected_bonds, AtomicStructure, PseudobondGroup
-from chimerax.core.commands import BoolArg, FloatArg, ColorArg, ObjectsArg, CmdDesc
+from chimerax.core.commands import BoolArg, FloatArg, ColorArg, ObjectsArg, CmdDesc, run
 
 
-tsbond_description = CmdDesc(required=[("selection", ObjectsArg)],  \
-                             keyword=[
-                                      ("transparency", FloatArg), \
-                                      ("color", ColorArg),        \
-                                      ("radius", FloatArg),       \
-                                     ],
-                             synopsis="draw a forming/breaking bond"
-                    )
-erase_tsbond_description = CmdDesc(required=[("selection", ObjectsArg)],  \
-                                   synopsis="draw a forming/breaking bond"
-                          )
+tsbond_description = CmdDesc(
+    required=[("selection", ObjectsArg)],
+    keyword=[
+        ("transparency", FloatArg),
+        ("color", ColorArg),
+        ("radius", FloatArg),
+    ],
+    synopsis="draw a forming/breaking bond",
+    url="https://github.com/QChASM/SEQCROW/wiki/Commands#tsbond",
+)
+
+erase_tsbond_description = CmdDesc(
+    required=[("selection", ObjectsArg)],
+    synopsis="draw a forming/breaking bond",
+    url="https://github.com/QChASM/SEQCROW/wiki/Commands#tsbond",
+)
 
 # someone should totally make an acutal bond for this
 def tsbond(session, selection, transparency=50, color=[170, 255, 255, 255], radius=0.16):   
@@ -74,4 +79,10 @@ def erase_tsbond(session, selection):
             continue
         for bond in pbg.pseudobonds:
             if all(atom in atoms for atom in bond.atoms) or bond in pbonds:
+                atom1, atom2 = bond.atoms
                 bond.delete()
+                run(
+                    session,
+                    "bond %s %s reasonable true" % (atom1.atomspec, atom2.atomspec),
+                    log=False
+                )

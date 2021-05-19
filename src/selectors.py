@@ -177,13 +177,21 @@ def get_fragment(start, stop=None, max_len=100000):
     """
 
     stack = deque([start])
-    frag = [start]
-    stop = set([stop])
-    while len(stack) > 0 and len(frag) <= max_len:
-        connected = stack.popleft()
-        connected = set(connected.neighbors) - stop - set(frag)
-        stack.extend(connected)
-        frag.extend(connected)
+    frag = deque([start])
+    if stop is not None:
+        stop = set([stop])
+        while len(stack) > 0 and len(frag) <= max_len:
+            connected = stack.popleft()
+            connected = set(connected.neighbors) - stop - set(frag)
+            stack.extend(connected)
+            frag.extend(connected)
+
+    else:
+        while len(stack) > 0 and len(frag) <= max_len:
+            connected = stack.popleft()
+            connected = set(connected.neighbors) - set(frag)
+            stack.extend(connected)
+            frag.extend(connected)
 
     return Atoms(frag)
 

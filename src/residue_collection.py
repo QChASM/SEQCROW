@@ -3,7 +3,7 @@ import numpy as np
 import re
 
 from AaronTools.atoms import Atom as AaronToolsAtom
-from AaronTools.const import TMETAL, VDW_RADII, MASS
+from AaronTools.const import METAL, VDW_RADII, MASS
 from AaronTools.geometry import Geometry
 from AaronTools.ring import Ring
 from AaronTools.finders import BondedTo
@@ -37,6 +37,29 @@ class Atom(AaronToolsAtom):
         s += " {:>4s}".format(self.name)
         s += " ({:s})".format(self.atomspec) if self.atomspec is not None else "None"
         return s
+
+    def copy(self):
+        rv = Atom()
+        for key, val in self.__dict__.items():
+            if key == "connected":
+                continue
+            if key == "constraint":
+                continue
+            if key == "_hashed":
+                continue
+            if key == "chix_atom":
+                continue
+            try:
+                rv.__dict__[key] = val.copy()
+            except AttributeError:
+                rv.__dict__[key] = val
+                if val.__class__.__module__ != "builtins":
+                    self.LOG.warning(
+                        "No copy method for {}: in-place changes may occur".format(
+                            type(val)
+                        )
+                    )
+        return rv
 
 
 def fromChimAtom(atom=None, *args, use_scene=False, serial_number=None, atomspec=None, **kwargs):
@@ -142,7 +165,7 @@ class Residue(Geometry):
                 
         return out
     
-    def update_chix(self, chix_residue, refresh_connected=True):
+    def update_chix(self, chix_residue, refresh_connected=True, apply_preset=True):
         """changes chimerax residue to match self"""
         elements = {}
         known_atoms = []
@@ -160,14 +183,14 @@ class Residue(Geometry):
             if not hasattr(atom, "chix_atom") or \
                atom.chix_atom is None or \
                atom.chix_atom.deleted or atom.chix_atom not in chix_residue.atoms:
-                #if not hasattr(atom, "chix_atom"):
-                #    print("no chix atom", atom)
-                #elif atom.chix_atom is None:
-                #    print("no chix atom yet", atom)
-                #elif atom.chix_atom.deleted:
-                #    print("chix_atom deleted", atom)
-                #else:
-                #    print("atoms do not match", atom.chix_atom)
+                # if not hasattr(atom, "chix_atom"):
+                #     print("no chix atom", atom)
+                # elif atom.chix_atom is None:
+                #     print("no chix atom yet", atom)
+                # elif atom.chix_atom.deleted:
+                #     print("chix_atom deleted", atom)
+                # else:
+                #     print("atoms do not match", atom.chix_atom)
                 
                 #print("new chix atom for", atom)
                 
@@ -187,22 +210,22 @@ class Residue(Geometry):
                 chix_residue.add_atom(new_atom)
                 atom.chix_atom = new_atom
                 known_atoms.append(new_atom)
-                new_atoms.append(new_atom)
+                new_atoms.append((atom, new_atom))
 
             else:
                 if atom.chix_atom.element.name != atom.element:
                     atom.chix_atom.element = Element.get_element(atom.element)
-                    new_atoms.append(atom.chix_atom)
+                    new_atoms.append((atom, atom.chix_atom))
 
                 atom.chix_atom.coord = atom.coords
                 known_atoms.append(atom.chix_atom)
-                
+        
         for atom in chix_residue.atoms:
             if atom not in known_atoms:
-                #print("deleting %s" % atom.atomspec)
+                # print("deleting %s" % atom.atomspec)
                 atom.delete()
         
-        for atom in new_atoms:
+        for (at_atom, atom) in new_atoms:
             # print("starting name:", atom.name)
             if (
                     [a.name for a in known_atoms].count(atom.name) == 1 and
@@ -233,6 +256,10 @@ class Residue(Geometry):
                 atom.name = atom_name
             else:
                 atom.name = atom.element.name
+    
+            at_atom.chix_name = atom.name
+            at_atom.atomspec = atom.atomspec
+            at_atom.serial_number = atom.serial_number
 
             # print("final name:", atom.name)
 
@@ -243,12 +270,16 @@ class Residue(Geometry):
             if atom.serial_number == -1:
                 atom.serial_number = atom.structure.atoms.index(atom) + 1
         
-        apply_seqcrow_preset(chix_residue.structure, atoms=new_atoms)
+        if apply_preset:
+            apply_seqcrow_preset(chix_residue.structure, atoms=[atom[1] for atom in new_atoms])
 
     def refresh_chix_connected(self, chix_residue):
         known_bonds = []
         known_chix_bonds = []
-        residue_bonds = [bond for bond in chix_residue.structure.bonds if bond.atoms[0] in chix_residue.atoms and bond.atoms[1] in chix_residue.atoms]
+        residue_bonds = set()
+        for atom in chix_residue.atoms:
+            for bond in atom.bonds:
+                residue_bonds.add(bond)
         
         for i, aaron_atom1 in enumerate(self.atoms):
             atom1 = [atom for atom in chix_residue.atoms if aaron_atom1.chix_atom == atom][0]
@@ -272,7 +303,7 @@ class Residue(Geometry):
                 if atom1 not in atom2.neighbors:
                     new_bond = chix_residue.structure.new_bond(atom1, atom2)
 
-                    if any([aaron_atom.element in TMETAL for aaron_atom in [aaron_atom1, aaron_atom2]]):
+                    if any([aaron_atom.element in METAL for aaron_atom in [aaron_atom1, aaron_atom2]]):
                         pbg = chix_residue.structure.pseudobond_group(chix_residue.structure.PBG_METAL_COORDINATION, create_type='normal') 
                         pbg.new_pseudobond(atom1, atom2)
                         new_bond.delete()
@@ -320,6 +351,7 @@ class Residue(Geometry):
             
         return super().substitute(sub, target, *args, attached_to=attached_to, **kwargs) 
 
+
 class ResidueCollection(Geometry):
     """geometry object used for SEQCROW to easily convert to AaronTools but keep residue info"""
     def __init__(self, molecule, name="new", bonds_matter=True, convert_residues=None, use_scene=False, **kwargs):
@@ -350,12 +382,16 @@ class ResidueCollection(Geometry):
                 
                 all_atoms.extend(new_res.atoms)
             
+            refresh_ranks = bonds_matter
+            if "refresh_ranks" in kwargs:
+                refresh_ranks = kwargs.pop("refresh_ranks")
+            
             super().__init__(
                 all_atoms, 
                 name=molecule.name, 
                 comment=molecule.comment if hasattr(molecule, "comment") else "", 
                 refresh_connected=False, 
-                refresh_ranks=bonds_matter,
+                refresh_ranks=refresh_ranks,
                 **kwargs,
             )
         
@@ -409,6 +445,28 @@ class ResidueCollection(Geometry):
         self.atoms = []
         for res in self.residues:
             self.atoms.extend(res.atoms)
+
+    # def refresh_ranks(self, *args, useful=False, **kwargs):
+    #     if useful:
+    #         super().refresh_ranks(*args, **kwargs)
+
+    def copy(self, atoms=None, name=None, comment=None, copy_atoms=True):
+        """
+        creates a new copy of the geometry
+        parameters:
+            atoms (list): defaults to all atoms
+            name (str): defaults to NAME_copy
+        """
+        if name is None:
+            name = self.name
+        if comment is None:
+            comment = self.comment
+        atoms = self._fix_connectivity(atoms)
+        if hasattr(self, "components") and self.components is not None:
+            self.fix_comment()
+        if copy_atoms:
+            return ResidueCollection([a.copy() for a in atoms], name, comment)
+        return ResidueCollection(atoms, name, comment)
 
     def map_ligand(self, *args, **kwargs):
         """map_ligand, then put new atoms in the residue they are closest to"""
@@ -647,7 +705,26 @@ class ResidueCollection(Geometry):
         out = {'geom missing': geom_missing, 'chix missing': chix_missing}
         return out
     
-    def update_chix(self, atomic_structure, refresh_connected=True):
+    def change_element(self, target, *args, hold_steady=None, **kwargs):
+        target = self.find_exact(target)[0]
+        residue = self.find_residue(target)
+        if hold_steady:
+            hold_steady = self.find(hold_steady)
+
+        if len(residue) != 1:
+            raise RuntimeError("multiple or no residues found containing %s" % str(target))
+        else:
+            residue = residue[0]
+
+        residue.change_element(
+            target,
+            *args,
+            hold_steady=hold_steady,
+            **kwargs,
+        )
+        self._atom_update()
+    
+    def update_chix(self, atomic_structure, refresh_connected=True, apply_preset=True):
         """
         update chimerax atomic structure to match self
         may also change residue numbers for self
@@ -673,7 +750,7 @@ class ResidueCollection(Geometry):
                 res = residue.chix_residue
 
             try:
-                residue.update_chix(res, refresh_connected=False)
+                residue.update_chix(res, refresh_connected=False, apply_preset=apply_preset)
             except RuntimeError:
                 # somtimes I get an error saying the residue has already
                 # been deleted even though I checked if chix_residue.deleted...
@@ -694,6 +771,8 @@ class ResidueCollection(Geometry):
                 if residue in self.convert_residues and not any(residue is res.chix_residue for res in self.residues):
                     residue.delete()
 
+        # if refresh_connected:
+        #     self.refresh_chix_connected(atomic_structure, sanity_check=False)
         self.refresh_chix_connected(atomic_structure, sanity_check=False)
 
     def refresh_chix_connected(self, atomic_structure, sanity_check=True):
@@ -716,6 +795,10 @@ class ResidueCollection(Geometry):
                     known_bonds.append(sorted((aaron_atom1, aaron_atom2,)))
                 else:
                     bond.delete()
+
+        for atom in self.atoms:
+            if not hasattr(atom, "chix_atom"):
+                print(atom, "hasn no chix atom")
 
         for i, aaron_atom1 in enumerate(self.atoms):
             atom1 = [atom for atom in atomic_structure.atoms if aaron_atom1.chix_atom is atom][0]
@@ -740,7 +823,7 @@ class ResidueCollection(Geometry):
                 if atom2 not in atom1.neighbors:
                     new_bond = atomic_structure.new_bond(atom1, atom2)
 
-                    if any([aaron_atom.element in TMETAL for aaron_atom in [aaron_atom1, aaron_atom2]]):
+                    if any([aaron_atom.element in METAL for aaron_atom in [aaron_atom1, aaron_atom2]]):
                         pbg = atomic_structure.pseudobond_group(atomic_structure.PBG_METAL_COORDINATION, create_type='normal') 
                         pbg.new_pseudobond(atom1, atom2)
                         new_bond.delete()
@@ -750,7 +833,7 @@ class ResidueCollection(Geometry):
             warn("coordsets requested, but the file contains one or fewer sets of coordinates")
             coordsets = struc.coordset(1)
         else:
-            coordsets = np.zeros((len(filereader.all_geom), len(self.atoms), 3))
+            coordsets = np.zeros((len(filereader.all_geom) + 1, len(self.atoms), 3))
             for i, all_geom in enumerate(filereader.all_geom):
                 if not all([isinstance(a, Atom) for a in all_geom]):
                     atom_list = [l for l in all_geom if isinstance(l, list) and len(l) == len(self.atoms)][0]
@@ -758,6 +841,9 @@ class ResidueCollection(Geometry):
                     atom_list = all_geom
                 for j, atom in enumerate(atom_list):
                     coordsets[i][j] = atom.coords
+
+            for j, atom in enumerate(filereader.atoms):
+                coordsets[-1, j] = atom.coords
 
         return coordsets                    
     
@@ -809,9 +895,75 @@ class ResidueCollection(Geometry):
                     for i, atom1 in enumerate(self.atoms):
                         for j, atom1 in enumerate(self.atoms[:i]):
                             if changes[i,j] != 0:
-                                sel = _FauxAtomSelection(atoms=(struc.atoms[i], struc.atoms[j]))
+                                sel = _FauxAtomSelection(
+                                    atoms=(struc.atoms[i], struc.atoms[j])
+                                )
                                 tsbond(session, sel)
                     
                     self.update_geometry(cur_coords)
+        
+        if filereader is not None and "Mulliken Charges" in filereader.other:
+            for atom, charge in zip(struc.atoms, filereader.other["Mulliken Charges"]):
+                atom.mullikenCharge = charge
+                atom.charge = charge
+            
+                if not any(attr[0] == "mullikenCharge" for attr in atom.custom_attrs):
+                    atom.register_attr(
+                        session,
+                        "mullikenCharge",
+                        "seqcrow ResidueCollection.get_chimera",
+                        attr_type=float
+                    )
+                if not any(attr[0] == "charge" for attr in atom.custom_attrs):
+                    atom.register_attr(
+                        session,
+                        "charge",
+                        "seqcrow ResidueCollection.get_chimera",
+                        attr_type=float
+                    )
+
+        if filereader is not None and "NPA Charges" in filereader.other:
+            for atom, charge in zip(struc.atoms, filereader.other["NPA Charges"]):
+                atom.npaCharge = charge
+                atom.charge = charge
+            
+                if not any(attr[0] == "npaCharge" for attr in atom.custom_attrs):
+                    atom.register_attr(
+                        session,
+                        "npaCharge",
+                        "seqcrow ResidueCollection.get_chimera",
+                        attr_type=float
+                    )
+                if not any(attr[0] == "charge" for attr in atom.custom_attrs):
+                    atom.register_attr(
+                        session,
+                        "charge",
+                        "seqcrow ResidueCollection.get_chimera",
+                        attr_type=float
+                    )
+
+        if filereader is not None and "Nuclear ZEff" in filereader.other:
+            for atom, zeff in zip(struc.atoms, filereader.other["Nuclear ZEff"]):
+                atom.Zeff = zeff
+            
+                if not any(attr[0] == "Zeff" for attr in atom.custom_attrs):
+                    atom.register_attr(
+                        session,
+                        "Zeff",
+                        "seqcrow ResidueCollection.get_chimera",
+                        attr_type=float
+                    )
+
+        if filereader is not None and "Nuclear spins" in filereader.other:
+            for atom, spin in zip(struc.atoms, filereader.other["Nuclear spins"]):
+                atom.nuclearSpin = spin
+            
+                if not any(attr[0] == "nuclearSpin" for attr in atom.custom_attrs):
+                    atom.register_attr(
+                        session,
+                        "nuclearSpin",
+                        "seqcrow ResidueCollection.get_chimera",
+                        attr_type=int
+                    )
 
         return struc

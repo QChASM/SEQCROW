@@ -38,15 +38,15 @@
 					<a href="#multisub">Making Multiple Derivatives Simultaneously using the "Change Substituents" tool</a>
 				</li>
 				<li>
-					<a href="#residues">Changing Peptide Sidechains using the "Change Substituents" tool</a>
+					<a href="#residues">Changing Peptide Side Chains using the "Change Substituents" tool</a>
 				</li>
 			</ul>
 
 		<h2 id="TNT">Making TNT</h2>
 			<p>
-				In this tutorial, we're going to make 1,3,5-trinitrotoluene starting from benzene using
-				SEQCROW's 'Change Substituents' tool. To begin, click the following command to open a
-				benzene structure from a SMILES string (requires internet access):
+				In this tutorial, we're going to start from benzene and make 1,3,5-trinitrotoluene
+                benzene using SEQCROW's 'Change Substituents' tool. To begin, click the following 
+                command to open a benzene structure from a SMILES string (requires internet access):
 				<br>
 				<a class="cxcmd" href="cxcmd:open smiles:C1=CC=CC=C1">
 					open smiles:C1=CC=CC=C1
@@ -66,13 +66,13 @@
 				</code>
 			</a>
 			<aside>
-				<img src="../images/structureMod_Me.png"  style="width:324px"/>
+				<img src="../images/structureMod_Me.png"  style="width:256px"/>
 			</aside>
 			<p>
-				First, we'll be turning this benzene structure into toluene. Then, we'll add the nitro groups.
-				To make toluene, we need to replace one of the hydrogens with a methyl substituent. In the 
-				'substituent name:' box on the tool window, enter "Me" or "CH3", the names of the methyl 
-				substituent in the AaronTools library.
+				First, we'll be turning this benzene structure into toluene, and then we'll add the 
+                nitro groups. To make toluene, we need to replace one of the hydrogens with a methyl 
+                substituent. In the 'substituent name:' box on the tool window, enter "Me" or "CH3", 
+                the names of the methyl substituent in the AaronTools library.
 			</p>
 			
 			<p>
@@ -86,8 +86,7 @@
 
 			<p>
 				Next, select one of the hydrogens on the benzene structure. This can be done by 
-				<kbd>CTRL</kbd>-clicking (with a non-Mac keyboard) or <kbd>command</kbd>-clicking (on a Mac keyboard)
-				on one of the hydrogens.
+				<kbd>control</kbd>-clicking on one of the hydrogens.
 			</p>
 			<p>
 				Regardless of the following options, you will still have a toluene structure in the end. But, 
@@ -136,10 +135,11 @@
 			<p>
 				Clear the "substituent name" box and enter "NO2" - this is the name of the nitro substituent. 
 				Select the hydrogen atoms that are <i>ortho</i> or <i>para</i> to the methyl group. This is similar to
-				before, but <kbd>CTRL</kbd>- or <kbd>command</kbd>-clicking on atoms will only allow you to select 
-				one atom by default. An easy way to select more atoms is <kbd>CTRL</kbd> + <kbd>shift</kbd> 
-				clicking or <kbd>command</kbd> + <kbd>shift</kbd> clicking on atoms. Press the 
-				<button>substitute current selection</button> again to create 1,3,5-trinitrotoluene.
+				before, but <kbd>control</kbd>-clicking on atoms will only allow you to select 
+				one atom by default. An easy way to select more atoms is <kbd>control</kbd>
+                + <kbd>shift</kbd> clicking on atoms. Press the 
+                <button>substitute current selection</button> again to create
+                1,3,5-trinitrotoluene.
 			</p>
 
 			<p>
@@ -165,7 +165,7 @@
 				case where you don't want to let SEQCROW guess your previous substituent.
 			</p>
 			<aside>
-				<img src="../images/structureMod_OMe.png" style="width:324px"/>
+				<img src="../images/structureMod_OMe.png" style="width:256px"/>
 			</aside>
 			<p>
 				First, open the tool window as described in the previous tutorial. Then, select everything
@@ -205,7 +205,7 @@
 			<p>
 				In this tutorial, we'll be modifying two minima for a Claisen rearrangement using
 				the <a class="cxcmd">substitute</a> command. That is, running <a class="cxcmd">substitute</a>
-				just once to modify two structures. While, we could do this with the tool just as easily,
+				just once to modify two structures. While we could do this with the tool just as easily,
 				we're using the <a class="cxcmd">substitute</a> command out of fairness. An astute reader may
 				have already noticed that the tool runs the <a class="cxcmd">substitute</a> command.
 			</p>
@@ -244,7 +244,7 @@
 			</p>
 			<p>
 				ChimeraX commands and keyword names can be abbreviated as long as the abbreviation uniquely
-				identified the command or keyword. So, the <a class="cxcmd">substitute</a> command 
+				identifies the command or keyword. So, the <a class="cxcmd">substitute</a> command 
 				above can also be written as:
 				<br>
 				<a class="cxcmd" href="cxcmd:sub #1@H4 #2@H7 sub Me">sub #1@H4 #2@H7 sub Me</a>
@@ -257,7 +257,7 @@
 		
 		<h2 id="multisub">Making Multiple Derivatives Simultaneously</h2>
 			<aside>
-				<img src="../images/structureMod_multi.png"  style="width:324px"/>
+				<img src="../images/structureMod_multi.png"  style="width:256px"/>
 			</aside>
 			<p>
 				In this tutorial, we will be returning to the Claisen rearrangement from the previous section.
@@ -275,7 +275,7 @@
 			
 			<p>
 				In the tools, 'substituent name' box, enter "Me,  Et,  iPr,  tBu, OMe, Cl". Substituent names
-				can be seperated by commas like this to request different substitutions. However, 'modify 
+				can be separated by commas like this to request different substitutions. However, 'modify 
 				selected structure' must be unchecked. This will create a new structure for every substitution
 				that was requested.
 			</p>
@@ -286,7 +286,7 @@
 				<a href="cxcmd:tile spacingFactor 2" class="cxcmd">tile spacingFactor 2</a> command to see them all.
 			</p>
 		
-		<h2 id="residues">Changing Peptide Sidechains</h2>
+		<h2 id="residues">Changing Peptide Side Chains</h2>
 			<p>
 				As most amino acid side chains can be thought of as substituents, we can also use the 
 				"Change Substituents" tool to mutate polypeptides. We'll be mutating a tyrosine to a 
@@ -295,16 +295,16 @@
 				<a class="cxcmd" href="cxcmd:open 7LCM">open 7LCM</a>
 			</p>
 			<aside>
-				<img src="../images/structureMod_COCH3.png" style="width:324px"/>
+				<img src="../images/structureMod_COCH3.png" style="width:256px"/>
 			</aside>
 			<p>
-				Now, we'll select the hydroxyl group on the one tyrosine in this structure:
+				Now, we'll select the oxygen on the one tyrosine in this structure:
 				<br>
 				<a class="cxcmd" href="cxcmd:select :TYR@OH">select :TYR@OH</a>
 			</p>
 			<p>
 				Next, enter "COCH3" in the 'substituent name' box. Ensure 'use distance names' is checked.
-				To my knowledge, there is to three letter code for <i>p</i>-acetylphenylalanine, so we
+				To my knowledge, there is no three letter code for <i>p</i>-acetylphenylalanine, so we
 				can change the residue name to "FpAc" or something else. Press <button>substitute current
 				selection</button> to complete the mutation.
 			</p>

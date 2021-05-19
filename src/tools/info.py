@@ -2,11 +2,23 @@ import re
 
 from SEQCROW.widgets import FilereaderComboBox
 
-from PyQt5.QtCore import Qt, QRegularExpression
-from PyQt5.QtGui import QKeySequence, QClipboard
-from PyQt5.QtWidgets import QVBoxLayout, QTableWidget, QTableWidgetItem, \
-                            QTabWidget, QHeaderView, QSizePolicy, QMenuBar, QAction, \
-                            QFileDialog, QApplication, QLineEdit, QLabel
+from Qt.QtCore import Qt, QRegularExpression
+from Qt.QtGui import QKeySequence, QClipboard
+from Qt.QtWidgets import (
+    QVBoxLayout,
+    QTableWidget,
+    QTableWidgetItem,
+    QTabWidget,
+    QHeaderView,
+    QSizePolicy,
+    QMenuBar,
+    QAction,
+    QFileDialog,
+    QApplication,
+    QLineEdit,
+    QLabel,
+    QWidget,
+)
 
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
@@ -14,6 +26,8 @@ from chimerax.core.settings import Settings
 
 from AaronTools.theory import Theory
 from AaronTools.const import UNIT, PHYSICAL
+
+from SEQCROW.tools.normal_modes import FreqTableWidgetItem
 
 
 nrg_infos = [
@@ -89,6 +103,14 @@ class Info(ToolInstance):
         self.file_selector.currentIndexChanged.connect(self.fill_table)
         layout.insertWidget(0, self.file_selector, 0)
         
+        tabs = QTabWidget()
+        self.tabs = tabs
+        layout.insertWidget(1, self.tabs, 1)
+        
+        general_info = QWidget()
+        general_layout = QVBoxLayout(general_info)
+        tabs.addTab(general_info, "general")
+        
         self.table = QTableWidget()
         self.table.setColumnCount(2)
         self.table.setHorizontalHeaderLabels(['Data', 'Value'])
@@ -97,13 +119,117 @@ class Info(ToolInstance):
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
-        layout.insertWidget(1, self.table, 1)
+        general_layout.insertWidget(1, self.table, 1)
         
         self.filter = QLineEdit()
         self.filter.setPlaceholderText("filter data")
         self.filter.textChanged.connect(self.apply_filter)
         self.filter.setClearButtonEnabled(True)
-        layout.insertWidget(2, self.filter, 0)
+        general_layout.insertWidget(2, self.filter, 0)
+        
+        freq_info = QWidget()
+        freq_layout = QVBoxLayout(freq_info)
+        tabs.addTab(freq_info, "harmonic frequencies")
+        
+        self.freq_table = QTableWidget()
+        self.freq_table.setColumnCount(4)
+        self.freq_table.setHorizontalHeaderLabels(
+            [
+                "Frequency (cm\u207b\u00b9)",
+                "symmetry",
+                "IR intensity",
+                "force constant (mDyne/\u212B)",
+            ]
+        )
+        self.freq_table.setSortingEnabled(True)
+        self.freq_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        for i in range(0, 4):
+            self.freq_table.resizeColumnToContents(i)
+        
+        self.freq_table.horizontalHeader().setStretchLastSection(False)            
+        self.freq_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        self.freq_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)        
+        self.freq_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)        
+        self.freq_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)        
+        
+        self.freq_table.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
+        freq_layout.insertWidget(1, self.freq_table, 1)        
+
+        anharm_info = QWidget()
+        anharm_layout = QVBoxLayout(anharm_info)
+        tabs.addTab(anharm_info, "anharmonic frequencies")
+        
+        anharm_layout.insertWidget(0, QLabel("fundamentals:"), 0)
+        
+        self.fundamental_table = QTableWidget()
+        self.fundamental_table.setColumnCount(3)
+        self.fundamental_table.setHorizontalHeaderLabels(
+            [
+                "Fundamental (cm\u207b\u00b9)",
+                "Δ\u2090\u2099\u2095 (cm\u207b\u00b9)",
+                "IR intensity",
+            ]
+        )
+        self.fundamental_table.setSortingEnabled(True)
+        self.fundamental_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        for i in range(0, 3):
+            self.fundamental_table.resizeColumnToContents(i)
+        
+        self.fundamental_table.horizontalHeader().setStretchLastSection(False)            
+        self.fundamental_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        self.fundamental_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)        
+        self.fundamental_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)        
+        
+        self.fundamental_table.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
+        anharm_layout.insertWidget(1, self.fundamental_table, 1)
+
+        # self.overtone_table = QTableWidget()
+        # self.overtone_table.setColumnCount(3)
+        # self.overtone_table.setHorizontalHeaderLabels(
+        #     [
+        #         "Fundamental (cm\u207b\u00b9)",
+        #         "Overtone (cm\u207b\u00b9)",
+        #         "IR intensity",
+        #     ]
+        # )
+        # self.overtone_table.setSortingEnabled(True)
+        # self.overtone_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        # for i in range(0, 3):
+        #     self.overtone_table.resizeColumnToContents(i)
+        # 
+        # self.overtone_table.horizontalHeader().setStretchLastSection(False)            
+        # self.overtone_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        # self.overtone_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)        
+        # self.overtone_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)        
+        # 
+        # self.overtone_table.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
+        # anharm_layout.insertWidget(2, self.overtone_table, 1)
+        
+        anharm_layout.insertWidget(2, QLabel("combinations and overtones:"), 0)
+
+        self.combo_table = QTableWidget()
+        self.combo_table.setColumnCount(4)
+        self.combo_table.setHorizontalHeaderLabels(
+            [
+                "Fundamental (cm\u207b\u00b9)",
+                "Fundamental (cm\u207b\u00b9)",
+                "Combination (cm\u207b\u00b9)",
+                "IR intensity",
+            ]
+        )
+        self.combo_table.setSortingEnabled(True)
+        self.combo_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        for i in range(0, 3):
+            self.combo_table.resizeColumnToContents(i)
+        
+        self.combo_table.horizontalHeader().setStretchLastSection(False)            
+        self.combo_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        self.combo_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)        
+        self.combo_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)        
+        self.combo_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)        
+        
+        self.combo_table.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
+        anharm_layout.insertWidget(3, self.combo_table, 1)
         
         menu = QMenuBar()
         
@@ -249,26 +375,97 @@ class Info(ToolInstance):
             delim = "\t"
         elif self.settings.delimiter == "semicolon":
             delim = ";"
+
+        if self.tabs.currentIndex() == 0:
+            if self.settings.include_header:
+                s = delim.join(["Data", "Value"])
+                s += "\n"
+            else:
+                s = ""
             
-        if self.settings.include_header:
-            s = delim.join(["Data", "Value"])
-            s += "\n"
-        else:
-            s = ""
-        
-        for i in range(0, self.table.rowCount()):
-            if self.table.isRowHidden(i):
-                continue
-            s += delim.join(
-                [
-                    item.text().replace("<sub>", "").replace("</sub>", "") for item in [
-                        self.table.item(i, j) if self.table.item(i, j) is not None 
-                        else self.table.cellWidget(i, j) for j in range(0, 2)
+            for i in range(0, self.table.rowCount()):
+                if self.table.isRowHidden(i):
+                    continue
+                s += delim.join(
+                    [
+                        item.text().replace("<sub>", "").replace("</sub>", "") for item in [
+                            self.table.item(i, j) if self.table.item(i, j) is not None 
+                            else self.table.cellWidget(i, j) for j in range(0, 2)
+                        ]
                     ]
-                ]
-            )
-            s += "\n"
+                )
+                s += "\n"
         
+        elif self.tabs.currentIndex() == 1:
+            if self.settings.include_header:
+                s = delim.join(
+                    ["Frequency (cm\u207b\u00b9)", "symmetry", "IR intensity", "force constant"]
+                )
+                s += "\n"
+            else:
+                s = ""
+            
+            for i in range(0, self.freq_table.rowCount()):
+                if self.freq_table.isRowHidden(i):
+                    continue
+                s += delim.join(
+                    [
+                        item.text().replace("<sub>", "").replace("</sub>", "") for item in [
+                            self.freq_table.item(i, j) if self.freq_table.item(i, j) is not None 
+                            else self.freq_table.cellWidget(i, j) for j in range(0, 4)
+                        ]
+                    ]
+                )
+                s += "\n"
+        
+        else:
+            if self.settings.include_header:
+                s = delim.join(
+                    ["Fundamental (cm\u207b\u00b9)", "Δanh", "IR intensity"]
+                )
+                s += "\n"
+            else:
+                s = ""
+            
+            for i in range(0, self.fundamental_table.rowCount()):
+                if self.fundamental_table.isRowHidden(i):
+                    continue
+                s += delim.join(
+                    [
+                        item.text().replace("<sub>", "").replace("</sub>", "") for item in [
+                            self.fundamental_table.item(i, j) if self.fundamental_table.item(i, j) is not None 
+                            else self.fundamental_table.cellWidget(i, j) for j in range(0, 3)
+                        ]
+                    ]
+                )
+                s += "\n"
+            
+            if self.settings.include_header:
+                s += delim.join(
+                    [
+                        "Fundamental (cm\u207b\u00b9)",
+                        "Fundamental (cm\u207b\u00b9)",
+                        "Combination (cm\u207b\u00b9)",
+                        "IR intensity"
+                    ]
+                )
+                s += "\n"
+            else:
+                s += "\n"
+            
+            for i in range(0, self.combo_table.rowCount()):
+                if self.combo_table.isRowHidden(i):
+                    continue
+                s += delim.join(
+                    [
+                        item.text().replace("<sub>", "").replace("</sub>", "") for item in [
+                            self.combo_table.item(i, j) if self.combo_table.item(i, j) is not None 
+                            else self.combo_table.cellWidget(i, j) for j in range(0, 4)
+                        ]
+                    ]
+                )
+                s += "\n"
+
         return s
     
     def copy_csv(self):
@@ -291,6 +488,10 @@ class Info(ToolInstance):
     
     def fill_table(self, ndx):
         self.table.setRowCount(0)
+        self.freq_table.setRowCount(0)
+        self.fundamental_table.setRowCount(0)
+        # self.overtone_table.setRowCount(0)
+        self.combo_table.setRowCount(0)
         
         if ndx < 0:
             return
@@ -421,8 +622,8 @@ class Info(ToolInstance):
                 item = QTableWidgetItem()
                 info_name = info.replace("_", " ")
                 vals = fr.other[info]
-                if info == "rotational_temperature":
-                    info_name = "rotational constants (%s)" % self.settings.rot_const
+                if "rotational_temperature" in info:
+                    info_name = info_name.replace("temperature", "constants (%s)" % self.settings.rot_const)
                     if self.settings.rot_const == "GHz":
                         vals = [x * PHYSICAL.KB / (PHYSICAL.PLANCK * (10 ** 9)) for x in vals]
                 
@@ -433,11 +634,157 @@ class Info(ToolInstance):
                 value.setData(Qt.DisplayRole, ", ".join(["%.4f" % x for x in vals]))
                 self.table.setItem(row, 1, value)
 
+
+        if "frequency" in fr.other:
+            self.tabs.setTabEnabled(1, True)
+            freq_data = fr.other['frequency'].data
             
+            for i, mode in enumerate(freq_data):
+                row = self.freq_table.rowCount()
+                self.freq_table.insertRow(row)
                 
+                freq = FreqTableWidgetItem()
+                freq.setData(
+                    Qt.DisplayRole,
+                    "%.2f%s" % (abs(mode.frequency), "i" if mode.frequency < 0 else "")
+                )
+                freq.setData(Qt.UserRole, i)
+                self.freq_table.setItem(row, 0, freq)
+                
+                if mode.symmetry:
+                    text = mode.symmetry
+                    if re.search("\d", text):
+                        text = re.sub(r"(\d+)", r"<sub>\1</sub>", text)
+                    if text.startswith("SG"):
+                        text = "Σ" + text[2:]
+                    elif text.startswith("PI"):
+                        text = "Π" + text[2:]
+                    elif text.startswith("DLT"):
+                        text = "Δ" + text[3:]
+                    if any(text.endswith(char) for char in "vhdugVHDUG"):
+                        text = text[:-1] + "<sub>" + text[-1].lower() + "</sub>"
+    
+                    label = QLabel(text)
+                    label.setAlignment(Qt.AlignCenter)
+                    self.freq_table.setCellWidget(row, 1, label)
+    
+                intensity = QTableWidgetItem()
+                if mode.intensity is not None:
+                    intensity.setData(Qt.DisplayRole, round(mode.intensity, 2))
+                self.freq_table.setItem(row, 2, intensity)
+    
+                forcek = QTableWidgetItem()
+                if mode.forcek is not None:
+                    forcek.setData(Qt.DisplayRole, round(mode.forcek, 2))
+                self.freq_table.setItem(row, 3, forcek)
+
+            if fr.other["frequency"].anharm_data:
+                freq = fr.other["frequency"]
+                self.tabs.setTabEnabled(2, True)
+                anharm_data = sorted(
+                    freq.anharm_data,
+                    key=lambda x: x.harmonic_frequency,
+                )
+                
+                for i, mode in enumerate(anharm_data):
+                    row = self.fundamental_table.rowCount()
+                    self.fundamental_table.insertRow(row)
+                    
+                    fund = FreqTableWidgetItem()
+                    fund.setData(
+                        Qt.DisplayRole,
+                        "%.2f%s" % (abs(mode.frequency), "i" if mode.frequency < 0 else "")
+                    )
+                    fund.setData(Qt.UserRole, i)
+                    self.fundamental_table.setItem(row, 0, fund)
+                
+                    delta_anh = QTableWidgetItem()
+                    delta_anh.setData(Qt.DisplayRole, round(mode.delta_anh, 2))
+                    self.fundamental_table.setItem(row, 1, delta_anh)
+                
+                    intensity = QTableWidgetItem()
+                    if mode.intensity is not None:
+                        intensity.setData(Qt.DisplayRole, round(mode.intensity, 2))
+                    self.fundamental_table.setItem(row, 2, intensity)
+                    
+                    for overtone in mode.overtones:
+                        row = self.combo_table.rowCount()
+                        self.combo_table.insertRow(row)
+                        
+                        fund = FreqTableWidgetItem()
+                        fund.setData(
+                            Qt.DisplayRole,
+                            "%.2f%s" % (abs(mode.frequency), "i" if mode.frequency < 0 else "")
+                        )
+                        fund.setData(Qt.UserRole, i)
+                        self.combo_table.setItem(row, 0, fund)
+
+                        fund = FreqTableWidgetItem()
+                        fund.setData(Qt.UserRole, i)
+                        self.combo_table.setItem(row, 1, fund)
+
+                        ot = FreqTableWidgetItem()
+                        ot.setData(
+                            Qt.DisplayRole,
+                            "%.2f%s" % (abs(overtone.frequency), "i" if overtone.frequency < 0 else "")
+                        )
+                        ot.setData(Qt.UserRole, i)
+                        self.combo_table.setItem(row, 2, ot)
+ 
+                        intensity = QTableWidgetItem()
+                        if overtone.intensity is not None:
+                            intensity.setData(Qt.DisplayRole, round(overtone.intensity, 2))
+                        self.combo_table.setItem(row, 3, intensity)
+
+                    for key in mode.combinations:
+                        for combination in mode.combinations[key]:
+                            row = self.combo_table.rowCount()
+                            self.combo_table.insertRow(row)
+                            
+                            fund = FreqTableWidgetItem()
+                            fund.setData(
+                                Qt.DisplayRole,
+                                "%.2f%s" % (abs(mode.frequency), "i" if mode.frequency < 0 else "")
+                            )
+                            fund.setData(Qt.UserRole, i)
+                            self.combo_table.setItem(row, 0, fund)
+
+                            other_freq = freq.anharm_data[key].frequency
+                            fund = FreqTableWidgetItem()
+                            fund.setData(
+                                Qt.DisplayRole,
+                                "%.2f%s" % (abs(other_freq), "i" if other_freq < 0 else "")
+                            )
+                            fund.setData(Qt.UserRole, i + len(freq.anharm_data) * key)
+                            self.combo_table.setItem(row, 1, fund)
+                            
+                
+                            combo = FreqTableWidgetItem()
+                            combo.setData(
+                                Qt.DisplayRole,
+                                "%.2f%s" % (abs(combination.frequency), "i" if combination.frequency < 0 else "")
+                            )
+                            combo.setData(Qt.UserRole, i)
+                            self.combo_table.setItem(row, 2, combo)
+                        
+                            intensity = QTableWidgetItem()
+                            if combination.intensity is not None:
+                                intensity.setData(Qt.DisplayRole, round(combination.intensity, 2))
+                            self.combo_table.setItem(row, 3, intensity)
+
+            else:
+                self.tabs.setTabEnabled(2, False)
+
+        else:
+            self.tabs.setTabEnabled(1, False)
+            self.tabs.setTabEnabled(2, False)
 
         self.table.resizeColumnToContents(0)
         self.table.resizeColumnToContents(1)
+
+        self.freq_table.resizeColumnToContents(0)
+        self.freq_table.resizeColumnToContents(1)
+        self.freq_table.resizeColumnToContents(2)
         
         self.apply_filter()
     

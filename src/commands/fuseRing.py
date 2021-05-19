@@ -30,6 +30,7 @@ fuseRing_description = CmdDesc(
         ("available", NoArg),
     ],
     synopsis="fuse a ring",
+    url="https://github.com/QChASM/SEQCROW/wiki/Commands#fuseRing",
 )
 
 def minimal_ring_convert(atomic_structure, atom1, atom2, avoid=None):

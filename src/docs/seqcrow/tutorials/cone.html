@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+
+    <head>
+        <meta charset="UTF-8">
+        <title>Buried Volume</title>
+        <meta http-equiv="Content-Type" content="text/html">
+        <link rel="icon" href="../images/SEQCROW.png" type="image/png">
+        <link rel="stylesheet" href="../style.css">
+    </head>
+    
+    <div class="head">
+        <object data="../ribbon.html" class="head"></object>
+    </div>
+    
+    <body>
+        <h1>Cone Angles</h1>
+            <p>
+                Cone angles are one of the more iconic measurements for the size
+                of ligands. Two methods for calculating cone angles can be employed:
+                Tolman's cone angle for unsymmetric ligands
+                <sup><a href="#Ref">1</a></sup>
+                and exact cone angles<sup><a href="#Ref">2</a></sup>.
+                The latter can only be used on mono- or bidentate ligands.
+            </p>
+            <p>
+                Tolman cone angles essentially measure the size of the different
+                groups on the ligand's coordinating atoms, with some dependence on
+                the L-M-L angle for bidentate ligands. Tolman built upscaled models 
+                of ligands, and used those to determine cone angles. Modern
+                computational methods allow us to use ligand structures that have
+                been optimized with DFT or other methods. This alleviates some concerns
+                about the empirical parameters Tolman originally used.
+                Of course, cone angles calculated from DFT-optimized structures are
+                not always comparable to ones calculated using physical model kits
+                or the original empirical constraints.
+            </p>
+            <p>
+                Exact cone angles use rigorous trigonometry to determine the smallest
+                cone that can enclose the ligand with the apex at the metal center.
+                This minimum enclosing cone depends on at most three of the ligand's
+                atoms. Exact cone angles have remained relatively neglected, possibly
+                due to challenges in implementing the method or executing the
+                original code. While neither of these should concern the reader,
+                exact cone angles have not proven to be as useful as a steric
+                parameter for correlating with reactivity.
+            </p>
+            <p>
+                In this tutorial, you'll see how to calculate Tolman and exact cone
+                angles for ligands. The process is similar to both, so the process
+                will only be described once.
+            </p>
+
+        <h2>Cone Angles for a BINAP ligand</h2>
+            <p>
+                We'll calculate the cone angles for a BINAP ligand. To begin,
+                open the structure using the command below:
+                <br>
+                <a class="cxcmd" href="cxcmd:open https://raw.githubusercontent.com/QChASM/AaronTools.py/master/test/test_files/catalysts/tm_multi-lig.xyz">
+                open https://raw.githubusercontent.com/QChASM/AaronTools.py/master/test/test_files/catalysts/tm_multi-lig.xyz
+                </a>
+            </p>
+            <p>
+                Now, open the cone angle tool:
+                <br>
+                <span class="menulike">Tools &rarr; Structure Analysis &rarr; Cone Angle</span>
+                <br>
+                or run the command:
+                <br>
+                <a class="cxcmd" href="cxcmd:ui tool show &quot;Cone Angle&quot;">
+                ui tool show "Cone Angle"
+                </a>
+            </p>
+            <aside>
+                <img src="../images/binap.jpg" width=256px/>
+                <br>
+                Exact cone angle and radii for ligand atoms
+            </aside>
+            <p>
+                This tool has several options. The first is the method for calculating
+                the cone angle. These methods are described above. You can also choose
+                which set of VDW radii to use. This choice doesn't matter as much,
+                though UMN covers more of the periodic table. You can also visualize
+                the results. For Tolman cone angles, there will be one cone for 
+                every group on the coordinating atoms. For exact cone angles, there
+                will be only one cone. The radii of the ligand atoms can be displayed.
+            </p>
+            <p>
+                Select the diphosphine ligand. An easy way to do this is to use the
+                "Select Fragment" mouse mode, which can be activated from the 
+                "More Right Mouse" tab the the ChimeraX toolbar. You can also
+                run the following command:
+                <br>
+                <a class="cxcmd" href="cxcmd:select P;select connected">
+                select P;select connected"
+                </a>
+            </p>
+            <p>
+                On the tool window, press <button>set ligand to current selection</button>.
+                Next, select the ruthenium atom and press <button>calculate cone angle
+                for selected center</button>. After a moment, the cone angle
+                should appear in the table in the bottom part of the tool window.
+                If you used UMN radii for the exact cone angle, you should 
+                get a value of 233.4°. The Tolman cone angle is 277.4°.
+            </p>
+            
+
+        <h2 id="Ref">References</h2>
+        <ol>
+            <li>
+                <a href="https://doi.org/10.1021/ja00808a009">
+                    C. A. Tolman, W. C. Seidel, and L. W. Gosser
+                    Journal of the American Chemical Society 1974 96 (1), 53-60 
+                </a>
+            </li>
+            <li>
+                <a href="https://doi.org/10.1002/jcc.23217">
+                    Bilbrey, J.A., Kazez, A.H., Locklin, J. and Allen, W.D. (2013),
+                    Exact ligand cone angles. J. Comput. Chem., 34: 1189-1197.
+                </a>
+            </li>
+        </ol>
+    </body>
+</html>

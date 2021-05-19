@@ -26,6 +26,7 @@ from SEQCROW.commands.substitute import guessAttachmentTargets
 from SEQCROW.finders import AtomSpec
 from SEQCROW.widgets import PeriodicTable, ModelComboBox
 from SEQCROW.managers.filereader_manager import apply_seqcrow_preset
+from SEQCROW.utils import contrast_bw
 
 
 class _EditStructureSettings(Settings):
@@ -43,8 +44,8 @@ class _EditStructureSettings(Settings):
 class EditStructure(ToolInstance):
 
     help = "https://github.com/QChASM/SEQCROW/wiki/Structure-Modification-Tool"
-    SESSION_ENDURING = True
-    SESSION_SAVE = True
+    SESSION_ENDURING = False
+    SESSION_SAVE = False
 
     def __init__(self, session, name):       
         super().__init__(session, name)
@@ -253,11 +254,7 @@ class EditStructure(ToolInstance):
         ele_color = tuple(list(element_color(ELEMENTS.index("C")))[:-1])
         self.element.setStyleSheet(
             "QPushButton { background: rgb(%i, %i, %i); color: %s; font-weight: bold; }" % (
-                *ele_color,
-                'white' if sum(
-                    int(x < 130) - int(x > 225) for x in ele_color
-                ) - int(ele_color[1] > 225) +
-                int(ele_color[2] > 200) >= 2 else 'black'
+                *ele_color, contrast_bw(ele_color)
             )
         )
         self.element.clicked.connect(self.open_ptable)
@@ -825,11 +822,7 @@ class PTable(ChildToolWindow):
             ele_color = tuple(list(element_color(ELEMENTS.index(element)))[:-1])
             self.button.setStyleSheet(
                 "QPushButton { background: rgb(%i, %i, %i); color: %s; font-weight: bold; }" % (
-                    *ele_color,
-                    'white' if sum(
-                        int(x < 130) - int(x > 225) for x in ele_color
-                    ) - int(ele_color[1] > 225) +
-                    int(ele_color[2] > 200) >= 2 else 'black'
+                    *ele_color, contrast_bw(ele_color)
                 )
             )
 

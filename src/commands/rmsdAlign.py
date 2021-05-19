@@ -5,11 +5,19 @@ from chimerax.core.commands import BoolArg, ModelsArg, ModelArg, CmdDesc
 
 from SEQCROW.residue_collection import ResidueCollection
 
-rmsdAlign_description = CmdDesc(required=[("models", ModelsArg)], \
-                                keyword=[("reference", ModelArg), ("sort", BoolArg), ("align", BoolArg), ("heavyOnly", BoolArg)], \
-                                required_arguments=['reference'], synopsis=\
-                                "calculate the RMSD between the reference model and other models, " + \
-                                "with or without sorting the atoms or aligning the structures")
+rmsdAlign_description = CmdDesc(
+    required=[("models", ModelsArg)],
+    keyword=[
+        ("reference", ModelArg),
+        ("sort", BoolArg),
+        ("align", BoolArg),
+        ("heavyOnly", BoolArg),
+    ],
+    required_arguments=['reference'],
+    synopsis="calculate the RMSD between the reference model and other models, " +
+    "with or without sorting the atoms or aligning the structures",
+    url="https://github.com/QChASM/SEQCROW/wiki/Commands#rmsdalign",
+)
 
 def rmsdAlign(session, models, reference, align=True, sort=False, heavyOnly=False):   
     ref = ResidueCollection(reference)

@@ -566,8 +566,9 @@ def vbur_vis(
         sphere = np.array(sphere)
     
     n_sphere = len(sphere)
-    sphere = np.concatenate((sphere, np.array(center_added_points)))
-    
+    if center_added_points:
+        sphere = np.concatenate((sphere, np.array(center_added_points)))
+
     center_hull = ConvexHull(sphere / radius)
     sphere += center_coords
     tri = center_hull.simplices
@@ -615,8 +616,10 @@ def vbur_vis(
         for j, v in enumerate(ti):
             new_t[i][j] = new_ndx[v]
 
-    sphere = np.array(sphere)
-    norms = (sphere - center_coords) / radius
+    norms = []
+    if sphere:
+        sphere = np.array(sphere)
+        norms = (sphere - center_coords) / radius
     
     triangles.extend(new_t + len(vertices))
     vertices.extend(sphere)

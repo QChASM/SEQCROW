@@ -99,8 +99,8 @@ class BuildQM(ToolInstance):
     additional options - generic (and uncurated) options
     """
 
-    SESSION_ENDURING = True
-    SESSION_SAVE = True
+    SESSION_ENDURING = False
+    SESSION_SAVE = False
 
     help = "https://github.com/QChASM/SEQCROW/wiki/Build-QM-Input-Tool"
 
@@ -206,6 +206,8 @@ class BuildQM(ToolInstance):
         self.model_selector.currentIndexChanged.connect(self.change_model)
 
         layout.addWidget(tabs, 1, 0)
+        self.tabs = tabs
+        self.tabs.setTabEnabled(2, init_form.basis_sets is not None)
 
         #menu stuff
         menu = QMenuBar()
@@ -836,7 +838,11 @@ class BuildQM(ToolInstance):
         file_info = self.session.seqcrow_qm_input_manager.get_info(program)
         self.settings.last_program = program
         self.method_widget.setOptions(file_info)
-        self.basis_widget.setOptions(file_info)
+        if file_info.basis_sets is None:
+            self.tabs.setTabEnabled(2, False)
+        else:
+            self.tabs.setTabEnabled(2, True)
+            self.basis_widget.setOptions(file_info)
         self.job_widget.setOptions(file_info)
         self.other_keywords_widget.setOptions(file_info)
 
@@ -851,10 +857,16 @@ class BuildQM(ToolInstance):
     def update_theory(self, update_settings=False):
         """grabs the current settings and updates self.theory
         always called before creating an input file"""
+        program = self.file_type.currentText()
+        file_info = self.session.seqcrow_qm_input_manager.get_info(program)
+
         rescol = ResidueCollection(self.model_selector.currentData(), bonds_matter=False)
 
         meth = self.method_widget.getMethod(update_settings)
-        basis = self.get_basis_set(update_settings)
+        if file_info.basis_sets is not None:
+            basis = self.get_basis_set(update_settings)
+        else:
+            basis = None
 
         dispersion = self.method_widget.getDispersion(update_settings)
 
@@ -966,6 +978,26 @@ class BuildQM(ToolInstance):
         """run job"""
         self.update_theory(update_settings=True)
 
+        # need to convert constraints to atoms so they can be encoded by the 
+        # job manager
+        for job in self.theory.job_type:
+            if isinstance(job, OptimizationJob):
+                if job.constraints:
+                    for key in job.constraints:
+                        if key == "atoms":
+                            if not job.constraints["atoms"]:
+                                continue
+                            job.constraints["atoms"] = [
+                                "%i" % (self.theory.geometry.atoms.index(atom) + 1)
+                                for atom in self.theory.geometry.find(job.constraints["atoms"])
+                            ]
+                        else:
+                            for i, con in enumerate(job.constraints[key]):
+                                job.constraints[key][i] = [
+                                    "%i" % (self.theory.geometry.atoms.index(atom) + 1)
+                                    for atom in self.theory.geometry.find(con)
+                                ]
+
         kw_dict = self.job_widget.getKWDict(update_settings=True)
         other_kw_dict = self.other_keywords_widget.getKWDict(update_settings=True)
         self.settings.save()
@@ -1021,7 +1053,7 @@ class BuildQM(ToolInstance):
         program = self.file_type.currentText()
         info = self.session.seqcrow_qm_input_manager.get_info(program)
         self.settings.last_program = program
-        filename, _ = QFileDialog.getSaveFileName(filter=info.save_file_filer)
+        filename, _ = QFileDialog.getSaveFileName(filter=info.save_file_filter)
 
         if not filename:
             return
@@ -1424,10 +1456,10 @@ class JobTypeOption(QWidget):
     def tab_dble_click(self, ndx):
         """toggle job type when optimization or frequency tab is clicked
         this is done so that the job type can be changed when the top half has been collapsed"""
-        if ndx == 1:
+        if ndx == 1 and self.form.optimization:
             self.do_geom_opt.setChecked(not self.do_geom_opt.checkState() == Qt.Checked)
 
-        elif ndx == 2:
+        elif ndx == 2 and self.form.frequency:
             self.do_freq.setChecked(not self.do_freq.checkState() == Qt.Checked)
 
     def open_chk_save(self):
@@ -1481,6 +1513,21 @@ class JobTypeOption(QWidget):
         self.solvent_option.clear()
         self.solvent_names.clear()
         self.solvent_option.addItems(["None"])
+        self.nprocs.setEnabled(file_info.parallel)
+        self.mem.setEnabled(file_info.memory)
+        if not file_info.frequency:
+            self.do_freq.setCheckState(Qt.Unchecked)
+        self.do_freq.setEnabled(file_info.frequency)
+        if not file_info.optimization:
+            self.do_geom_opt.setCheckState(Qt.Unchecked)
+        self.do_geom_opt.setEnabled(file_info.optimization)
+        if not file_info.ts_optimization:
+            self.ts_opt.setCheckState(Qt.Unchecked)
+        self.ts_opt.setEnabled(file_info.ts_optimization)
+        if not file_info.const_optimization:
+            self.use_contraints.setCheckState(Qt.Unchecked)
+        self.use_contraints.setEnabled(file_info.const_optimization)
+        
         if file_info.solvent_models is not None:
             self.solvent_option.addItems(file_info.solvent_models)
         self.hpmodes.setEnabled(file_info.hpmodes_available)
@@ -2957,6 +3004,10 @@ class BasisOption(QWidget):
         basis.elements = []
         aux = self.aux_type.currentText()
         self.basis_option.clear()
+
+        if getattr(file_info, self.info_attribute) is None:
+            self.blockSignals(False)
+            return
 
         self.basis_option.addItems(getattr(file_info, self.info_attribute))
         self.basis_option.addItem("other")
@@ -5001,7 +5052,7 @@ class WarningPreview(ChildToolWindow):
         if warnings_list:
             self.preview.setText("\n---------\n".join(warnings_list))
         else:
-            self.preview.setText("looks fine")
+            self.preview.setText("it's probably fine")
 
     def cleanup(self):
         self.tool_instance.warning_window = None

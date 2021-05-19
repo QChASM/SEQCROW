@@ -19,8 +19,10 @@ sterimol_description = CmdDesc(
         ("radii", EnumOf(["UMN", "Bondi"], case_sensitive=False)),
         ("showVectors", BoolArg),
         ("showRadii", BoolArg), 
+        ("oldL", BoolArg), 
     ],
-    synopsis="calculate Sterimol B1, B5, and L"
+    synopsis="calculate Sterimol B1-B5, and L",
+    url="https://github.com/QChASM/SEQCROW/wiki/Commands#sterimol",
 )
 
 def sterimol(
@@ -29,6 +31,7 @@ def sterimol(
         radii="UMN",
         showVectors=True,
         showRadii=True,
+        oldL=False,
         return_values=False
     ):
     models, attached = avoidTargets(session.logger, selection)
@@ -59,12 +62,17 @@ def sterimol(
                 start_atomspec = AtomSpec(target.atomspec)
                 
                 sub_atoms = rescol.get_fragment(start_atomspec, end_atomspec)
-                sub = Substituent(sub_atoms, 
-                                  end=rescol.find_exact(end_atomspec)[0], 
-                                  detect=False,
-                      )
+                sub = Substituent(
+                    sub_atoms, 
+                    end=rescol.find_exact(end_atomspec)[0], 
+                    detect=False,
+                )
                 
-                data = sub.sterimol(return_vector=True, radii=radii)
+                data = sub.sterimol(
+                    return_vector=True,
+                    radii=radii,
+                    old_L=oldL,
+                )
                 l = np.linalg.norm(data["L"][1] - data["L"][0])
                 b1 = np.linalg.norm(data["B1"][1] - data["B1"][0])
                 b2 = np.linalg.norm(data["B2"][1] - data["B2"][0])

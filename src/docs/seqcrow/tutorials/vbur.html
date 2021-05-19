@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+
+    <head>
+        <meta charset="UTF-8">
+        <title>Buried Volume</title>
+        <meta http-equiv="Content-Type" content="text/html">
+        <link rel="icon" href="../images/SEQCROW.png" type="image/png">
+        <link rel="stylesheet" href="../style.css">
+    </head>
+    
+    <div class="head">
+        <object data="../ribbon.html" class="head"></object>
+    </div>
+    
+    <body>
+        <h1>Buried Volume</h1>
+            <p>
+                Buried volume has proven to be a useful parameter for gauging steric
+                bulk of a ligand around a catalyst center (see <a href="https://doi.org/10.1021/om034016k">
+                https://doi.org/10.1021/om034016k</a>). The percent buried volume, or
+                %V<sub>bur</sub>, is the percentage of the volume around a catalyst center
+                that is taken up by the ligand atoms. Unlike cone angles, this parameter
+                focuces on steric bulk up close to the center, whereas cone angles can be set
+                by atoms that are far from the substrate. Here, you will see how to calculate
+                and visualize buried volume using SEQCROW.
+            </p>
+        
+
+        <h2>Buried Volume of an N-Heterocyclic Carbene Ligand</h2>
+            <p>
+                In this tutorial, we'll measure the %V<sub>bur</sub> of 
+                1,3-bis(2,6-diisopropylphenyl)imidazol-2-ylidene (IPr) on a metal
+                center. Click the command below    to open a structure of an
+                Ru(II) complex with an IPr ligand:
+                <br>
+                <a class="cxcmd" href="cxcmd:open https://raw.githubusercontent.com/QChASM/SEQCROW/images_for_wiki/strux/Ru_Cp-star_IPr_Cl_10.1021.om034016k.xyz">open https://raw.githubusercontent.com/QChASM/SEQCROW/images_for_wiki/strux/Ru_Cp-star_IPr_Cl_10.1021.om034016k.xyz
+                </a>
+                <br>
+                This structure is from the article mentioned above.
+            </p>
+            <h3>Setting the Settings</h3>
+                <p>
+                    Now, open the buried volume tool (<span class=menulike>
+                    Tools &rarr; Structure Analysis &rarr; Buried Volume</span> or
+                    run the command
+                    <a class="cxcmd" href="cxcmd:ui tool show &quot;Buried Volume&quot;">
+                    ui tool show "Buried Volume"</a>).
+                </p>
+                <p>
+                    The tool offers a few options we can tweak. The first is the VDW radii to
+                    use. There's not much of a difference between the "UMN" and "Bondi" radii,
+                    other than the "UMN" radii cover more of the periodic table.
+                    There's also the option to scale the VDW radii to account for 
+                    Real Molecules not being totally static, like this structure.
+                </p>
+                <aside>
+                    <img src="../images/Vbur_IPr.jpg" width=256px/>
+                </aside>
+                <p>
+                    The next thing we can do is specify the atoms to include in the buried 
+                    volume calculation by selecting them. 
+                    To calculate the buried volume of this ligand, we need to select the entire
+                    ligand and click the <button>set ligands to current selection</button>
+                    on the tool window. For this particular structure, a concise way to select
+                    the ligand is to select just one atom on the ligand and then employ the
+                    'connected' selector (<span class="menulike">Select &rarr;
+                    Structure &rarr; Connected</span>). The 'connected' selector expands the
+                    current selection to everything with a bonding path to the current
+                    selection. The following command is also effective:
+                    <br>
+                    <a class="cxcmd" href="cxcmd:select N; select connected">select
+                    N; select connected</a>
+                    <br>
+                    Another option is to use the "Select Fragment" mouse mode, which can
+                    be turned on by going to the "More Right Mouse" tab of the ChimeraX toolbar.
+                </p>
+                <p>
+                    Next, we choose the radius around the metal center. This defines the
+                    total volume, and the %V<sub>bur</sub> is the portion of this sphere
+                    that is taken up by the VDW radii of the ligand. For the purpose of
+                    this tutorial, we'll use 3.0 Å. This radius should be chosen to 
+                    capture the parts of the ligand that likely do interact with substrates.
+                    For other systems, different radii should be tested.
+                </p>
+                <p>
+                    We can also choose what algorithm to use to integrate this volume.
+                    The "Lebedev" option uses a Lebedev quadrature of the angular component
+                    of the sphere and a Gauss-Legendre quadrature for the radial component. 
+                    For this method, we can choose how many points to use for the angular
+                    and radial components. More points will result in lower error, but 
+                    it will also take longer to calculate %V<sub>bur</sub>. With sufficient
+                    points, the error in calculated %V<sub>bur</sub> should be negligible. 
+                </p>
+                <p>
+                    The other option we have is Monte-Carlo integration. For this, we can
+                    choose the minimum MC iterations (each iteration samples 3000 points).
+                    Regardless of the specified iterations, the MC algorithm will continue
+                    until it converges (%V<sub>bur</sub> changes by &lt; 0.01 over the last 
+                    four iterations and the average change over the last four iterations is
+                    &lt; 0.01). The sign of the error from the MC method is random, but will
+                    typically fall within ± 0.3 of the expected value.
+                </p>
+                <p>
+                    The next option, 'use centroid of centers' might be useful for calculating
+                    the buried volume at the centroid of key atoms on a polydentate ligand.
+                    We'll leave that unchecked for this tutorial.
+                </p>
+                <p>
+                    Simply select the ruthenium and press <button>calculate % buried
+                    volume for selected centers</button>. The %V<sub>bur</sub>
+                    value should appear in the table on the lower half of the tool.
+                    you should get a value around 28%.
+                </p>
+
+            <h3>Visualization options</h3>
+                <p>
+                    Now that we've calculated the buried volume, let's take a look at the
+                    visualization options. These are all on the 'visualization' tab of the
+                    tool. To generate visuals, the buried volume will have to be 
+                    re-computed. 
+                </p>
+                <h4>Steric Map</h4>
+                <p>
+                    A steric map can be generated for the ligand. A steric map is a contour
+                    plot of a 2-D projection of the VDW radii of the ligand's atoms. 
+                    This can provide insight into areas where the steric bulk of the ligand
+                    is encroaching on the center or where the center is relatively open. 
+                    Let's turn this option on for the purpose of this tutorial. <b>Note</b> -
+                    VDW radii are scaled for %V<sub>bur</sub> calculations, but not for
+                    steric maps.
+                </p>
+                <p>
+                    When generating a steric map, the default is to orient the projection of
+                    the VDW radii such that the average of the vectors from the coordinating
+                    atoms to the center is orthogonal to the plane. For our monodentate ligand,
+                    this means the C-Ru bond defines the plane onto which everything is projected. 
+                    The y-axis of the plot is defined as orthogonal to the
+                    plane-of-best-fit of the center and any coordinating atoms. This typically
+                    makes sense for polydentate ligands. For a monodentate ligand, this is 
+                    going to be random, which may or may not be useful. 
+                </p>
+                <aside>
+                    <img src="../images/Ru_IPr.png"/>
+                    <br>
+                    <img src="../images/steric_map.jpg" width=256px/>
+                </aside>
+                <p>
+                    To eliminate this randomness, we can check the 'use display orientation'
+                    box. With this box checked, the steric map will use whatever orientation
+                    the structure appears on the screen. Check the box, and align 
+                    the structure so you are looking down the Ru-C bond and the N's 
+                    lie close to the x-axis:
+                    <br>
+                    <a class="cxcmd" href="cxcmd:lookDown @N1 atom2 @N2 axis x">
+                    lookDown @N1 atom2 @N2 axis x
+                    </a>
+                    <br>
+                    <a class="cxcmd" href="cxcmd:lookDown Ru atom2 @C11">
+                    lookDown Ru atom2 @C11
+                    </a>
+                </p>
+                <p>
+                    The next option, 'number of points', specifies how many points should be along
+                    the x- and y-axis of the steric map. Increasing this will make the map look
+                    more smooth, but take considerably longer to generate.
+                </p>
+                <p>
+                    The quadrant can also be labeled with the %V<sub>bur</sub> in each by checking
+                    the 'label quadrant with %V<sub>bur</sub>' box. This will also cause the
+                    buried volume to be reported for each individual quadrant back on the 
+                    'calculation' tab.
+                </p>
+                <p>
+                    We can also choose the shape of the map: circle or square. Given that %V<sub>bur</sub>
+                    is calculated using a sphere around the Ru, we'll use 'circle'. The square option
+                    might be useful for generating a steric map of a small molecule, however. 
+                    The 'radius around center' option back on the 'calculation' tab determines the
+                    radius of the circle (or the apothem of the square) on the steric map.
+                </p>
+                <p>
+                    By default, the minimum and maximum of the steric map are chosen automatically
+                    based on the highest and lowest altitudes on the map. If you are comparing
+                    steric maps for other ligands, it may be more useful to have a set minimum and
+                    maximum. To do this, simply uncheck the 'automatic min. and max.' box and
+                    choose your desired minimum and maximum values. For the purposes of this
+                    tutorial, we'll be keeping 'automatic min. and max.' checked.
+                </p>
+                
+                <h4>Volume Cutout</h4>
+                <aside>
+                    <img src="../images/Ru_IPr_cutout.png"/>
+                    <br>
+                    Cp* and Cl hidden for clarity
+                </aside>
+                <p>
+                    The volume around the center that is free or buried can also be visualized.
+                    This is mostly useful for double checking that all the intended ligand atoms 
+                    were included in the %V<sub>bur</sub> calculation, but it also looks nice.
+                    For this tutorial, we'll create a volume cutout for the buried volume.
+                </p>
+                <p>
+                    Gaps may appear in the volume cutout. To make these gaps smaller,
+                    you can try using a finer point spacing or a higher intersection
+                    density. Higher values of both of these will cause the volume
+                    cutout to take longer to generate.
+                </p>
+                <p>
+                    To generate these visuals, flip back to the 'calculation' tab of the tool
+                    and press <button>calculate % buried volume for selected centers</button>.
+                </p>
+
+    </body>
+</html>

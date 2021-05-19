@@ -15,13 +15,12 @@ class QMInputManager(ProviderManager):
             super().__init__()
 
     def add_provider(self, bundle_info, name):
-        print("adding %s format" % name)
-        if name in self.formats:
-            self.session.logger.warning(
-                "file format %s from %s supplanted that from %s" % (
-                    name, bundle_info.name, self.formats[name].name
-                )
-            )
+        # if name in self.formats:
+        #     self.session.logger.warning(
+        #         "file format %s from %s supplanted that from %s" % (
+        #             name, bundle_info.name, self.formats[name].name
+        #         )
+        #     )
         self.formats[name] = bundle_info
     
     def get_info(self, name):
@@ -32,4 +31,3 @@ class QMInputManager(ProviderManager):
                 self
             )
         return self.file_info[name]
-    

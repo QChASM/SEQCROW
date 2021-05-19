@@ -1,6 +1,7 @@
 from io import BytesIO
 from os.path import basename
 import re
+from json import loads, dumps
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -25,12 +26,33 @@ from matplotlib.backend_bases import MouseEvent
 from matplotlib.figure import Figure
 from matplotlib import rcParams
 
-from PyQt5.QtCore import Qt, QRect, QItemSelectionModel 
-from PyQt5.QtGui import QValidator, QFont, QIcon
-from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QGridLayout, QPushButton, QTabWidget, QComboBox, \
-                            QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, \
-                            QFormLayout, QCheckBox, QHeaderView, QMenuBar, QAction, QFileDialog, QStyle, \
-                            QGroupBox, QLabel, QToolBox, QHBoxLayout
+from Qt.QtCore import Qt, QRect, QItemSelectionModel 
+from Qt.QtGui import QValidator, QFont, QIcon
+from Qt.QtWidgets import (
+    QSpinBox,
+    QDoubleSpinBox,
+    QGridLayout,
+    QPushButton,
+    QTabWidget,
+    QComboBox,
+    QTableWidget,
+    QTableView,
+    QWidget,
+    QVBoxLayout,
+    QTableWidgetItem,
+    QFormLayout,
+    QCheckBox,
+    QHeaderView,
+    QMenuBar,
+    QAction,
+    QFileDialog,
+    QStyle,
+    QGroupBox,
+    QLabel,
+    QToolBox,
+    QHBoxLayout,
+    QLineEdit,
+)
 
 from SEQCROW.tools.per_frame_plot import NavigationToolbar
 from SEQCROW.utils import iter2str
@@ -58,6 +80,7 @@ class _NormalModeSettings(Settings):
         'figure_width': 2,
         'figure_height': 2,
         "fixed_size": False,
+        "scales": "{}",
     }
 
 
@@ -1073,7 +1096,9 @@ class NormalModes(ToolInstance):
         #table that lists frequencies
         table = QTableWidget()
         table.setColumnCount(3)
-        table.setHorizontalHeaderLabels(["Frequency (cm\u207b\u00b9)", "symmetry", "IR intensity"])
+        table.setHorizontalHeaderLabels(
+            ["Frequency (cm\u207b\u00b9)", "symmetry", "IR intensity"]
+        )
         table.setSortingEnabled(True)
         table.setSelectionBehavior(QTableView.SelectRows)
         table.setSelectionMode(QTableView.SingleSelection)
@@ -1220,19 +1245,46 @@ class NormalModes(ToolInstance):
         if fr is None:
             return 
 
-        freq_data = fr.other['frequency'].data
+        freq = fr.other['frequency']
+        if freq.anharm_data:
+            self.table.setColumnCount(4)
+            self.table.setHorizontalHeaderLabels([
+                "Fundamental (cm\u207b\u00b9)",
+                "Δ\u2090\u2099\u2095",
+                "symmetry",
+                "IR intensity",
+            ])
+            freq_data = sorted(freq.anharm_data, key=lambda x: x.harmonic_frequency)
+        else:
+            self.table.setColumnCount(3)
+            self.table.setHorizontalHeaderLabels([
+                "Frequency (cm\u207b\u00b9)",
+                "symmetry",
+                "IR intensity",
+            ])
+            freq_data = freq.data
         
         for i, mode in enumerate(freq_data):
             row = self.table.rowCount()
             self.table.insertRow(row)
             
-            freq = FreqTableWidgetItem()
-            freq.setData(Qt.DisplayRole, "%.2f%s" % (abs(mode.frequency), "i" if mode.frequency < 0 else ""))
-            freq.setData(Qt.UserRole, i)
-            self.table.setItem(row, 0, freq)
-            
-            if mode.symmetry:
-                text = mode.symmetry
+            freq_cm = FreqTableWidgetItem()
+            freq_cm.setData(Qt.DisplayRole, "%.2f%s" % (abs(mode.frequency), "i" if mode.frequency < 0 else ""))
+            freq_cm.setData(Qt.UserRole, i)
+            self.table.setItem(row, 0, freq_cm)
+
+            if isinstance(mode, freq.Data):
+                symm = mode.symmetry
+                offset = 0
+            else:
+                symm = mode.harmonic.symmetry
+                delta_anh = QTableWidgetItem()
+                delta_anh.setData(Qt.DisplayRole, round(mode.delta_anh, 2))
+                offset = 1
+                self.table.setItem(row, 1, delta_anh)
+
+            if symm:
+                text = symm
                 if re.search("\d", text):
                     text = re.sub(r"(\d+)", r"<sub>\1</sub>", text)
                 if text.startswith("SG"):
@@ -1241,17 +1293,26 @@ class NormalModes(ToolInstance):
                     text = "Π" + text[2:]
                 elif text.startswith("DLT"):
                     text = "Δ" + text[3:]
+                    if text[1:] == "A":
+                        text = text[0]
                 if any(text.endswith(char) for char in "vhdugVHDUG"):
                     text = text[:-1] + "<sub>" + text[-1].lower() + "</sub>"
 
                 label = QLabel(text)
                 label.setAlignment(Qt.AlignCenter)
-                self.table.setCellWidget(row, 1, label)
+                self.table.setCellWidget(row, 1 + offset, label)
 
             intensity = QTableWidgetItem()
             if mode.intensity is not None:
                 intensity.setData(Qt.DisplayRole, round(mode.intensity, 2))
-            self.table.setItem(row, 2, intensity)
+            self.table.setItem(row, 2 + offset, intensity)
+        
+        if freq.anharm_data:
+            for i in range(0, 4):
+                self.table.resizeColumnToContents(i)
+        else:
+            for i in range(0, 3):
+                self.table.resizeColumnToContents(i)
         
         self.table.setSelection(QRect(0, 0, 2, 1), QItemSelectionModel.Select)
     
@@ -1400,7 +1461,7 @@ class NormalModes(ToolInstance):
             if isinstance(tool, CoordinateSetSlider):
                 if tool.structure is model:
                     tool.delete()
-    
+
         pause_frames = (60 // anim_fps)
 
         slider =  CoordinateSetSlider(self.session, model, movie_framerate=anim_fps, pause_frames=pause_frames)
@@ -1427,7 +1488,7 @@ class NormalModes(ToolInstance):
     def show_ir_plot(self, *args, create=True, **kwargs):
         if self.ir_plot is None and create:
             self.ir_plot = self.tool_window.create_child_window("IR Plot", window_class=IRPlot)
-        else:
+        elif self.ir_plot is not None:
             self.ir_plot.refresh_plot()
     
     def highlight_ir_plot(self, *args):
@@ -1441,8 +1502,11 @@ class NormalModes(ToolInstance):
     
     def close(self):
         self.model_selector.deleteLater()
+    
+    def cleanup(self):
+        self.model_selector.deleteLater()
 
-        return super().close()
+        return super().cleanup()
     
 
 class IRPlot(ChildToolWindow):
@@ -1558,6 +1622,10 @@ class IRPlot(ChildToolWindow):
         self.voigt_mix.setEnabled(self.peak_type.currentText() == "pseudo-Voigt")
         self.peak_type.currentTextChanged.connect(lambda text, widget=self.voigt_mix: widget.setEnabled(text == "pseudo-Voigt"))
         
+        self.anharm = QCheckBox()
+        self.anharm.setCheckState(Qt.Checked)
+        peak_layout.addRow("anharmonic:", self.anharm)
+        
         toolbox.addTab(peak_widget, "peak settings")
         
         # plot experimental data alongside computed
@@ -1609,6 +1677,10 @@ class IRPlot(ChildToolWindow):
         self.quadratic.setValue(0.)
         scaling_layout.addRow("c<sub>2</sub> =", self.quadratic)
         
+        save_scales = QPushButton("save current scale factors...")
+        save_scales.clicked.connect(self.open_save_scales)
+        scaling_layout.addRow(save_scales)
+        
         set_zero = QPushButton("set scales to 0")
         set_zero.clicked.connect(lambda *args: self.linear.setValue(0.))
         set_zero.clicked.connect(lambda *args: self.quadratic.setValue(0.))
@@ -1620,16 +1692,15 @@ class IRPlot(ChildToolWindow):
         lookup_layout = QFormLayout(lookup_scale)
         
         self.library = QComboBox()
-        self.library.addItems(SCALE_LIBS.keys())
         lookup_layout.addRow("database:", self.library)
         
         self.method = QComboBox()
-        self.method.addItems(SCALE_LIBS[self.library.currentText()][1].keys())
         lookup_layout.addRow("method:", self.method)
         
         self.basis = QComboBox()
-        self.basis.addItems(SCALE_LIBS[self.library.currentText()][1][self.method.currentText()].keys())
         lookup_layout.addRow("basis set:", self.basis)
+        
+        self.fill_lib_options()
         
         desc = QLabel("")
         desc.setText("view database online <a href=\"test\" style=\"text-decoration: none;\">here</a>")
@@ -1679,6 +1750,8 @@ class IRPlot(ChildToolWindow):
         # toolbox.setMinimumWidth(int(1.1 * plot_widget.size().width()))
         # toolbox.setMinimumHeight(int(1.2 * plot_widget.size().height()))
 
+        self.tool_instance.model_selector.currentIndexChanged.connect(self.check_anharm)
+
         #menu bar for saving stuff
         menu = QMenuBar()
         file = menu.addMenu("&Export")
@@ -1692,6 +1765,68 @@ class IRPlot(ChildToolWindow):
         self.ui_area.setLayout(layout)
         self.manage(None)
 
+    def fill_lib_options(self):
+        cur_lib = self.library.currentIndex()
+        cur_method = self.method.currentText()
+        cur_basis = self.basis.currentText()
+        self.library.blockSignals(True)
+        self.method.blockSignals(True)
+        self.basis.blockSignals(True)
+        self.library.clear()
+        self.method.clear()
+        self.basis.clear()
+        lib_names = list(SCALE_LIBS.keys())
+        user_def = loads(self.tool_instance.settings.scales)
+        if user_def:
+            lib_names.append("user-defined")
+        
+        self.library.addItems(lib_names)
+        if cur_lib >= 0:
+            self.library.setCurrentIndex(cur_lib)
+
+        if self.library.currentText() != "user-defined":
+            self.method.addItems(
+                SCALE_LIBS[self.library.currentText()][1].keys()
+            )
+
+            self.basis.addItems(
+                SCALE_LIBS[lib_names[0]][1][self.method.currentText()].keys()
+            )
+
+        else:
+            user_def = loads(self.tool_instance.settings.scales)
+            self.method.addItems(user_def.keys())
+            ndx = self.method.findText(cur_method, Qt.MatchExactly)
+        
+        ndx = self.method.findText(cur_method, Qt.MatchExactly)
+        if ndx >= 0:
+            self.method.setCurrentIndex(ndx)
+
+        ndx = self.basis.findText(cur_basis, Qt.MatchExactly)
+        if ndx >= 0:
+            self.basis.setCurrentIndex(ndx)
+        
+        self.library.blockSignals(False)
+        self.method.blockSignals(False)
+        self.basis.blockSignals(False)
+
+    def open_save_scales(self):
+        c1 = self.linear.value()
+        c2 = self.quadratic.value()
+        self.tool_instance.tool_window.create_child_window(
+            "saving frequency scales",
+            window_class=SaveScales,
+            c1=c1,
+            c2=c2,
+        )
+
+    def check_anharm(self):
+        data = self.tool_instance.model_selector.currentData()
+        if not data:
+            return
+        freq = data.other["frequency"]
+        self.anharm.setEnabled(bool(freq.anharm_data))
+
     def change_figure_size(self, *args):
         if self.fixed_size.checkState() == Qt.Checked:
             self.figure_height.setEnabled(True)
@@ -1701,10 +1836,10 @@ class IRPlot(ChildToolWindow):
             
             self.figure.set_size_inches(w, h)
             
-            self.canvas.setMinimumHeight(100 * h)
-            self.canvas.setMaximumHeight(100 * h)
-            self.canvas.setMinimumWidth(100 * w)
-            self.canvas.setMaximumWidth(100 * w)
+            self.canvas.setMinimumHeight(96 * h)
+            self.canvas.setMaximumHeight(96 * h)
+            self.canvas.setMinimumWidth(96 * w)
+            self.canvas.setMaximumWidth(96 * w)
         else:
             self.canvas.setMinimumHeight(1)
             self.canvas.setMaximumHeight(100000)
@@ -1760,7 +1895,31 @@ class IRPlot(ChildToolWindow):
         filename, _ = QFileDialog.getSaveFileName(filter="CSV Files (*.csv)")
         if filename:
             s = "frequency (cm^-1),IR intensity\n"
-            data = self.get_data()
+
+        
+            fr = self.tool_instance.model_selector.currentData()
+            if fr is None:
+                return
+    
+            freq = fr.other["frequency"]
+        
+            fwhm = self.fwhm.value()
+            peak_type = self.peak_type.currentText()
+            plot_type = self.tool_instance.plot_type.currentText()
+            voigt_mixing = self.voigt_mix.value()
+            linear = self.linear.value()
+            quadratic = self.quadratic.value()
+            anharmonic = freq.anharm_data and self.anharm.checkState() == Qt.Checked
+
+            data = freq.get_ir_data(
+                plot_type=plot_type,
+                peak_type=peak_type,
+                fwhm=fwhm,
+                voigt_mixing=voigt_mixing,
+                linear_scale=linear,
+                quadratic_scale=quadratic,
+                anharmonic=anharmonic,
+            )
             x_values, y_values = data
             for x, y in zip(x_values, y_values):
                 s += "%f,%f\n" % (x, y)
@@ -1775,7 +1934,10 @@ class IRPlot(ChildToolWindow):
         run(self.session, "open https://doi.org/10.1021/acs.jpca.5b11386")
 
     def open_scale_library_link(self, *args):
-        run(self.session, "open %s" % SCALE_LIBS[self.library.currentText()][0])
+        if self.library.currentText() != "user-defined":
+            run(self.session, "open %s" % SCALE_LIBS[self.library.currentText()][0])
+        else:
+            self.session.logger.info("that's your database")
 
     def change_scale_lib(self, lib):
         cur_method = self.method.currentText()
@@ -1784,29 +1946,43 @@ class IRPlot(ChildToolWindow):
         self.method.blockSignals(True)
         self.method.clear()
         self.method.blockSignals(False)
-        self.method.addItems(SCALE_LIBS[lib][1].keys())
-        ndx = self.method.findText(cur_method, Qt.MatchExactly)
-        if ndx >= 0:
-            self.method.setCurrentIndex(ndx)
-        
-        ndx = self.basis.findText(cur_basis, Qt.MatchExactly)
-        if ndx >= 0:
-            self.basis.setCurrentIndex(ndx)
+        if lib in SCALE_LIBS:
+            self.basis.setEnabled(True)
+            self.method.addItems(SCALE_LIBS[lib][1].keys())
+            ndx = self.method.findText(cur_method, Qt.MatchExactly)
+            if ndx >= 0:
+                self.method.setCurrentIndex(ndx)
+            
+            ndx = self.basis.findText(cur_basis, Qt.MatchExactly)
+            if ndx >= 0:
+                self.basis.setCurrentIndex(ndx)
+        else:
+            self.basis.setEnabled(False)
+            user_def = loads(self.tool_instance.settings.scales)
+            self.method.addItems(user_def.keys())
     
     def change_method(self, method):
         cur_basis = self.basis.currentText()
         self.basis.blockSignals(True)
         self.basis.clear()
         self.basis.blockSignals(False)
-        if isinstance(SCALE_LIBS[self.library.currentText()][1][method], dict):
-            self.basis.addItems(SCALE_LIBS[self.library.currentText()][1][method].keys())
-            ndx = self.basis.findText(cur_basis, Qt.MatchExactly)
-            if ndx >= 0:
-                self.basis.setCurrentIndex(ndx)
-        else:
-            scale = SCALE_LIBS[self.library.currentText()][1][method]
-            self.linear.setValue(1 - scale)
-            self.quadratic.setValue(0.)
+        if self.library.currentText() in SCALE_LIBS:
+            if isinstance(SCALE_LIBS[self.library.currentText()][1][method], dict):
+                self.basis.addItems(
+                    SCALE_LIBS[self.library.currentText()][1][method].keys()
+                )
+                ndx = self.basis.findText(cur_basis, Qt.MatchExactly)
+                if ndx >= 0:
+                    self.basis.setCurrentIndex(ndx)
+            else:
+                scale = SCALE_LIBS[self.library.currentText()][1][method]
+                self.linear.setValue(1 - scale)
+                self.quadratic.setValue(0.)
+        elif method:
+            user_def = loads(self.tool_instance.settings.scales)
+            c1, c2 = user_def[method]
+            self.linear.setValue(c1)
+            self.quadratic.setValue(c2)
 
     def change_basis(self, basis):
         scale = SCALE_LIBS[self.library.currentText()][1][self.method.currentText()][basis]
@@ -1874,254 +2050,51 @@ class IRPlot(ChildToolWindow):
         self.drag_prev = None
         self.dragging = False
 
-    def get_data(self):
+    def refresh_plot(self):
+        
         fr = self.tool_instance.model_selector.currentData()
         if fr is None:
-            return None
-        fwhm = self.fwhm.value()
-        self.tool_instance.settings.fwhm = fwhm
-        self.tool_instance.settings.peak_type = self.peak_type.currentText()
-        self.tool_instance.settings.plot_type = self.tool_instance.plot_type.currentText()
-        self.tool_instance.settings.reverse_x = self.tool_instance.reverse_x.checkState() == Qt.Checked
-        eta = self.voigt_mix.value()
-        self.tool_instance.settings.voigt_mix = eta
-        
-        frequencies = np.array([freq.frequency for freq in fr.other['frequency'].data if freq.frequency > 0])
-        c1 = self.linear.value()
-        c2 = self.quadratic.value()
-        frequencies -= c1 * frequencies + c2 * frequencies ** 2
-        
-        intensities = [freq.intensity for freq in fr.other['frequency'].data if freq.frequency > 0]
-        e_factor = -4 * np.log(2) / fwhm ** 2
-        
-        if self.peak_type.currentText() != "Delta":
-            functions = []
-            x_values = np.linspace(0, max(frequencies) - 10 * fwhm, num=100).tolist()
-            for freq, intensity in zip(frequencies, intensities):
-                if intensity is not None:
-                    #make sure to get x values near the peak
-                    #this makes the peaks look hi res, but we can cheap out
-                    #on areas where there's no peak
-                    x_values.extend(
-                        np.linspace(
-                            max(freq - (3.5 * fwhm), 0), 
-                            freq + (3.5 * fwhm), 
-                            num=65,
-                        ).tolist()
-                    )
-                    x_values.append(freq)
-                    if self.peak_type.currentText() == "Gaussian":
-                        functions.append(lambda x, x0=freq, inten=intensity: \
-                                        inten * np.exp(e_factor * (x - x0) ** 2))
-    
-                    elif self.peak_type.currentText() == "Lorentzian":
-                        functions.append(lambda x, x0=freq, inten=intensity, : \
-                                        inten * 0.5 * (0.5 * fwhm / ((x - x0) ** 2 + (0.5 * fwhm)**2)))
-                    
-                    elif self.peak_type.currentText() == "pseudo-Voigt":
-                        functions.append(
-                            lambda x, x0=freq, inten=intensity:
-                                inten * (
-                                    (1 - eta) * 0.5 * (0.5 * fwhm / ((x - x0)**2 + (0.5 * fwhm)**2)) + 
-                                    eta * np.exp(e_factor * (x - x0)**2)
-                                )
-                        )
-    
-        
-            x_values = np.array(list(set(x_values)))
-            x_values.sort()
-            y_values = np.sum([f(x_values) for f in functions], axis=0)
-        
-        else:
-            x_values = []
-            y_values = []
-
-            for freq, intensity in zip(frequencies, intensities):
-                if intensity is not None:
-                    y_values.append(intensity)
-                    x_values.append(freq)
-
-            y_values = np.array(y_values)
-
-        if len(y_values) == 0:
-            self.tool_instance.session.logger.error("nothing to plot")
-            return None
-
-        y_values /= np.amax(y_values)
-
-
-        if self.tool_instance.plot_type.currentText() == "Transmittance":
-            y_values = np.array([10 ** (2 - y) for y in y_values])
-
-        return x_values, y_values
-
-    def refresh_plot(self):
-        data = self.get_data()
-        if data is None:
             return
-        x_values, y_values = data
-
         self.figure.clear()
 
-        if self.section_table.rowCount() == 1:
-            axes = [self.figure.subplots(nrows=1, ncols=1)]
-            widths = [max(x_values)]
-            centers = [max(x_values) / 2]
-        else:
-            n_sections = self.section_table.rowCount() - 1
-            self.figure.subplots_adjust(wspace=0.05)
+        freq = fr.other["frequency"]
+        
+        fwhm = self.fwhm.value()
+        self.tool_instance.settings.fwhm = fwhm
+        peak_type = self.peak_type.currentText()
+        self.tool_instance.settings.peak_type = peak_type
+        plot_type = self.tool_instance.plot_type.currentText()
+        self.tool_instance.settings.plot_type = plot_type
+        reverse_x = self.tool_instance.reverse_x.checkState() == Qt.Checked
+        voigt_mixing = self.voigt_mix.value()
+        self.tool_instance.voigt_mix = voigt_mixing
+        linear = self.linear.value()
+        quadratic = self.quadratic.value()
+        anharmonic = freq.anharm_data and self.anharm.checkState() == Qt.Checked
+        
+        centers = None
+        widths = None
+        if self.section_table.rowCount() > 1:
             centers = []
             widths = []
             for i in range(0, self.section_table.rowCount() - 1):
                 centers.append(self.section_table.cellWidget(i, 0).value())
                 widths.append(self.section_table.cellWidget(i, 1).value())
-                
-            widths = [x for _, x in sorted(
-                zip(centers, widths),
-                key=lambda p: p[0],
-                reverse=self.tool_instance.reverse_x.checkState() == Qt.Checked,
-            )]
-            centers = sorted(centers, reverse=self.tool_instance.reverse_x.checkState() == Qt.Checked)
-            
-            axes = self.figure.subplots(
-                nrows=1,
-                ncols=n_sections,
-                sharey=True,
-                gridspec_kw={'width_ratios': widths},
-            )
-            if not hasattr(axes, "__iter__"):
-                axes = [axes]
-
-        for i, ax in enumerate(axes):
-            if i == 0:
-                if self.tool_instance.plot_type.currentText() == "Transmittance":
-                    ax.set_ylabel('Transmittance (%)')
-                else:
-                    ax.set_ylabel('Absorbance (arb.)')
-            
-                if len(axes) > 1:
-                    ax.spines["right"].set_visible(False)
-                    ax.tick_params(labelright=False, right=False)
-                    ax.plot(
-                        [1, 1],
-                        [0, 1],
-                        marker=((-1, -1), (1, 1)),
-                        markersize=5,
-                        linestyle='none',
-                        color='k',
-                        mec='k',
-                        mew=1,
-                        clip_on=False,
-                        transform=ax.transAxes,
-                    )
-
-            elif i == len(axes) - 1 and len(axes) > 1:
-                ax.spines["left"].set_visible(False)
-                ax.tick_params(labelleft=False, left=False)
-                ax.plot(
-                    [0, 0],
-                    [0, 1],
-                    marker=((-1, -1), (1, 1)),
-                    markersize=5,
-                    linestyle='none',
-                    color='k',
-                    mec='k',
-                    mew=1,
-                    clip_on=False,
-                    transform=ax.transAxes,
-                )
-
-            elif len(axes) > 1:
-                ax.spines["right"].set_visible(False)
-                ax.spines["left"].set_visible(False)
-                ax.tick_params(labelleft=False, labelright=False, left=False, right=False)
-                ax.plot(
-                    [0, 0],
-                    [0, 1],
-                    marker=((-1, -1), (1, 1)),
-                    markersize=5,
-                    linestyle='none',
-                    label="Silence Between Two Subplots",
-                    color='k',
-                    mec='k',
-                    mew=1,
-                    clip_on=False,
-                    transform=ax.transAxes,
-                )
-                ax.plot(
-                    [1, 1],
-                    [0, 1],
-                    marker=((-1, -1), (1, 1)),
-                    markersize=5,
-                    label="Silence Between Two Subplots",
-                    linestyle='none',
-                    color='k',
-                    mec='k',
-                    mew=1,
-                    clip_on=False,
-                    transform=ax.transAxes,
-                )
-
-
-            if self.peak_type.currentText() != "Delta":
-                ax.plot(
-                    x_values,
-                    y_values,
-                    color='k',
-                    linewidth=0.5,
-                    label="computed",
-                )
-            else:
-                if self.tool_instance.plot_type.currentText() == "Transmittance":
-                    ax.vlines(
-                        x_values,
-                        y_values,
-                        [100 for y in y_values],
-                        linewidth=0.5,
-                        colors=['k' for x in x_values],
-                        label="computed"
-                    )
-                    ax.hlines(
-                        100,
-                        0,
-                        max(4000, *x_values),
-                        linewidth=0.5,
-                        colors=['k' for y in y_values],
-                        label="computed",
-                    )
-                
-                else:
-                    ax.vlines(
-                        x_values,
-                        [0 for y in y_values],
-                        y_values,
-                        linewidth=0.5,
-                        colors=['k' for x in x_values],
-                        label="computed"
-                    )
-                    ax.hlines(
-                        0,
-                        0,
-                        max(4000, *x_values),
-                        linewidth=0.5,
-                        colors=['k' for y in y_values],
-                        label="computed"
-                    )
-
-            if self.exp_data:
-                for x, y, color in self.exp_data:
-                    ax.plot(x, y, color=color, zorder=-1, linewidth=0.5, label="observed")
-
-            center = centers[i]
-            width = widths[i]
-            high = center + width / 2
-            low = center - width / 2
-            if self.tool_instance.reverse_x.checkState() == Qt.Checked:
-                ax.set_xlim(high, low)
-            else:
-                ax.set_xlim(low, high)
         
-        self.figure.text(0.5, 0.0, r"wavenumber (cm$^{-1}$)" , ha="center", va="bottom")
+        freq.plot_ir(
+            self.figure,
+            centers=centers,
+            widths=widths,
+            exp_data=self.exp_data,
+            plot_type=plot_type,
+            peak_type=peak_type,
+            reverse_x=reverse_x,
+            fwhm=fwhm,
+            voigt_mixing=voigt_mixing,
+            linear_scale=linear,
+            quadratic_scale=quadratic,
+            anharmonic=anharmonic,
+        )
 
         self.canvas.draw()
 
@@ -2144,7 +2117,15 @@ class IRPlot(ChildToolWindow):
                 if item.column() == 0:
                     row = item.data(Qt.UserRole)
             
-            frequency = [freq.frequency for freq in fr.other['frequency'].data][row]
+            freq = fr.other['frequency']
+            if freq.anharm_data and self.anharm.checkState() == Qt.Checked:
+                frequencies = sorted(freq.anharm_data, key=lambda x: x.harmonic_frequency)
+            elif freq.anharm_data:
+                frequencies = sorted(freq.anharm_data, key=lambda x: x.harmonic_frequency)
+                frequencies = [x.harmonic for x in frequencies]
+            else:
+                frequencies = sorted(freq.data, key=lambda x: x.frequency)
+            frequency = frequencies[row].frequency
             if frequency < 0:
                 self.canvas.draw()
                 continue
@@ -2189,7 +2170,6 @@ class IRPlot(ChildToolWindow):
             self.exp_data = []
 
         for i in range(1, data.shape[1]):
-            print(i)
             self.exp_data.append((data[:,0], data[:,i], hex_code))
 
     def clear_data(self, *args):
@@ -2197,7 +2177,9 @@ class IRPlot(ChildToolWindow):
 
     def show_match_peaks(self, *args):
         if self.tool_instance.match_peaks is None:
-            self.tool_instance.match_peaks = self.tool_instance.tool_window.create_child_window("match peaks", window_class=MatchPeaks)
+            self.tool_instance.match_peaks = self.tool_instance.tool_window.create_child_window(
+                "match peaks", window_class=MatchPeaks
+            )
 
     def cleanup(self):
         self.tool_instance.ir_plot = None
@@ -2323,3 +2305,47 @@ class MatchPeaks(ChildToolWindow):
         self.tool_instance.match_peaks = None
         
         super().cleanup()
+
+
+class SaveScales(ChildToolWindow):
+    def __init__(self, tool_instance, title, *args, c1=0.0, c2=0.0, **kwargs):
+        super().__init__(tool_instance, title, *args, **kwargs)
+        
+        self.c1 = c1
+        self.c2 = c2
+        self._build_ui()
+    
+    def _build_ui(self):
+        layout = QFormLayout()
+        
+        self.scale_name = QLineEdit()
+        layout.addRow("name:", self.scale_name)
+        
+        do_it = QPushButton("save scales")
+        do_it.clicked.connect(self.save_scales)
+        layout.addRow(do_it)
+        
+        self.ui_area.setLayout(layout)
+        self.manage(None)
+    
+    def save_scales(self):
+        name = self.scale_name.text()
+        if not name:
+            self.session.logger.warning("no name entered")
+            return
+        
+        current = loads(self.tool_instance.settings.scales)
+        current[name] = (self.c1, self.c2)
+        self.tool_instance.settings.scales = dumps(current)
+        if self.tool_instance.ir_plot:
+            self.tool_instance.ir_plot.fill_lib_options()
+        
+        self.session.logger.info(
+            "saved frequency scale factors to user-defined database"
+        )
+        self.session.logger.status(
+            "saved frequency scale factors to user-defined database"
+        )
+
+        self.destroy()
+    

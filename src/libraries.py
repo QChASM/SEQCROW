@@ -10,7 +10,7 @@ from AaronTools.fileIO import read_types
 
 
 class LigandTable(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, singleSelect=False, maxDenticity=None):
         super().__init__(parent)
         
         layout = QGridLayout(self)
@@ -20,7 +20,7 @@ class LigandTable(QWidget):
         self.table.setColumnCount(3)
         self.table.setHorizontalHeaderLabels(['name', 'denticity', 'coordinating elements'])
         
-        self.add_ligands()
+        self.add_ligands(maxDenticity)
         
         for i in range(0, 3):
             self.table.resizeColumnToContents(i)
@@ -32,6 +32,8 @@ class LigandTable(QWidget):
         
         self.table.setSortingEnabled(True)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        if singleSelect:
+            self.table.setSelectionMode(QTableWidget.SingleSelection)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         
         self.filterEdit = QLineEdit()
@@ -65,7 +67,7 @@ class LigandTable(QWidget):
 
         self.change_filter_method("name")
 
-    def add_ligands(self):
+    def add_ligands(self, maxDenticity=None):
         from AaronTools.component import Component
 
         names = []
@@ -90,6 +92,9 @@ class LigandTable(QWidget):
                 )
             
                 key_atoms = [geom.atoms[i] for i in geom.other["key_atoms"]]
+            
+                if maxDenticity and len(key_atoms) > maxDenticity:
+                    continue
             
                 row = self.table.rowCount()
                 self.table.insertRow(row)
@@ -179,7 +184,7 @@ class LigandTable(QWidget):
  
 
 class SubstituentTable(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, singleSelect=False):
         super().__init__(parent)
         
         layout = QGridLayout(self)
@@ -201,6 +206,8 @@ class SubstituentTable(QWidget):
         
         self.table.setSortingEnabled(True)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        if singleSelect:
+            self.table.setSelectionMode(QTableWidget.SingleSelection)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         
         self.filterEdit = QLineEdit()

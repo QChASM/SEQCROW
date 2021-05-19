@@ -10,12 +10,14 @@ highlight_description = CmdDesc(
         ("color", ColorArg),
         ("scale", FloatArg),
     ],
-    synopsis="make atoms or bonds stand out a bit more"
+    synopsis="make atoms or bonds stand out a bit more",
+    url="https://github.com/QChASM/SEQCROW/wiki/Commands#highlight",
 )
 
 erase_highlight_description = CmdDesc(
     required=[("selection", ObjectsArg)],
-    synopsis="erase a highlight"
+    synopsis="erase a highlight",
+    url="https://github.com/QChASM/SEQCROW/wiki/Commands#highlight",
 )
 
 
@@ -25,7 +27,7 @@ class Highlight(MarkerSet):
         
         global_triggers = get_triggers()
         self._changes = global_triggers.add_handler("changes", self.check_changes)
-        
+
     def create_marker(self, atom, rgba, scale):
         for a in self.atoms:
             if a._follow is atom:
