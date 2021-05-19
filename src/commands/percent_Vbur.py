@@ -1,7 +1,5 @@
 import numpy as np
 
-from io import BytesIO
-
 from chimerax.core.commands import BoolArg, StringArg, CmdDesc, EnumOf, FloatArg, IntArg, ModelsArg, Or, TupleOf, run
 from chimerax.atomic import AtomsArg, AtomicStructure
 from chimerax.core.models import Surface
@@ -346,7 +344,6 @@ def vbur_vis(
         # reduces the number of distances we need to calculate
         d = np.linalg.norm(center_coords - atom.coords)
         inner_edge = d - scale*radii_dict[atom.element]
-        outer_edge = inner_edge + 2*scale*radii_dict[atom.element]
         if inner_edge < radius:
             atoms_within_radius.append(atom)
     

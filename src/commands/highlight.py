@@ -1,6 +1,6 @@
-from chimerax.atomic import selected_atoms, selected_bonds, get_triggers, Element
+from chimerax.atomic import get_triggers, Element
 from chimerax.markers import MarkerSet, create_link
-from chimerax.core.commands import BoolArg, FloatArg, ColorArg, ObjectsArg, CmdDesc
+from chimerax.core.commands import FloatArg, ColorArg, ObjectsArg, CmdDesc
 
 
 highlight_description = CmdDesc(
@@ -44,7 +44,7 @@ class Highlight(MarkerSet):
 
         a._scale = scale
         if atom.draw_mode == atom.STICK_STYLE and atom.neighbors:
-            radius = scale * atom.bonds[-1].radius
+            atom.radius = scale * atom.bonds[-1].radius
         return a
     
     def check_changes(self, trigger_name=None, changes=None):

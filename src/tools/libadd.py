@@ -5,8 +5,8 @@ from chimerax.core.tools import ToolInstance
 from chimerax.atomic import selected_atoms
 from chimerax.core.commands import run
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QGridLayout, QPushButton, QTabWidget, QWidget, QVBoxLayout, QLineEdit, QLabel, QSpinBox, QFormLayout, QMessageBox
+from Qt.QtCore import Qt
+from Qt.QtWidgets import QGridLayout, QPushButton, QTabWidget, QWidget, QLineEdit, QLabel, QSpinBox, QFormLayout, QMessageBox
 
 from AaronTools.component import Component
 from AaronTools.ring import Ring

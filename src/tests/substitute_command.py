@@ -1,5 +1,4 @@
 import os.path
-import unittest
 
 from AaronTools.test import prefix, validate
 from chimerax.core.commands import run

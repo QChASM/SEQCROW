@@ -1,7 +1,5 @@
 from io import BytesIO
 
-import numpy as np
-
 from chimerax.atomic import selected_atoms
 from chimerax.bild.bild import read_bild
 from chimerax.core.generic3d import Generic3DModel 
@@ -9,7 +7,7 @@ from chimerax.core.settings import Settings
 from chimerax.core.tools import ToolInstance
 
 from Qt.QtCore import Qt
-from Qt.QtGui import QKeySequence, QClipboard
+from Qt.QtGui import QKeySequence
 from Qt.QtWidgets import (
     QPushButton,
     QFormLayout,

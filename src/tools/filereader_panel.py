@@ -1,16 +1,10 @@
-import numpy as np
-
-from chimerax.atomic import selected_atoms, selected_residues
-from chimerax.core.commands import run
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow
 from chimerax.core.models import MODEL_ID_CHANGED, MODEL_NAME_CHANGED, ADD_MODELS
 from chimerax.std_commands.coordset_gui import CoordinateSetSlider
 
-from io import BytesIO
-
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QLabel, QGridLayout, QPushButton, QTreeWidget, QWidget, QVBoxLayout, QTreeWidgetItem, QCheckBox
+from Qt.QtCore import Qt
+from Qt.QtWidgets import QGridLayout, QPushButton, QTreeWidget, QTreeWidgetItem
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.managers.filereader_manager import FILEREADER_CHANGE 

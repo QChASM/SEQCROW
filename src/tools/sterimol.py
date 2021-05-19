@@ -8,7 +8,7 @@ from chimerax.core.settings import Settings
 from chimerax.core.generic3d import Generic3DModel 
 
 from Qt.QtCore import Qt
-from Qt.QtGui import QKeySequence, QClipboard
+from Qt.QtGui import QKeySequence
 from Qt.QtWidgets import (
     QPushButton,
     QFormLayout,
@@ -23,11 +23,6 @@ from Qt.QtWidgets import (
     QHeaderView,
 )
 
-from AaronTools.const import VDW_RADII, BONDI_RADII
-from AaronTools.substituent import Substituent
-
-from SEQCROW.residue_collection import ResidueCollection
-from SEQCROW.finders import AtomSpec
 from SEQCROW.commands.sterimol import sterimol as sterimol_cmd
 
 class _SterimolSettings(Settings):

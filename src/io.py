@@ -1,9 +1,7 @@
 def open_aarontools(session, stream, file_name, format_name=None, coordsets=False):
     from AaronTools.fileIO import FileReader
-    from AaronTools.geometry import Geometry
     from SEQCROW.residue_collection import ResidueCollection
     from SEQCROW.managers import ADD_FILEREADER
-    from os.path import split as path_split
     from warnings import warn
 
     if format_name == "Gaussian input file":
@@ -122,6 +120,6 @@ def save_aarontools(session, path, format_name, **kwargs):
     geom = Geometry(atoms)
     
     if 'comment' in kwargs:
-        geom.comment = kwargs[comment]
+        geom.comment = kwargs["comment"]
     
     geom.write(outfile=path)

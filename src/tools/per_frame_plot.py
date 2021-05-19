@@ -3,16 +3,14 @@ import numpy as np
 from chimerax.core.tools import ToolInstance
 from chimerax.core.models import REMOVE_MODELS
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QGuiApplication
-from PyQt5.QtWidgets import QGridLayout, QWidget, QMenuBar, QAction, QFileDialog
+from Qt.QtCore import Qt
+from Qt.QtGui import QGuiApplication
+from Qt.QtWidgets import QGridLayout, QWidget, QMenuBar, QFileDialog
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
-from matplotlib.backend_bases import MouseEvent
 
 from matplotlib.figure import Figure
-import matplotlib.pyplot as plt
 
 keyboardModifiers = QGuiApplication.keyboardModifiers
 
@@ -257,7 +255,7 @@ class EnergyPlot(ToolInstance):
                 ax.lines.remove(line)
                 break
         
-        hover_circle = ax.plot(
+        ax.plot(
             self.structure.coordset_ids[ndx],
             self.ys[ndx],
             marker='o',

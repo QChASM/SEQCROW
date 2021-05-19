@@ -6,7 +6,7 @@ from chimerax.atomic import AtomsArg, selected_atoms
 from chimerax.core.commands import BoolArg, CmdDesc, StringArg, DynamicEnum, ListOf, NoArg, Or, EmptyArg
 
 from SEQCROW.finders import AtomSpec
-from SEQCROW.residue_collection import ResidueCollection, Residue
+from SEQCROW.residue_collection import ResidueCollection
 
 
 substitute_description = CmdDesc(

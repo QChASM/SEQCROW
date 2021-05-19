@@ -1,10 +1,8 @@
 from io import BytesIO
-from os.path import basename
 import re
 from json import loads, dumps
 
 import numpy as np
-import matplotlib.pyplot as plt
 
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
@@ -16,13 +14,10 @@ from chimerax.core.configfile import Value
 from chimerax.core.commands.cli import FloatArg, TupleOf, IntArg
 from chimerax.core.commands import run
 
-from AaronTools.atoms import Atom
-from AaronTools.const import PHYSICAL
 from AaronTools.geometry import Geometry
 from AaronTools.pathway import Pathway
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
-from matplotlib.backend_bases import MouseEvent
 from matplotlib.figure import Figure
 from matplotlib import rcParams
 
@@ -38,18 +33,15 @@ from Qt.QtWidgets import (
     QTableWidget,
     QTableView,
     QWidget,
-    QVBoxLayout,
     QTableWidgetItem,
     QFormLayout,
     QCheckBox,
     QHeaderView,
     QMenuBar,
-    QAction,
     QFileDialog,
     QStyle,
     QGroupBox,
     QLabel,
-    QToolBox,
     QHBoxLayout,
     QLineEdit,
 )

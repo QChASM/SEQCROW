@@ -1,6 +1,6 @@
 from io import BytesIO
 
-from chimerax.atomic import AtomicStructuresArg, AtomicStructure
+from chimerax.atomic import AtomicStructuresArg
 from chimerax.bild.bild import read_bild
 from chimerax.core.commands import CmdDesc, FloatArg, BoolArg, IntArg
 

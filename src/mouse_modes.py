@@ -15,7 +15,7 @@ from chimerax.core.commands import run
 from chimerax.core.tools import ToolInstance
 from chimerax.markers import MarkerSet, create_link
 from chimerax.mouse_modes import MouseMode
-from chimerax.ui.gui import MainToolWindow, ChildToolWindow
+from chimerax.ui.gui import MainToolWindow
 
 from Qt.QtCore import Qt
 from Qt.QtWidgets import QPushButton, QComboBox, QFormLayout, QCheckBox, QLineEdit
@@ -211,7 +211,7 @@ class _TSBondMarkers(MarkerSet):
         return mark
 
     def create_marker_from_point(self, pt, rgba, rad):
-        mark = super().create_marker(pt, (170, 255, 255, 127), rad)
+        super().create_marker(pt, (170, 255, 255, 127), rad)
 
 
 class DrawBondMouseMode(MouseMode):
@@ -287,7 +287,7 @@ class DrawBondMouseMode(MouseMode):
 
                 avg_radius = self.avg_bond_radius(self._atom1)
 
-                mark = self._markerset.create_marker_from_point(
+                self._markerset.create_marker_from_point(
                     pt,
                     self._atom1.color,
                     avg_radius,
@@ -644,13 +644,13 @@ class ChangeElementMouseMode(MouseMode):
     
     def mouse_up(self, event):
         if event.shift_down():
-            element_selector = _ElementPicker(self.session, "pick element")
+            _ElementPicker(self.session, "pick element")
             return
             
         if not self.element:
             self.session.logger.warning("no element selected; shift-click to set element")
             self.session.logger.status("no element selected; shift-click to set element")
-            element_selector = _ElementPicker(self.session, "pick element")
+            _ElementPicker(self.session, "pick element")
             return
             
         x, y = event.position()

@@ -3,21 +3,20 @@ import numpy as np
 from chimerax.atomic import selected_atoms, selected_bonds, selected_pseudobonds, AtomicStructure
 from chimerax.atomic.colors import element_color
 from chimerax.core.tools import ToolInstance
-from chimerax.ui.gui import MainToolWindow, ChildToolWindow
+from chimerax.ui.gui import MainToolWindow
 from chimerax.ui.widgets import ColorButton
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
-from chimerax.core.commands import run, BoolArg, ColorArg, FloatArg, IntArg, TupleOf
+from chimerax.core.commands import run, BoolArg, FloatArg, IntArg, TupleOf
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QGridLayout, QFormLayout, QCheckBox, QTabWidget, QPushButton, \
+from Qt.QtCore import Qt
+from Qt.QtWidgets import QGridLayout, QFormLayout, QCheckBox, QTabWidget, QPushButton, \
                          QSpinBox, QDoubleSpinBox, QWidget, QLabel, QStatusBar, QSizePolicy, \
                          QGroupBox, QComboBox
 
 from SEQCROW.utils import iter2str
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.selectors import get_fragment
-from SEQCROW.widgets import PeriodicTable
 from SEQCROW.tools.structure_editing import PTable
 from SEQCROW.utils import contrast_bw
 

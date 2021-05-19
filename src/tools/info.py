@@ -3,7 +3,7 @@ import re
 from SEQCROW.widgets import FilereaderComboBox
 
 from Qt.QtCore import Qt, QRegularExpression
-from Qt.QtGui import QKeySequence, QClipboard
+from Qt.QtGui import QKeySequence
 from Qt.QtWidgets import (
     QVBoxLayout,
     QTableWidget,
@@ -21,7 +21,7 @@ from Qt.QtWidgets import (
 )
 
 from chimerax.core.tools import ToolInstance
-from chimerax.ui.gui import MainToolWindow, ChildToolWindow
+from chimerax.ui.gui import MainToolWindow
 from chimerax.core.settings import Settings
 
 from AaronTools.theory import Theory

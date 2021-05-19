@@ -7,31 +7,8 @@ from AaronTools.theory import *
 
 from SEQCROW.tools.input_generator import (
     KeywordOptions,
-    CurrentKWTable,
-    CurrentOptTable,
     OneLayerKeyWordOption,
     TwoLayerKeyWordOption,
-)
-from SEQCROW.jobs import ORCAJob, GaussianJob, Psi4Job
-
-from PyQt5.QtCore import Qt, QRegularExpression, Signal
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import (
-    QLabel,
-    QGridLayout,
-    QSplitter,
-    QLineEdit,
-    QFileDialog,
-    QPushButton,
-    QWidget,
-    QGroupBox,
-    QTableWidget,
-    QTableWidgetItem,
-    QHBoxLayout,
-    QHeaderView,
-    QTextEdit,
-    QSizePolicy,
-    QStyle,
 )
 
 

@@ -9,13 +9,9 @@ from chimerax.core.commands import run
 
 from json import load, dump
 
-from Qt.QtWidgets import QMessageBox, QApplication
-
-from SEQCROW.jobs import LocalJob, GaussianJob, ORCAJob, Psi4Job
+from SEQCROW.jobs import LocalJob
 from SEQCROW.managers import ADD_FILEREADER
 from SEQCROW.residue_collection import ResidueCollection
-
-from inspect import signature
 
 JOB_FINISHED = "job finished"
 JOB_STARTED = "job started"

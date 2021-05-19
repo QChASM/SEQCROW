@@ -5,7 +5,7 @@ from AaronTools.ring import Ring
 from chimerax.atomic import OrderedAtomsArg, selected_atoms
 from chimerax.core.commands import BoolArg, CmdDesc, StringArg, DynamicEnum, ListOf, NoArg, Or, EmptyArg
 
-from SEQCROW.residue_collection import ResidueCollection, Residue
+from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.finders import AtomSpec
 
 

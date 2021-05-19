@@ -2,11 +2,8 @@ import os
 import subprocess
 from time import asctime, localtime
 
-from PyQt5.QtCore import QThread
+from Qt.QtCore import QThread
 
-from SEQCROW.theory import SEQCROW_Theory
-
-from AaronTools.theory import Theory
 from AaronTools.geometry import Geometry
 
 
@@ -105,8 +102,6 @@ class ORCAJob(LocalJob):
             "%s %s" % (self.name, self.start_time.replace(':', '.')),
         )
 
-        cwd = os.getcwd()
-
         if not os.path.exists(self.scratch_dir):
             os.makedirs(self.scratch_dir)
 
@@ -161,8 +156,6 @@ class GaussianJob(LocalJob):
             os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
             "%s %s" % (self.name, self.start_time.replace(':', '.')), \
         )
-
-        cwd = os.getcwd()
         
         if not os.path.exists(self.scratch_dir):
             os.makedirs(self.scratch_dir)
@@ -215,8 +208,6 @@ class Psi4Job(LocalJob):
             "%s %s" % (self.name, self.start_time.replace(':', '.')), \
         )
 
-        cwd = os.getcwd()
-
         if not os.path.exists(self.scratch_dir):
             os.makedirs(self.scratch_dir)
 
@@ -265,8 +256,6 @@ class SQMJob(LocalJob):
                         os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
                         "%s %s" % (self.name, self.start_time.replace(':', '.')), \
                     )
-
-        cwd = os.getcwd()
 
         if not os.path.exists(self.scratch_dir):
             os.makedirs(self.scratch_dir)

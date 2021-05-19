@@ -1,5 +1,5 @@
-from chimerax.atomic import selected_atoms, selected_bonds, AtomicStructure, PseudobondGroup
-from chimerax.core.commands import BoolArg, FloatArg, ColorArg, ObjectsArg, CmdDesc, run
+from chimerax.atomic import PseudobondGroup
+from chimerax.core.commands import FloatArg, ColorArg, ObjectsArg, CmdDesc, run
 
 
 tsbond_description = CmdDesc(
@@ -53,7 +53,6 @@ def tsbond(session, selection, transparency=50, color=[170, 255, 255, 255], radi
         bonds.append(ts_bond)
         
     for bond in bonds:       
-        s = ""
         atom1, atom2 = bond.atoms
         
         pbg = bond.structure.pseudobond_group("TS bonds", create_type=1)

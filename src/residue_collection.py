@@ -3,15 +3,13 @@ import numpy as np
 import re
 
 from AaronTools.atoms import Atom as AaronToolsAtom
-from AaronTools.const import METAL, VDW_RADII, MASS
+from AaronTools.const import METAL
 from AaronTools.geometry import Geometry
 from AaronTools.ring import Ring
 from AaronTools.finders import BondedTo
 
 from chimerax.atomic import AtomicStructure, Element
 from chimerax.atomic import Residue as ChimeraResidue
-from chimerax.atomic import Atom as ChixAtom
-from chimerax.atomic.colors import element_color
 
 from SEQCROW.finders import AtomSpec
 from SEQCROW.managers.filereader_manager import apply_seqcrow_preset
@@ -167,7 +165,6 @@ class Residue(Geometry):
     
     def update_chix(self, chix_residue, refresh_connected=True, apply_preset=True):
         """changes chimerax residue to match self"""
-        elements = {}
         known_atoms = []
         new_atoms = []
 
@@ -558,7 +555,7 @@ class ResidueCollection(Geometry):
             )
 
         if use_greek:
-            from AaronTools.finders import BondsFrom, NotAny
+            from AaronTools.finders import NotAny
             alphabet = [
                 "A",
                 "B",
@@ -596,13 +593,14 @@ class ResidueCollection(Geometry):
             cur_atoms = sub.find(list(start_atom.connected), BondedTo(sub.end))
             prev_atoms = [start_atom]
             stop = [start_atom]
+            not_h = sub.find(NotAny("H"))
             while ndx < len(alphabet):
                 if not cur_atoms:
                     break
                 for i, atom in enumerate(cur_atoms):
                     atom.chix_name = "%s%s" % (atom.element, alphabet[ndx])
                     if len([a for a in cur_atoms if a.element == atom.element]) > 1:
-                        neighbors = sub.find(BondedTo(atom), prev_atoms, NotAny("H"))
+                        neighbors = sub.find(BondedTo(atom), prev_atoms, not_h)
                         for neighbor in neighbors:
                             if not hasattr(neighbor, "chix_name"):
                                 continue
@@ -831,7 +829,7 @@ class ResidueCollection(Geometry):
     def all_geom_coordsets(self, filereader):
         if filereader.all_geom is None:
             warn("coordsets requested, but the file contains one or fewer sets of coordinates")
-            coordsets = struc.coordset(1)
+            coordsets = np.array([self.coords])
         else:
             coordsets = np.zeros((len(filereader.all_geom) + 1, len(self.atoms), 3))
             for i, all_geom in enumerate(filereader.all_geom):

@@ -2,7 +2,7 @@ import numpy as np
 
 from io import BytesIO
 
-from chimerax.core.commands import BoolArg, StringArg, CmdDesc, EnumOf
+from chimerax.core.commands import BoolArg, CmdDesc, EnumOf
 from chimerax.atomic import AtomsArg
 from chimerax.bild.bild import read_bild
 

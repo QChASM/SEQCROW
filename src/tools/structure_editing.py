@@ -2,7 +2,7 @@ from AaronTools.substituent import Substituent
 from AaronTools.component import Component
 from AaronTools.ring import Ring
 
-from chimerax.atomic import selected_atoms, selected_residues, PseudobondGroup
+from chimerax.atomic import selected_atoms, PseudobondGroup
 from chimerax.atomic.colors import element_color
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
@@ -10,23 +10,24 @@ from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
 from chimerax.core.commands import BoolArg, run
 
-from io import BytesIO
-
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QLabel, QLineEdit, QGridLayout, QPushButton, QTabWidget, QComboBox, \
-                            QTableWidget, QTableView, QWidget, QVBoxLayout, QTableWidgetItem, \
-                            QFormLayout, QCheckBox, QCompleter
+from Qt.QtCore import Qt
+from Qt.QtWidgets import (
+    QLabel, QLineEdit, QGridLayout, QPushButton, QTabWidget, QComboBox,
+    QWidget, QFormLayout, QCheckBox, QCompleter
+)
 
 from AaronTools.const import ELEMENTS, RADII
 from AaronTools.atoms import Atom
 
-from SEQCROW.residue_collection import ResidueCollection, Residue
+from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.libraries import SubstituentTable, LigandTable, RingTable
 from SEQCROW.commands.substitute import guessAttachmentTargets
 from SEQCROW.finders import AtomSpec
 from SEQCROW.widgets import PeriodicTable, ModelComboBox
 from SEQCROW.managers.filereader_manager import apply_seqcrow_preset
 from SEQCROW.utils import contrast_bw
+
+import numpy as np
 
 
 class _EditStructureSettings(Settings):

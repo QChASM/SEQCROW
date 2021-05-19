@@ -9,12 +9,11 @@ from chimerax.core.commands.cli import FloatArg, BoolArg, StringArg, IntArg
 
 from numpy import isclose
 
-from Qt.QtCore import Qt, QSize, Signal, QRegularExpression
-from Qt.QtGui import QKeySequence, QClipboard, QIcon
+from Qt.QtCore import Qt, Signal, QRegularExpression
+from Qt.QtGui import QKeySequence, QIcon
 from Qt.QtWidgets import (
     QLabel,
     QGridLayout,
-    QComboBox,
     QSplitter,
     QLineEdit,
     QDoubleSpinBox,
@@ -29,18 +28,13 @@ from Qt.QtWidgets import (
     QTreeWidget,
     QSizePolicy,
     QPushButton,
-    QHeaderView,
-    QHBoxLayout,
     QTreeWidgetItem,
     QStyle,
     QFormLayout,
     QTableWidget,
     QTableWidgetItem,
-    QStyleOptionHeader,
     QTextBrowser,
 )
-
-from os.path import basename
 
 from SEQCROW.widgets import FilereaderComboBox
 
@@ -155,7 +149,6 @@ class Thermochem(ToolInstance):
         sp_layout.addRow(self.sp_table)
 
 
-        row = 0
         #box for thermo
         therm_area_widget = QGroupBox("Thermal corrections")
         thermo_layout = QFormLayout(therm_area_widget)

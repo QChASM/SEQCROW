@@ -1,7 +1,6 @@
 from chimerax.atomic.colors import element_color
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
-from chimerax.core.settings import Settings
 
 from Qt.QtCore import Qt
 from Qt.QtGui import QIcon
@@ -22,11 +21,9 @@ from Qt.QtWidgets import (
 
 from AaronTools.const import ELEMENTS
 from AaronTools.component import Component
-from AaronTools.geometry import Geometry
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.libraries import LigandTable
-from SEQCROW.widgets import PeriodicTable
 from SEQCROW.managers.filereader_manager import apply_seqcrow_preset
 from SEQCROW.tools.structure_editing import _PTable
 from SEQCROW.utils import contrast_bw

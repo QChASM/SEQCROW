@@ -3,15 +3,15 @@ import numpy as np
 from chimerax.atomic import selected_atoms, selected_bonds, get_triggers
 from chimerax.bild.bild import read_bild
 from chimerax.core.tools import ToolInstance
-from chimerax.ui.gui import MainToolWindow, ChildToolWindow
+from chimerax.ui.gui import MainToolWindow
 from chimerax.core.settings import Settings
 from chimerax.core.generic3d import Generic3DModel 
 from chimerax.core.selection import SELECTION_CHANGED
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QGridLayout, QFormLayout, QCheckBox, QPushButton, \
-                            QDoubleSpinBox, QWidget, QLabel, QStatusBar, QComboBox, \
-                            QHBoxLayout
+from Qt.QtCore import Qt
+from Qt.QtWidgets import QGridLayout, QCheckBox, QPushButton, \
+    QDoubleSpinBox, QWidget, QLabel, QStatusBar, QComboBox, \
+    QHBoxLayout
 
 from io import BytesIO
 
@@ -416,9 +416,7 @@ class PrecisionRotate(ToolInstance):
             y = self.vector_y.value()
             z = self.vector_z.value()
             vector = np.array([x, y, z])
-        
-        angle = np.deg2rad(self.angle.value())
-        
+
         center = {}
         for model in models:
             atoms = models[model]

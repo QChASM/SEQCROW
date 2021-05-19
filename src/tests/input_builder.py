@@ -1,9 +1,9 @@
 import os.path
 
-from AaronTools.test import prefix, validate
+from AaronTools.test import prefix
 from AaronTools.theory import BasisSet, Basis
 from chimerax.core.commands import run
-from PyQt5.QtCore import Qt
+from Qt.QtCore import Qt
 from TestManager import TestWithSession
 
 

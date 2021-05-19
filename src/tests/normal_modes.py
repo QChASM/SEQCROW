@@ -1,6 +1,6 @@
 import os.path
 
-from AaronTools.test import prefix, validate
+from AaronTools.test import prefix
 from chimerax.core.commands import run
 from TestManager import TestWithSession
 

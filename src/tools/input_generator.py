@@ -1,4 +1,6 @@
-from chimerax.atomic import AtomicStructure, selected_atoms, selected_bonds, selected_pseudobonds, get_triggers
+import re
+
+from chimerax.atomic import selected_atoms, selected_bonds, selected_pseudobonds, get_triggers
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.core.settings import Settings
@@ -10,14 +12,14 @@ from json import dumps, loads, dump, load
 
 from configparser import ConfigParser
 
-from PyQt5.QtCore import Qt, QRegularExpression, Signal
-from PyQt5.QtGui import QKeySequence, QFontMetrics, QFontDatabase, QClipboard, QIcon
-from PyQt5.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, QFrame, QLineEdit, \
-                            QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, \
-                            QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, \
-                            QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView, QTextBrowser, \
-                            QStatusBar, QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem, QSizePolicy, \
-                            QStyle 
+from Qt.QtCore import Qt, QRegularExpression, Signal
+from Qt.QtGui import QKeySequence, QFontDatabase, QIcon
+from Qt.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, QLineEdit, \
+    QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, \
+    QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, \
+    QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView, QTextBrowser, \
+    QStatusBar, QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem, QSizePolicy, \
+    QStyle 
 
 from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.utils import iter2str
@@ -312,7 +314,6 @@ class BuildQM(ToolInstance):
         old_settings = ConfigParser()
         old_settings.read(filename)
         if old_settings.has_option("DEFAULT", "previous_basis_names"):
-            previous_basis_names = old_settings.get("DEFAULT", "previous_basis_names")
             self.settings.previous_basis_names = eval("[%s]" % old_settings.get("DEFAULT", "previous_basis_names"))
         if old_settings.has_option("DEFAULT", "previous_basis_paths"):
             previous_basis_paths = eval("[%s]" % old_settings.get("DEFAULT", "previous_basis_paths"))
@@ -997,12 +998,6 @@ class BuildQM(ToolInstance):
                                     "%i" % (self.theory.geometry.atoms.index(atom) + 1)
                                     for atom in self.theory.geometry.find(con)
                                 ]
-
-        kw_dict = self.job_widget.getKWDict(update_settings=True)
-        other_kw_dict = self.other_keywords_widget.getKWDict(update_settings=True)
-        self.settings.save()
-
-        combined_dict = combine_dicts(kw_dict, other_kw_dict)
 
         self.settings.last_program = self.file_type.currentText()
 
@@ -3186,8 +3181,6 @@ class BasisOption(QWidget):
             return basis_obj
         else:
             basis = self.custom_basis_kw.text()
-            if update_settings:
-                cur_settings = self.settings.__getattr__(self.last_custom)
 
             if self.is_builtin.checkState() == Qt.Checked:
                 gen_path = False

@@ -1,19 +1,16 @@
 import numpy as np
 
-from chimerax.atomic import AtomicStructure, Atoms, Atom, selected_atoms, selected_bonds
+from chimerax.atomic import AtomicStructure, Atoms, selected_atoms, selected_bonds
 from chimerax.core.commands import register_selector
 
 from AaronTools.atoms import BondOrder
 from AaronTools.substituent import Substituent
-from AaronTools.geometry import Geometry
 from AaronTools.const import TMETAL
 from AaronTools.utils.prime_numbers import Primes
 
 from SEQCROW.residue_collection import ResidueCollection
 
 from collections import deque
-
-from time import perf_counter
 
 from warnings import warn
 
@@ -70,9 +67,7 @@ def substituent_selection(session, sub_name, models, results):
     sorted_sub_atoms = [x for _, x in sorted(zip(sub_ranks, chix_sub.atoms), key = lambda pair: pair[0])]
     
     length = len(sub.atoms)
-    
-    found = False
-    
+
     #rank_time = 0
     #frag_time = 0
     

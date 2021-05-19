@@ -1,16 +1,14 @@
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.widgets import ColorButton
 from chimerax.bild.bild import read_bild
-from chimerax.atomic import Atom
-from chimerax.core.models import MODEL_DISPLAY_CHANGED
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
 from chimerax.core.commands.cli import FloatArg, TupleOf
 
 from io import BytesIO
 
-from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtWidgets import QGridLayout, QPushButton, QCheckBox, QTabWidget, QWidget, QVBoxLayout
+from Qt import QtCore
+from Qt.QtWidgets import QGridLayout, QPushButton, QCheckBox, QTabWidget, QWidget, QVBoxLayout
 
 from AaronTools.component import Component
 from AaronTools.ring import Ring

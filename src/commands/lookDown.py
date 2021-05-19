@@ -59,7 +59,7 @@ def lookDown(session, atom1, atom2, axis="z", printRotation=False):
             dot = -1
         angle = np.arccos(dot)
         
-        rot_mat = rotation_matrix(-angle, rot_axis)
+        rot_mat = rotation_matrix(-angle, rot_axis).T
         
         if printRotation:
             session.logger.info("rotation matrix:\n%s" % "\n".join([",".join(["%.3f" % x for x in r]) for r in rot_mat]))

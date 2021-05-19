@@ -1,5 +1,3 @@
-import numpy as np
-
 def apply_seqcrow_bse_lighting(session):
     view = session.main_view
     # view.set_background_color([1., 1., 1., 0])
@@ -27,7 +25,7 @@ def seqcrow_bse(session, models=None, atoms=None):
     atoms colored by Jmol colors"""
 
     from AaronTools.const import RADII
-    from chimerax.atomic import AtomicStructure, Atom, Bond
+    from chimerax.atomic import AtomicStructure, Atom
     from chimerax.atomic.colors import element_color
 
     if models is None or atoms is None:
@@ -149,8 +147,8 @@ def seqcrow_s(session, models=None, atoms=None):
     """atoms are represented with sticks
     atoms colored by Jmol colors"""
 
-    from AaronTools.const import RADII, VDW_RADII, TMETAL
-    from chimerax.atomic import AtomicStructure, Atom, Bond
+    from AaronTools.const import RADII
+    from chimerax.atomic import AtomicStructure, Atom
     from chimerax.atomic.colors import element_color
     from SEQCROW.selectors import get_fragment
 

@@ -1,5 +1,3 @@
-import os
-
 from chimerax.core.tools import ToolInstance
 from chimerax.atomic import selected_atoms
 from chimerax.core.configfile import Value
@@ -8,15 +6,13 @@ from chimerax.core.settings import Settings
 from chimerax.core.models import Surface
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QKeySequence, QClipboard
-from PyQt5.QtWidgets import QPushButton, QFormLayout, QComboBox, QCheckBox, QMenuBar, QAction, \
-                            QFileDialog, QApplication, QTableWidget, QTableWidgetItem, \
-                            QHeaderView, QSpinBox, QWidget, QGridLayout, \
-                            QTabWidget, QGroupBox, QDoubleSpinBox
+from Qt.QtCore import Qt
+from Qt.QtGui import QKeySequence
+from Qt.QtWidgets import QPushButton, QFormLayout, QComboBox, QCheckBox, QMenuBar, QAction, \
+    QFileDialog, QApplication, QTableWidget, QTableWidgetItem, \
+    QHeaderView, QSpinBox, QWidget, QGridLayout, \
+    QTabWidget, QGroupBox, QDoubleSpinBox
 
-from SEQCROW.residue_collection import ResidueCollection
-from SEQCROW.finders import AtomSpec
 from SEQCROW.commands.percent_Vbur import percent_vbur as percent_vbur_cmd
 from SEQCROW.tools.per_frame_plot import NavigationToolbar
 
@@ -621,7 +617,12 @@ class StericMap(ChildToolWindow):
         fig, ax = plt.subplots()
         steric_map = ax.contourf(x, y, z, extend="min", cmap=copy.copy(plt.cm.get_cmap("jet")), levels=np.linspace(min_alt, max_alt, num=21))
         steric_map.cmap.set_under('w')
-        steric_lines = ax.contour(x, y, z, extend="min", colors='k', levels=np.linspace(min_alt, max_alt, num=21))
+        ax.contour(
+            x, y, z,
+            extend="min",
+            colors='k',
+            levels=np.linspace(min_alt, max_alt, num=21)
+        )
         bar = fig.colorbar(steric_map, format="%.1f")
         bar.set_label("altitude (Å)")
         ax.set_aspect("equal")
