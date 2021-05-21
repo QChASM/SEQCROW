@@ -483,6 +483,14 @@ class _SEQCROW_API(BundleAPI):
                 from .tests.buried_volume import BuriedVolumeToolTest
                 return BuriedVolumeToolTest
 
+            elif name == "lookDown_command":
+                from .tests.lookDown_command import LookDownCmdTest
+                return LookDownCmdTest
+
+            elif name == "cone_angle":
+                from .tests.cone_angle import ConeAngleToolTest
+                return ConeAngleToolTest
+
     @staticmethod
     def register_command(bundle_info, command_info, logger):
         """

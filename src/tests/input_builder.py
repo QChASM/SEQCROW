@@ -8,16 +8,18 @@ from TestManager import TestWithSession
 
 
 class QMInputBuilderToolTest(TestWithSession):
-    
+
     benzene = os.path.join(prefix, "test_files", "benzene.xyz")
-    met_cat = os.path.join(prefix, "test_files", "catalysts", "tm_multi-lig.xyz")
+    met_cat = os.path.join(
+        prefix, "test_files", "catalysts", "tm_multi-lig.xyz"
+    )
 
     def test_gaussian_opt(self):
         run(self.session, "open %s" % self.benzene)
-        
+
         qm_input_tool = self.open_tool("Build QM Input")
         self.assertTrue(bool(qm_input_tool))
-        
+
         ndx = qm_input_tool.file_type.findText("Gaussian", Qt.MatchExactly)
         qm_input_tool.file_type.setCurrentIndex(ndx)
 
@@ -29,24 +31,26 @@ class QMInputBuilderToolTest(TestWithSession):
         qm_input_tool.job_widget.nprocs.setValue(0)
         qm_input_tool.job_widget.mem.setValue(0)
 
-        ndx = qm_input_tool.job_widget.solvent_option.findText("None", Qt.MatchExactly)
+        ndx = qm_input_tool.job_widget.solvent_option.findText(
+            "None", Qt.MatchExactly
+        )
         qm_input_tool.job_widget.solvent_option.setCurrentIndex(ndx)
-        
+
         qm_input_tool.method_widget.setMethod("wB97X-D")
         qm_input_tool.method_widget.setGrid("SuperFineGrid")
         qm_input_tool.method_widget.setDispersion("None")
-        
+
         basis = BasisSet("def2-SVP")
         qm_input_tool.basis_widget.setBasis(basis)
-        
+
         qm_input_tool.other_keywords_widget.setKeywords({})
-        
+
         contents, warnings = qm_input_tool.get_file_contents()
         qm_input_tool.delete()
         if warnings:
             # there were warnings - I don't expect any
             self.assertTrue(False)
-        
+
         ref_file = """#n wB97XD/def2SVP opt Integral=(grid=SuperFineGrid) 
 
 benzene_1-NO2_4-Cl.xyz 12,11=>H
@@ -68,12 +72,12 @@ H     -2.52191    -3.27117     0.00170
 
 
 """
-        
+
         content_lines = contents.splitlines()
         ref_lines = ref_file.splitlines()
-        
+
         self.assertEqual(len(content_lines), len(ref_lines))
-        
+
         for ref, test in zip(ref_lines, content_lines):
             self.assertEqual(ref, test)
 
@@ -82,7 +86,7 @@ H     -2.52191    -3.27117     0.00170
 
         qm_input_tool = self.open_tool("Build QM Input")
         self.assertTrue(bool(qm_input_tool))
-        
+
         ndx = qm_input_tool.file_type.findText("Gaussian", Qt.MatchExactly)
         qm_input_tool.file_type.setCurrentIndex(ndx)
 
@@ -93,13 +97,15 @@ H     -2.52191    -3.27117     0.00170
         qm_input_tool.job_widget.nprocs.setValue(0)
         qm_input_tool.job_widget.mem.setValue(0)
 
-        ndx = qm_input_tool.job_widget.solvent_option.findText("None", Qt.MatchExactly)
+        ndx = qm_input_tool.job_widget.solvent_option.findText(
+            "None", Qt.MatchExactly
+        )
         qm_input_tool.job_widget.solvent_option.setCurrentIndex(ndx)
-        
+
         qm_input_tool.method_widget.setMethod("B3LYP")
         qm_input_tool.method_widget.setGrid("SuperFineGrid")
         qm_input_tool.method_widget.setDispersion("None")
-        
+
         basis = BasisSet(
             basis=[
                 Basis(
@@ -114,15 +120,15 @@ H     -2.52191    -3.27117     0.00170
             ecp="Ru SDD"
         )
         qm_input_tool.basis_widget.setBasis(basis)
-        
+
         qm_input_tool.other_keywords_widget.setKeywords({})
-        
+
         contents, warnings = qm_input_tool.get_file_contents()
         qm_input_tool.delete()
         if warnings:
             # there were warnings - I don't expect any
             self.assertTrue(False)
-        
+
         ref_file = """#n B3LYP/genecp Integral=(grid=SuperFineGrid) 
 
 F:22-8;8-3;3-4
@@ -241,12 +247,12 @@ SDD
 
 
 """
-        
+
         content_lines = contents.splitlines()
         ref_lines = ref_file.splitlines()
-        
+
         self.assertEqual(len(content_lines), len(ref_lines))
-        
+
         for ref, test in zip(ref_lines, content_lines):
             self.assertEqual(ref, test)
 
@@ -255,7 +261,7 @@ SDD
 
         qm_input_tool = self.open_tool("Build QM Input")
         self.assertTrue(bool(qm_input_tool))
-        
+
         ndx = qm_input_tool.file_type.findText("ORCA", Qt.MatchExactly)
         qm_input_tool.file_type.setCurrentIndex(ndx)
 
@@ -267,24 +273,26 @@ SDD
         qm_input_tool.job_widget.nprocs.setValue(0)
         qm_input_tool.job_widget.mem.setValue(0)
 
-        ndx = qm_input_tool.job_widget.solvent_option.findText("None", Qt.MatchExactly)
+        ndx = qm_input_tool.job_widget.solvent_option.findText(
+            "None", Qt.MatchExactly
+        )
         qm_input_tool.job_widget.solvent_option.setCurrentIndex(ndx)
-        
+
         qm_input_tool.method_widget.setMethod("M06-2X")
         qm_input_tool.method_widget.setGrid("Grid7")
         qm_input_tool.method_widget.setDispersion("Zero-damped Grimme D3")
-        
+
         basis = BasisSet("def2-TZVP")
         qm_input_tool.basis_widget.setBasis(basis)
-        
+
         qm_input_tool.other_keywords_widget.setKeywords({})
-        
+
         contents, warnings = qm_input_tool.get_file_contents()
         qm_input_tool.delete()
         if warnings:
             # there were warnings - I don't expect any
             self.assertTrue(False)
-        
+
         ref_file = """#benzene_1-NO2_4-Cl.xyz 12,11=>H
 ! M062X D3ZERO Grid7 FinalGrid7 def2-TZVP Opt
 
@@ -303,12 +311,12 @@ H    -0.037665   1.033485  -0.000129
 H    -2.521911  -3.271171   0.001704
 *
 """
-        
+
         content_lines = contents.splitlines()
         ref_lines = ref_file.splitlines()
-        
+
         self.assertEqual(len(content_lines), len(ref_lines))
-        
+
         for ref, test in zip(ref_lines, content_lines):
             self.assertEqual(ref, test)
 
@@ -317,7 +325,7 @@ H    -2.521911  -3.271171   0.001704
 
         qm_input_tool = self.open_tool("Build QM Input")
         self.assertTrue(bool(qm_input_tool))
-        
+
         ndx = qm_input_tool.file_type.findText("ORCA", Qt.MatchExactly)
         qm_input_tool.file_type.setCurrentIndex(ndx)
 
@@ -331,24 +339,26 @@ H    -2.521911  -3.271171   0.001704
         qm_input_tool.job_widget.nprocs.setValue(0)
         qm_input_tool.job_widget.mem.setValue(0)
 
-        ndx = qm_input_tool.job_widget.solvent_option.findText("None", Qt.MatchExactly)
+        ndx = qm_input_tool.job_widget.solvent_option.findText(
+            "None", Qt.MatchExactly
+        )
         qm_input_tool.job_widget.solvent_option.setCurrentIndex(ndx)
-        
+
         qm_input_tool.method_widget.setMethod("M06-2X")
         qm_input_tool.method_widget.setGrid("Grid7")
         qm_input_tool.method_widget.setDispersion("None")
-        
+
         basis = BasisSet("def2-SVP")
         qm_input_tool.basis_widget.setBasis(basis)
-        
+
         qm_input_tool.other_keywords_widget.setKeywords({})
-        
+
         contents, warnings = qm_input_tool.get_file_contents()
         qm_input_tool.delete()
         if warnings:
             # there were warnings - I don't expect any
             self.assertTrue(False)
-        
+
         ref_file = """#benzene_1-NO2_4-Cl.xyz 12,11=>H
 ! M062X Grid7 FinalGrid7 def2-SVP NumFreq
 %freq
@@ -370,12 +380,12 @@ H    -0.037665   1.033485  -0.000129
 H    -2.521911  -3.271171   0.001704
 *
 """
-        
+
         content_lines = contents.splitlines()
         ref_lines = ref_file.splitlines()
-        
+
         self.assertEqual(len(content_lines), len(ref_lines))
-        
+
         for ref, test in zip(ref_lines, content_lines):
             self.assertEqual(ref, test)
 
@@ -384,7 +394,7 @@ H    -2.521911  -3.271171   0.001704
 
         qm_input_tool = self.open_tool("Build QM Input")
         self.assertTrue(bool(qm_input_tool))
-        
+
         ndx = qm_input_tool.file_type.findText("Psi4", Qt.MatchExactly)
         qm_input_tool.file_type.setCurrentIndex(ndx)
 
@@ -395,22 +405,22 @@ H    -2.521911  -3.271171   0.001704
         qm_input_tool.job_widget.multiplicity.setValue(1)
         qm_input_tool.job_widget.nprocs.setValue(0)
         qm_input_tool.job_widget.mem.setValue(0)
-        
+
         qm_input_tool.method_widget.setMethod("HF")
         qm_input_tool.method_widget.setGrid("Default")
         qm_input_tool.method_widget.setDispersion("None")
-        
+
         basis = BasisSet("def2-SVP")
         qm_input_tool.basis_widget.setBasis(basis)
-        
+
         qm_input_tool.other_keywords_widget.setKeywords({})
-        
+
         contents, warnings = qm_input_tool.get_file_contents()
         qm_input_tool.delete()
         if warnings:
             # there were warnings - I don't expect any
             self.assertTrue(False)
-        
+
         ref_file = """#benzene_1-NO2_4-Cl.xyz 12,11=>H
 basis {
     assign    def2-SVP
@@ -437,9 +447,9 @@ nrg = optimize('HF')
 
         content_lines = contents.splitlines()
         ref_lines = ref_file.splitlines()
-        
+
         self.assertEqual(len(content_lines), len(ref_lines))
-        
+
         for ref, test in zip(ref_lines, content_lines):
             self.assertEqual(ref, test)
 
@@ -448,7 +458,7 @@ nrg = optimize('HF')
 
         qm_input_tool = self.open_tool("Build QM Input")
         self.assertTrue(bool(qm_input_tool))
-        
+
         ndx = qm_input_tool.file_type.findText("Psi4", Qt.MatchExactly)
         qm_input_tool.file_type.setCurrentIndex(ndx)
 
@@ -458,22 +468,24 @@ nrg = optimize('HF')
         qm_input_tool.job_widget.multiplicity.setValue(1)
         qm_input_tool.job_widget.nprocs.setValue(0)
         qm_input_tool.job_widget.mem.setValue(0)
-        
+
         qm_input_tool.method_widget.setMethod("CCSD(T)")
         qm_input_tool.method_widget.setGrid("Default")
         qm_input_tool.method_widget.setDispersion("None")
-        
+
         basis = BasisSet("aug-cc-pVDZ")
         qm_input_tool.basis_widget.setBasis(basis)
-        
-        qm_input_tool.other_keywords_widget.setKeywords({"job":{"energy":[]}})
-        
+
+        qm_input_tool.other_keywords_widget.setKeywords(
+            {"job": {"energy": []}}
+        )
+
         contents, warnings = qm_input_tool.get_file_contents()
         qm_input_tool.delete()
         if warnings:
             # there were warnings - I don't expect any
             self.assertTrue(False)
-        
+
         ref_file = """#benzene_1-NO2_4-Cl.xyz 12,11=>H
 basis {
     assign    aug-cc-pVDZ
@@ -500,8 +512,61 @@ nrg = energy('CCSD(T)')
 
         content_lines = contents.splitlines()
         ref_lines = ref_file.splitlines()
-        
+
         self.assertEqual(len(content_lines), len(ref_lines))
-        
+
+        for ref, test in zip(ref_lines, content_lines):
+            self.assertEqual(ref, test)
+
+    def test_sqm_opt(self):
+        run(self.session, "open %s" % self.benzene)
+
+        qm_input_tool = self.open_tool("Build QM Input")
+        self.assertTrue(bool(qm_input_tool))
+
+        ndx = qm_input_tool.file_type.findText("SQM", Qt.MatchExactly)
+        qm_input_tool.file_type.setCurrentIndex(ndx)
+
+        qm_input_tool.job_widget.do_geom_opt.setCheckState(Qt.Checked)
+        qm_input_tool.job_widget.charge.setValue(0)
+        qm_input_tool.job_widget.multiplicity.setValue(1)
+        qm_input_tool.job_widget.nprocs.setValue(0)
+        qm_input_tool.job_widget.mem.setValue(0)
+
+        qm_input_tool.method_widget.setMethod("AM1")
+
+        qm_input_tool.other_keywords_widget.setKeywords({})
+
+        contents, warnings = qm_input_tool.get_file_contents()
+        qm_input_tool.delete()
+        if warnings:
+            # there were warnings - I don't expect any
+            self.assertTrue(False)
+
+        ref_file = """benzene_1-NO2_4-Cl.xyz 12,11=>H
+ &qmmm
+   qmcharge=0,
+   spin=1,
+   qm_theory='AM1',
+ /
+  6   C   -1.97696   -2.32718    0.00126
+  6   C   -2.36814   -1.29554    0.85518
+  6   C   -1.67136   -0.08735    0.85440
+  6   C   -0.58210    0.08919    0.00026
+  6   C   -0.19077   -0.94241   -0.85309
+  6   C   -0.88848   -2.15056   -0.85289
+  1   H   -3.22679   -1.43483    1.52790
+  1   H   -1.98002    0.72606    1.52699
+  1   H    0.66766   -0.80358   -1.52636
+  1   H   -0.57992   -2.96360   -1.52585
+  1   H   -0.03766    1.03348   -0.00013
+  1   H   -2.52191   -3.27117    0.00170
+"""
+
+        content_lines = contents.splitlines()
+        ref_lines = ref_file.splitlines()
+
+        self.assertEqual(len(content_lines), len(ref_lines))
+
         for ref, test in zip(ref_lines, content_lines):
             self.assertEqual(ref, test)

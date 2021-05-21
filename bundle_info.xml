@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="1.0.1">
+            version="1.0.2b1">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -189,6 +189,8 @@
                 <Provider name="normal_modes"/>
                 <Provider name="substitute_command"/>
                 <Provider name="buried_volume"/>
+                <Provider name="lookDown_command"/>
+                <Provider name="cone_angle"/>
             </Providers>
   
             <!--
