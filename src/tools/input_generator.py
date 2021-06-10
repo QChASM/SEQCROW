@@ -2826,7 +2826,7 @@ class MethodOption(QWidget):
 
         elif "sapt" in test_value:
             ndx = self.method_option.findText("SAPT", Qt.MatchExactly)
-            m = QRegularExpression("(.*)sapt(.*)(-ct)")
+            m = QRegularExpression("(.*)sapt(0|2\+(?:\(?3\)?)?|2)(-ct)?")
             match = m.match(test_value)
             sapt_type = match.captured(1)
             sapt_level = match.captured(2)
@@ -2922,6 +2922,7 @@ class BasisOption(QWidget):
         self.custom_basis_kw.textChanged.connect(self.update_tooltab)
         self.custom_basis_kw.setPlaceholderText("filter basis sets")
         self.custom_basis_kw.setClearButtonEnabled(True)
+        self.custom_basis_kw.editingFinished.connect(lambda *args, s=self: self.parent.something_changed())
         keyword_label = QLabel("name:")
         self.basis_name_options.addRow(keyword_label, self.custom_basis_kw)
 
@@ -2932,8 +2933,10 @@ class BasisOption(QWidget):
         self.basis_name_options.addRow(aux_label, self.aux_type)
 
         self.is_builtin = QCheckBox()
-        self.is_builtin.setToolTip("checked: basis set is avaiable in the software with a keyword\n" + \
-                                   "unchecked: basis set is stored in an external file")
+        self.is_builtin.setToolTip(
+            "checked: basis set is avaiable in the software with a keyword\n"
+            "unchecked: basis set is stored in an external file"
+        )
         self.is_builtin.stateChanged.connect(self.show_gen_path)
 
         is_builtin_label = QLabel("built-in:")
@@ -3228,6 +3231,7 @@ class BasisOption(QWidget):
 
                     self.previously_used_table.resizeColumnToContents(0)
                     self.previously_used_table.resizeColumnToContents(2)
+                    self.previously_used_table.resizeRowToContents(row)
 
             basis_obj = self.basis_class(basis, self.currentElements(), aux_type=aux, user_defined=gen_path)
             return basis_obj

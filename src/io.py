@@ -90,8 +90,6 @@ def save_aarontools(session, path, format_name, **kwargs):
     kwargs may be:
         comment - str
     """
-    from SEQCROW.residue_collection import ResidueCollection
-    from AaronTools.geometry import Geometry
     from chimerax.atomic import AtomicStructure
     
     accepted_kwargs = ['comment', 'models']
@@ -112,14 +110,12 @@ def save_aarontools(session, path, format_name, **kwargs):
     if len(models) < 1:
         raise RuntimeError('nothing to save')
     
-    res_cols = [ResidueCollection(model) for model in models]
-    atoms = []
-    for res in res_cols:
-        atoms.extend(res.atoms)
-        
-    geom = Geometry(atoms)
-    
-    if 'comment' in kwargs:
-        geom.comment = kwargs["comment"]
-    
-    geom.write(outfile=path)
+    with open(path, "w") as f:
+        for model in models:
+            f.write("%i\n%s\n" % (model.num_atoms, model.name))
+        for atom in model.atoms:
+            f.write(
+                "%2s    %9.5f    %9.5f     %9.5f\n" % (
+                    atom.element.name, *atom.coord
+                )
+            )

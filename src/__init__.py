@@ -278,6 +278,10 @@ class _SEQCROW_API(BundleAPI):
             from .tools import CoordinationComplexVomit
             return CoordinationComplexVomit(session, ti.name)
 
+        elif ti.name == "Orbital Viewer":
+            from .tools import OrbitalViewer
+            return OrbitalViewer(session, ti.name)
+
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)
 
