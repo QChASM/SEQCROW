@@ -47,9 +47,9 @@ class OrbitalGrid(GridData):
         if ijk_size is None:
             ijk_size = self.data.shape
         return self._data[
-            ijk_origin[2]:ijk_size[2]:ijk_step[2],
-            ijk_origin[1]:ijk_size[1]:ijk_step[1],
-            ijk_origin[0]:ijk_size[0]:ijk_step[0]
+            ijk_origin[2]:ijk_size[2] + ijk_origin[2]:ijk_step[2],
+            ijk_origin[1]:ijk_size[1] + ijk_origin[1]:ijk_step[1],
+            ijk_origin[0]:ijk_size[0] + ijk_origin[0]:ijk_step[0]
         ]
     
     def matrix(
@@ -63,9 +63,9 @@ class OrbitalGrid(GridData):
         if ijk_size is None:
             ijk_size = self.data.shape
         return self._data[
-            ijk_origin[2]:ijk_size[2]:ijk_step[2],
-            ijk_origin[1]:ijk_size[1]:ijk_step[1],
-            ijk_origin[0]:ijk_size[0]:ijk_step[0]
+            ijk_origin[2]:ijk_size[2] + ijk_origin[2]:ijk_step[2],
+            ijk_origin[1]:ijk_size[1] + ijk_origin[1]:ijk_step[1],
+            ijk_origin[0]:ijk_size[0] + ijk_origin[0]:ijk_step[0]
         ]
 
 
