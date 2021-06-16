@@ -1,3 +1,4 @@
+from sys import platform
 import os
 import subprocess
 from time import asctime, localtime
@@ -7,10 +8,9 @@ from Qt.QtCore import QThread
 from AaronTools.geometry import Geometry
 
 
-from sys import platform
-
 class LocalJob(QThread):
     format_name = None
+    info_type = None
     """name of format for open command"""
     def __init__(self, name, session, theory, geometry=None, auto_update=False, auto_open=False):
         """base class of local ORCA, Gaussian, and Psi4 jobs
@@ -40,7 +40,9 @@ class LocalJob(QThread):
         if self.process is not None:
             self.process.kill()
             self.process.wait()
-            self.session.logger.warning("%s might finish an in-progess calculation step before exiting" % self)
+            self.session.logger.warning(
+                "%s might finish an in-progess calculation step before exiting" % self
+            )
         
         self.killed = True
        
@@ -56,6 +58,27 @@ class LocalJob(QThread):
             self.process.kill()
             
         super().terminate()
+    
+    def write_file(self, filename):
+        input_info = self.session.seqcrow_qm_input_manager.get_info(self.info_type)
+        contents, warnings = input_info.get_file_contents(self.theory)
+        if isinstance(contents, dict):
+            for key, item in contents.items():
+                if "%" in key:
+                    fname = key % filename
+                else:
+                    fname = filename
+                outname = os.path.basename(fname)
+                name, ext = os.path.splitext(outname)
+                item = item.replace("{ name }", name)
+                with open(fname, "w") as f:
+                    f.write(item)
+        else:
+            outname = os.path.basename(filename)
+            name, ext = os.path.splitext(outname)
+            contents = contents.replace("{ name }", name)
+            with open(filename, "w") as f:
+                f.write(contents)
     
     def get_json(self):
         d = {
@@ -91,6 +114,7 @@ class LocalJob(QThread):
 
 class ORCAJob(LocalJob):
     format_name = "out"
+    info_type = "ORCA"
     def __repr__(self):
         return "local ORCA job \"%s\"" % self.name
 
@@ -108,8 +132,7 @@ class ORCAJob(LocalJob):
         infile = self.name + '.inp'
         infile = infile.replace(' ', '_')
         infile_path = os.path.join(self.scratch_dir, infile)
-        self.theory.geometry.write(theory=self.theory, outfile=infile_path, style="orca")
-
+        self.write_file(infile_path)
         executable = os.path.abspath(self.session.seqcrow_settings.settings.ORCA_EXE)
         if not os.path.exists(executable):
             executable = self.session.seqcrow_settings.settings.ORCA_EXE
@@ -146,6 +169,7 @@ class ORCAJob(LocalJob):
 
 class GaussianJob(LocalJob):
     format_name = "log"
+    info_type = "Gaussian"
     def __repr__(self):
         return "local Gaussian job \"%s\"" % self.name
 
@@ -166,7 +190,7 @@ class GaussianJob(LocalJob):
             infile = self.name + '.com'
 
         infile_path = os.path.join(self.scratch_dir, infile)
-        self.theory.geometry.write(theory=self.theory, outfile=infile_path, style="gaussian")
+        self.write_file(infile_path)
 
         executable = os.path.abspath(self.session.seqcrow_settings.settings.GAUSSIAN_EXE)
         if not os.path.exists(executable):
@@ -197,6 +221,7 @@ class GaussianJob(LocalJob):
 
 class Psi4Job(LocalJob):
     format_name = "dat"
+    info_type = "Psi4"
     def __repr__(self):
         return "local Psi4 job \"%s\"" % self.name
 
@@ -213,7 +238,7 @@ class Psi4Job(LocalJob):
 
         infile = self.name + '.in'
         infile_path = os.path.join(self.scratch_dir, infile)
-        self.theory.geometry.write(theory=self.theory, outfile=infile_path, style="psi4")
+        self.write_file(infile_path)
 
         executable = os.path.abspath(self.session.seqcrow_settings.settings.PSI4_EXE)
         if not os.path.exists(executable):
@@ -244,7 +269,7 @@ class Psi4Job(LocalJob):
 
 class SQMJob(LocalJob):
     format_name = "sqmout"
-
+    info_type = "SQM"
     def __repr__(self):
         return "local sqm job \"%s\"" % self.name
 
@@ -262,11 +287,12 @@ class SQMJob(LocalJob):
 
         infile = self.name + '.mdin'
         infile_path = os.path.join(self.scratch_dir, infile)
-        self.theory.geometry.write(theory=self.theory, outfile=infile_path, style="sqm")
+        self.write_file(infile_path)
 
         exec_dir = os.path.dirname(sys.executable)
         sqm_exe = os.path.join(exec_dir, "amber20", "bin", "sqm")
         if not os.path.exists(sqm_exe):
+            # add .exe for windows only?
             sqm_exe += ".exe"
 
         self.output_name = os.path.join(self.scratch_dir, self.name + '.sqmout')

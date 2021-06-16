@@ -1,3 +1,4 @@
+import os.path
 import re
 
 from chimerax.atomic import selected_atoms, selected_bonds, selected_pseudobonds, get_triggers
@@ -23,7 +24,8 @@ from Qt.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, Q
 
 from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.utils import iter2str
-from SEQCROW.widgets import PeriodicTable, ModelComboBox
+from SEQCROW.widgets.periodic_table import PeriodicTable
+from SEQCROW.widgets.comboboxes import ModelComboBox
 from SEQCROW.finders import AtomSpec
 
 from AaronTools.config import Config
@@ -1008,7 +1010,13 @@ class BuildQM(ToolInstance):
                 program,
                 self.session.seqcrow_job_manager,
             )
-            job = job_cls(name, self.session, self.theory, auto_update=auto_update, auto_open=auto_open)
+            job = job_cls(
+                name,
+                self.session,
+                self.theory,
+                auto_update=auto_update,
+                auto_open=auto_open
+            )
     
             self.session.logger.status("adding %s to queue" % name)
     
@@ -1061,9 +1069,15 @@ class BuildQM(ToolInstance):
                     fname = key % filename
                 else:
                     fname = filename
+                outname = os.path.basename(fname)
+                name, ext = os.path.splitext(outname)
+                item = item.replace("{ name }", name)
                 with open(fname, "w") as f:
                     f.write(item)
         else:
+            outname = os.path.basename(filename)
+            name, ext = os.path.splitext(outname)
+            contents = contents.replace("{ name }", name)
             with open(filename, "w") as f:
                 f.write(contents)
 
@@ -1209,6 +1223,9 @@ class JobTypeOption(QWidget):
         new_margins = (margins.left(), 0, margins.right(), 0)
         file_browse_layout.setContentsMargins(*new_margins)
         self.chk_file_path = QLineEdit()
+        self.chk_file_path.setPlaceholderText(
+            "{ name } will be replaced if file is saved"
+        )
         self.chk_file_path.textChanged.connect(self.something_changed)
         self.chk_browse_button = QPushButton("browse...")
         self.chk_browse_button.clicked.connect(self.open_chk_save)
