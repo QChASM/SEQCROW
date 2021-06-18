@@ -280,9 +280,9 @@ class OrbitalViewer(ToolInstance):
                 
                 occ = ""
                 if use_alpha and alpha_ndx < orbits.n_alpha:
-                    occ = "\u21bf"
+                    occ = "\u21bf "
                 elif beta_ndx < orbits.n_beta:
-                    occ = "\u21c2"
+                    occ = " \u21c2"
                 occupancy = OrbitalTableItem()
                 occupancy.setData(Qt.DisplayRole, occ)
                 occupancy.setData(Qt.UserRole, alpha_ndx if use_alpha else beta_ndx)
@@ -424,6 +424,7 @@ class OrbitalViewer(ToolInstance):
         
         if keep_open:
             found = False
+            hide_vols = []
             for child in model.child_models():
                 if (
                     isinstance(child, Volume) and
@@ -453,11 +454,14 @@ class OrbitalViewer(ToolInstance):
                                 hex2, hex1,
                             )
                         )
-                elif (
-                    isinstance(child, Volume) and child.name.startswith("MO") and
-                    hasattr(child, "shown") and child.shown()
-                ):
-                    run(self.session, "hide %s" % child.atomspec)
+                    elif child.name.startswith("MO") and child.shown():
+                        hide_vols.append(child)
+                elif isinstance(child, Volume) and child.name.startswith("MO") and child.shown():
+                    hide_vols.append(child)
+
+            for child in hide_vols:
+                run(self.session, "hide %s" % child.atomspec)
+                
         if found:
             return
         
