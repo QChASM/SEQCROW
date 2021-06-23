@@ -84,6 +84,69 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
     return [structure], status
 
 
+def open_nbo(session, path, file_name, format_name=None, orbitals=None):
+    import os.path
+    
+    from AaronTools.fileIO import FileReader
+    from SEQCROW.residue_collection import ResidueCollection
+    from SEQCROW.managers import ADD_FILEREADER
+
+    print(file_name)
+
+    if orbitals == "browse":
+        if not session.ui.is_gui:
+            raise RuntimeError("cannot browse for orbital file without gui")
+        
+        from Qt.QtWidgets import QFileDialog
+        
+        print(os.path.dirname(path))
+        
+        orbitals, _ = QFileDialog.getOpenFileName(
+            caption="NBO orbital file",
+            directory=os.path.dirname(path),
+            filter="PNAO file (*.32);;"
+            "NAO file (*.33);;"
+            "PNHO file (*.34);;"
+            "NHO file(*.35);;"
+            "PBNO file (*.36);;"
+            "NBO file (*.37);;"
+            "PNLMO file (*.38);;"
+            "NLMO file (*.39);;"
+            "MO file (*.40);;"
+            "NO file (*.41)"
+        )
+        if not orbitals:
+            orbitals = None
+    
+    if format_name == "NBO file":
+        fmt = "47"
+    
+    print(orbitals)
+    
+    fr = FileReader((path, fmt, None), nbo_name=orbitals)
+
+    try:
+        geom = ResidueCollection(fr, refresh_ranks=False)
+    except Exception as e:
+        s = "could not open %s" % file_name
+        if "error" in fr.other and fr.other["error"]:
+            s += "\n%s contains an error (%s):\n%s" % (format_name, fr.other["error"], fr.other["error_msg"])
+        
+        session.logger.error(s)
+        session.logger.error(repr(e))
+        return [], "SEQCROW failed to open %s" % file_name
+
+    structure = geom.get_chimera(session, filereader=fr)
+    #associate the AaronTools FileReader with each structure
+    session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([structure], [fr]))
+
+    status = "Opened %s as an %s" % (file_name, format_name)
+
+    structure.filename = file_name
+
+    return [structure], status
+
+
 def save_aarontools(session, path, format_name, **kwargs):
     """ 
     save XYZ file using AaronTools

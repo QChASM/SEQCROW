@@ -72,7 +72,7 @@ class OrbitalGrid(GridData):
 
 class _OrbitalSettings(Settings):
     AUTO_SAVE = {
-        "color1": Value((1.0, 0.0, 0.0, 0.5), TupleOf(FloatArg, 4), iter2str),
+        "color1": Value((0.0, 1.0, 0.0, 0.5), TupleOf(FloatArg, 4), iter2str),
         "color2": Value((0.0, 0.0, 1.0, 0.5), TupleOf(FloatArg, 4), iter2str),
         "keep_open": True,
         "padding": 3.0,
@@ -278,7 +278,7 @@ class OrbitalViewer(ToolInstance):
                 ndx.setTextAlignment(Qt.AlignCenter)
                 self.mo_table.setItem(row, 0, ndx)
                 
-                occ = ""
+                occ = "_ " if use_alpha else " _"
                 if use_alpha and alpha_ndx < orbits.n_alpha:
                     occ = "\u21bf "
                 elif beta_ndx < orbits.n_beta:
@@ -462,8 +462,8 @@ class OrbitalViewer(ToolInstance):
             for child in hide_vols:
                 run(self.session, "hide %s" % child.atomspec)
                 
-        if found:
-            return
+            if found:
+                return
         
         n_val = n_pts1 * n_pts2 * n_pts3
         n_val *= 32 * 4 * threads
@@ -522,3 +522,17 @@ class OrbitalViewer(ToolInstance):
                 else:
                     run(self.session, "close %s" % child.atomspec)
         self.session.models.add([vol], parent=model)
+
+    def delete(self):
+        self.model_selector.deleteLater()
+
+        return super().delete()
+    
+    def close(self):
+        self.model_selector.deleteLater()
+    
+    def cleanup(self):
+        self.model_selector.deleteLater()
+
+        return super().cleanup()
+    

@@ -3,7 +3,7 @@ import os
 from chimerax.core.toolshed import BundleAPI
 from chimerax.core.toolshed.info import SelectorInfo
 from chimerax.open_command import OpenerInfo
-from chimerax.core.commands import BoolArg, ModelsArg, StringArg, register
+from chimerax.core.commands import BoolArg, ModelsArg, StringArg, register, OpenFileNameArg
 
 class _SEQCROW_API(BundleAPI):
 
@@ -121,11 +121,15 @@ class _SEQCROW_API(BundleAPI):
         format_name - str, file format
         coordsets   - bool, load as trajectory
         """
-        from .io import open_aarontools
+        if format_name != "NBO file":
+            from .io import open_aarontools
 
-        session.logger.info("loading %s file" % format_name)
+            return open_aarontools(session, path, format_name=format_name, coordsets=coordsets)
+        else:
+            from .io import open_nbo
+            
+            return open_nbo(session, path, format_name=format_name, )
 
-        return open_aarontools(session, path, format_name=format_name, coordsets=coordsets)
 
     @staticmethod
     def save_file(session, path, format_name, **kw):
@@ -412,6 +416,38 @@ class _SEQCROW_API(BundleAPI):
                     @property
                     def open_args(self):
                         return {'coordsets': BoolArg}
+
+                return Info()
+            
+            elif name == "NBO file":
+                from .io import open_nbo
+                
+                class NBOOrbitalFile(OpenFileNameArg):
+                    name_filter = "PNAO file (*.32);;"
+                    "NAO file (*.33);;"
+                    "PNHO file (*.34);;"
+                    "NHO file(*.35);;"
+                    "PBNO file (*.36);;"
+                    "NBO file (*.37);;"
+                    "PNLMO file (*.38);;"
+                    "NLMO file (*.39);;"
+                    "MO file (*.40);;"
+                    "NO file (*.41)"
+
+                class Info(OpenerInfo):
+                    def open(self, session, data, file_name, **kw):
+                        return open_nbo(
+                            session,
+                            data,
+                            file_name,
+                            format_name="NBO file",
+                            orbitals="browse",
+                            **kw
+                        )
+
+                    @property
+                    def open_args(self):
+                        return {'orbitals': NBOOrbitalFile}
 
                 return Info()
 
