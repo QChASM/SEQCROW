@@ -154,12 +154,20 @@
                           synopsis="Amber SQM output file"
                 />
 
-                <Provider name="NBO file" 
+                <Provider name="NBO input file" 
                           category="Molecular structure" 
                           suffixes=".47" 
                           encoding="utf-8" 
-                          nicknames="nbo" 
-                          synopsis="NBO file"
+                          nicknames="nbo47" 
+                          synopsis="NBO input file"
+                />
+
+                <Provider name="NBO output file" 
+                          category="Molecular structure" 
+                          suffixes=".31" 
+                          encoding="utf-8" 
+                          nicknames="nbo31" 
+                          synopsis="NBO output file"
                 />
             </Providers>
             
@@ -171,7 +179,8 @@
                 <Provider name="XYZ file" want_path="false"/>
                 <Provider name="FCHK file" want_path="false"/>
                 <Provider name="sqm output file" want_path="false"/>
-                <Provider name="NBO file" want_path="true"/>
+                <Provider name="NBO input file" want_path="true"/>
+                <Provider name="NBO output file" want_path="true"/>
             </Providers>
             
             <!--we can save Gaussian input files, but not with the save command-->

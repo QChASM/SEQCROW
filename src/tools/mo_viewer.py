@@ -216,10 +216,16 @@ class OrbitalViewer(ToolInstance):
         orbits = fr.other["orbitals"]
 
         if orbits.beta_nrgs is None or len(orbits.beta_nrgs) == 0:
-            self.mo_table.setColumnCount(3)
-            self.mo_table.setHorizontalHeaderLabels(
-                ["#", "Ground State Occ.", "Energy (E\u2095)"]
-            )
+            if "orbit_kinds" not in fr.other:
+                self.mo_table.setColumnCount(3)
+                self.mo_table.setHorizontalHeaderLabels(
+                    ["#", "Ground State Occ.", "Energy (E\u2095)"]
+                )
+            else:
+                self.mo_table.setColumnCount(2)
+                self.mo_table.setHorizontalHeaderLabels(
+                    ["#", "Type"]
+                )
             for i, nrg in enumerate(orbits.alpha_nrgs[::-1]):
                 row = self.mo_table.rowCount()
                 self.mo_table.insertRow(row)
@@ -232,20 +238,26 @@ class OrbitalViewer(ToolInstance):
                 self.mo_table.setItem(row, 0, ndx)
                 
                 occ = ""
+                change_font = True
                 if i >= (orbits.n_mos - orbits.n_alpha):
                     occ += "\u21bf"
                 if i >= (orbits.n_mos - orbits.n_beta):
                     occ += "\u21c2"
 
+                if "orbit_kinds" in fr.other:
+                    change_font = False
+                    occ = fr.other["orbit_kinds"][-i - 1]
+
                 occupancy = OrbitalTableItem()
                 occupancy.setData(Qt.DisplayRole, occ)
                 occupancy.setData(Qt.UserRole, len(occ))
                 occupancy.setTextAlignment(Qt.AlignCenter)
-                occupancy_font = occupancy.font()
-                # the arrows are really small by default
-                # up it to 2.5x
-                occupancy_font.setPointSize(int(2.5 * occupancy_font.pointSize()))
-                occupancy.setFont(occupancy_font)
+                if change_font:
+                    occupancy_font = occupancy.font()
+                    # the arrows are really small by default
+                    # up it to 2.5x
+                    occupancy_font.setPointSize(int(2.5 * occupancy_font.pointSize()))
+                    occupancy.setFont(occupancy_font)
                 self.mo_table.setItem(row, 1, occupancy)
                 
                 nrg_str = "%.5f" % nrg
@@ -256,6 +268,10 @@ class OrbitalViewer(ToolInstance):
                 self.mo_table.setItem(row, 2, orbit_nrg)
             homo_ndx = orbits.n_mos - max(orbits.n_alpha, orbits.n_beta)
         else:
+            self.mo_table.setColumnCount(3)
+            self.mo_table.setHorizontalHeaderLabels(
+                ["#", "Ground State Occ.", "Energy (E\u2095)"]
+            )
             alpha_ndx = beta_ndx = len(orbits.alpha_nrgs) - 1
             while alpha_ndx >= 0 or beta_ndx >= 0:
                 use_alpha = True

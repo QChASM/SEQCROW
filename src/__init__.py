@@ -93,7 +93,7 @@ class _SEQCROW_API(BundleAPI):
         from SEQCROW.logging_logger import LoggingLogger
         from AaronTools.geometry import Geometry
         from AaronTools.job_control import SubmitProcess
-        from AaronTools.fileIO import Frequency
+        from AaronTools.fileIO import Frequency, Orbitals
         from AaronTools.config import Config
         from AaronTools.atoms import Atom
 
@@ -110,6 +110,8 @@ class _SEQCROW_API(BundleAPI):
         for hdlr in Config.LOG.handlers:
             hdlr.setStream(log)
         for hdlr in Atom.LOG.handlers:
+            hdlr.setStream(log)
+        for hdlr in Orbitals.LOG.handlers:
             hdlr.setStream(log)
 
     @staticmethod
@@ -129,7 +131,6 @@ class _SEQCROW_API(BundleAPI):
             from .io import open_nbo
             
             return open_nbo(session, path, format_name=format_name, )
-
 
     @staticmethod
     def save_file(session, path, format_name, **kw):
@@ -419,7 +420,7 @@ class _SEQCROW_API(BundleAPI):
 
                 return Info()
             
-            elif name == "NBO file":
+            elif name == "NBO input file" or name == "NBO output file":
                 from .io import open_nbo
                 
                 class NBOOrbitalFile(OpenFileNameArg):
@@ -440,7 +441,7 @@ class _SEQCROW_API(BundleAPI):
                             session,
                             data,
                             file_name,
-                            format_name="NBO file",
+                            format_name=name,
                             orbitals="browse",
                             **kw
                         )

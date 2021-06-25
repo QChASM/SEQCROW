@@ -91,7 +91,7 @@ def open_nbo(session, path, file_name, format_name=None, orbitals=None):
     from SEQCROW.residue_collection import ResidueCollection
     from SEQCROW.managers import ADD_FILEREADER
 
-    print(file_name)
+    # print(file_name)
 
     if orbitals == "browse":
         if not session.ui.is_gui:
@@ -99,7 +99,7 @@ def open_nbo(session, path, file_name, format_name=None, orbitals=None):
         
         from Qt.QtWidgets import QFileDialog
         
-        print(os.path.dirname(path))
+        # print(os.path.dirname(path))
         
         orbitals, _ = QFileDialog.getOpenFileName(
             caption="NBO orbital file",
@@ -118,10 +118,12 @@ def open_nbo(session, path, file_name, format_name=None, orbitals=None):
         if not orbitals:
             orbitals = None
     
-    if format_name == "NBO file":
+    if format_name == "NBO input file":
         fmt = "47"
+    elif format_name == "NBO output file":
+        fmt = "31"
     
-    print(orbitals)
+    # print(orbitals)
     
     fr = FileReader((path, fmt, None), nbo_name=orbitals)
 
