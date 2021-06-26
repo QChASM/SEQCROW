@@ -243,20 +243,14 @@ class Info(ToolInstance):
         
         save = QAction("&Save CSV...", self.tool_window.ui_area)
         save.triggered.connect(self.save_csv)
-        #this shortcut interferes with main window's save shortcut
-        #I've tried different shortcut contexts to no avail
-        #thanks Qt...
-        #shortcut = QKeySequence(Qt.CTRL + Qt.Key_S)
-        #save.setShortcut(shortcut)
-        #save.setShortcutContext(Qt.WidgetShortcut)
         export.addAction(save)
 
         delimiter = export.addMenu("Delimiter")
         
-        # comma = QAction("comma", self.tool_window.ui_area, checkable=True)
-        # comma.setChecked(self.settings.delimiter == "comma")
-        # comma.triggered.connect(lambda *args, delim="comma": self.settings.__setattr__("delimiter", delim))
-        # delimiter.addAction(comma)
+        comma = QAction("comma", self.tool_window.ui_area, checkable=True)
+        comma.setChecked(self.settings.delimiter == "comma")
+        comma.triggered.connect(lambda *args, delim="comma": self.settings.__setattr__("delimiter", delim))
+        delimiter.addAction(comma)
         
         tab = QAction("tab", self.tool_window.ui_area, checkable=True)
         tab.setChecked(self.settings.delimiter == "tab")
@@ -494,6 +488,8 @@ class Info(ToolInstance):
         self.combo_table.setRowCount(0)
         
         if ndx < 0:
+            self.fundamental_table.setVisible(False)
+            self.combo_table.setVisible(False)
             return
         
         fr = self.file_selector.currentData()
@@ -679,6 +675,9 @@ class Info(ToolInstance):
                 self.freq_table.setItem(row, 3, forcek)
 
             if fr.other["frequency"].anharm_data:
+                self.fundamental_table.setVisible(True)
+                self.combo_table.setVisible(True)
+                
                 freq = fr.other["frequency"]
                 self.tabs.setTabEnabled(2, True)
                 anharm_data = sorted(
@@ -773,9 +772,14 @@ class Info(ToolInstance):
                             self.combo_table.setItem(row, 3, intensity)
 
             else:
+                self.fundamental_table.setVisible(False)
+                self.combo_table.setVisible(False)                
                 self.tabs.setTabEnabled(2, False)
 
         else:
+            self.fundamental_table.setVisible(False)
+            self.combo_table.setVisible(False)
+            
             self.tabs.setTabEnabled(1, False)
             self.tabs.setTabEnabled(2, False)
 

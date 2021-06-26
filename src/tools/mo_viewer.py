@@ -77,7 +77,7 @@ class _OrbitalSettings(Settings):
         "keep_open": True,
         "padding": 3.0,
         "spacing": 0.20,
-        "iso_val": 0.022,
+        "iso_val": 0.025,
         "threads": int(cpu_count() // 2),
     }
 
@@ -490,11 +490,13 @@ class OrbitalViewer(ToolInstance):
                 "Memory Limit Warning",
                 "Estimated peak memory usage (%.1fGB) is above or close to\n" % gb +
                 "the available memory (%.1fGB).\n" % (virtual_memory().free * 1e-9) +
-                "You may attempt to continue, but it is suggested that you\n" +
-                "lower your resolution, decrease padding, or use fewer threads.\n\n" +
+                "Exceeding available memory might affect the stability of your\n"
+                "computer. You may attempt to continue, but it is recommended\n" +
+                "that you lower your resolution, decrease padding, or use\n" +
+                "fewer threads.\n\n" +
                 "Press \"Ok\" to continue or \"Abort\" to cancel.",
-                QMessageBox.Ok,
-                QMessageBox.Cancel
+                QMessageBox.Abort | QMessageBox.Ok,
+                defaultButton=QMessageBox.Abort,
             )
             if are_you_sure != QMessageBox.Ok:
                 return

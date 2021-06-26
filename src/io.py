@@ -124,7 +124,7 @@ def open_nbo(session, path, file_name, format_name=None, orbitals=None):
         fmt = "31"
     
     # print(orbitals)
-    
+
     fr = FileReader((path, fmt, None), nbo_name=orbitals)
 
     try:
