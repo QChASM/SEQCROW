@@ -150,7 +150,7 @@
                           category="Molecular structure" 
                           suffixes=".sqmout" 
                           encoding="utf-8" 
-                          nicknames="sqm" 
+                          nicknames="sqmout" 
                           synopsis="Amber SQM output file"
                 />
 

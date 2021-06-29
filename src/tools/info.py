@@ -611,7 +611,11 @@ class Info(ToolInstance):
                             value.setData(Qt.DisplayRole, ecp.name)
                             self.table.setItem(row, 1, value)
 
-            elif hasattr(fr.other[info], "__iter__") and all(isinstance(x, float) for x in fr.other[info]):
+            elif (
+                hasattr(fr.other[info], "__iter__") and
+                all(isinstance(x, float) for x in fr.other[info]) and
+                len(fr.other[info]) > 1
+            ):
                 row = self.table.rowCount()
                 self.table.insertRow(row)
                 

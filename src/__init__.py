@@ -93,7 +93,7 @@ class _SEQCROW_API(BundleAPI):
         from SEQCROW.logging_logger import LoggingLogger
         from AaronTools.geometry import Geometry
         from AaronTools.job_control import SubmitProcess
-        from AaronTools.fileIO import Frequency, Orbitals
+        from AaronTools.fileIO import Frequency, Orbitals, FileReader
         from AaronTools.config import Config
         from AaronTools.atoms import Atom
 
@@ -112,6 +112,8 @@ class _SEQCROW_API(BundleAPI):
         for hdlr in Atom.LOG.handlers:
             hdlr.setStream(log)
         for hdlr in Orbitals.LOG.handlers:
+            hdlr.setStream(log)
+        for hdlr in FileReader.LOG.handlers:
             hdlr.setStream(log)
 
     @staticmethod
@@ -424,11 +426,12 @@ class _SEQCROW_API(BundleAPI):
                 from .io import open_nbo
                 
                 class NBOOrbitalFile(OpenFileNameArg):
-                    name_filter = "PNAO file (*.32);;"
+                    name_filter = "NBO coefficient files (*.32 *.33 *.34 *.35 *.36 *.37 *.38 *.39 *.40 *.41);;"
+                    "PNAO file (*.32);;"
                     "NAO file (*.33);;"
                     "PNHO file (*.34);;"
                     "NHO file(*.35);;"
-                    "PBNO file (*.36);;"
+                    "PNBO file (*.36);;"
                     "NBO file (*.37);;"
                     "PNLMO file (*.38);;"
                     "NLMO file (*.39);;"
@@ -436,13 +439,13 @@ class _SEQCROW_API(BundleAPI):
                     "NO file (*.41)"
 
                 class Info(OpenerInfo):
-                    def open(self, session, data, file_name, **kw):
+                    def open(self, session, data, file_name, orbitals="browse", **kw):
                         return open_nbo(
                             session,
                             data,
                             file_name,
                             format_name=name,
-                            orbitals="browse",
+                            orbitals=orbitals,
                             **kw
                         )
 

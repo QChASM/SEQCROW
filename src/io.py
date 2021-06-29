@@ -44,6 +44,8 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
     #associate the AaronTools FileReader with each structure
     session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([structure], [fr]))
 
+    coordsets = coordsets and fr.all_geom is not None and len(fr.all_geom) > 1
+
     if coordsets:
         from chimerax.std_commands.coordset_gui import CoordinateSetSlider
         from SEQCROW.tools import EnergyPlot
@@ -104,11 +106,12 @@ def open_nbo(session, path, file_name, format_name=None, orbitals=None):
         orbitals, _ = QFileDialog.getOpenFileName(
             caption="NBO orbital file",
             directory=os.path.dirname(path),
-            filter="PNAO file (*.32);;"
+            filter="NBO coefficient files (*.32 *.33 *.34 *.35 *.36 *.37 *.38 *.39 *.40 *.41);;"
+            "PNAO file (*.32);;"
             "NAO file (*.33);;"
             "PNHO file (*.34);;"
             "NHO file(*.35);;"
-            "PBNO file (*.36);;"
+            "PNBO file (*.36);;"
             "NBO file (*.37);;"
             "PNLMO file (*.38);;"
             "NLMO file (*.39);;"
