@@ -713,10 +713,9 @@ class ORCAFileInfo(QMInputFileInfo):
         "Grimme D4"
     ]
     grids = [
-        "Grid7",
-        "Grid6",
-        "Grid5",
-        "Grid4"
+        "DefGrid1",
+        "DefGrid2",
+        "DefGrid3",
     ]
     basis_sets = [
         "def2-SVP",

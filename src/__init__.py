@@ -289,6 +289,10 @@ class _SEQCROW_API(BundleAPI):
             from .tools import OrbitalViewer
             return OrbitalViewer(session, ti.name)
 
+        elif ti.name == "Ligand Sterimol":
+            from .tools import LigandSterimol
+            return LigandSterimol(session, ti.name)
+
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)
 

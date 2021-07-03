@@ -279,7 +279,7 @@ SDD
         qm_input_tool.job_widget.solvent_option.setCurrentIndex(ndx)
 
         qm_input_tool.method_widget.setMethod("M06-2X")
-        qm_input_tool.method_widget.setGrid("Grid7")
+        qm_input_tool.method_widget.setGrid("DefGrid3")
         qm_input_tool.method_widget.setDispersion("Zero-damped Grimme D3")
 
         basis = BasisSet("def2-TZVP")
@@ -294,7 +294,7 @@ SDD
             self.assertTrue(False)
 
         ref_file = """#benzene_1-NO2_4-Cl.xyz 12,11=>H
-! M062X D3ZERO Grid7 FinalGrid7 def2-TZVP Opt
+! M062X D3ZERO DefGrid3 def2-TZVP Opt
 
 *xyz 0 1
 C    -1.976956  -2.327177   0.001258
@@ -345,7 +345,7 @@ H    -2.521911  -3.271171   0.001704
         qm_input_tool.job_widget.solvent_option.setCurrentIndex(ndx)
 
         qm_input_tool.method_widget.setMethod("M06-2X")
-        qm_input_tool.method_widget.setGrid("Grid7")
+        qm_input_tool.method_widget.setGrid("DefGrid3")
         qm_input_tool.method_widget.setDispersion("None")
 
         basis = BasisSet("def2-SVP")
@@ -360,7 +360,7 @@ H    -2.521911  -3.271171   0.001704
             self.assertTrue(False)
 
         ref_file = """#benzene_1-NO2_4-Cl.xyz 12,11=>H
-! M062X Grid7 FinalGrid7 def2-SVP NumFreq
+! M062X DefGrid3 def2-SVP NumFreq
 %freq
     Temp    298.15
 end

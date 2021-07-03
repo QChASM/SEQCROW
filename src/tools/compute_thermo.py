@@ -748,7 +748,7 @@ class Thermochem(ToolInstance):
                     "𝛿G<sub>RRHO</sub> =",
                     rrho_dg,
                     None,
-                    "energy relative after taking into account the average\n"
+                    "energy after taking into account the average\n"
                     "population of vibrational, rotational, and translational\n"
                     "degrees of freedom",
                 ), (
