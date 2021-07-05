@@ -588,6 +588,10 @@ class _SEQCROW_API(BundleAPI):
             from .commands.point_group import pointGroup, pointGroup_description
             register("pointGroup", pointGroup_description, pointGroup)
 
+        elif command_info.name == "ligandSterimol":
+            from .commands.ligand_sterimol import ligandSterimol, sterimol_description
+            register("ligandSterimol", sterimol_description, ligandSterimol)
+
     @staticmethod
     def register_selector_menus(session):
         """

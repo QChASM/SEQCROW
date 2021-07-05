@@ -359,12 +359,13 @@
                 <ChimeraXClassifier>ChimeraX :: Command :: fuseRing            :: Structure Editing  :: fuse a ring</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: tsbond              :: Structure Editing  :: display a forming/breaking bond as semi-transparent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: ~tsbond             :: Structure Editing  :: remove a forming/breaking bond</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Command :: sterimol            :: Structure Analysis :: calculate L, B1, and B5 Sterimol parameters</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: sterimol            :: Structure Analysis :: calculate Sterimol parameters</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: percentVolumeBuried :: Structure Analysis :: calculate percent volume buried by ligands around a metal center</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: highlight           :: General            :: make some atoms or bonds stand out</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: ~highlight          :: General            :: remove highlights</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: lookDown            :: General            :: reorient molecule along bond</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: pointGroup          :: General            :: print the point group of atomic structures to the log</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: ligandSterimol      :: Structure Analysis :: calculate sterimol parameters for ligands on a metal center</ChimeraXClassifier>
                 <!--
                 <ChimeraXClassifier>ChimeraX :: Command :: duplicate           :: Structure Editing  :: duplicate selected atoms</ChimeraXClassifier>
                 -->

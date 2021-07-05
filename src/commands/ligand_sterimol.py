@@ -8,6 +8,7 @@ from chimerax.bild.bild import read_bild
 
 from AaronTools.component import Component
 from AaronTools.const import VDW_RADII, BONDI_RADII
+from AaronTools.utils.utils import get_filename
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.finders import AtomSpec
@@ -80,10 +81,11 @@ sterimol_description = CmdDesc(
         ("radii", EnumOf(["UMN", "Bondi"], case_sensitive=False)),
         ("showVectors", BoolArg),
         ("showRadii", BoolArg), 
+        ("bisect_L", BoolArg),
         ("at_L", FloatArg), 
     ],
-    synopsis="calculate Sterimol B1-B5, and L",
-    url="https://github.com/QChASM/SEQCROW/wiki/Commands#sterimol",
+    synopsis="calculate Sterimol B1-B5, and L for a ligand on a metal center",
+    url="https://github.com/QChASM/SEQCROW/wiki/Commands#ligandSterimol",
 )
 
 def ligandSterimol(
@@ -92,7 +94,7 @@ def ligandSterimol(
         radii="UMN",
         showVectors=True,
         showRadii=True,
-        at_L=False,
+        at_L=None,
         bisect_L=False,
         return_values=False
     ):
@@ -187,12 +189,14 @@ def ligandSterimol(
             
             session.models.add(bild_obj, parent=model)
         
+        name = get_filename(model.name, include_parent_dir=False)
+        
         info += "%-16s\t%-11s\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\n" % (
-            model.atomspec,
+            name,
             ", ".join(at.atomspec for at in key_atoms[model]),
             b1, b2, b3, b4, b5, l
         )
-        targets.append(model.atomspec)
+        targets.append(name)
         coord_atoms.append([at.atomspec for at in key_atoms[model]])
         datas.append(data)
     

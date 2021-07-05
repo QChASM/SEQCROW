@@ -1041,6 +1041,12 @@ class BuildQM(ToolInstance):
         for warning in warnings:
             self.session.logger.warning(warning)
 
+        for line in output.splitlines():
+            if "{ name }" in line:
+                self.session.logger.warning(
+                    "{ name } was used in the input file, but this feature is not available when copying the file to the clipboard because the file name is unknown"
+                )
+
         app = QApplication.instance()
         clipboard = app.clipboard()
         clipboard.setText(output)

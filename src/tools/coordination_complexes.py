@@ -226,7 +226,9 @@ class LigandSelection(ChildToolWindow):
     def _build_ui(self):
         layout = QFormLayout()
         
-        self.lig_table = LigandTable(singleSelect=True, maxDenticity=2)
+        self.lig_table = LigandTable(
+            singleSelect=True, maxDenticity=2, include_substituents=True
+        )
         self.lig_table.table.itemSelectionChanged.connect(self.refresh_selection)
         layout.addRow(self.lig_table)
         

@@ -12,6 +12,7 @@ from AaronTools.const import VDW_RADII, BONDI_RADII
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.finders import AtomSpec
 from SEQCROW.commands.substitute import avoidTargets
+from AaronTools.utils.utils import get_filename
 
 sterimol_description = CmdDesc(
     required=[("selection", AtomsArg)], \
@@ -19,7 +20,7 @@ sterimol_description = CmdDesc(
         ("radii", EnumOf(["UMN", "Bondi"], case_sensitive=False)),
         ("showVectors", BoolArg),
         ("showRadii", BoolArg), 
-        ("oldL", BoolArg), 
+        ("LCorrection", EnumOf(["FORTRAN", "AaronTools"], case_sensitive=False)), 
     ],
     synopsis="calculate Sterimol B1-B5, and L",
     url="https://github.com/QChASM/SEQCROW/wiki/Commands#sterimol",
@@ -31,21 +32,22 @@ def sterimol(
         radii="UMN",
         showVectors=True,
         showRadii=True,
-        oldL=False,
+        LCorrection="FORTRAN",
         return_values=False
     ):
     models, attached = avoidTargets(session.logger, selection)
     
     radii = radii.lower()
-    
-    l = None
-    b1 = None
-    b5 = None
+
+    old_L = False
+    if LCorrection.upper() == "FORTRAN":
+        old_L = True
+
+    model_names = []
     targets = []
-    neighbors = []
     datas = []
     
-    info = "<pre>substituent atom\tbonded atom\tB1\tB2\tB3\tB4\tB5\tL\n"
+    info = "<pre>model\tsubstituent atom\tB1\tB2\tB3\tB4\tB5\tL\n"
     
     if return_values:
         # if len(models.keys()) > 1:
@@ -71,7 +73,7 @@ def sterimol(
                 data = sub.sterimol(
                     return_vector=True,
                     radii=radii,
-                    old_L=oldL,
+                    old_L=old_L,
                 )
                 l = np.linalg.norm(data["L"][1] - data["L"][0])
                 b1 = np.linalg.norm(data["B1"][1] - data["B1"][0])
@@ -120,11 +122,15 @@ def sterimol(
                     
                     session.models.add(bild_obj, parent=model)
                 
+                model_name = get_filename(model.name, include_parent_dir=False)
+                
                 info += "%-16s\t%-11s\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\n" % (
-                    target.atomspec, attached[target].atomspec, b1, b2, b3, b4, b5, l
+                    model_name,
+                    target.atomspec,
+                    b1, b2, b3, b4, b5, l
                 )
+                model_names.append(model_name)
                 targets.append(target.atomspec)
-                neighbors.append(attached[target].atomspec)
                 datas.append(data)
     
     info = info.strip()
@@ -133,4 +139,4 @@ def sterimol(
         session.logger.info(info, is_html=True)
     
     if return_values:
-        return targets, neighbors, datas
+        return model_names, targets, datas

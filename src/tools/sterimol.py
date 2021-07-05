@@ -21,6 +21,7 @@ from Qt.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
+    QMessageBox,
 )
 
 from SEQCROW.commands.sterimol import sterimol as sterimol_cmd
@@ -32,7 +33,7 @@ class _SterimolSettings(Settings):
         "display_radii": Value(True, BoolArg),
         "display_vectors": Value(True, BoolArg),
         "include_header": Value(True, BoolArg),
-        "old_L": Value(False, BoolArg),
+        "L_style": "FORTRAN",
         "delimiter": "comma",
     }
 
@@ -61,18 +62,16 @@ class Sterimol(ToolInstance):
         self.radii_option.setCurrentIndex(ndx)
         layout.addRow("radii:", self.radii_option)
 
-        self.old_L = QCheckBox()
-        self.old_L.setChecked(self.settings.old_L)
-        self.old_L.setToolTip(
-            """approximate the FORTRAN Sterimol method for determining L
-If X is the substituent atom connected to the rest of the molecule,
-this is 0.4 + the ideal X-H bond length + the distance from X to
-the furthest VDW radii projected onto the molecule-X bond vector
-By default, L is calculated as the distance from the VDW radius
-of X (on the molecule side) to the furthest VDW radius projected
-onto the molecule-X bond vector"""
+        self.L_style = QComboBox()
+        self.L_style.addItems(["FORTRAN", "AaronTools"])
+        ndx = self.L_style.findText(self.settings.L_style, Qt.MatchExactly)
+        self.L_style.setCurrentIndex(ndx)
+        self.L_style.setToolTip(
+            """FORTRAN: Add 0.4 + the ideal X-H bond length to the length
+of the substituent
+AaronTools: add VDW radius to the length of the substituent"""
         )
-        layout.addRow("FORTRAN-style L:", self.old_L)
+        layout.addRow("L correction:", self.L_style)
 
         self.display_vectors = QCheckBox()
         self.display_vectors.setChecked(self.settings.display_vectors)
@@ -96,8 +95,8 @@ onto the molecule-X bond vector"""
         self.table.setColumnCount(8)
         self.table.setHorizontalHeaderLabels(
             [
+                'model',
                 'substituent atom',
-                'bonded atom',
                 'B\u2081',
                 'B\u2082',
                 'B\u2083',
@@ -127,6 +126,11 @@ onto the molecule-X bond vector"""
         menu = QMenuBar()
         
         export = menu.addMenu("&Export")
+
+        clear = QAction("Clear data table", self.tool_window.ui_area)
+        clear.triggered.connect(self.clear_table)
+        export.addAction(clear)
+
         copy = QAction("&Copy CSV to clipboard", self.tool_window.ui_area)
         copy.triggered.connect(self.copy_csv)
         shortcut = QKeySequence(Qt.CTRL + Qt.Key_C)
@@ -194,28 +198,38 @@ onto the molecule-X bond vector"""
 
         self.tool_window.manage(None)
 
+    def clear_table(self):
+        are_you_sure = QMessageBox.question(
+            None,
+            "Clear table?",
+            "Are you sure you want to clear the data table?",
+        )
+        if are_you_sure != QMessageBox.Yes:
+            return
+        self.table.setRowCount(0)
+
     def calc_sterimol(self, *args):
         self.settings.radii = self.radii_option.currentText()
         self.settings.display_radii = self.display_radii.checkState() == Qt.Checked
         self.settings.display_vectors = self.display_vectors.checkState() == Qt.Checked
-        self.settings.old_L = self.old_L.checkState() == Qt.Checked
+        self.settings.L_style = self.L_style.currentText()
 
-        targets, neighbors, datas = sterimol_cmd(
+        model_names, targets, datas = sterimol_cmd(
             self.session, 
             selected_atoms(self.session), 
             radii=self.radii_option.currentText(),
             showVectors=self.display_vectors.checkState() == Qt.Checked,
             showRadii=self.display_radii.checkState() == Qt.Checked,
             return_values=True,
-            oldL=self.old_L.checkState() == Qt.Checked,
+            LCorrection=self.settings.L_style,
         )
         
-        if len(targets) == 0:
+        if len(model_names) == 0:
             return
         
-        self.table.setRowCount(0)
+        # self.table.setRowCount(0)
         
-        for t, b, data in zip(targets, neighbors, datas):
+        for t, b, data in zip(model_names, targets, datas):
             row = self.table.rowCount()
             self.table.insertRow(row)
             
@@ -257,6 +271,11 @@ onto the molecule-X bond vector"""
             b5i = QTableWidgetItem()
             b5i.setData(Qt.DisplayRole, "%.2f" % b5)
             self.table.setItem(row, 6, b5i)
+        
+        for i in range(0, 7):
+            if i == 1:
+                continue
+            self.table.resizeColumnToContents(i)
     
     def header_check(self, state):
         """user has [un]checked the 'include header' option on the menu"""

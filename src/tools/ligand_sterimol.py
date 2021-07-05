@@ -43,7 +43,7 @@ class _SterimolSettings(Settings):
 
 class LigandSterimol(ToolInstance):
 
-    help = "https://github.com/QChASM/SEQCROW/wiki/Sterimol-Tool"
+    help = "https://github.com/QChASM/SEQCROW/wiki/Ligand-Sterimol-Tool"
     SESSION_ENDURING = False
     SESSION_SAVE = False
     
@@ -301,6 +301,11 @@ class LigandSterimol(ToolInstance):
             b5i = QTableWidgetItem()
             b5i.setData(Qt.DisplayRole, "%.2f" % b5)
             self.table.setItem(row, 6, b5i)
+        
+        for i in range(0, 7):
+            if i == 1:
+                continue
+            self.table.resizeColumnToContents(i)
     
     def header_check(self, state):
         """user has [un]checked the 'include header' option on the menu"""
