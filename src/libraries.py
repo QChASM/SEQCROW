@@ -10,8 +10,15 @@ from AaronTools.fileIO import read_types
 
 
 class LigandTable(QWidget):
-    def __init__(self, parent=None, singleSelect=False, maxDenticity=None):
+    def __init__(
+        self, parent=None,
+        singleSelect=False,
+        maxDenticity=None,
+        include_substituents=False,
+    ):
         super().__init__(parent)
+        
+        self._include_substituents = include_substituents
         
         layout = QGridLayout(self)
         
@@ -114,6 +121,52 @@ class LigandTable(QWidget):
                         )
                     )
                 )
+    
+        if self._include_substituents:
+            from AaronTools.substituent import Substituent
+            
+            for lib in [Substituent.AARON_LIBS, Substituent.BUILTIN]:
+                if not os.path.exists(lib):
+                    continue
+                for sub in os.listdir(lib):
+                    name, ext = os.path.splitext(sub)
+                    if not any(".%s" % x == ext for x in read_types):
+                        continue
+                    
+                    if name in names:
+                        continue
+                    
+                    names.append(name)
+
+                    geom = Geometry(
+                        os.path.join(lib, sub),
+                        refresh_connected=False,
+                        refresh_ranks=False,
+                    )
+            
+                    key_atoms = [geom.atoms[0]]
+                
+                    if maxDenticity and len(key_atoms) > maxDenticity:
+                        continue
+                
+                    row = self.table.rowCount()
+                    self.table.insertRow(row)
+                    self.table.setItem(row, 0, QTableWidgetItem(name))
+                    
+                    #this is an integer, so I need to initialize it then set the data
+                    denticity = QTableWidgetItem()
+                    denticity.setData(Qt.DisplayRole, len(key_atoms))
+                    self.table.setItem(row, 1, denticity)
+                    
+                    self.table.setItem(
+                        row,
+                        2,
+                        QTableWidgetItem(
+                            ", ".join(
+                                sorted([atom.element for atom in key_atoms])
+                            )
+                        )
+                    )
     
         self.ligand_list = names
 

@@ -2,7 +2,7 @@
 def iter2str(t):
     """converts tuple to str and cuts off ()"""
     return str(t)[1:-1]
-    
+
 def contrast_bw(color):
     """
     color: RGB tuple

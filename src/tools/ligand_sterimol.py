@@ -21,10 +21,12 @@ from Qt.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
+    QGroupBox,
+    QDoubleSpinBox,
     QMessageBox,
 )
 
-from SEQCROW.commands.sterimol import sterimol as sterimol_cmd
+from SEQCROW.commands.ligand_sterimol import ligandSterimol as sterimol_cmd
 
 class _SterimolSettings(Settings):
 
@@ -33,13 +35,15 @@ class _SterimolSettings(Settings):
         "display_radii": Value(True, BoolArg),
         "display_vectors": Value(True, BoolArg),
         "include_header": Value(True, BoolArg),
-        "L_style": "FORTRAN",
+        "sterimol2vec": Value(False, BoolArg),
+        "at_L": 3.0,
         "delimiter": "comma",
+        "L_option": "to centroid of coordinating atoms",
     }
 
-class Sterimol(ToolInstance):
+class LigandSterimol(ToolInstance):
 
-    help = "https://github.com/QChASM/SEQCROW/wiki/Sterimol-Tool"
+    help = "https://github.com/QChASM/SEQCROW/wiki/Ligand-Sterimol-Tool"
     SESSION_ENDURING = False
     SESSION_SAVE = False
     
@@ -62,17 +66,31 @@ class Sterimol(ToolInstance):
         self.radii_option.setCurrentIndex(ndx)
         layout.addRow("radii:", self.radii_option)
 
-        self.L_style = QComboBox()
-        self.L_style.addItems(["FORTRAN", "AaronTools"])
-        ndx = self.L_style.findText(self.settings.L_style, Qt.MatchExactly)
-        self.L_style.setCurrentIndex(ndx)
-        self.L_style.setToolTip(
-            """FORTRAN: Add 0.4 + the ideal X-H bond length to the length
-of the substituent
-AaronTools: add VDW radius to the length of the substituent"""
-        )
-        layout.addRow("L correction:", self.L_style)
+        self.L_option = QComboBox()
+        self.L_option.addItems([
+            "to centroid of coordinating atoms",
+            "bisect angle between coordinating atoms"
+        ])
+        ndx = self.L_option.findText(self.settings.L_option, Qt.MatchExactly)
+        self.L_option.setCurrentIndex(ndx)
+        layout.addRow("L axis:", self.L_option)
 
+        self.sterimol2vec = QGroupBox("Sterimol2Vec")
+        sterimol2vec_layout = QFormLayout(self.sterimol2vec)
+        
+        self.at_L = QDoubleSpinBox()
+        self.at_L.setRange(-10, 30)
+        self.at_L.setDecimals(2)
+        self.at_L.setSingleStep(0.25)
+        self.at_L.setValue(self.settings.at_L)
+        sterimol2vec_layout.addRow("L value:", self.at_L)
+        
+        layout.addRow(self.sterimol2vec)
+        
+        self.sterimol2vec.setCheckable(True)
+        self.sterimol2vec.toggled.connect(lambda x: self.at_L.setEnabled(x))
+        self.sterimol2vec.setChecked(self.settings.sterimol2vec)
+        
         self.display_vectors = QCheckBox()
         self.display_vectors.setChecked(self.settings.display_vectors)
         layout.addRow("show vectors:", self.display_vectors)
@@ -81,7 +99,7 @@ AaronTools: add VDW radius to the length of the substituent"""
         self.display_radii.setChecked(self.settings.display_radii)
         layout.addRow("show radii:", self.display_radii)
 
-        calc_sterimol_button = QPushButton("calculate parameters for selected substituents")
+        calc_sterimol_button = QPushButton("calculate parameters for selected ligands")
         calc_sterimol_button.clicked.connect(self.calc_sterimol)
         layout.addRow(calc_sterimol_button)
         self.calc_sterimol_button = calc_sterimol_button
@@ -96,7 +114,7 @@ AaronTools: add VDW radius to the length of the substituent"""
         self.table.setHorizontalHeaderLabels(
             [
                 'model',
-                'substituent atom',
+                'coord. atoms',
                 'B\u2081',
                 'B\u2082',
                 'B\u2083',
@@ -126,11 +144,11 @@ AaronTools: add VDW radius to the length of the substituent"""
         menu = QMenuBar()
         
         export = menu.addMenu("&Export")
-
+        
         clear = QAction("Clear data table", self.tool_window.ui_area)
         clear.triggered.connect(self.clear_table)
         export.addAction(clear)
-
+        
         copy = QAction("&Copy CSV to clipboard", self.tool_window.ui_area)
         copy.triggered.connect(self.copy_csv)
         shortcut = QKeySequence(Qt.CTRL + Qt.Key_C)
@@ -212,24 +230,36 @@ AaronTools: add VDW radius to the length of the substituent"""
         self.settings.radii = self.radii_option.currentText()
         self.settings.display_radii = self.display_radii.checkState() == Qt.Checked
         self.settings.display_vectors = self.display_vectors.checkState() == Qt.Checked
-        self.settings.L_style = self.L_style.currentText()
+        self.settings.at_L = self.at_L.value()
+        self.settings.sterimol2vec = self.sterimol2vec.isChecked()
+        self.settings.L_option = self.L_option.currentText()
 
-        model_names, targets, datas = sterimol_cmd(
+        targets, neighbors, datas = sterimol_cmd(
             self.session, 
             selected_atoms(self.session), 
             radii=self.radii_option.currentText(),
             showVectors=self.display_vectors.checkState() == Qt.Checked,
             showRadii=self.display_radii.checkState() == Qt.Checked,
             return_values=True,
-            LCorrection=self.settings.L_style,
+            at_L=self.at_L.value() if self.sterimol2vec.isChecked() else None,
+            bisect_L=self.L_option.currentText() == "bisect angle between coordinating atoms",
         )
         
-        if len(model_names) == 0:
+        if len(targets) == 0:
             return
         
+        if self.settings.delimiter == "comma":
+            delim = ","
+        elif self.settings.delimiter == "space":
+            delim = " "
+        elif self.settings.delimiter == "tab":
+            delim = "\t"
+        elif self.settings.delimiter == "semicolon":
+            delim = ";"
+           
         # self.table.setRowCount(0)
         
-        for t, b, data in zip(model_names, targets, datas):
+        for t, b, data in zip(targets, neighbors, datas):
             row = self.table.rowCount()
             self.table.insertRow(row)
             
@@ -238,7 +268,7 @@ AaronTools: add VDW radius to the length of the substituent"""
             self.table.setItem(row, 0, targ)
 
             neigh = QTableWidgetItem()
-            neigh.setData(Qt.DisplayRole, b)
+            neigh.setData(Qt.DisplayRole, delim.join(b))
             self.table.setItem(row, 1, neigh)
 
             l = np.linalg.norm(data["L"][1] - data["L"][0])

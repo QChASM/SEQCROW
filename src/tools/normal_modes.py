@@ -1089,7 +1089,7 @@ class NormalModes(ToolInstance):
         table = QTableWidget()
         table.setColumnCount(3)
         table.setHorizontalHeaderLabels(
-            ["Frequency (cm\u207b\u00b9)", "symmetry", "IR intensity"]
+            ["Frequency (cm\u207b\u00b9)", "Symmetry", "IR Intensity"]
         )
         table.setSortingEnabled(True)
         table.setSelectionBehavior(QTableView.SelectRows)
@@ -1739,6 +1739,10 @@ class IRPlot(ChildToolWindow):
         interrupt_layout.addRow(self.section_table)
         self.add_section()
 
+        auto_section = QPushButton("automatically section")
+        auto_section.clicked.connect(self.auto_breaks)
+        interrupt_layout.addRow(auto_section)
+
         toolbox.addTab(interrupt_widget, "x-axis breaks")
         
 
@@ -1760,6 +1764,40 @@ class IRPlot(ChildToolWindow):
         layout.setMenuBar(menu)        
         self.ui_area.setLayout(layout)
         self.manage(None)
+
+    def auto_breaks(self):
+        fr = self.tool_instance.model_selector.currentData()
+        if fr is None:
+            return
+        linear_scale = self.linear.value()
+        quadratic_scale = self.quadratic.value()
+        freq = fr.other["frequency"]
+        frequencies = np.array(
+            [mode.frequency for mode in freq.data if mode.frequency > 0]
+        )
+        fwhm = self.fwhm.value()
+        frequencies -= linear_scale * frequencies + quadratic_scale * frequencies ** 2
+
+        tolerance = max(2 * fwhm, 25)
+
+        groups = []
+        for freq in frequencies:
+            added = False
+            for group in groups:
+                for other_freq in group:
+                    if abs(freq - other_freq) < (8 * tolerance):
+                        group.append(freq)
+                        added = True
+                        break
+                if added:
+                    break
+            else:
+                groups.append([freq])
+        
+        for group in groups:
+            width = 4 * tolerance + max(group) - min(group)
+            center = min(group) + width / 2 - 2 * tolerance
+            self.add_section(center=center, width=width)
 
     def fill_lib_options(self):
         cur_lib = self.library.currentIndex()
@@ -1850,20 +1888,20 @@ class IRPlot(ChildToolWindow):
         elif column == 2:
             self.section_table.removeRow(row)
     
-    def add_section(self):
+    def add_section(self, center=950, width=1900):
         rows = self.section_table.rowCount()
         if rows != 0:
             rows -= 1
             section_center = QDoubleSpinBox()
             section_center.setRange(0, 5000)
-            section_center.setValue(950)
+            section_center.setValue(center)
             section_center.setSuffix(" cm\u207b\u00b9")
             section_center.setSingleStep(25)
             self.section_table.setCellWidget(rows, 0, section_center)
             
             section_width = QDoubleSpinBox()
             section_width.setRange(1, 5000)
-            section_width.setValue(1900)
+            section_width.setValue(width)
             section_width.setSuffix(" cm\u207b\u00b9")
             section_width.setSingleStep(25)
             self.section_table.setCellWidget(rows, 1, section_width)

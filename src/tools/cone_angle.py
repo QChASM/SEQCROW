@@ -20,6 +20,7 @@ from Qt.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
+    QMessageBox,
 )
 
 from AaronTools.component import Component
@@ -117,6 +118,11 @@ class ConeAngle(ToolInstance):
         menu = QMenuBar()
         
         export = menu.addMenu("&Export")
+
+        clear = QAction("Clear data table", self.tool_window.ui_area)
+        clear.triggered.connect(self.clear_table)
+        export.addAction(clear)
+
         copy = QAction("&Copy CSV to clipboard", self.tool_window.ui_area)
         copy.triggered.connect(self.copy_csv)
         shortcut = QKeySequence(Qt.CTRL + Qt.Key_C)
@@ -183,6 +189,16 @@ class ConeAngle(ToolInstance):
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(None)
+    
+    def clear_table(self):
+        are_you_sure = QMessageBox.question(
+            None,
+            "Clear table?",
+            "Are you sure you want to clear the data table?",
+        )
+        if are_you_sure != QMessageBox.Yes:
+            return
+        self.table.setRowCount(0)
     
     def header_check(self, state):
         """user has [un]checked the 'include header' option on the menu"""
@@ -267,7 +283,7 @@ class ConeAngle(ToolInstance):
         return_cones = self.display_cone.checkState() == Qt.Checked
         display_radii = self.display_radii.checkState() == Qt.Checked
         
-        self.table.setRowCount(0)
+        # self.table.setRowCount(0)
 
         for center_atom in selected_atoms(self.session):
             rescol = ResidueCollection(center_atom.structure)

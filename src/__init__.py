@@ -3,7 +3,7 @@ import os
 from chimerax.core.toolshed import BundleAPI
 from chimerax.core.toolshed.info import SelectorInfo
 from chimerax.open_command import OpenerInfo
-from chimerax.core.commands import BoolArg, ModelsArg, StringArg, register
+from chimerax.core.commands import BoolArg, ModelsArg, StringArg, register, OpenFileNameArg
 
 class _SEQCROW_API(BundleAPI):
 
@@ -93,7 +93,7 @@ class _SEQCROW_API(BundleAPI):
         from SEQCROW.logging_logger import LoggingLogger
         from AaronTools.geometry import Geometry
         from AaronTools.job_control import SubmitProcess
-        from AaronTools.fileIO import Frequency
+        from AaronTools.fileIO import Frequency, Orbitals, FileReader
         from AaronTools.config import Config
         from AaronTools.atoms import Atom
 
@@ -111,6 +111,10 @@ class _SEQCROW_API(BundleAPI):
             hdlr.setStream(log)
         for hdlr in Atom.LOG.handlers:
             hdlr.setStream(log)
+        for hdlr in Orbitals.LOG.handlers:
+            hdlr.setStream(log)
+        for hdlr in FileReader.LOG.handlers:
+            hdlr.setStream(log)
 
     @staticmethod
     def open_file(session, path, format_name, coordsets=False):
@@ -121,11 +125,14 @@ class _SEQCROW_API(BundleAPI):
         format_name - str, file format
         coordsets   - bool, load as trajectory
         """
-        from .io import open_aarontools
+        if format_name != "NBO file":
+            from .io import open_aarontools
 
-        session.logger.info("loading %s file" % format_name)
-
-        return open_aarontools(session, path, format_name=format_name, coordsets=coordsets)
+            return open_aarontools(session, path, format_name=format_name, coordsets=coordsets)
+        else:
+            from .io import open_nbo
+            
+            return open_nbo(session, path, format_name=format_name, )
 
     @staticmethod
     def save_file(session, path, format_name, **kw):
@@ -278,6 +285,14 @@ class _SEQCROW_API(BundleAPI):
             from .tools import CoordinationComplexVomit
             return CoordinationComplexVomit(session, ti.name)
 
+        elif ti.name == "Orbital Viewer":
+            from .tools import OrbitalViewer
+            return OrbitalViewer(session, ti.name)
+
+        elif ti.name == "Ligand Sterimol":
+            from .tools import LigandSterimol
+            return LigandSterimol(session, ti.name)
+
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)
 
@@ -410,6 +425,39 @@ class _SEQCROW_API(BundleAPI):
                         return {'coordsets': BoolArg}
 
                 return Info()
+            
+            elif name == "NBO input file" or name == "NBO output file":
+                from .io import open_nbo
+                
+                class NBOOrbitalFile(OpenFileNameArg):
+                    name_filter = "NBO coefficient files (*.32 *.33 *.34 *.35 *.36 *.37 *.38 *.39 *.40 *.41);;"
+                    "PNAO file (*.32);;"
+                    "NAO file (*.33);;"
+                    "PNHO file (*.34);;"
+                    "NHO file(*.35);;"
+                    "PNBO file (*.36);;"
+                    "NBO file (*.37);;"
+                    "PNLMO file (*.38);;"
+                    "NLMO file (*.39);;"
+                    "MO file (*.40);;"
+                    "NO file (*.41)"
+
+                class Info(OpenerInfo):
+                    def open(self, session, data, file_name, orbitals="browse", **kw):
+                        return open_nbo(
+                            session,
+                            data,
+                            file_name,
+                            format_name=name,
+                            orbitals=orbitals,
+                            **kw
+                        )
+
+                    @property
+                    def open_args(self):
+                        return {'orbitals': NBOOrbitalFile}
+
+                return Info()
 
         elif mgr is session.save_command:
             from chimerax.save_command import SaverInfo
@@ -539,6 +587,10 @@ class _SEQCROW_API(BundleAPI):
         elif command_info.name == "pointGroup":
             from .commands.point_group import pointGroup, pointGroup_description
             register("pointGroup", pointGroup_description, pointGroup)
+
+        elif command_info.name == "ligandSterimol":
+            from .commands.ligand_sterimol import ligandSterimol, sterimol_description
+            register("ligandSterimol", sterimol_description, ligandSterimol)
 
     @staticmethod
     def register_selector_menus(session):

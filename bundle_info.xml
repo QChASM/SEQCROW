@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="1.0.2">
+            version="1.0.3">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -69,6 +69,7 @@
                 <Dependency name="ChimeraX-Core" version="~=1.2"/>
                 <Dependency name="scipy"/>
                 <Dependency name="Send2Trash"/>
+                <Dependency name="psutil"/>
                 <!-- wait for numpy to fix fortran stuff in python 3.8
                 I've tried installing this with just gfortran on windows, but no luck
                 <Dependency name="stripy"/>
@@ -149,8 +150,24 @@
                           category="Molecular structure" 
                           suffixes=".sqmout" 
                           encoding="utf-8" 
-                          nicknames="sqm" 
+                          nicknames="sqmout" 
                           synopsis="Amber SQM output file"
+                />
+
+                <Provider name="NBO input file" 
+                          category="Molecular structure" 
+                          suffixes=".47" 
+                          encoding="utf-8" 
+                          nicknames="nbo47" 
+                          synopsis="NBO input file"
+                />
+
+                <Provider name="NBO output file" 
+                          category="Molecular structure" 
+                          suffixes=".31" 
+                          encoding="utf-8" 
+                          nicknames="nbo31" 
+                          synopsis="NBO output file"
                 />
             </Providers>
             
@@ -162,6 +179,8 @@
                 <Provider name="XYZ file" want_path="false"/>
                 <Provider name="FCHK file" want_path="false"/>
                 <Provider name="sqm output file" want_path="false"/>
+                <Provider name="NBO input file" want_path="true"/>
+                <Provider name="NBO output file" want_path="true"/>
             </Providers>
             
             <!--we can save Gaussian input files, but not with the save command-->
@@ -286,7 +305,7 @@
                 <ChimeraXClassifier>ChimeraX :: Tool :: Add to Personal Library        :: AaronTools         :: Add to your personal ligand, substituent, and ring libraries</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Visualize Normal Modes         :: AaronTools         :: Visualize normal modes from a frequency output file as displacement vectors or as an animation</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Job Queue                      :: SEQCROW            :: View status of jobs</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Substituent Sterimol           :: Structure Analysis :: Calculate L, B1, and B5 Sterimol parameters for a substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Substituent Sterimol           :: Structure Analysis :: Calculate L, and B1-B5 Sterimol parameters for a substituent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Bond Editor                    :: Structure Editing  :: Draw or erase bonds</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Change Element                 :: Structure Editing  :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Rotate Atoms                   :: Structure Editing  :: Rotate all or part of a molecular structure</ChimeraXClassifier>
@@ -294,6 +313,8 @@
                 <ChimeraXClassifier>ChimeraX :: Tool :: File Info                      :: AaronTools         :: Miscellaneous file data</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Cone Angle                     :: Structure Analysis :: Calculate ligand cone angles</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Coordination Complex Generator :: Structure Editing  :: Create coordination complexes with mono- or bidentate ligands</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Orbital Viewer                 :: AaronTools         :: View molecular orbitals</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Ligand Sterimol                :: Structure Analysis :: Calculate Sterimol parameters for ligands on organo- or organometallic catalysts</ChimeraXClassifier>
                 <!--ChimeraXClassifier>ChimeraX :: Tool :: AARON Input Builder :: AARON :: Build AARON input file</ChimeraXClassifier-->
                 
                 <ChimeraXClassifier>ChimeraX :: Selector :: tm        :: Transition metals</ChimeraXClassifier>
@@ -338,12 +359,13 @@
                 <ChimeraXClassifier>ChimeraX :: Command :: fuseRing            :: Structure Editing  :: fuse a ring</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: tsbond              :: Structure Editing  :: display a forming/breaking bond as semi-transparent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: ~tsbond             :: Structure Editing  :: remove a forming/breaking bond</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Command :: sterimol            :: Structure Analysis :: calculate L, B1, and B5 Sterimol parameters</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: sterimol            :: Structure Analysis :: calculate Sterimol parameters</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: percentVolumeBuried :: Structure Analysis :: calculate percent volume buried by ligands around a metal center</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: highlight           :: General            :: make some atoms or bonds stand out</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: ~highlight          :: General            :: remove highlights</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: lookDown            :: General            :: reorient molecule along bond</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: pointGroup          :: General            :: print the point group of atomic structures to the log</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: ligandSterimol      :: Structure Analysis :: calculate sterimol parameters for ligands on a metal center</ChimeraXClassifier>
                 <!--
                 <ChimeraXClassifier>ChimeraX :: Command :: duplicate           :: Structure Editing  :: duplicate selected atoms</ChimeraXClassifier>
                 -->

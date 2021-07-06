@@ -11,7 +11,7 @@ from Qt.QtGui import QKeySequence
 from Qt.QtWidgets import QPushButton, QFormLayout, QComboBox, QCheckBox, QMenuBar, QAction, \
     QFileDialog, QApplication, QTableWidget, QTableWidgetItem, \
     QHeaderView, QSpinBox, QWidget, QGridLayout, \
-    QTabWidget, QGroupBox, QDoubleSpinBox
+    QTabWidget, QGroupBox, QDoubleSpinBox, QMessageBox
 
 from SEQCROW.commands.percent_Vbur import percent_vbur as percent_vbur_cmd
 from SEQCROW.tools.per_frame_plot import NavigationToolbar
@@ -124,14 +124,20 @@ class PercentVolumeBuried(ToolInstance):
         
         self.radial_points = QComboBox()
         self.radial_points.addItems(["20", "32", "64", "75", "99", "127"])
-        self.radial_points.setToolTip("more radial points will give more accurate results, but integration will take longer")
+        self.radial_points.setToolTip(
+            "more radial points will give more accurate results, but integration will take longer"
+        )
         ndx = self.radial_points.findText(self.settings.radial_points, Qt.MatchExactly)
         self.radial_points.setCurrentIndex(ndx)
         leb_layout.addRow("radial points:", self.radial_points)
         
         self.angular_points = QComboBox()
-        self.angular_points.addItems(["110", "194", "302", "590", "974", "1454", "2030", "2702", "5810"])
-        self.angular_points.setToolTip("more angular points will give more accurate results, but integration will take longer")
+        self.angular_points.addItems(
+            ["110", "194", "302", "590", "974", "1454", "2030", "2702", "5810"]
+        )
+        self.angular_points.setToolTip(
+            "more angular points will give more accurate results, but integration will take longer"
+        )
         ndx = self.angular_points.findText(self.settings.angular_points, Qt.MatchExactly)
         self.angular_points.setCurrentIndex(ndx)
         leb_layout.addRow("angular points:", self.angular_points)
@@ -145,8 +151,9 @@ class PercentVolumeBuried(ToolInstance):
         self.min_iter = QSpinBox()
         self.min_iter.setValue(self.settings.minimum_iterations)
         self.min_iter.setRange(0, 10000)
-        self.min_iter.setToolTip("each iteration is 3000 points\n" +
-                                 "iterations continue until convergence criteria are met"
+        self.min_iter.setToolTip(
+            "each iteration is 3000 points\n" +
+            "iterations continue until convergence criteria are met"
         )
         mc_layout.addRow("minimum interations:", self.min_iter)
         
@@ -313,6 +320,11 @@ class PercentVolumeBuried(ToolInstance):
         menu = QMenuBar()
         
         export = menu.addMenu("&Export")
+
+        clear = QAction("Clear data table", self.tool_window.ui_area)
+        clear.triggered.connect(self.clear_table)
+        export.addAction(clear)
+
         copy = QAction("&Copy CSV to clipboard", self.tool_window.ui_area)
         copy.triggered.connect(self.copy_csv)
         shortcut = QKeySequence(Qt.CTRL + Qt.Key_C)
@@ -380,6 +392,16 @@ class PercentVolumeBuried(ToolInstance):
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(None)
+    
+    def clear_table(self):
+        are_you_sure = QMessageBox.question(
+            None,
+            "Clear table?",
+            "Are you sure you want to clear the data table?",
+        )
+        if are_you_sure != QMessageBox.Yes:
+            return
+        self.table.setRowCount(0)
 
     def set_ligand_atoms(self):
         self.ligand_atoms = selected_atoms(self.session)
@@ -492,7 +514,7 @@ class PercentVolumeBuried(ToolInstance):
             **args
         )
         
-        self.table.setRowCount(0)
+        # self.table.setRowCount(0)
         
         if steric_map:
             for mdl, cent, vbur, map_info in info:

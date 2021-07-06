@@ -1,3 +1,4 @@
+import os.path
 import re
 
 from chimerax.atomic import selected_atoms, selected_bonds, selected_pseudobonds, get_triggers
@@ -23,7 +24,8 @@ from Qt.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, Q
 
 from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.utils import iter2str
-from SEQCROW.widgets import PeriodicTable, ModelComboBox
+from SEQCROW.widgets.periodic_table import PeriodicTable
+from SEQCROW.widgets.comboboxes import ModelComboBox
 from SEQCROW.finders import AtomSpec
 
 from AaronTools.config import Config
@@ -1008,7 +1010,13 @@ class BuildQM(ToolInstance):
                 program,
                 self.session.seqcrow_job_manager,
             )
-            job = job_cls(name, self.session, self.theory, auto_update=auto_update, auto_open=auto_open)
+            job = job_cls(
+                name,
+                self.session,
+                self.theory,
+                auto_update=auto_update,
+                auto_open=auto_open
+            )
     
             self.session.logger.status("adding %s to queue" % name)
     
@@ -1032,6 +1040,12 @@ class BuildQM(ToolInstance):
 
         for warning in warnings:
             self.session.logger.warning(warning)
+
+        for line in output.splitlines():
+            if "{ name }" in line:
+                self.session.logger.warning(
+                    "{ name } was used in the input file, but this feature is not available when copying the file to the clipboard because the file name is unknown"
+                )
 
         app = QApplication.instance()
         clipboard = app.clipboard()
@@ -1061,9 +1075,15 @@ class BuildQM(ToolInstance):
                     fname = key % filename
                 else:
                     fname = filename
+                outname = os.path.basename(fname)
+                name, ext = os.path.splitext(outname)
+                item = item.replace("{ name }", name)
                 with open(fname, "w") as f:
                     f.write(item)
         else:
+            outname = os.path.basename(filename)
+            name, ext = os.path.splitext(outname)
+            contents = contents.replace("{ name }", name)
             with open(filename, "w") as f:
                 f.write(contents)
 
@@ -1209,6 +1229,9 @@ class JobTypeOption(QWidget):
         new_margins = (margins.left(), 0, margins.right(), 0)
         file_browse_layout.setContentsMargins(*new_margins)
         self.chk_file_path = QLineEdit()
+        self.chk_file_path.setPlaceholderText(
+            "{ name } will be replaced if file is saved"
+        )
         self.chk_file_path.textChanged.connect(self.something_changed)
         self.chk_browse_button = QPushButton("browse...")
         self.chk_browse_button.clicked.connect(self.open_chk_save)
@@ -2826,7 +2849,7 @@ class MethodOption(QWidget):
 
         elif "sapt" in test_value:
             ndx = self.method_option.findText("SAPT", Qt.MatchExactly)
-            m = QRegularExpression("(.*)sapt(.*)(-ct)")
+            m = QRegularExpression("(.*)sapt(0|2\+(?:\(?3\)?)?|2)(-ct)?")
             match = m.match(test_value)
             sapt_type = match.captured(1)
             sapt_level = match.captured(2)
@@ -2922,6 +2945,7 @@ class BasisOption(QWidget):
         self.custom_basis_kw.textChanged.connect(self.update_tooltab)
         self.custom_basis_kw.setPlaceholderText("filter basis sets")
         self.custom_basis_kw.setClearButtonEnabled(True)
+        self.custom_basis_kw.editingFinished.connect(lambda *args, s=self: self.parent.something_changed())
         keyword_label = QLabel("name:")
         self.basis_name_options.addRow(keyword_label, self.custom_basis_kw)
 
@@ -2932,8 +2956,10 @@ class BasisOption(QWidget):
         self.basis_name_options.addRow(aux_label, self.aux_type)
 
         self.is_builtin = QCheckBox()
-        self.is_builtin.setToolTip("checked: basis set is avaiable in the software with a keyword\n" + \
-                                   "unchecked: basis set is stored in an external file")
+        self.is_builtin.setToolTip(
+            "checked: basis set is avaiable in the software with a keyword\n"
+            "unchecked: basis set is stored in an external file"
+        )
         self.is_builtin.stateChanged.connect(self.show_gen_path)
 
         is_builtin_label = QLabel("built-in:")
@@ -3228,6 +3254,7 @@ class BasisOption(QWidget):
 
                     self.previously_used_table.resizeColumnToContents(0)
                     self.previously_used_table.resizeColumnToContents(2)
+                    self.previously_used_table.resizeRowToContents(row)
 
             basis_obj = self.basis_class(basis, self.currentElements(), aux_type=aux, user_defined=gen_path)
             return basis_obj

@@ -746,7 +746,7 @@ class LigandSelection(ChildToolWindow):
     def _build_ui(self):
         layout = QGridLayout()
         
-        self.lig_table = LigandTable()
+        self.lig_table = LigandTable(include_substituents=True)
         self.lig_table.table.itemSelectionChanged.connect(self.refresh_selection)
         layout.addWidget(self.lig_table)
         

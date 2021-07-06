@@ -44,6 +44,8 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
     #associate the AaronTools FileReader with each structure
     session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([structure], [fr]))
 
+    coordsets = coordsets and fr.all_geom is not None and len(fr.all_geom) > 1
+
     if coordsets:
         from chimerax.std_commands.coordset_gui import CoordinateSetSlider
         from SEQCROW.tools import EnergyPlot
@@ -84,14 +86,78 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
     return [structure], status
 
 
+def open_nbo(session, path, file_name, format_name=None, orbitals=None):
+    import os.path
+    
+    from AaronTools.fileIO import FileReader
+    from SEQCROW.residue_collection import ResidueCollection
+    from SEQCROW.managers import ADD_FILEREADER
+
+    # print(file_name)
+
+    if orbitals == "browse":
+        if not session.ui.is_gui:
+            raise RuntimeError("cannot browse for orbital file without gui")
+        
+        from Qt.QtWidgets import QFileDialog
+        
+        # print(os.path.dirname(path))
+        
+        orbitals, _ = QFileDialog.getOpenFileName(
+            caption="NBO orbital file",
+            directory=os.path.dirname(path),
+            filter="NBO coefficient files (*.32 *.33 *.34 *.35 *.36 *.37 *.38 *.39 *.40 *.41);;"
+            "PNAO file (*.32);;"
+            "NAO file (*.33);;"
+            "PNHO file (*.34);;"
+            "NHO file(*.35);;"
+            "PNBO file (*.36);;"
+            "NBO file (*.37);;"
+            "PNLMO file (*.38);;"
+            "NLMO file (*.39);;"
+            "MO file (*.40);;"
+            "NO file (*.41)"
+        )
+        if not orbitals:
+            orbitals = None
+    
+    if format_name == "NBO input file":
+        fmt = "47"
+    elif format_name == "NBO output file":
+        fmt = "31"
+    
+    # print(orbitals)
+
+    fr = FileReader((path, fmt, None), nbo_name=orbitals)
+
+    try:
+        geom = ResidueCollection(fr, refresh_ranks=False)
+    except Exception as e:
+        s = "could not open %s" % file_name
+        if "error" in fr.other and fr.other["error"]:
+            s += "\n%s contains an error (%s):\n%s" % (format_name, fr.other["error"], fr.other["error_msg"])
+        
+        session.logger.error(s)
+        session.logger.error(repr(e))
+        return [], "SEQCROW failed to open %s" % file_name
+
+    structure = geom.get_chimera(session, filereader=fr)
+    #associate the AaronTools FileReader with each structure
+    session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([structure], [fr]))
+
+    status = "Opened %s as an %s" % (file_name, format_name)
+
+    structure.filename = file_name
+
+    return [structure], status
+
+
 def save_aarontools(session, path, format_name, **kwargs):
     """ 
     save XYZ file using AaronTools
     kwargs may be:
         comment - str
     """
-    from SEQCROW.residue_collection import ResidueCollection
-    from AaronTools.geometry import Geometry
     from chimerax.atomic import AtomicStructure
     
     accepted_kwargs = ['comment', 'models']
@@ -112,14 +178,12 @@ def save_aarontools(session, path, format_name, **kwargs):
     if len(models) < 1:
         raise RuntimeError('nothing to save')
     
-    res_cols = [ResidueCollection(model) for model in models]
-    atoms = []
-    for res in res_cols:
-        atoms.extend(res.atoms)
-        
-    geom = Geometry(atoms)
-    
-    if 'comment' in kwargs:
-        geom.comment = kwargs["comment"]
-    
-    geom.write(outfile=path)
+    with open(path, "w") as f:
+        for model in models:
+            f.write("%i\n%s\n" % (model.num_atoms, model.name))
+        for atom in model.atoms:
+            f.write(
+                "%2s    %9.5f    %9.5f     %9.5f\n" % (
+                    atom.element.name, *atom.coord
+                )
+            )
