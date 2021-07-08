@@ -1750,7 +1750,8 @@ class IRPlot(ChildToolWindow):
         # toolbox.setMinimumWidth(int(1.1 * plot_widget.size().width()))
         # toolbox.setMinimumHeight(int(1.2 * plot_widget.size().height()))
 
-        self.tool_instance.model_selector.currentIndexChanged.connect(self.check_anharm)
+        self.tool_instance.model_selector.currentTextChanged.connect(self.check_anharm)
+        self.check_anharm()
 
         #menu bar for saving stuff
         menu = QMenuBar()
@@ -2217,6 +2218,7 @@ class IRPlot(ChildToolWindow):
 
     def cleanup(self):
         self.tool_instance.ir_plot = None
+        self.tool_instance.model_selector.currentTextChanged.disconnect(self.check_anharm)
         
         self.tool_instance.settings.figure_height = self.figure_height.value()
         self.tool_instance.settings.figure_width = self.figure_width.value()
