@@ -261,7 +261,7 @@ class _SEQCROW_API(BundleAPI):
             from .tools import JobQueue
             return JobQueue(session, ti.name)
 
-        elif ti.name == "AARON Input Builder":
+        elif ti.name == "AaronJr Input Builder":
             from .tools import AARONInputBuilder
             return AARONInputBuilder(session, ti.name)
 

@@ -138,7 +138,6 @@ class BuildQM(ToolInstance):
         if self.settings.settings_version == 2:
             self.migrate_settings_from_v2()
             self.session.logger.warning("settings migrated from version 2")
-            # self.session.logger.warning("migration will occur until migration testing is completed")
             self.settings.settings_version = self.settings.settings_version + 1
 
         self.refresh_presets()
@@ -1170,6 +1169,9 @@ class JobTypeOption(QWidget):
         self.charge.setRange(-5, 5)
         self.charge.setSingleStep(1)
         self.charge.setValue(self.settings.previous_charge)
+        self.charge.setToolTip(
+            "net charge of the system"
+        )
         self.charge.valueChanged.connect(self.something_changed)
 
         job_type_layout.addRow("charge:", self.charge)
@@ -1178,6 +1180,10 @@ class JobTypeOption(QWidget):
         self.multiplicity.setRange(1, 3)
         self.multiplicity.setSingleStep(1)
         self.multiplicity.setValue(self.settings.previous_mult)
+        self.multiplicity.setToolTip(
+            "one plus the number of unpaired electrons\n"
+            "e.g. a methylene radical would have a multiplicity of 2"
+        )
         self.multiplicity.valueChanged.connect(self.something_changed)
 
         job_type_layout.addRow("multiplicity:", self.multiplicity)
@@ -2675,7 +2681,10 @@ class MethodOption(QWidget):
 
         self.grid.addItem("Default")
         if file_info.grids:
-            self.grid.addItems(file_info.grids)
+            if isinstance(file_info.grids, dict):
+                self.grid.addItems(file_info.grids.keys())
+            else:
+                self.grid.addItems(file_info.grids)
 
         ndx = self.method_option.findText(current_func, Qt.MatchExactly)
         if ndx == -1:
@@ -2796,6 +2805,8 @@ class MethodOption(QWidget):
     def getGrid(self, update_settings=True):
         """returns IntegrationGrid corresponding to current settings"""
         grid = self.grid.currentText()
+        if isinstance(self.form.grids, dict) and grid != "Default":
+            grid = self.form.grids[grid]
         if update_settings:
             self.settings.previous_grid = grid
 
@@ -2809,6 +2820,11 @@ class MethodOption(QWidget):
         if grid is None:
             ndx = self.grid.findText("Default")
         elif isinstance(grid, str):
+            if isinstance(self.form.grids, dict):
+                for key in self.form.grids:
+                    if self.form.grids[key] == grid:
+                        grid = key
+                        break
             ndx = self.grid.findText(grid)
         else:
             ndx = self.grid.findText(grid.name)

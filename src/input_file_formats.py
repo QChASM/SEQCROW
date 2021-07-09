@@ -712,11 +712,15 @@ class ORCAFileInfo(QMInputFileInfo):
         "Becke-Johnson damped Grimme D3",
         "Grimme D4"
     ]
-    grids = [
-        "DefGrid1",
-        "DefGrid2",
-        "DefGrid3",
-    ]
+    grids = {
+        "DefGrid3 (ORCA 5)": "DefGrid3",
+        "DefGrid2 (ORCA 5)": "DefGrid2",
+        "DefGrid1 (ORCA 5)": "DefGrid1",
+        "Grid7 (ORCA 4)": "Grid7",
+        "Grid6 (ORCA 4)": "Grid6",
+        "Grid5 (ORCA 4)": "Grid5",
+        "Grid4 (ORCA 4)": "Grid4",
+    }
     basis_sets = [
         "def2-SVP",
         "def2-TZVP",
@@ -902,7 +906,7 @@ class SQMFileInfo(QMInputFileInfo):
         "quick optimize" : {
             "theory": Theory(
                 method="AM1",
-                                job_type=OptimizationJob(),
+                job_type=OptimizationJob(),
             ),
             "use_other": True,
             "use_method": True,
