@@ -309,13 +309,15 @@ class JobQueue(ToolInstance):
     def remove_job(self, job):
         if isinstance(job, LocalJob):
             self.tree.takeTopLevelItem(self.session.seqcrow_job_manager.jobs.index(job))
-            self.session.seqcrow_job_manager.local_jobs.remove(job)
+            self.session.seqcrow_job_manager.remove_local_job(job)
             if hasattr(job, "scratch_dir") and os.path.exists(job.scratch_dir):
-                yes = QMessageBox.question(self.tool_window.ui_area, \
-                                            "Remove local files?", \
-                                            "%s has been removed from the queue.\n" % (job.name) + \
-                                            "Would you also like to move '%s' to the trash bin?" % job.scratch_dir, \
-                                            QMessageBox.Yes | QMessageBox.No)
+                yes = QMessageBox.question(
+                    self.tool_window.ui_area,
+                    "Remove local files?",
+                    "%s has been removed from the queue.\n" % (job.name) + \
+                    "Would you also like to move '%s' to the trash bin?" % job.scratch_dir,
+                    QMessageBox.Yes | QMessageBox.No
+                )
 
                 if yes == QMessageBox.Yes:
                     send2trash(job.scratch_dir)

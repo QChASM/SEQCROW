@@ -147,6 +147,11 @@ class JobManager(ProviderManager):
 
         self.initialized = True
 
+    def remove_local_job(self, job):
+        """remove a local job from the list of jobs and update the json"""
+        self.local_jobs.remove(job)
+        self.write_json()
+
     def write_json(self, *args, **kwargs):
         """updates the list of cached jobs"""
         d = {'finished':[], 'queued':[], 'check':[], 'error':[], 'killed':[]}

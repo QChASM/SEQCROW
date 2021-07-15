@@ -56,8 +56,8 @@ def percent_vbur(
         center=None,
         useCentroid=True,
         displaySphere=None,
-        pointSpacing=0.075,
-        intersectionScale=2,
+        pointSpacing=0.1,
+        intersectionScale=6,
         palette="rainbow",
         return_values=False,
         steric_map=False,
@@ -300,6 +300,11 @@ def vbur_vis(
         intersection_scale,
         volume_type,
 ):
+    # from cProfile import Profile
+    # 
+    # profile = Profile()
+    # profile.enable()
+
     # number of points is based on surface area
     n_grid = int(4 * np.pi * radius**2 / point_spacing)
     if volume_type == "buried":
@@ -397,20 +402,20 @@ def vbur_vis(
             rot_angle = 2*np.pi / n_added
             R = rotation_matrix(rot_angle, v_n)
             prev_r = r0
+            prev_r_list = []
             for x in np.linspace(0, 2*np.pi, num=n_added):
                 prev_r = np.dot(R, prev_r)
-                d_ep = distance_matrix(coords, [prev_r + p + center_coords])
-                # if the point is obscured by another atom, don't bother adding it
-                # this saves time on triangulation
-                for j in range(0, len(coords)):
-                    if i == j:
-                        continue
-                    if d_ep[j,0] <= radius_list[j]:
-                        break
-                else:
-                    center_added_points.append(prev_r + p)
-                    atom_added_points[i].append(prev_r + p + center_coords)
-        
+                prev_r_list.append(prev_r)
+            prev_r_list = np.array(prev_r_list)
+            d_ep = distance_matrix(prev_r_list + p + center_coords, coords)
+            # if the point is obscured by another atom, don't bother adding it
+            # this saves time on triangulation
+            diff_mat = d_ep - radius_list
+            diff_mat[:,i] = 1
+            mask = np.invert(np.any(diff_mat < 0, axis=1))
+            center_added_points.extend(prev_r_list[mask] + p)
+            atom_added_points[i].extend(prev_r_list[mask] + p + center_coords)
+
         for j in range(0, i):
             d = atom_dist[i,j]
             r2 = radius_list[j]
@@ -441,22 +446,26 @@ def vbur_vis(
                 rot_angle = 2*np.pi / n_added
                 R = rotation_matrix(rot_angle, v_n)
                 prev_r = r0
+                prev_r_list = []
                 for x in np.linspace(0, 2*np.pi, num=n_added):
                     prev_r = np.dot(R, prev_r)
-                    if np.linalg.norm(center_coords - (prev_r + p + coords[i])) > radius:
-                        continue
-                    
-                    d_ep = distance_matrix(coords, [prev_r + p + coords[i]])
-                    for k in range(0, len(coords)):
-                        if i == k or j == k:
-                            continue
-                        
-                        if d_ep[k,0] <= radius_list[k]:
-                            break
-                    else:
-                        atom_added_points[i].append(prev_r + p + coords[i])
-                        atom_added_points[j].append(prev_r + p + coords[i])
-  
+                    prev_r_list.append(prev_r)
+                prev_r_list = np.array(prev_r_list)
+                norm_mask = np.linalg.norm(center_coords - (prev_r_list + p + coords[i]), axis=1) < radius
+                prev_r_list = prev_r_list[norm_mask]
+                
+                if not len(prev_r_list):
+                    continue
+                d_ep = distance_matrix(prev_r_list + p + coords[i], coords)
+                diff_mat = d_ep - radius_list
+                diff_mat[:,i] = 1
+                diff_mat[:,j] = 1
+                mask = np.invert(np.any(diff_mat < 0, axis=1))
+                if any(mask):
+                    atom_added_points[i].extend(prev_r_list[mask] + p + coords[i])
+                    atom_added_points[j].extend(prev_r_list[mask] + p + coords[i])
+
+    tol = 0.3 * point_spacing
     for i in range(0, len(coords)):
         # get a grid of points around each atom
         # remove any points that are close to an intersection
@@ -466,20 +475,15 @@ def vbur_vis(
         # it won't leave a gap
         n_atom_grid = int(radius_list[i]**2 * n_grid / radius**2)
         atom_sphere = fibonacci_sphere(radius=radius_list[i], num=n_atom_grid)
+        mask = np.ones(len(atom_sphere), dtype=bool)
         n_atom_grid = len(atom_sphere)
         if len(atom_added_points[i]) > 0:
             remove_ndx = []
             dist_mat = distance_matrix(atom_sphere, np.array(atom_added_points[i]) - coords[i])
-            for j in range(0, len(atom_sphere)):
-                for k in range(0, len(atom_added_points[i])):
-                    if dist_mat[j,k] < 0.3 * point_spacing:
-                        remove_ndx.append(j)
-                        break
-            
-            atom_sphere = atom_sphere.tolist()
-            for ndx in remove_ndx[::-1]:
-                atom_sphere.pop(ndx)
-            
+            mask *= np.any((dist_mat - tol) < 0)
+
+            atom_sphere = atom_sphere[mask]
+
             atom_sphere = np.array(atom_sphere)
             n_atom_grid = len(atom_sphere)
             atom_sphere = np.concatenate((atom_sphere, np.array(atom_added_points[i]) - coords[i]))
@@ -525,15 +529,7 @@ def vbur_vis(
             atom_sphere.pop(vi)
             tri = tri[np.all(tri != vi, axis=1)]
         
-        new_t = tri.tolist()
-        # remove_t = []
-        # for j, ti in enumerate(new_t):
-        #     if all(t >= n_atom_grid for t in ti):
-        #         remove_t.append(j)
-        # 
-        # for vi in remove_t[::-1]:
-        #     new_t.pop(vi)
-        new_t = np.array(new_t)
+        new_t = tri
 
         for j, ti in enumerate(new_t):
             for k, v in enumerate(ti):
@@ -552,7 +548,7 @@ def vbur_vis(
         dist_mat = distance_matrix(sphere, center_added_points)
         for i in range(0, len(sphere)):
             for j in range(0, len(center_added_points)):
-                if dist_mat[i,j] < 0.3 * point_spacing:
+                if dist_mat[i,j] < tol:
                     remove_ndx.append(i)
                     break
         
@@ -577,10 +573,10 @@ def vbur_vis(
     for i in range(0, n_sphere):
         if volume_type == "free":
             for j in range(0, len(coords)):
-                    if center_grid_dist[i,j] < radius_list[j]:
-                        remove_v.append(i)
-                        del_count += 1
-                        break
+                if center_grid_dist[i,j] < radius_list[j]:
+                    remove_v.append(i)
+                    del_count += 1
+                    break
             
         elif volume_type == "buried":
             if all(center_grid_dist[i,j] > radius_list[j] for j in range(0, len(coords))):
@@ -593,25 +589,21 @@ def vbur_vis(
         new_ndx[i] = i - del_count
         
     sphere = sphere.tolist()
+    mask = np.ones(len(tri), dtype=bool)
     for vi in remove_v[::-1]:
         sphere.pop(vi)
-        tri = tri[np.all(tri != vi, axis=1)]
+        mask *= np.invert(np.any(tri == vi, axis=1))
+    tri = tri[mask]
 
-    new_t = tri.tolist()
+    new_t = tri
     if volume_type == "buried":
-        remove_t = []
-        for j, ti in enumerate(new_t):
-            if all(t >= n_sphere for t in ti):
-                remove_t.append(j)
-        
-        for vi in remove_t[::-1]:
-            new_t.pop(vi)
+        mask = np.invert(np.all(new_t >= n_sphere, axis=1))
+        new_t = new_t[mask]
 
     new_t = np.array(new_t)
 
     for i, ti in enumerate(new_t):
-        for j, v in enumerate(ti):
-            new_t[i][j] = new_ndx[v]
+        new_t[i] = new_ndx[ti]
 
     norms = []
     if sphere:
@@ -624,14 +616,23 @@ def vbur_vis(
     
     # the triangles need to be reordered so the points are 
     # clockwise (or counterclockwise? i don't remember)
-    for i in range(0, len(triangles)):
-        t = triangles[i]
-        v1 = vertices[t[1]] - vertices[t[0]]
-        v2 = vertices[t[2]] - vertices[t[0]]
-        c = np.cross(v1, v2)
-        if np.dot(c, normals[t[0]]) < 0:
-            triangles[i] = t[::-1]
+    vertices = np.array(vertices)
+    normals = np.array(normals)
+    triangles = np.array(triangles)
+    v1 = vertices[triangles[:,1]] - vertices[triangles[:,0]]
+    v2 = vertices[triangles[:,2]] - vertices[triangles[:,0]]
+    c = np.cross(v1, v2)
+    mask = np.sum(c * normals[triangles[:,0]], axis=1) < 0
+    triangles[mask] = triangles[mask, ::-1]
+
+    model.set_geometry(vertices, normals, triangles)
     
-    model.set_geometry(np.array(vertices), np.array(normals), np.array(triangles))
+    # profile.disable()
+    # from TestManager.stream_holder import StreamHolder
+    # import pstats
+    # stream = StreamHolder(session)
+    # pstats.Stats(profile, stream=stream).strip_dirs().sort_stats(-1).print_stats()
+    # stream.flush()
+
     
     return model
