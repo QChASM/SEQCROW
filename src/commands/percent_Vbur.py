@@ -488,6 +488,8 @@ def vbur_vis(
             n_atom_grid = len(atom_sphere)
             atom_sphere = np.concatenate((atom_sphere, np.array(atom_added_points[i]) - coords[i]))
 
+        if len(atom_sphere) < 4:
+            continue
         atom_hull = ConvexHull(atom_sphere / radius_list[i])
         tri = atom_hull.simplices
 
@@ -529,16 +531,14 @@ def vbur_vis(
             atom_sphere.pop(vi)
             tri = tri[np.all(tri != vi, axis=1)]
         
-        new_t = tri
-
-        for j, ti in enumerate(new_t):
+        for j, ti in enumerate(tri):
             for k, v in enumerate(ti):
-                new_t[j][k] = new_ndx[v]
+                tri[j][k] = new_ndx[v]
   
         atom_sphere = np.array(atom_sphere)
         norms = -(atom_sphere - coords[i]) / radius_list[i]
         
-        triangles.extend(new_t + len(vertices))
+        triangles.extend(tri + len(vertices))
         vertices.extend(atom_sphere)
         normals.extend(norms)
     
