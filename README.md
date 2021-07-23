@@ -17,10 +17,8 @@ More information about SEQCROW features can be found on the [GitHub wiki](https:
 ## Citation
 If you use SEQCROW, please cite the following:
 
-1. "QChASM: Quantum Chemistry Automation and Structure Manipulation" <a href="http://dx.doi.org/10.1002/wcms.1510" target="_blank"><i>WIREs Comp. Mol. Sci.</i> (in press, 2021)</a>
-
-2. SEQCROW, Anthony J. Schaefer and Steven E. Wheeler, University of Georgia (2020).
-
+1. "SEQCROW: A ChimeraX Bundle to Facilitate Quantum Chemical Applications to Complex Molecular Systems" <a href="http://dx.doi.org/10.1002/jcc.26700" target="_blank"><i>J. Comp. Chem.</i> <b>42</b>, 1750 (2021)</a>.
+2. "QChASM: Quantum Chemistry Automation and Structure Manipulation" <a href="http://dx.doi.org/10.1002/wcms.1510" target="_blank"><i>WIREs Comp. Mol. Sci.</i> <b>11</b>, e1510 (2021)</a>
 
 ## Other Versions
 This is a plug-in for ChimeraX.
