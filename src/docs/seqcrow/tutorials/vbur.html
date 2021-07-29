@@ -39,49 +39,31 @@
                 <br>
                 This structure is from the article mentioned above.
             </p>
+            <p>
+                Now, open the buried volume tool (<span class=menulike>
+                Tools &rarr; Structure Analysis &rarr; Buried Volume</span> or
+                run the command
+                <a class="cxcmd" href="cxcmd:ui tool show &quot;Buried Volume&quot;">
+                ui tool show "Buried Volume"</a>).
+            </p>
             <h3>Setting the Settings</h3>
-                <p>
-                    Now, open the buried volume tool (<span class=menulike>
-                    Tools &rarr; Structure Analysis &rarr; Buried Volume</span> or
-                    run the command
-                    <a class="cxcmd" href="cxcmd:ui tool show &quot;Buried Volume&quot;">
-                    ui tool show "Buried Volume"</a>).
-                </p>
-                <p>
-                    The tool offers a few options we can tweak. The first is the VDW radii to
+               <p>
+                    The tool offers a few options we can tweak over on the "settings"
+					tab. The first is the VDW radii to
                     use. There's not much of a difference between the "UMN" and "Bondi" radii,
                     other than the "UMN" radii cover more of the periodic table.
                     There's also the option to scale the VDW radii to account for 
                     Real Molecules not being totally static, like this structure.
                 </p>
-                <aside>
-                    <img src="../images/Vbur_IPr.jpg" width=256px/>
-                </aside>
                 <p>
-                    The next thing we can do is specify the atoms to include in the buried 
-                    volume calculation by selecting them. 
-                    To calculate the buried volume of this ligand, we need to select the entire
-                    ligand and click the <button>set ligands to current selection</button>
-                    on the tool window. For this particular structure, a concise way to select
-                    the ligand is to select just one atom on the ligand and then employ the
-                    'connected' selector (<span class="menulike">Select &rarr;
-                    Structure &rarr; Connected</span>). The 'connected' selector expands the
-                    current selection to everything with a bonding path to the current
-                    selection. The following command is also effective:
-                    <br>
-                    <a class="cxcmd" href="cxcmd:select N; select connected">select
-                    N; select connected</a>
-                    <br>
-                    Another option is to use the "Select Fragment" mouse mode, which can
-                    be turned on by going to the "More Right Mouse" tab of the ChimeraX toolbar.
-                </p>
-                <p>
-                    Next, we choose the radius around the metal center. This defines the
-                    total volume, and the %V<sub>bur</sub> is the portion of this sphere
-                    that is taken up by the VDW radii of the ligand. For the purpose of
-                    this tutorial, we'll use 3.0 Å. This radius should be chosen to 
-                    capture the parts of the ligand that likely do interact with substrates.
-                    For other systems, different radii should be tested.
+                    Next, we choose the radius around the metal center. The radius around the
+					metal center defines the total volume, and the %V<sub>bur</sub>
+					is the portion of this sphere that is taken up by the VDW radii of
+					the ligand. For the purpose of this tutorial, we'll use 3.0 Å. This
+					radius should be chosen to capture the parts of the ligand that
+					likely do interact with substrates. For other systems, different
+					radii should be tested. 3.0 Å was chosen here simply to provide
+					a comparison with the reference above.
                 </p>
                 <p>
                     We can also choose what algorithm to use to integrate this volume.
@@ -101,16 +83,39 @@
                     &lt; 0.01). The sign of the error from the MC method is random, but will
                     typically fall within ± 0.3 of the expected value.
                 </p>
+			<h3>Calculating Buried Volume</h3>
+                <aside>
+                    <img src="../images/Vbur_IPr.jpg" width=256px/>
+                </aside>
                 <p>
-                    The next option, 'use centroid of centers' might be useful for calculating
-                    the buried volume at the centroid of key atoms on a polydentate ligand.
-                    We'll leave that unchecked for this tutorial.
+                    Now we need to specify the ligand atoms to include in the buried 
+                    volume calculation by selecting them. Flip back to the "calculation" tab.
+                    To calculate the buried volume of this ligand, we need to select the entire
+                    ligand and click the <button>set ligands to current selection</button>
+                    on the tool window. For this particular structure, a concise way to select
+                    the ligand is to select just one atom on the ligand and then employ the
+                    'connected' selector (<span class="menulike">Select &rarr;
+                    Structure &rarr; Connected</span>). The 'connected' selector expands the
+                    current selection to everything with a bonding path to the current
+                    selection. The following command is also effective:
+                    <br>
+                    <a class="cxcmd" href="cxcmd:select N; select connected">select
+                    N; select connected</a>
+                    <br>
+                    Another option is to use the "Select Fragment" mouse mode, which can
+                    be turned on by going to the "More Right Mouse" tab of the ChimeraX toolbar.
                 </p>
                 <p>
-                    Simply select the ruthenium and press <button>calculate % buried
+                    The next option, 'use centroid of centers' might be useful for calculating
+                    the buried volume at the centroid of key atoms on a polydentate ligand
+					that is not bound to a metal. We'll leave that unchecked for this tutorial.
+                </p>
+				<p>
+					Finally, select the ruthenium atom and press <button>calculate % buried
                     volume for selected centers</button>. The %V<sub>bur</sub>
                     value should appear in the table on the lower half of the tool.
-                    you should get a value around 28%.
+                    you should get a value around 28%. This is in line with the value
+					reported in table 3 of the reference mentioned above. 
                 </p>
                 <p>
                     The data table can be exported to a CSV file using the 

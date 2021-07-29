@@ -538,6 +538,9 @@ class Info(ToolInstance):
 
                     val = "%.6f" % val
 
+                elif info.startswith("optical rotation"):
+                    info_name += " (°)"
+
                 elif any(info == x for x in pg_infos):
                     info_name = info.replace("_", " ")
                     if re.search("\d", val):

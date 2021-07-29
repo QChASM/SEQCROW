@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="1.2b1">
+            version="1.1.1">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -315,7 +315,7 @@
                 <ChimeraXClassifier>ChimeraX :: Tool :: Coordination Complex Generator :: Structure Editing  :: Create coordination complexes with mono- or bidentate ligands</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Orbital Viewer                 :: AaronTools         :: View molecular orbitals</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Ligand Sterimol                :: Structure Analysis :: Calculate Sterimol parameters for ligands on organo- or organometallic catalysts</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: AaronJr Input Builder          :: AaronJr            :: Create input files for AaronJr</ChimeraXClassifier>
+                <!--<ChimeraXClassifier>ChimeraX :: Tool :: AaronJr Input Builder          :: AaronJr            :: Create input files for AaronJr</ChimeraXClassifier>-->
                 <!--ChimeraXClassifier>ChimeraX :: Tool :: AARON Input Builder :: AARON :: Build AARON input file</ChimeraXClassifier-->
                 
                 <ChimeraXClassifier>ChimeraX :: Selector :: tm        :: Transition metals</ChimeraXClassifier>
