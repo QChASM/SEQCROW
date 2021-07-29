@@ -215,6 +215,7 @@ class OrbitalViewer(ToolInstance):
         
         orbits = fr.other["orbitals"]
 
+        homo_ndx = 0
         if orbits.beta_nrgs is None or len(orbits.beta_nrgs) == 0:
             if "orbit_kinds" not in fr.other:
                 self.mo_table.setColumnCount(3)
@@ -247,6 +248,8 @@ class OrbitalViewer(ToolInstance):
                 if "orbit_kinds" in fr.other:
                     change_font = False
                     occ = fr.other["orbit_kinds"][-i - 1]
+                    if not homo_ndx and "ry" not in occ and "*" not in occ:
+                        homo_ndx = i
 
                 occupancy = OrbitalTableItem()
                 occupancy.setData(Qt.DisplayRole, occ)
@@ -266,7 +269,8 @@ class OrbitalViewer(ToolInstance):
                 orbit_nrg.setData(Qt.UserRole, nrg)
                 orbit_nrg.setTextAlignment(Qt.AlignCenter)
                 self.mo_table.setItem(row, 2, orbit_nrg)
-            homo_ndx = orbits.n_mos - max(orbits.n_alpha, orbits.n_beta)
+            if not homo_ndx:
+                homo_ndx = orbits.n_mos - max(orbits.n_alpha, orbits.n_beta)
         else:
             self.mo_table.setColumnCount(3)
             self.mo_table.setHorizontalHeaderLabels(

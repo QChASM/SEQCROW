@@ -1,7 +1,9 @@
 import os
 
+from chimerax.core.commands import run
 from chimerax.core.toolshed import BundleAPI
 from chimerax.core.toolshed.info import SelectorInfo
+from chimerax.core.models import ADD_MODELS
 from chimerax.open_command import OpenerInfo
 from chimerax.core.commands import BoolArg, ModelsArg, StringArg, register, OpenFileNameArg
 
@@ -61,6 +63,8 @@ class _SEQCROW_API(BundleAPI):
             session.ui.mouse_modes.add_mode(ChangeElementMouseMode(session))
             session.ui.mouse_modes.add_mode(EraserMouseMode(session))
             session.ui.mouse_modes.add_mode(SubstituteMouseMode(session))
+            
+            session.triggers.add_handler(ADD_MODELS, _SEQCROW_API.open_useful_tools)
 
         #apply AARONLIB setting
         if seqcrow_settings.settings.AARONLIB is not None:
@@ -257,7 +261,7 @@ class _SEQCROW_API(BundleAPI):
             from .tools import JobQueue
             return JobQueue(session, ti.name)
 
-        elif ti.name == "AARON Input Builder":
+        elif ti.name == "AaronJr Input Builder":
             from .tools import AARONInputBuilder
             return AARONInputBuilder(session, ti.name)
 
@@ -701,5 +705,21 @@ class _SEQCROW_API(BundleAPI):
         del session.filereader_manager
         del session.seqcrow_qm_input_manager
         del session.seqcrow_job_manager
+
+    @classmethod
+    def open_useful_tools(cls, trigger_name, models):
+        for model in models:
+            if hasattr(model, "filereader") and model.filereader is not None:
+                fr = model.filereader[-1]
+                if (
+                    "orbitals" in fr.other and
+                    model.session.seqcrow_settings.settings.ORBIT_OPEN != "do nothing"
+                ):
+                    run(model.session, "ui tool show \"Orbital Viewer\"")
+                if (
+                    "frequency" in fr.other and
+                    model.session.seqcrow_settings.settings.FREQ_OPEN != "do nothing"
+                ):
+                    run(model.session, "ui tool show \"Visualize Normal Modes\"")
 
 bundle_api = _SEQCROW_API()

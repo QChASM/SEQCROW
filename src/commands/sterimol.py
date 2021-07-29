@@ -49,15 +49,15 @@ def sterimol(
     
     info = "<pre>model\tsubstituent atom\tB1\tB2\tB3\tB4\tB5\tL\n"
     
-    if return_values:
+    # if return_values:
         # if len(models.keys()) > 1:
         #     raise RuntimeError("only one substituent may be selected")
         
-        if any(len(models[key]) > 1 for key in models.keys()):
-            raise RuntimeError("only one substituent may be selected")
+        # if any(len(models[key]) > 1 for key in models.keys()):
+        #     raise RuntimeError("only one substituent may be selected")
     
     for model in models:
-        rescol = ResidueCollection(model)
+        rescol = ResidueCollection(model, refresh_ranks=False)
         for res in models[model]:
             for target in models[model][res]:
                 end_atomspec = AtomSpec(attached[target].atomspec)

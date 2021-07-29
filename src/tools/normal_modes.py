@@ -69,8 +69,8 @@ class _NormalModeSettings(Settings):
         'voigt_mix': 0.5,
         'exp_color': Value((0.0, 0.0, 1.0), TupleOf(FloatArg, 3), iter2str),
         'reverse_x': True,
-        'figure_width': 2,
-        'figure_height': 2,
+        'figure_width': 5,
+        'figure_height': 3.5,
         "fixed_size": False,
         "scales": "{}",
     }
@@ -1621,6 +1621,10 @@ class IRPlot(ChildToolWindow):
         self.anharm = QCheckBox()
         self.anharm.setCheckState(Qt.Checked)
         peak_layout.addRow("anharmonic:", self.anharm)
+
+        self.vcd = QCheckBox()
+        self.vcd.setCheckState(Qt.Checked)
+        peak_layout.addRow("VCD:", self.vcd)
         
         toolbox.addTab(peak_widget, "peak settings")
         
@@ -1750,7 +1754,10 @@ class IRPlot(ChildToolWindow):
         # toolbox.setMinimumWidth(int(1.1 * plot_widget.size().width()))
         # toolbox.setMinimumHeight(int(1.2 * plot_widget.size().height()))
 
-        self.tool_instance.model_selector.currentIndexChanged.connect(self.check_anharm)
+        self.tool_instance.model_selector.currentTextChanged.connect(self.check_anharm)
+        self.check_anharm()
+        self.tool_instance.model_selector.currentTextChanged.connect(self.check_vcd)
+        self.check_vcd()
 
         #menu bar for saving stuff
         menu = QMenuBar()
@@ -1860,6 +1867,14 @@ class IRPlot(ChildToolWindow):
             return
         freq = data.other["frequency"]
         self.anharm.setEnabled(bool(freq.anharm_data))
+    
+    def check_vcd(self):
+        data = self.tool_instance.model_selector.currentData()
+        if not data:
+            return
+        freq = data.other["frequency"]
+        if len(freq.data):
+            self.vcd.setEnabled(bool(freq.data[0].rotation))
 
     def change_figure_size(self, *args):
         if self.fixed_size.checkState() == Qt.Checked:
@@ -2105,6 +2120,7 @@ class IRPlot(ChildToolWindow):
         linear = self.linear.value()
         quadratic = self.quadratic.value()
         anharmonic = freq.anharm_data and self.anharm.checkState() == Qt.Checked
+        vcd = self.vcd.isEnabled() and self.vcd.checkState() == Qt.Checked
         
         centers = None
         widths = None
@@ -2128,6 +2144,7 @@ class IRPlot(ChildToolWindow):
             linear_scale=linear,
             quadratic_scale=quadratic,
             anharmonic=anharmonic,
+            vcd=vcd,
         )
 
         self.canvas.draw()
@@ -2217,6 +2234,7 @@ class IRPlot(ChildToolWindow):
 
     def cleanup(self):
         self.tool_instance.ir_plot = None
+        self.tool_instance.model_selector.currentTextChanged.disconnect(self.check_anharm)
         
         self.tool_instance.settings.figure_height = self.figure_height.value()
         self.tool_instance.settings.figure_width = self.figure_width.value()

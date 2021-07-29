@@ -15,6 +15,14 @@ class IOPresets(EnumOption):
     values = ['None', 'Ball-Stick-Endcap', 'Sticks', 'VDW', 'Index Labels', 'Ball-Stick-Endcap + Index Labels', 'Sticks + Index Labels', 'VDW + Index Labels']
     labels = ['None', 'Ball-Stick-Endcap', 'Sticks', 'VDW', 'Index Labels', 'Ball-Stick-Endcap + Index Labels', 'Sticks + Index Labels', 'VDW + Index Labels']
 
+class OrbitOptions(EnumOption):
+    values = ['do nothing', 'open orbital viewer tool']
+    labels = ['do nothing', 'open orbital viewer tool']
+
+class FreqOptions(EnumOption):
+    values = ['do nothing', 'open normal modes tool']
+    labels = ['do nothing', 'open normal modes tool']
+
 # 'settings' module attribute will be set by manager initialization
 class _SEQCROWSettings(Settings):
     EXPLICIT_SAVE = {
@@ -23,12 +31,22 @@ class _SEQCROWSettings(Settings):
         'GAUSSIAN_EXE': Value("g09.exe" if platform == "win32" else "g09", StringArg),
         'PSI4_EXE': Value("psi4", StringArg),
         'SCRATCH_DIR': Value(path.join(path.expanduser('~'), "SEQCROW_SCRATCH"), StringArg), 
-        'JOB_FINISHED_NOTIFICATION': Value('log notification', 
-                                           EnumOf(JobFinishedNotification.values),
-                                          ), 
-        'SEQCROW_IO_PRESET': Value('None', 
-                                   EnumOf(IOPresets.values),
-                                  ),
+        'JOB_FINISHED_NOTIFICATION': Value(
+            'log notification', 
+            EnumOf(JobFinishedNotification.values),
+        ), 
+        'SEQCROW_IO_PRESET': Value(
+            'None', 
+            EnumOf(IOPresets.values),
+        ),
+        'ORBIT_OPEN': Value(
+            'do nothing',
+            EnumOf(OrbitOptions.values),
+        ),
+        'FREQ_OPEN': Value(
+            'do nothing',
+            EnumOf(FreqOptions.values),
+        ),
         'NON_SEQCROW_IO_PRESET': [],
     }
 
@@ -68,12 +86,26 @@ def register_settings_options(session):
         "AARONLIB": (
             "Personal AaronTools library folder",
             InputFolderOption,
-            "Directory containing your substituents (/Subs), ligands (/Ligands), rings (/Rings), and AARON templates (/TS_geoms)\nYou will need to restart ChimeraX for changes to take effect"),
+            "Directory containing your substituents (/Subs), ligands (/Ligands), rings (/Rings), and AARON templates (/TS_geoms)\nYou will need to restart ChimeraX for changes to take effect"
+        ),
             
         "SEQCROW_IO_PRESET" : (
             "Preset for molecules opened with SEQCROW", 
             IOPresets, 
-            "Molecules opened through SEQCROW (xyz, log, etc.) will use this graphical preset"),
+            "Molecules opened through SEQCROW (xyz, log, etc.) will use this graphical preset"
+        ),
+        
+        "ORBIT_OPEN": (
+            "When orbital files are opened",
+            OrbitOptions,
+            "whether or not to open the Orbital Viewer tool when a file with orbital info is opened",
+        ),
+
+        "FREQ_OPEN": (
+            "When frequency files are opened",
+            FreqOptions,
+            "whether or not to open the Normal Modes tool when a file with orbital info is opened",
+        ),
         
         "NON_SEQCROW_IO_PRESET" : (
             """commands executed when a model is added:
@@ -83,34 +115,40 @@ for it to only apply to new models
 from that file type 
 (e.g. cif: color <model>/A purple)""",
             StringsOption,
-            "opening a model will run these commands"),
+            "opening a model will run these commands"
+        ),
     }
     
     job_settings_info = {
         "ORCA_EXE" : (
             "ORCA executable", 
             FileOption, 
-            "Path to ORCA executable\nFull path is required for parallel/multithreaded execution"),
+            "Path to ORCA executable\nFull path is required for parallel/multithreaded execution"
+        ),
         
         "GAUSSIAN_EXE" : (
             "Gaussian executable", 
             FileOption, 
-            "Path to Gaussian executable"),
+            "Path to Gaussian executable"
+        ),
         
         "PSI4_EXE" : (
             "Psi4 executable", 
             FileOption, 
-            "Path to Psi4 executable"), 
+            "Path to Psi4 executable"
+        ), 
         
         "SCRATCH_DIR" : (
             "Scratch directory",
             InputFolderOption,
-            "Directory for staging QM jobs"),
+            "Directory for staging QM jobs"
+        ),
         
         "JOB_FINISHED_NOTIFICATION" : (
             "Finished notification", 
             JobFinishedNotification, 
-            "type of notification when job finished"),
+            "type of notification when job finished"
+        ),
     }
     
     for setting, setting_info in settings_info.items():

@@ -35,8 +35,8 @@ class _VburSettings(Settings):
         "minimum_iterations": 25,
         "use_centroid": Value(False, BoolArg), 
         "display_cutout": "no", 
-        "point_spacing": 0.075,
-        "intersection_scale": 2.0, 
+        "point_spacing": 0.1,
+        "intersection_scale": 6.0, 
         "include_header": Value(True, BoolArg),
         "delimiter": "comma",
         "steric_map": False,
@@ -72,24 +72,30 @@ class PercentVolumeBuried(ToolInstance):
         tabs = QTabWidget()
         calc_widget = QWidget()
         calc_layout = QFormLayout(calc_widget)
-        vis_widget = QWidget()
-        vis_layout = QFormLayout(vis_widget)
+        settings_widget = QWidget()
+        settings_layout = QFormLayout(settings_widget)
+        steric_map_widget = QWidget()
+        steric_layout = QFormLayout(steric_map_widget)
+        cutout_widget = QWidget()
+        vol_cutout_layout = QFormLayout(cutout_widget)
         layout.addWidget(tabs)
         
         tabs.addTab(calc_widget, "calculation")
-        tabs.addTab(vis_widget, "visualization")
+        tabs.addTab(settings_widget, "settings")
+        tabs.addTab(steric_map_widget, "steric map")
+        tabs.addTab(cutout_widget, "volume cutout")
 
         self.radii_option = QComboBox()
         self.radii_option.addItems(["Bondi", "UMN"])
         ndx = self.radii_option.findText(self.settings.radii, Qt.MatchExactly)
         self.radii_option.setCurrentIndex(ndx)
-        calc_layout.addRow("radii:", self.radii_option)
+        settings_layout.addRow("radii:", self.radii_option)
        
         self.scale = QDoubleSpinBox()
         self.scale.setValue(self.settings.vdw_scale)
         self.scale.setSingleStep(0.01)
         self.scale.setRange(1., 1.5)
-        calc_layout.addRow("VDW scale:", self.scale)
+        settings_layout.addRow("VDW scale:", self.scale)
         
         set_ligand_atoms = QPushButton("set ligands to current selection")
         set_ligand_atoms.clicked.connect(self.set_ligand_atoms)
@@ -107,7 +113,7 @@ class PercentVolumeBuried(ToolInstance):
         self.radius.setDecimals(1)
         self.radius.setSingleStep(0.1)
         self.radius.setRange(1., 15.)
-        calc_layout.addRow("radius around center:", self.radius)
+        settings_layout.addRow("radius around center:", self.radius)
         
         self.method = QComboBox()
         self.method.addItems(["Lebedev", "Monte-Carlo"])
@@ -116,7 +122,7 @@ class PercentVolumeBuried(ToolInstance):
         )
         ndx = self.method.findText(self.settings.method, Qt.MatchExactly)
         self.method.setCurrentIndex(ndx)
-        calc_layout.addRow("integration method:", self.method)
+        settings_layout.addRow("integration method:", self.method)
         
         leb_widget = QWidget()
         leb_layout = QFormLayout(leb_widget)
@@ -142,7 +148,7 @@ class PercentVolumeBuried(ToolInstance):
         self.angular_points.setCurrentIndex(ndx)
         leb_layout.addRow("angular points:", self.angular_points)
 
-        calc_layout.addRow(leb_widget)
+        settings_layout.addRow(leb_widget)
         
         mc_widget = QWidget()
         mc_layout = QFormLayout(mc_widget)
@@ -157,7 +163,7 @@ class PercentVolumeBuried(ToolInstance):
         )
         mc_layout.addRow("minimum interations:", self.min_iter)
         
-        calc_layout.addRow(mc_widget)
+        settings_layout.addRow(mc_widget)
         
         if self.settings.method == "Lebedev":
             mc_widget.setVisible(False)
@@ -175,52 +181,50 @@ class PercentVolumeBuried(ToolInstance):
         )
         calc_layout.addRow("use centroid of centers:", self.use_centroid)
 
-        steric_map_options = QGroupBox("steric map")
-        steric_map_layout = QFormLayout(steric_map_options)
-        
+
         self.steric_map = QCheckBox()
         self.steric_map.setChecked(self.settings.steric_map)
         self.steric_map.setToolTip("produce a 2D projection of steric bulk\ncauses buried volume to be reported for individual quadrants")
-        steric_map_layout.addRow("create steric map:", self.steric_map)
+        steric_layout.addRow("create steric map:", self.steric_map)
         
         self.use_scene = QCheckBox()
         self.use_scene.setChecked(self.settings.use_scene)
         self.use_scene.setToolTip("steric map will use the orientation the molecule is displayed in")
-        steric_map_layout.addRow("use display orientation:", self.use_scene)
+        steric_layout.addRow("use display orientation:", self.use_scene)
         
         self.num_pts = QSpinBox()
         self.num_pts.setRange(25, 250)
         self.num_pts.setValue(self.settings.num_pts)
         self.num_pts.setToolTip("number of points along x and y axes")
-        steric_map_layout.addRow("number of points:", self.num_pts)
+        steric_layout.addRow("number of points:", self.num_pts)
         
         self.include_vbur = QCheckBox()
         self.include_vbur.setChecked(self.settings.include_vbur)
-        steric_map_layout.addRow("label quadrants with %V<sub>bur</sub>", self.include_vbur)
+        steric_layout.addRow("label quadrants with %V<sub>bur</sub>", self.include_vbur)
 
         self.map_shape = QComboBox()
         self.map_shape.addItems(["circle", "square"])
         ndx = self.map_shape.findText(self.settings.map_shape, Qt.MatchExactly)
         self.map_shape.setCurrentIndex(ndx)
-        steric_map_layout.addRow("map shape:", self.map_shape)
+        steric_layout.addRow("map shape:", self.map_shape)
         
         self.auto_minmax = QCheckBox()
         self.auto_minmax.setChecked(self.settings.auto_minmax)
-        steric_map_layout.addRow("automatic min. and max.:", self.auto_minmax)
+        steric_layout.addRow("automatic min. and max.:", self.auto_minmax)
         
         self.map_min = QDoubleSpinBox()
         self.map_min.setRange(-15., 0.)
         self.map_min.setSuffix(" \u212B")
         self.map_min.setSingleStep(0.1)
         self.map_min.setValue(self.settings.map_min)
-        steric_map_layout.addRow("minimum value:", self.map_min)    
+        steric_layout.addRow("minimum value:", self.map_min)    
         
         self.map_max = QDoubleSpinBox()
         self.map_max.setRange(0., 15.)
         self.map_max.setSuffix(" \u212B")
         self.map_max.setSingleStep(0.1)
         self.map_max.setValue(self.settings.map_max)
-        steric_map_layout.addRow("maximum value:", self.map_max)
+        steric_layout.addRow("maximum value:", self.map_max)
         
         self.use_scene.setEnabled(self.settings.steric_map)
         self.steric_map.stateChanged.connect(lambda state, widget=self.use_scene: widget.setEnabled(state == Qt.Checked))
@@ -252,18 +256,14 @@ class PercentVolumeBuried(ToolInstance):
         self.auto_minmax.stateChanged.connect(
             lambda state, widget=self.map_max, widget2=self.steric_map: widget.setEnabled(not state == Qt.Checked and widget2.isChecked())
         )
-        
-        vis_layout.addRow(steric_map_options)
-        
-        cutout_options = QGroupBox("volume cutout")
-        cutout_layout = QFormLayout(cutout_options)
-        
+
+
         self.display_cutout = QComboBox()
         self.display_cutout.addItems(["no", "free", "buried"])
         ndx = self.display_cutout.findText(self.settings.display_cutout, Qt.MatchExactly)
         self.display_cutout.setCurrentIndex(ndx)
         self.display_cutout.setToolTip("show free or buried volume")
-        cutout_layout.addRow("display volume:", self.display_cutout)
+        vol_cutout_layout.addRow("display volume:", self.display_cutout)
         
         self.point_spacing = QDoubleSpinBox()
         self.point_spacing.setDecimals(3)
@@ -275,7 +275,7 @@ class PercentVolumeBuried(ToolInstance):
             "distance between points on cutout\n" +
             "smaller spacing will narrow gaps, but increase time to create the cutout"
         )
-        cutout_layout.addRow("point spacing:", self.point_spacing)
+        vol_cutout_layout.addRow("point spacing:", self.point_spacing)
         
         self.intersection_scale = QDoubleSpinBox()
         self.intersection_scale.setDecimals(2)
@@ -287,16 +287,14 @@ class PercentVolumeBuried(ToolInstance):
             "higher density will narrow gaps, but increase time to create cutout"
         )
         self.intersection_scale.setValue(self.settings.intersection_scale)
-        cutout_layout.addRow("intersection density:", self.intersection_scale)
+        vol_cutout_layout.addRow("intersection density:", self.intersection_scale)
         
         self.point_spacing.setEnabled(self.settings.display_cutout != "no")
         self.intersection_scale.setEnabled(self.settings.display_cutout != "no")
         
         self.display_cutout.currentTextChanged.connect(lambda text, widget=self.point_spacing: widget.setEnabled(text != "no"))
         self.display_cutout.currentTextChanged.connect(lambda text, widget=self.intersection_scale: widget.setEnabled(text != "no"))
-        
-        vis_layout.addRow(cutout_options)
-        
+
         calc_vbur_button = QPushButton("calculate % buried volume for selected centers")
         calc_vbur_button.clicked.connect(self.calc_vbur)
         calc_layout.addRow(calc_vbur_button)
@@ -304,7 +302,7 @@ class PercentVolumeBuried(ToolInstance):
         
         remove_vbur_button = QPushButton("remove % buried volume visualizations")
         remove_vbur_button.clicked.connect(self.del_vbur)
-        cutout_layout.addRow(remove_vbur_button)
+        vol_cutout_layout.addRow(remove_vbur_button)
         
         self.table = QTableWidget()
         self.table.setColumnCount(3)
@@ -314,6 +312,8 @@ class PercentVolumeBuried(ToolInstance):
         self.table.resizeColumnToContents(0)
         self.table.resizeColumnToContents(1)
         self.table.resizeColumnToContents(2)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Interactive)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         calc_layout.addRow(self.table)
 
@@ -562,8 +562,8 @@ class PercentVolumeBuried(ToolInstance):
                 v.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
                 self.table.setItem(row, 2, v)
         
-        self.table.resizeColumnToContents(0)
         self.table.resizeColumnToContents(1)
+        self.table.resizeColumnToContents(2)
     
     def header_check(self, state):
         """user has [un]checked the 'include header' option on the menu"""

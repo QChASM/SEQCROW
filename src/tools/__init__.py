@@ -7,7 +7,7 @@ from .filereader_panel import FileReaderPanel
 from .compute_thermo import Thermochem
 from .input_generator import BuildQM
 from .job_manager_tool import JobQueue
-from .aaron_input_builder import AARONInputBuilder
+from .aaronjr_input_builder import AARONInputBuilder
 from .sterimol import Sterimol
 from .bond_editor import BondEditor
 from .precision_rotate import PrecisionRotate
