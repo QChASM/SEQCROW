@@ -146,7 +146,8 @@ class EnergyPlot(ToolInstance):
         menu.setNativeMenuBar(False)
         self._menu = menu
         layout.setMenuBar(menu)
-        
+        menu.setVisible(True)
+
         self.tool_window.ui_area.setLayout(layout)
         
         self.tool_window.manage(None)

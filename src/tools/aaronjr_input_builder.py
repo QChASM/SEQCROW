@@ -271,6 +271,7 @@ class AARONSettingsWidget(QWidget):
         menu.setNativeMenuBar(False)
         self._menu = menu
         layout.setMenuBar(menu)
+        menu.setVisible(True)
         
         self.settings = settings
         self.presets = {}

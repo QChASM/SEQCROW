@@ -344,6 +344,7 @@ class Info(ToolInstance):
         menu.setNativeMenuBar(False)
         self._menu = menu
         layout.setMenuBar(menu)
+        menu.setVisible(True)
 
 
         if len(self.session.filereader_manager.list()) > 0:
