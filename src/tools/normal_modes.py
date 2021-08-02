@@ -21,7 +21,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
 from matplotlib import rcParams
 
-from Qt.QtCore import Qt, QRect, QItemSelectionModel 
+from Qt.QtCore import Qt, QRect, QItemSelectionModel, QVariant
 from Qt.QtGui import QValidator, QFont, QIcon
 from Qt.QtWidgets import (
     QSpinBox,
@@ -1194,7 +1194,7 @@ class NormalModes(ToolInstance):
         ir_layout = QFormLayout(ir_tab)
         
         self.plot_type = QComboBox()
-        self.plot_type.addItems(['Absorbance', 'Transmittance'])
+        self.plot_type.addItems(['Absorbance', 'Transmittance', "VCD"])
         ndx = self.plot_type.findText(self.settings.plot_type, Qt.MatchExactly)
         self.plot_type.setCurrentIndex(ndx)
         self.plot_type.currentIndexChanged.connect(lambda *args: self.show_ir_plot(create=False))
@@ -1242,6 +1242,14 @@ class NormalModes(ToolInstance):
             return 
 
         freq = fr.other['frequency']
+        
+        vcd_ndx = self.plot_type.model().index(2, 0)
+        if freq.data[0].rotation is None:
+            self.plot_type.model().setData(vcd_ndx, "VCD", Qt.UserRole - 1)
+        else:
+            self.plot_type.model().setData(vcd_ndx, "VCD", Qt.DisplayRole)
+
+        
         if freq.anharm_data:
             self.table.setColumnCount(4)
             self.table.setHorizontalHeaderLabels([
@@ -1311,7 +1319,12 @@ class NormalModes(ToolInstance):
                 self.table.resizeColumnToContents(i)
         
         self.table.setSelection(QRect(0, 0, 2, 1), QItemSelectionModel.Select)
-    
+
+        if self.plot_type.currentIndex() == 2 and freq.data[0].rotation is None:
+            self.plot_type.setCurrentIndex(0)
+        elif freq.data[0].rotation is not None:
+            self.plot_type.setCurrentIndex(2)
+
     def change_mw_option(self, state):
         """toggle bool associated with mass-weighting option"""
         if state == Qt.Checked:
@@ -1622,9 +1635,9 @@ class IRPlot(ChildToolWindow):
         self.anharm.setCheckState(Qt.Checked)
         peak_layout.addRow("anharmonic:", self.anharm)
 
-        self.vcd = QCheckBox()
-        self.vcd.setCheckState(Qt.Checked)
-        peak_layout.addRow("VCD:", self.vcd)
+        # self.vcd = QCheckBox()
+        # self.vcd.setCheckState(Qt.Checked)
+        # peak_layout.addRow("VCD:", self.vcd)
         
         toolbox.addTab(peak_widget, "peak settings")
         
@@ -1756,13 +1769,14 @@ class IRPlot(ChildToolWindow):
 
         self.tool_instance.model_selector.currentTextChanged.connect(self.check_anharm)
         self.check_anharm()
-        self.tool_instance.model_selector.currentTextChanged.connect(self.check_vcd)
-        self.check_vcd()
+        # self.tool_instance.model_selector.currentTextChanged.connect(self.check_vcd)
+        # self.check_vcd()
 
         #menu bar for saving stuff
         menu = QMenuBar()
         file = menu.addMenu("&Export")
         file.addAction("&Save CSV...")
+        menu.setVisible(True)
         
         file.triggered.connect(self.save)
         
@@ -1868,13 +1882,13 @@ class IRPlot(ChildToolWindow):
         freq = data.other["frequency"]
         self.anharm.setEnabled(bool(freq.anharm_data))
     
-    def check_vcd(self):
-        data = self.tool_instance.model_selector.currentData()
-        if not data:
-            return
-        freq = data.other["frequency"]
-        if len(freq.data):
-            self.vcd.setEnabled(bool(freq.data[0].rotation))
+    # def check_vcd(self):
+    #     data = self.tool_instance.model_selector.currentData()
+    #     if not data:
+    #         return
+    #     freq = data.other["frequency"]
+    #     if len(freq.data):
+    #         self.vcd.setEnabled(bool(freq.data[0].rotation))
 
     def change_figure_size(self, *args):
         if self.fixed_size.checkState() == Qt.Checked:
@@ -2120,7 +2134,7 @@ class IRPlot(ChildToolWindow):
         linear = self.linear.value()
         quadratic = self.quadratic.value()
         anharmonic = freq.anharm_data and self.anharm.checkState() == Qt.Checked
-        vcd = self.vcd.isEnabled() and self.vcd.checkState() == Qt.Checked
+        # vcd = self.vcd.isEnabled() and self.vcd.checkState() == Qt.Checked
         
         centers = None
         widths = None
@@ -2144,7 +2158,6 @@ class IRPlot(ChildToolWindow):
             linear_scale=linear,
             quadratic_scale=quadratic,
             anharmonic=anharmonic,
-            vcd=vcd,
         )
 
         self.canvas.draw()
