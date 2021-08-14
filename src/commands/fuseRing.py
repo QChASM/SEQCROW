@@ -159,8 +159,8 @@ def fuseRing(session, selection=None, rings=None, newName=None, modify=True, min
 
                 target = rescol.find(
                     [
-                        AtomSpec(model_copy.atoms[model.atoms.index(atom1)].atomspec),
-                        AtomSpec(model_copy.atoms[model.atoms.index(atom2)].atomspec)
+                        AtomSpec(a1.atomspec),
+                        AtomSpec(a2.atomspec)
                     ]
                 )
 

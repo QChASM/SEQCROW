@@ -1194,7 +1194,7 @@ class NormalModes(ToolInstance):
         ir_layout = QFormLayout(ir_tab)
         
         self.plot_type = QComboBox()
-        self.plot_type.addItems(['Absorbance', 'Transmittance', "VCD"])
+        self.plot_type.addItems(['Absorbance', 'Transmittance', "VCD", "Raman"])
         ndx = self.plot_type.findText(self.settings.plot_type, Qt.MatchExactly)
         self.plot_type.setCurrentIndex(ndx)
         self.plot_type.currentIndexChanged.connect(lambda *args: self.show_ir_plot(create=False))
@@ -1243,13 +1243,18 @@ class NormalModes(ToolInstance):
 
         freq = fr.other['frequency']
         
-        vcd_ndx = self.plot_type.model().index(2, 0)
+        model = self.plot_type.model()
+        vcd_item = model.item(2)
+        raman_item = model.item(3)
         if freq.data[0].rotation is None:
-            self.plot_type.model().setData(vcd_ndx, "VCD", Qt.UserRole - 1)
+            vcd_item.setFlags(vcd_item.flags() & ~Qt.ItemIsEnabled)
         else:
-            self.plot_type.model().setData(vcd_ndx, "VCD", Qt.DisplayRole)
+            vcd_item.setFlags(vcd_item.flags() | Qt.ItemIsEnabled)
+        if freq.data[0].raman_activity is None:
+            raman_item.setFlags(raman_item.flags() & ~Qt.ItemIsEnabled)
+        else:
+            raman_item.setFlags(raman_item.flags() | Qt.ItemIsEnabled)
 
-        
         if freq.anharm_data:
             self.table.setColumnCount(4)
             self.table.setHorizontalHeaderLabels([
@@ -1320,10 +1325,10 @@ class NormalModes(ToolInstance):
         
         self.table.setSelection(QRect(0, 0, 2, 1), QItemSelectionModel.Select)
 
-        if self.plot_type.currentIndex() == 2 and freq.data[0].rotation is None:
-            self.plot_type.setCurrentIndex(0)
-        elif freq.data[0].rotation is not None:
-            self.plot_type.setCurrentIndex(2)
+        # if self.plot_type.currentIndex() == 2 and freq.data[0].rotation is None:
+        #     self.plot_type.setCurrentIndex(0)
+        # elif freq.data[0].rotation is not None:
+        #     self.plot_type.setCurrentIndex(2)
 
     def change_mw_option(self, state):
         """toggle bool associated with mass-weighting option"""

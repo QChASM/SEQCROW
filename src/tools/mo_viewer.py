@@ -30,6 +30,7 @@ from Qt.QtWidgets import (
     QMessageBox,
     QSizePolicy,
     QTabWidget,
+    QGroupBox,
 )
 
 from SEQCROW.widgets import FilereaderComboBox
@@ -79,6 +80,8 @@ class _OrbitalSettings(Settings):
         "spacing": 0.20,
         "iso_val": 0.025,
         "threads": int(cpu_count() // 2),
+        "e_density_iso": 0.001,
+        "ed_low_mem": False,
     }
 
 
@@ -141,6 +144,35 @@ class OrbitalViewer(ToolInstance):
         
         tabs.addTab(orbit_tab, "orbitals")
 
+
+        other_surface_tab = QWidget()
+        other_surface_layout = QFormLayout(other_surface_tab)
+        
+        e_density_group = QGroupBox("electron density")
+        e_density_layout = QFormLayout(e_density_group)
+        other_surface_layout.addRow(e_density_group)
+        
+        self.e_density_iso = QDoubleSpinBox()
+        self.e_density_iso.setDecimals(4)
+        self.e_density_iso.setRange(1e-4, 5)
+        self.e_density_iso.setSingleStep(1e-3)
+        self.e_density_iso.setValue(self.settings.e_density_iso)
+        e_density_layout.addRow("iso value:", self.e_density_iso)
+        
+        self.low_mem_mode = QCheckBox()
+        self.low_mem_mode.setCheckState(
+            Qt.Checked if self.settings.ed_low_mem else Qt.Unchecked
+        )
+        self.low_mem_mode.setToolTip("use less memory at the cost of performance")
+        e_density_layout.addRow("low memory:", self.low_mem_mode)
+        
+        show_e_density = QPushButton("calculate electron density")
+        show_e_density.clicked.connect(self.show_e_density)
+        e_density_layout.addRow(show_e_density)
+        
+        tabs.addTab(other_surface_tab, "other surfaces")
+
+
         options_tab = QWidget()
         options_layout = QFormLayout(options_tab)
 
@@ -193,10 +225,11 @@ class OrbitalViewer(ToolInstance):
 
         self.keep_open = QCheckBox()
         self.keep_open.setCheckState(Qt.Checked if self.settings.keep_open else Qt.Unchecked)
-        options_layout.addRow("hide previous orbitals:", self.keep_open)
+        options_layout.addRow("cache previous surfaces:", self.keep_open)
 
-        tabs.addTab(options_tab, "settings")
+        tabs.addTab(options_tab, "orbital settings")
         
+
         layout.addRow(tabs)
 
         self.tool_window.ui_area.setLayout(layout)
@@ -340,43 +373,15 @@ class OrbitalViewer(ToolInstance):
             self.mo_table.item(homo_ndx, 0), QTableWidget.PositionAtCenter
         )
 
-    def show_orbit(self):
+    def get_coords(self, mem_scale=1):
         fr = self.model_selector.currentData()
         if fr is None:
             return
-
-        table_items = self.mo_table.selectedItems()
-        if len(table_items) == 0:
-            return
-        for item in table_items:
-            if item.column() == 0:
-                mo = item.data(Qt.UserRole)
-
-        alpha = True
-        if isinstance(mo, tuple):
-            mo, alpha_or_beta = mo
-            alpha = alpha_or_beta == "alpha"
-
-        orbits = fr.other["orbitals"]
-
-        padding = self.padding.value()
-        self.settings.padding = padding
-        spacing = self.spacing.value()
-        self.settings.spacing = spacing
         threads = self.threads.value()
-        self.settings.threads = threads
-        iso_val = self.iso_value.value()
-        self.settings.iso_val = iso_val
-        color1 = tuple(x / 255. for x in self.pos_color.get_color())
-        self.settings.color1 = color1
-        color2 = tuple(x / 255. for x in self.neg_color.get_color())
-        self.settings.color2 = color2
-        keep_open = self.keep_open.checkState() == Qt.Checked
-        self.settings.keep_open = keep_open
+        spacing = self.spacing.value()
+        padding = self.padding.value()
 
-        model = self.session.filereader_manager.get_model(fr)
         geom_coords = np.array([atom.coords for atom in fr.atoms])
-
         def get_standard_axis():
             """returns info to set up a grid along the x, y, and z axes"""
 
@@ -441,13 +446,82 @@ class OrbitalViewer(ToolInstance):
         except np.linalg.LinAlgError:
             n_pts1, n_pts2, n_pts3, v1, v2, v3, com = get_standard_axis()
             u = np.eye(3)
+
+        n_val = n_pts1 * n_pts2 * n_pts3
+        n_val *= 32 * 4 * threads
+        n_val *= mem_scale
+        gb = n_val * (10 ** -9)
+        if n_val > (0.9 * virtual_memory().free):
+            are_you_sure = QMessageBox.warning(
+                self.mo_table,
+                "Memory Limit Warning",
+                "Estimated peak memory usage (%.1fGB) is above or close to\n" % gb +
+                "the available memory (%.1fGB).\n" % (virtual_memory().free * 1e-9) +
+                "Exceeding available memory might affect the stability of your\n"
+                "computer. You may attempt to continue, but it is recommended\n" +
+                "that you lower your resolution, decrease padding, or use\n" +
+                "fewer threads.\n\n" +
+                "Press \"Ok\" to continue or \"Abort\" to cancel.",
+                QMessageBox.Abort | QMessageBox.Ok,
+                defaultButton=QMessageBox.Abort,
+            )
+            if are_you_sure != QMessageBox.Ok:
+                return False
+        
+        ndx = np.vstack(
+            np.mgrid[0:n_pts1, 0:n_pts2, 0:n_pts3]
+        ).reshape(3, np.prod([n_pts1, n_pts2, n_pts3])).T
+        coords = np.matmul(ndx, [v1, v2, v3])
+        coords += com
+        
+        return coords, com, u, n_pts1, n_pts2, n_pts3, v1, v2, v3
+
+    def show_orbit(self):
+        fr = self.model_selector.currentData()
+        if fr is None:
+            return
+        model = self.session.filereader_manager.get_model(fr)
+
+        table_items = self.mo_table.selectedItems()
+        if len(table_items) == 0:
+            return
+        for item in table_items:
+            if item.column() == 0:
+                mo = item.data(Qt.UserRole)
+
+        alpha = True
+        if isinstance(mo, tuple):
+            mo, alpha_or_beta = mo
+            alpha = alpha_or_beta == "alpha"
+
+        orbits = fr.other["orbitals"]
+
+        padding = self.padding.value()
+        self.settings.padding = padding
+        spacing = self.spacing.value()
+        self.settings.spacing = spacing
+        threads = self.threads.value()
+        self.settings.threads = threads
+        iso_val = self.iso_value.value()
+        self.settings.iso_val = iso_val
+        color1 = tuple(x / 255. for x in self.pos_color.get_color())
+        self.settings.color1 = color1
+        color2 = tuple(x / 255. for x in self.neg_color.get_color())
+        self.settings.color2 = color2
+        keep_open = self.keep_open.checkState() == Qt.Checked
+        self.settings.keep_open = keep_open
+        
+        coords = self.get_coords()
+        if coords is False:
+            return
+        coords, com, u, n_pts1, n_pts2, n_pts3, v1, v2, v3 = coords
         
         if keep_open:
             found = False
             hide_vols = []
             for child in model.child_models():
                 if (
-                    isinstance(child, Volume) and
+                    isinstance(child, Volume) and 
                     child.name == "MO %s %i" % ("alpha" if alpha else "beta", mo + 1)
                 ):
                     if (
@@ -478,6 +552,8 @@ class OrbitalViewer(ToolInstance):
                         hide_vols.append(child)
                 elif isinstance(child, Volume) and child.name.startswith("MO") and child.shown():
                     hide_vols.append(child)
+                elif isinstance(child, Volume) and child.name.startswith("electron density") and child.shown():
+                    hide_vols.append(child)
 
             for child in hide_vols:
                 run(self.session, "hide %s" % child.atomspec)
@@ -485,31 +561,6 @@ class OrbitalViewer(ToolInstance):
             if found:
                 return
         
-        n_val = n_pts1 * n_pts2 * n_pts3
-        n_val *= 32 * 4 * threads
-        gb = n_val * (10 ** -9)
-        if n_val > (0.9 * virtual_memory().free):
-            are_you_sure = QMessageBox.warning(
-                self.mo_table,
-                "Memory Limit Warning",
-                "Estimated peak memory usage (%.1fGB) is above or close to\n" % gb +
-                "the available memory (%.1fGB).\n" % (virtual_memory().free * 1e-9) +
-                "Exceeding available memory might affect the stability of your\n"
-                "computer. You may attempt to continue, but it is recommended\n" +
-                "that you lower your resolution, decrease padding, or use\n" +
-                "fewer threads.\n\n" +
-                "Press \"Ok\" to continue or \"Abort\" to cancel.",
-                QMessageBox.Abort | QMessageBox.Ok,
-                defaultButton=QMessageBox.Abort,
-            )
-            if are_you_sure != QMessageBox.Ok:
-                return
-        
-        ndx = np.vstack(
-            np.mgrid[0:n_pts1, 0:n_pts2, 0:n_pts3]
-        ).reshape(3, np.prod([n_pts1, n_pts2, n_pts3])).T
-        coords = np.matmul(ndx, [v1, v2, v3])
-        coords += com
         val = orbits.mo_value(mo, coords, alpha=alpha, n_jobs=threads)
         val = np.reshape(val, (n_pts1, n_pts2, n_pts3))
 
@@ -539,6 +590,106 @@ class OrbitalViewer(ToolInstance):
         vol.update_drawings()
         for child in model.child_models():
             if isinstance(child, Volume) and child.name.startswith("MO"):
+                if keep_open:
+                    run(self.session, "hide %s" % child.atomspec)
+                else:
+                    run(self.session, "close %s" % child.atomspec)
+        self.session.models.add([vol], parent=model)
+
+    def show_e_density(self):
+        fr = self.model_selector.currentData()
+        if fr is None:
+            return
+        model = self.session.filereader_manager.get_model(fr)
+        orbits = fr.other["orbitals"]
+
+        padding = self.padding.value()
+        self.settings.padding = padding
+        spacing = self.spacing.value()
+        self.settings.spacing = spacing
+        threads = self.threads.value()
+        self.settings.threads = threads
+        iso_val = self.e_density_iso.value()
+        self.settings.e_density_iso = iso_val
+        keep_open = self.keep_open.checkState() == Qt.Checked
+        self.settings.keep_open = keep_open
+        low_mem_mode = self.low_mem_mode.checkState() == Qt.Checked
+
+        mem_scale = orbits.n_mos / 4
+        if low_mem_mode:
+            mem_scale = 1
+
+        coords = self.get_coords(mem_scale=mem_scale)
+        if coords is False:
+            return
+        coords, com, u, n_pts1, n_pts2, n_pts3, v1, v2, v3 = coords
+
+        if keep_open:
+            found = False
+            hide_vols = []
+            for child in model.child_models():
+                if (
+                    isinstance(child, Volume) and 
+                    child.name.startswith("electron density")
+                ):
+                    if (
+                        all(x == y for x, y in zip(com, child.data.origin)) and
+                        child.data._data.shape == (n_pts3, n_pts2, n_pts1)
+                    ):
+                        found = True
+                        run(self.session, "show %s" % child.atomspec)
+                        run(
+                            self.session,
+                            "volume %s level %.3f" % (
+                                child.atomspec,
+                                iso_val,
+                            )
+                        )
+                    elif child.shown():
+                        hide_vols.append(child)
+                elif isinstance(child, Volume) and child.name.startswith("MO") and child.shown():
+                    hide_vols.append(child)
+                elif isinstance(child, Volume) and child.name.startswith("electron density") and child.shown():
+                    hide_vols.append(child)
+
+            for child in hide_vols:
+                run(self.session, "hide %s" % child.atomspec)
+                
+            if found:
+                return
+        
+        if low_mem_mode:
+            val = orbits.low_mem_density_value(coords, n_jobs=threads)
+        else:
+            val = orbits.density_value(coords, n_jobs=threads)
+        val = np.reshape(val, (n_pts1, n_pts2, n_pts3))
+
+        grid = OrbitalGrid(
+            (n_pts1, n_pts2, n_pts3),
+            name="electron density",
+            origin=com,
+            rotation=u,
+            step=[np.linalg.norm(v) for v in [v1, v2, v3]],
+        )
+        grid._data = np.swapaxes(val, 0, 2)
+        
+        opt = RenderingOptions()
+        opt.flip_normals = True
+        opt.bt_correction = True
+        opt.cap_faces = False
+        opt.square_mesh = False
+        opt.smooth_lines = True
+        opt.tilted_slab_axis = v3 / np.linalg.norm(v3)
+
+        vol = Volume(self.session, grid, rendering_options=opt)
+        vol.set_parameters(
+            surface_levels=[iso_val],
+            surface_colors=[[1., 1., 1., 0.5]],
+        )
+        vol.matrix_value_statistics(read_matrix=True)
+        vol.update_drawings()
+        for child in model.child_models():
+            if isinstance(child, Volume) and child.name.startswith("electron density"):
                 if keep_open:
                     run(self.session, "hide %s" % child.atomspec)
                 else:
