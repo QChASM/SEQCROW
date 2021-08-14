@@ -219,6 +219,7 @@ class OrbitalViewer(ToolInstance):
         self.ed_iso_value = QDoubleSpinBox()
         self.ed_iso_value.setDecimals(4)
         self.ed_iso_value.setRange(1e-4, 5)
+        self.ed_iso_value.setSingleStep(1e-3)
         self.ed_iso_value.setValue(self.settings.ed_iso_val)
         e_density_layout.addRow("isosurface:", self.ed_iso_value)
         
@@ -554,7 +555,7 @@ class OrbitalViewer(ToolInstance):
                 return
 
         n_val = n_pts1 * n_pts2 * n_pts3
-        n_val *= 8 * 4 * max(threads, len(fr.atoms))
+        n_val *= 8 * (4 * threads + max(len(fr.atoms) - threads, 0))
         gb = n_val * 1e-9
         if n_val > (0.9 * virtual_memory().free):
             are_you_sure = QMessageBox.warning(
@@ -660,7 +661,7 @@ class OrbitalViewer(ToolInstance):
                             hex_color += ch1
                         run(
                             self.session,
-                            "volume %s level %.3f color %s" % (
+                            "volume %s level %.4f color %s" % (
                                 child.atomspec,
                                 iso_val,
                                 hex_color,
