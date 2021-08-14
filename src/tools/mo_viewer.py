@@ -80,7 +80,8 @@ class _OrbitalSettings(Settings):
         "spacing": 0.20,
         "iso_val": 0.025,
         "threads": int(cpu_count() // 2),
-        "e_density_iso": 0.001,
+        "ed_color": Value((1.0, 1.0, 1.0, 0.5), TupleOf(FloatArg, 4), iter2str),
+        "ed_iso_val": 0.001,
         "ed_low_mem": False,
     }
 
@@ -145,33 +146,6 @@ class OrbitalViewer(ToolInstance):
         tabs.addTab(orbit_tab, "orbitals")
 
 
-        other_surface_tab = QWidget()
-        other_surface_layout = QFormLayout(other_surface_tab)
-        
-        e_density_group = QGroupBox("electron density")
-        e_density_layout = QFormLayout(e_density_group)
-        other_surface_layout.addRow(e_density_group)
-        
-        self.e_density_iso = QDoubleSpinBox()
-        self.e_density_iso.setDecimals(4)
-        self.e_density_iso.setRange(1e-4, 5)
-        self.e_density_iso.setSingleStep(1e-3)
-        self.e_density_iso.setValue(self.settings.e_density_iso)
-        e_density_layout.addRow("iso value:", self.e_density_iso)
-        
-        self.low_mem_mode = QCheckBox()
-        self.low_mem_mode.setCheckState(
-            Qt.Checked if self.settings.ed_low_mem else Qt.Unchecked
-        )
-        self.low_mem_mode.setToolTip("use less memory at the cost of performance")
-        e_density_layout.addRow("low memory:", self.low_mem_mode)
-        
-        show_e_density = QPushButton("calculate electron density")
-        show_e_density.clicked.connect(self.show_e_density)
-        e_density_layout.addRow(show_e_density)
-        
-        tabs.addTab(other_surface_tab, "other surfaces")
-
 
         options_tab = QWidget()
         options_layout = QFormLayout(options_tab)
@@ -212,8 +186,8 @@ class OrbitalViewer(ToolInstance):
         options_layout.addRow("colors:", color_options)
         
         self.iso_value = QDoubleSpinBox()
-        self.iso_value.setDecimals(3)
-        self.iso_value.setRange(1e-3, 1)
+        self.iso_value.setDecimals(4)
+        self.iso_value.setRange(1e-4, 1)
         self.iso_value.setSingleStep(0.001)
         self.iso_value.setValue(self.settings.iso_val)
         options_layout.addRow("isosurface:", self.iso_value)
@@ -229,6 +203,45 @@ class OrbitalViewer(ToolInstance):
 
         tabs.addTab(options_tab, "orbital settings")
         
+        
+        other_surface_tab = QWidget()
+        other_surface_layout = QFormLayout(other_surface_tab)
+        
+        e_density_group = QGroupBox("electron density")
+        e_density_layout = QFormLayout(e_density_group)
+        other_surface_layout.addRow(e_density_group)
+        
+        self.ed_color = ColorButton(has_alpha_channel=True, max_size=(16, 16))
+        self.ed_color.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.ed_color.set_color(self.settings.ed_color)
+        e_density_layout.addRow("color:", self.ed_color)
+        
+        self.ed_iso_value = QDoubleSpinBox()
+        self.ed_iso_value.setDecimals(4)
+        self.ed_iso_value.setRange(1e-4, 5)
+        self.ed_iso_value.setValue(self.settings.ed_iso_val)
+        e_density_layout.addRow("isosurface:", self.ed_iso_value)
+        
+        self.low_mem_mode = QCheckBox()
+        self.low_mem_mode.setCheckState(
+            Qt.Checked if self.settings.ed_low_mem else Qt.Unchecked
+        )
+        self.low_mem_mode.setToolTip(
+            "use less memory at the cost of performance\n"
+            "expect calculation to take the time to calculate\n"
+            "an orbital multiplied by the number of electrons\n"
+            "divide by 2 if closed shell\n"
+            "memory usage is the same as orbital calculation"
+        )
+        e_density_layout.addRow("low memory:", self.low_mem_mode)
+        
+        show_e_density = QPushButton("calculate electron density")
+        show_e_density.clicked.connect(self.show_e_density)
+        e_density_layout.addRow(show_e_density)
+        
+        tabs.addTab(other_surface_tab, "other surfaces")
+
+
 
         layout.addRow(tabs)
 
@@ -373,7 +386,7 @@ class OrbitalViewer(ToolInstance):
             self.mo_table.item(homo_ndx, 0), QTableWidget.PositionAtCenter
         )
 
-    def get_coords(self, mem_scale=1):
+    def get_coords(self):
         fr = self.model_selector.currentData()
         if fr is None:
             return
@@ -447,27 +460,6 @@ class OrbitalViewer(ToolInstance):
             n_pts1, n_pts2, n_pts3, v1, v2, v3, com = get_standard_axis()
             u = np.eye(3)
 
-        n_val = n_pts1 * n_pts2 * n_pts3
-        n_val *= 32 * 4 * threads
-        n_val *= mem_scale
-        gb = n_val * (10 ** -9)
-        if n_val > (0.9 * virtual_memory().free):
-            are_you_sure = QMessageBox.warning(
-                self.mo_table,
-                "Memory Limit Warning",
-                "Estimated peak memory usage (%.1fGB) is above or close to\n" % gb +
-                "the available memory (%.1fGB).\n" % (virtual_memory().free * 1e-9) +
-                "Exceeding available memory might affect the stability of your\n"
-                "computer. You may attempt to continue, but it is recommended\n" +
-                "that you lower your resolution, decrease padding, or use\n" +
-                "fewer threads.\n\n" +
-                "Press \"Ok\" to continue or \"Abort\" to cancel.",
-                QMessageBox.Abort | QMessageBox.Ok,
-                defaultButton=QMessageBox.Abort,
-            )
-            if are_you_sure != QMessageBox.Ok:
-                return False
-        
         ndx = np.vstack(
             np.mgrid[0:n_pts1, 0:n_pts2, 0:n_pts3]
         ).reshape(3, np.prod([n_pts1, n_pts2, n_pts3])).T
@@ -560,6 +552,26 @@ class OrbitalViewer(ToolInstance):
                 
             if found:
                 return
+
+        n_val = n_pts1 * n_pts2 * n_pts3
+        n_val *= 8 * 4 * max(threads, len(fr.atoms))
+        gb = n_val * 1e-9
+        if n_val > (0.9 * virtual_memory().free):
+            are_you_sure = QMessageBox.warning(
+                self.mo_table,
+                "Memory Limit Warning",
+                "Estimated peak memory usage (%.1fGB) is above or close to\n" % gb +
+                "the available memory (%.1fGB).\n" % (virtual_memory().free * 1e-9) +
+                "Exceeding available memory might affect the stability of your\n"
+                "computer. You may attempt to continue, but it is recommended\n" +
+                "that you lower your resolution, decrease padding, or use\n" +
+                "fewer threads.\n\n" +
+                "Press \"Ok\" to continue or \"Abort\" to cancel.",
+                QMessageBox.Abort | QMessageBox.Ok,
+                defaultButton=QMessageBox.Abort,
+            )
+            if are_you_sure != QMessageBox.Ok:
+                return False
         
         val = orbits.mo_value(mo, coords, alpha=alpha, n_jobs=threads)
         val = np.reshape(val, (n_pts1, n_pts2, n_pts3))
@@ -609,17 +621,19 @@ class OrbitalViewer(ToolInstance):
         self.settings.spacing = spacing
         threads = self.threads.value()
         self.settings.threads = threads
-        iso_val = self.e_density_iso.value()
-        self.settings.e_density_iso = iso_val
+        iso_val = self.ed_iso_value.value()
+        self.settings.ed_iso_val = iso_val
+        ed_color = tuple(x / 255. for x in self.ed_color.get_color())
+        self.settings.ed_color = ed_color
         keep_open = self.keep_open.checkState() == Qt.Checked
         self.settings.keep_open = keep_open
         low_mem_mode = self.low_mem_mode.checkState() == Qt.Checked
 
-        mem_scale = orbits.n_mos / 4
+        mem_scale = orbits.n_mos / (2 * max(threads, len(fr.atoms)))
         if low_mem_mode:
             mem_scale = 1
 
-        coords = self.get_coords(mem_scale=mem_scale)
+        coords = self.get_coords()
         if coords is False:
             return
         coords, com, u, n_pts1, n_pts2, n_pts3, v1, v2, v3 = coords
@@ -638,11 +652,18 @@ class OrbitalViewer(ToolInstance):
                     ):
                         found = True
                         run(self.session, "show %s" % child.atomspec)
+                        hex_color = "#"
+                        for v in ed_color:
+                            ch1 = str(hex(int(255 * v)))[2:]
+                            if len(ch1) == 1:
+                                ch1 = "0" + ch1
+                            hex_color += ch1
                         run(
                             self.session,
-                            "volume %s level %.3f" % (
+                            "volume %s level %.3f color %s" % (
                                 child.atomspec,
                                 iso_val,
+                                hex_color,
                             )
                         )
                     elif child.shown():
@@ -657,6 +678,27 @@ class OrbitalViewer(ToolInstance):
                 
             if found:
                 return
+
+        n_val = n_pts1 * n_pts2 * n_pts3
+        n_val *= 8 * 4 * max(threads, len(fr.atoms))
+        n_val *= mem_scale
+        gb = n_val * 1e-9
+        if n_val > (0.9 * virtual_memory().free):
+            are_you_sure = QMessageBox.warning(
+                self.mo_table,
+                "Memory Limit Warning",
+                "Estimated peak memory usage (%.1fGB) is above or close to\n" % gb +
+                "the available memory (%.1fGB).\n" % (virtual_memory().free * 1e-9) +
+                "Exceeding available memory might affect the stability of your\n"
+                "computer. You may attempt to continue, but it is recommended\n" +
+                "that you lower your resolution, decrease padding, or use\n" +
+                "fewer threads.\n\n" +
+                "Press \"Ok\" to continue or \"Abort\" to cancel.",
+                QMessageBox.Abort | QMessageBox.Ok,
+                defaultButton=QMessageBox.Abort,
+            )
+            if are_you_sure != QMessageBox.Ok:
+                return False
         
         if low_mem_mode:
             val = orbits.low_mem_density_value(coords, n_jobs=threads)
@@ -684,7 +726,7 @@ class OrbitalViewer(ToolInstance):
         vol = Volume(self.session, grid, rendering_options=opt)
         vol.set_parameters(
             surface_levels=[iso_val],
-            surface_colors=[[1., 1., 1., 0.5]],
+            surface_colors=[ed_color],
         )
         vol.matrix_value_statistics(read_matrix=True)
         vol.update_drawings()
