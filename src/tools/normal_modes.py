@@ -1325,8 +1325,10 @@ class NormalModes(ToolInstance):
         
         self.table.setSelection(QRect(0, 0, 2, 1), QItemSelectionModel.Select)
 
-        # if self.plot_type.currentIndex() == 2 and freq.data[0].rotation is None:
-        #     self.plot_type.setCurrentIndex(0)
+        if self.plot_type.currentIndex() == 2 and freq.data[0].rotation is None:
+            self.plot_type.setCurrentIndex(0)
+        if self.plot_type.currentIndex() == 3 and freq.data[0].raman_activity is None:
+            self.plot_type.setCurrentIndex(0)
         # elif freq.data[0].rotation is not None:
         #     self.plot_type.setCurrentIndex(2)
 

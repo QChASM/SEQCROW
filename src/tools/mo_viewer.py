@@ -31,6 +31,7 @@ from Qt.QtWidgets import (
     QSizePolicy,
     QTabWidget,
     QGroupBox,
+    QLabel,
 )
 
 from SEQCROW.widgets import FilereaderComboBox
@@ -83,6 +84,11 @@ class _OrbitalSettings(Settings):
         "ed_color": Value((1.0, 1.0, 1.0, 0.5), TupleOf(FloatArg, 4), iter2str),
         "ed_iso_val": 0.001,
         "ed_low_mem": False,
+        "fd_color": Value((1.0, 0.0, 0.0, 0.5), TupleOf(FloatArg, 4), iter2str),
+        "fa_color": Value((0.0, 1.0, 0.0, 0.5), TupleOf(FloatArg, 4), iter2str),
+        "fd_iso_val": 0.01,
+        "fukui_delta": 0.1,
+        "fa_low_mem": False,
     }
 
 
@@ -103,6 +109,9 @@ class OrbitalViewer(ToolInstance):
         self.tool_window = MainToolWindow(self)
        
         self.settings = _OrbitalSettings(session, name)
+
+        self.alpha_occ = None
+        self.beta_occ = None
 
         self._build_ui()
     
@@ -144,7 +153,6 @@ class OrbitalViewer(ToolInstance):
         orbit_layout.addRow(draw_orbits)
         
         tabs.addTab(orbit_tab, "orbitals")
-
 
 
         options_tab = QWidget()
@@ -201,9 +209,25 @@ class OrbitalViewer(ToolInstance):
         self.keep_open.setCheckState(Qt.Checked if self.settings.keep_open else Qt.Unchecked)
         options_layout.addRow("cache previous surfaces:", self.keep_open)
 
+        self.low_mem_mode = QCheckBox()
+        self.low_mem_mode.setCheckState(
+            Qt.Checked if self.settings.ed_low_mem else Qt.Unchecked
+        )
+        self.low_mem_mode.setToolTip(
+            "use less memory at the cost of performance\n"
+            "when calculating electron density\n"
+            "expect calculation to take the time to calculate\n"
+            "an orbital multiplied by the number of electrons\n"
+            "divide by 2 if closed shell\n"
+            "memory usage is the same as orbital calculation\n"
+            "Note: this will not impact orbitals, only electron density"
+        )
+        options_layout.addRow("low memory denisities:", self.low_mem_mode)
+        
+
         tabs.addTab(options_tab, "orbital settings")
-        
-        
+
+
         other_surface_tab = QWidget()
         other_surface_layout = QFormLayout(other_surface_tab)
         
@@ -228,11 +252,12 @@ class OrbitalViewer(ToolInstance):
             Qt.Checked if self.settings.ed_low_mem else Qt.Unchecked
         )
         self.low_mem_mode.setToolTip(
-            "use less memory at the cost of performance\n"
-            "expect calculation to take the time to calculate\n"
-            "an orbital multiplied by the number of electrons\n"
-            "divide by 2 if closed shell\n"
-            "memory usage is the same as orbital calculation"
+            "use less memory at the cost of performance when calculating\n"
+            "electron density\n\n"
+            "expect calculation to take the time to calculate an orbital\n"
+            "an orbital multiplied by the number of electrons; divide by\n"
+            "2 if closed shell\n\n"
+            "memory usage is the same as orbital calculation\n"
         )
         e_density_layout.addRow("low memory:", self.low_mem_mode)
         
@@ -240,9 +265,77 @@ class OrbitalViewer(ToolInstance):
         show_e_density.clicked.connect(self.show_e_density)
         e_density_layout.addRow(show_e_density)
         
+
+        fukui_group = QGroupBox("Fukui Functions")
+        fukui_layout = QFormLayout(fukui_group)
+        other_surface_layout.addRow(fukui_group)
+        
+
+        fukui_color_options = QWidget()
+        color_layout = QHBoxLayout(fukui_color_options)
+        color_layout.setContentsMargins(5, 0, 5, 0)
+        
+        f_plus = QLabel("")
+        f_plus.setText("<a href=\"test\" style=\"text-decoration: none;\"><i>f</i><sub>w</sub><sup>+</sup>:</a>")
+        f_plus.setTextFormat(Qt.RichText)
+        f_plus.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        f_plus.linkActivated.connect(
+            lambda *args, doi="doi:10.1002/jcc.24699": self.open_link(doi)
+        )
+        color_layout.insertWidget(0, f_plus, 0, Qt.AlignRight | Qt.AlignVCenter)
+
+        self.fd_color = ColorButton(has_alpha_channel=True, max_size=(16, 16))
+        self.fd_color.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.fd_color.set_color(self.settings.fd_color)
+        color_layout.insertWidget(1, self.fd_color, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        
+        f_minus = QLabel("")
+        f_minus.setText("<a href=\"test\" style=\"text-decoration: none;\"><i>f</i><sub>w</sub><sup>-</sup>:</a>")
+        f_minus.setTextFormat(Qt.RichText)
+        f_minus.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        f_minus.linkActivated.connect(
+            lambda *args, doi="10.1021/acs.jpca.9b07516": self.open_link(doi)
+        )
+        color_layout.insertWidget(2, f_minus, 0, Qt.AlignRight | Qt.AlignVCenter)
+
+        self.fa_color = ColorButton(has_alpha_channel=True, max_size=(16, 16))
+        self.fa_color.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.fa_color.set_color(self.settings.fa_color)
+        color_layout.insertWidget(3, self.fa_color, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        
+        # widget for alignment
+        color_layout.insertWidget(4, QWidget(), 1, Qt.AlignLeft)
+        
+        fukui_layout.addRow("colors:", fukui_color_options)
+
+        self.fd_iso_value = QDoubleSpinBox()
+        self.fd_iso_value.setDecimals(4)
+        self.fd_iso_value.setRange(1e-4, 5)
+        self.fd_iso_value.setSingleStep(1e-3)
+        self.fd_iso_value.setValue(self.settings.fd_iso_val)
+        fukui_layout.addRow("isosurface:", self.fd_iso_value)
+
+        self.fukui_delta = QDoubleSpinBox()
+        self.fukui_delta.setDecimals(2)
+        self.fukui_delta.setRange(1e-2, 5)
+        self.fukui_delta.setSingleStep(1e-2)
+        self.fukui_delta.setValue(self.settings.fukui_delta)
+        self.fukui_delta.setSuffix(" E\u2095")
+        self.fukui_delta.setToolTip(
+            "width of gaussian function for weighting orbitals"
+        )
+        fukui_layout.addRow("Δ parameter:", self.fukui_delta)
+
+        show_fukui_donor = QPushButton("calculate Fukui donor")
+        show_fukui_donor.clicked.connect(self.show_fukui_donor)
+        fukui_layout.addRow(show_fukui_donor)
+
+        show_fukui_acceptor = QPushButton("calculate Fukui acceptor")
+        show_fukui_acceptor.clicked.connect(self.show_fukui_acceptor)
+        fukui_layout.addRow(show_fukui_acceptor)
+        
+        
         tabs.addTab(other_surface_tab, "other surfaces")
-
-
 
         layout.addRow(tabs)
 
@@ -253,6 +346,9 @@ class OrbitalViewer(ToolInstance):
     def fill_orbits(self, ndx):
         self.mo_table.setRowCount(0)
         
+        self.alpha_occ = None
+        self.beta_occ = None
+
         if ndx == -1:
             return
         
@@ -386,6 +482,10 @@ class OrbitalViewer(ToolInstance):
         self.mo_table.scrollToItem(
             self.mo_table.item(homo_ndx, 0), QTableWidget.PositionAtCenter
         )
+
+    def open_link(self, doi):
+        run(self.session, "open https://doi.org/%s" % doi)
+
 
     def get_coords(self):
         fr = self.model_selector.currentData()
@@ -547,6 +647,10 @@ class OrbitalViewer(ToolInstance):
                     hide_vols.append(child)
                 elif isinstance(child, Volume) and child.name.startswith("electron density") and child.shown():
                     hide_vols.append(child)
+                elif isinstance(child, Volume) and child.name.startswith("fukui donor") and child.shown():
+                    hide_vols.append(child)
+                elif isinstance(child, Volume) and child.name.startswith("fukui acceptor") and child.shown():
+                    hide_vols.append(child)
 
             for child in hide_vols:
                 run(self.session, "hide %s" % child.atomspec)
@@ -673,6 +777,10 @@ class OrbitalViewer(ToolInstance):
                     hide_vols.append(child)
                 elif isinstance(child, Volume) and child.name.startswith("electron density") and child.shown():
                     hide_vols.append(child)
+                elif isinstance(child, Volume) and child.name.startswith("fukui donor") and child.shown():
+                    hide_vols.append(child)
+                elif isinstance(child, Volume) and child.name.startswith("fukui acceptor") and child.shown():
+                    hide_vols.append(child)
 
             for child in hide_vols:
                 run(self.session, "hide %s" % child.atomspec)
@@ -701,10 +809,9 @@ class OrbitalViewer(ToolInstance):
             if are_you_sure != QMessageBox.Ok:
                 return False
         
-        if low_mem_mode:
-            val = orbits.low_mem_density_value(coords, n_jobs=threads)
-        else:
-            val = orbits.density_value(coords, n_jobs=threads)
+        val = orbits.density_value(
+            coords, n_jobs=threads, low_mem=low_mem_mode
+        )
         val = np.reshape(val, (n_pts1, n_pts2, n_pts3))
 
         grid = OrbitalGrid(
@@ -739,6 +846,280 @@ class OrbitalViewer(ToolInstance):
                     run(self.session, "close %s" % child.atomspec)
         self.session.models.add([vol], parent=model)
 
+    def show_fukui_donor(self):
+        fr = self.model_selector.currentData()
+        if fr is None:
+            return
+        model = self.session.filereader_manager.get_model(fr)
+        orbits = fr.other["orbitals"]
+
+        padding = self.padding.value()
+        self.settings.padding = padding
+        spacing = self.spacing.value()
+        self.settings.spacing = spacing
+        threads = self.threads.value()
+        self.settings.threads = threads
+        iso_val = self.fd_iso_value.value()
+        self.settings.fd_iso_val = iso_val
+        fd_color = tuple(x / 255. for x in self.fd_color.get_color())
+        self.settings.fd_color = fd_color
+        keep_open = self.keep_open.checkState() == Qt.Checked
+        self.settings.keep_open = keep_open
+        low_mem_mode = self.low_mem_mode.checkState() == Qt.Checked
+        delta = self.fukui_delta.value()
+        if delta != self.settings.fukui_delta:
+            keep_open = False
+        self.settings.fukui_delta = delta
+
+        mem_scale = orbits.n_mos / (2 * max(threads, len(fr.atoms)))
+        if low_mem_mode:
+            mem_scale = 1
+
+        coords = self.get_coords()
+        if coords is False:
+            return
+        coords, com, u, n_pts1, n_pts2, n_pts3, v1, v2, v3 = coords
+
+        if keep_open:
+            found = False
+            hide_vols = []
+            for child in model.child_models():
+                if (
+                    isinstance(child, Volume) and 
+                    child.name.startswith("fukui donor")
+                ):
+                    if (
+                        all(x == y for x, y in zip(com, child.data.origin)) and
+                        child.data._data.shape == (n_pts3, n_pts2, n_pts1)
+                    ):
+                        found = True
+                        run(self.session, "show %s" % child.atomspec)
+                        hex_color = "#"
+                        for v in fd_color:
+                            ch1 = str(hex(int(255 * v)))[2:]
+                            if len(ch1) == 1:
+                                ch1 = "0" + ch1
+                            hex_color += ch1
+                        run(
+                            self.session,
+                            "volume %s level %.4f color %s" % (
+                                child.atomspec,
+                                iso_val,
+                                hex_color,
+                            )
+                        )
+                    elif child.shown():
+                        hide_vols.append(child)
+                elif isinstance(child, Volume) and child.name.startswith("MO") and child.shown():
+                    hide_vols.append(child)
+                elif isinstance(child, Volume) and child.name.startswith("electron density") and child.shown():
+                    hide_vols.append(child)
+                elif isinstance(child, Volume) and child.name.startswith("fukui donor") and child.shown():
+                    hide_vols.append(child)
+                elif isinstance(child, Volume) and child.name.startswith("fukui acceptor") and child.shown():
+                    hide_vols.append(child)
+
+            for child in hide_vols:
+                run(self.session, "hide %s" % child.atomspec)
+                
+            if found:
+                return
+
+        n_val = n_pts1 * n_pts2 * n_pts3
+        n_val *= 8 * 4 * max(threads, len(fr.atoms))
+        n_val *= mem_scale
+        gb = n_val * 1e-9
+        if n_val > (0.9 * virtual_memory().free):
+            are_you_sure = QMessageBox.warning(
+                self.mo_table,
+                "Memory Limit Warning",
+                "Estimated peak memory usage (%.1fGB) is above or close to\n" % gb +
+                "the available memory (%.1fGB).\n" % (virtual_memory().free * 1e-9) +
+                "Exceeding available memory might affect the stability of your\n"
+                "computer. You may attempt to continue, but it is recommended\n" +
+                "that you lower your resolution, decrease padding, or use\n" +
+                "fewer threads.\n\n" +
+                "Press \"Ok\" to continue or \"Abort\" to cancel.",
+                QMessageBox.Abort | QMessageBox.Ok,
+                defaultButton=QMessageBox.Abort,
+            )
+            if are_you_sure != QMessageBox.Ok:
+                return False
+        
+        val = orbits.fukui_donor_value(
+            coords, n_jobs=threads, low_mem=low_mem_mode, delta=delta,
+        )
+        val = np.reshape(val, (n_pts1, n_pts2, n_pts3))
+
+        grid = OrbitalGrid(
+            (n_pts1, n_pts2, n_pts3),
+            name="fukui donor",
+            origin=com,
+            rotation=u,
+            step=[np.linalg.norm(v) for v in [v1, v2, v3]],
+        )
+        grid._data = np.swapaxes(val, 0, 2)
+        
+        opt = RenderingOptions()
+        opt.flip_normals = True
+        opt.bt_correction = True
+        opt.cap_faces = False
+        opt.square_mesh = False
+        opt.smooth_lines = True
+        opt.tilted_slab_axis = v3 / np.linalg.norm(v3)
+
+        vol = Volume(self.session, grid, rendering_options=opt)
+        vol.set_parameters(
+            surface_levels=[iso_val],
+            surface_colors=[fd_color],
+        )
+        vol.matrix_value_statistics(read_matrix=True)
+        vol.update_drawings()
+        for child in model.child_models():
+            if isinstance(child, Volume) and child.name.startswith("fukui donor"):
+                if keep_open:
+                    run(self.session, "hide %s" % child.atomspec)
+                else:
+                    run(self.session, "close %s" % child.atomspec)
+        self.session.models.add([vol], parent=model)
+
+    def show_fukui_acceptor(self):
+        fr = self.model_selector.currentData()
+        if fr is None:
+            return
+        model = self.session.filereader_manager.get_model(fr)
+        orbits = fr.other["orbitals"]
+
+        padding = self.padding.value()
+        self.settings.padding = padding
+        spacing = self.spacing.value()
+        self.settings.spacing = spacing
+        threads = self.threads.value()
+        self.settings.threads = threads
+        iso_val = self.fd_iso_value.value()
+        self.settings.fd_iso_val = iso_val
+        fa_color = tuple(x / 255. for x in self.fa_color.get_color())
+        self.settings.fa_color = fa_color
+        keep_open = self.keep_open.checkState() == Qt.Checked
+        self.settings.keep_open = keep_open
+        low_mem_mode = self.low_mem_mode.checkState() == Qt.Checked
+        delta = self.fukui_delta.value()
+        if delta != self.settings.fukui_delta:
+            keep_open = False
+        self.settings.fukui_delta = delta
+
+        mem_scale = orbits.n_mos / (2 * max(threads, len(fr.atoms)))
+        if low_mem_mode:
+            mem_scale = 1
+
+        coords = self.get_coords()
+        if coords is False:
+            return
+        coords, com, u, n_pts1, n_pts2, n_pts3, v1, v2, v3 = coords
+
+        if keep_open:
+            found = False
+            hide_vols = []
+            for child in model.child_models():
+                if (
+                    isinstance(child, Volume) and 
+                    child.name.startswith("fukui acceptor")
+                ):
+                    if (
+                        all(x == y for x, y in zip(com, child.data.origin)) and
+                        child.data._data.shape == (n_pts3, n_pts2, n_pts1)
+                    ):
+                        found = True
+                        run(self.session, "show %s" % child.atomspec)
+                        hex_color = "#"
+                        for v in fa_color:
+                            ch1 = str(hex(int(255 * v)))[2:]
+                            if len(ch1) == 1:
+                                ch1 = "0" + ch1
+                            hex_color += ch1
+                        run(
+                            self.session,
+                            "volume %s level %.4f color %s" % (
+                                child.atomspec,
+                                iso_val,
+                                hex_color,
+                            )
+                        )
+                    elif child.shown():
+                        hide_vols.append(child)
+                elif isinstance(child, Volume) and child.name.startswith("MO") and child.shown():
+                    hide_vols.append(child)
+                elif isinstance(child, Volume) and child.name.startswith("electron density") and child.shown():
+                    hide_vols.append(child)
+                elif isinstance(child, Volume) and child.name.startswith("fukui donor") and child.shown():
+                    hide_vols.append(child)
+                elif isinstance(child, Volume) and child.name.startswith("fukui acceptor") and child.shown():
+                    hide_vols.append(child)
+
+            for child in hide_vols:
+                run(self.session, "hide %s" % child.atomspec)
+                
+            if found:
+                return
+
+        n_val = n_pts1 * n_pts2 * n_pts3
+        n_val *= 8 * 4 * max(threads, len(fr.atoms))
+        n_val *= mem_scale
+        gb = n_val * 1e-9
+        if n_val > (0.9 * virtual_memory().free):
+            are_you_sure = QMessageBox.warning(
+                self.mo_table,
+                "Memory Limit Warning",
+                "Estimated peak memory usage (%.1fGB) is above or close to\n" % gb +
+                "the available memory (%.1fGB).\n" % (virtual_memory().free * 1e-9) +
+                "Exceeding available memory might affect the stability of your\n"
+                "computer. You may attempt to continue, but it is recommended\n" +
+                "that you lower your resolution, decrease padding, or use\n" +
+                "fewer threads.\n\n" +
+                "Press \"Ok\" to continue or \"Abort\" to cancel.",
+                QMessageBox.Abort | QMessageBox.Ok,
+                defaultButton=QMessageBox.Abort,
+            )
+            if are_you_sure != QMessageBox.Ok:
+                return False
+        
+        val = orbits.fukui_acceptor_value(
+            coords, n_jobs=threads, low_mem=low_mem_mode, delta=delta,
+        )
+        val = np.reshape(val, (n_pts1, n_pts2, n_pts3))
+
+        grid = OrbitalGrid(
+            (n_pts1, n_pts2, n_pts3),
+            name="fukui acceptor",
+            origin=com,
+            rotation=u,
+            step=[np.linalg.norm(v) for v in [v1, v2, v3]],
+        )
+        grid._data = np.swapaxes(val, 0, 2)
+        
+        opt = RenderingOptions()
+        opt.flip_normals = True
+        opt.bt_correction = True
+        opt.cap_faces = False
+        opt.square_mesh = False
+        opt.smooth_lines = True
+        opt.tilted_slab_axis = v3 / np.linalg.norm(v3)
+
+        vol = Volume(self.session, grid, rendering_options=opt)
+        vol.set_parameters(
+            surface_levels=[iso_val],
+            surface_colors=[fa_color],
+        )
+        vol.matrix_value_statistics(read_matrix=True)
+        vol.update_drawings()
+        for child in model.child_models():
+            if isinstance(child, Volume) and child.name.startswith("fukui acceptor"):
+                if keep_open:
+                    run(self.session, "hide %s" % child.atomspec)
+                else:
+                    run(self.session, "close %s" % child.atomspec)
+        self.session.models.add([vol], parent=model)
+
     def delete(self):
         self.model_selector.deleteLater()
 
@@ -751,4 +1132,17 @@ class OrbitalViewer(ToolInstance):
         self.model_selector.deleteLater()
 
         return super().cleanup()
-    
+
+
+# class OccupancyEditor(ChildToolWindow):
+#     def __init__(self, tool_instance, title, **kwargs):
+#         super().__init__(tool_instance, title, statusbar=False, **kwargs)
+#         
+#         self._build_ui()
+#     
+#     def _build_ui(self):
+#         layout = QFormLayout()
+# 
+#         self.ui_area.setLayout(layout)
+#         self.manage(None)
+
