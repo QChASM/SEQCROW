@@ -246,21 +246,7 @@ class OrbitalViewer(ToolInstance):
         self.ed_iso_value.setSingleStep(1e-3)
         self.ed_iso_value.setValue(self.settings.ed_iso_val)
         e_density_layout.addRow("isosurface:", self.ed_iso_value)
-        
-        self.low_mem_mode = QCheckBox()
-        self.low_mem_mode.setCheckState(
-            Qt.Checked if self.settings.ed_low_mem else Qt.Unchecked
-        )
-        self.low_mem_mode.setToolTip(
-            "use less memory at the cost of performance when calculating\n"
-            "electron density\n\n"
-            "expect calculation to take the time to calculate an orbital\n"
-            "an orbital multiplied by the number of electrons; divide by\n"
-            "2 if closed shell\n\n"
-            "memory usage is the same as orbital calculation\n"
-        )
-        e_density_layout.addRow("low memory:", self.low_mem_mode)
-        
+
         show_e_density = QPushButton("calculate electron density")
         show_e_density.clicked.connect(self.show_e_density)
         e_density_layout.addRow(show_e_density)
@@ -276,7 +262,7 @@ class OrbitalViewer(ToolInstance):
         color_layout.setContentsMargins(5, 0, 5, 0)
         
         f_plus = QLabel("")
-        f_plus.setText("<a href=\"test\" style=\"text-decoration: none;\"><i>f</i><sub>w</sub><sup>+</sup>:</a>")
+        f_plus.setText("<a href=\"test\" style=\"text-decoration: none;\"><i>f</i><sub>w</sub><sup>-</sup>:</a>")
         f_plus.setTextFormat(Qt.RichText)
         f_plus.setTextInteractionFlags(Qt.TextBrowserInteraction)
         f_plus.linkActivated.connect(
@@ -290,7 +276,7 @@ class OrbitalViewer(ToolInstance):
         color_layout.insertWidget(1, self.fd_color, 0, Qt.AlignLeft | Qt.AlignVCenter)
         
         f_minus = QLabel("")
-        f_minus.setText("<a href=\"test\" style=\"text-decoration: none;\"><i>f</i><sub>w</sub><sup>-</sup>:</a>")
+        f_minus.setText("<a href=\"test\" style=\"text-decoration: none;\"><i>f</i><sub>w</sub><sup>+</sup>:</a>")
         f_minus.setTextFormat(Qt.RichText)
         f_minus.setTextInteractionFlags(Qt.TextBrowserInteraction)
         f_minus.linkActivated.connect(
@@ -486,12 +472,10 @@ class OrbitalViewer(ToolInstance):
     def open_link(self, doi):
         run(self.session, "open https://doi.org/%s" % doi)
 
-
     def get_coords(self):
         fr = self.model_selector.currentData()
         if fr is None:
             return
-        threads = self.threads.value()
         spacing = self.spacing.value()
         padding = self.padding.value()
 
