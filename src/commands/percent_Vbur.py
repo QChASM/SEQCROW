@@ -172,11 +172,12 @@ def percent_vbur(
                         x_vec = np.cross(ip_vector, oop_vector)
                         x_vec /= np.linalg.norm(x_vec)
                         ip_vector = -np.cross(x_vec, oop_vector)
+                    ip_vector /= np.linalg.norm(ip_vector)
                     
                     basis = np.array([x_vec, ip_vector, oop_vector]).T
                 
                 if steric_map:
-                    x, y, z, min_alt, max_alt, basis, targets = rescol.steric_map(
+                    x, y, z, min_alt, max_alt, basis, _ = rescol.steric_map(
                         center=c,
                         key_atoms=key_atoms,
                         radii=radii,
@@ -291,11 +292,12 @@ def percent_vbur(
                     x_vec = np.cross(ip_vector, oop_vector)
                     x_vec /= np.linalg.norm(x_vec)
                     ip_vector = -np.cross(x_vec, oop_vector)
-                
+                ip_vector /= np.linalg.norm(ip_vector)
+
                 basis = np.array([x_vec, ip_vector, oop_vector]).T
 
             if steric_map:
-                x, y, z, min_alt, max_alt, basis, targets = rescol.steric_map(
+                x, y, z, min_alt, max_alt, basis, _ = rescol.steric_map(
                     center=mdl_center,
                     key_atoms=key_atoms,
                     radius=radius,

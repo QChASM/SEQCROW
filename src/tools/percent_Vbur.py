@@ -484,10 +484,6 @@ class PercentVolumeBuried(ToolInstance):
         self.settings.map_shape = shape
         args["shape"] = shape
 
-        cutout_labels = self.cutout_labels.currentText()
-        self.settings.cutout_labels = cutout_labels
-        args["labels"] = cutout_labels
-        
         report_component = self.report_component.currentText()
         self.settings.report_component = report_component
         args["reportComponent"] = report_component
@@ -516,7 +512,7 @@ class PercentVolumeBuried(ToolInstance):
         if display_cutout != "no":
             args["displaySphere"] = display_cutout
 
-        if display_cutout is not None:
+        if display_cutout != "no":
             point_spacing = self.point_spacing.value()
             self.settings.point_spacing = point_spacing
             args["pointSpacing"] = point_spacing
@@ -524,6 +520,10 @@ class PercentVolumeBuried(ToolInstance):
             intersection_scale = self.intersection_scale.value()
             self.settings.intersection_scale = intersection_scale
             args["intersectionScale"] = intersection_scale
+
+            cutout_labels = self.cutout_labels.currentText()
+            self.settings.cutout_labels = cutout_labels
+            args["labels"] = cutout_labels
 
         if len(self.ligand_atoms) > 0:
             args["onlyAtoms"] = [a for a in self.ligand_atoms if not a.deleted]

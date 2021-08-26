@@ -832,6 +832,7 @@ class ResidueCollection(Geometry):
             coordsets = np.array([self.coords])
         else:
             coordsets = np.zeros((len(filereader.all_geom) + 1, len(self.atoms), 3))
+            print("cs shape", coordsets.shape)
             for i, all_geom in enumerate(filereader.all_geom):
                 if not all([isinstance(a, Atom) for a in all_geom]):
                     atom_list = [l for l in all_geom if isinstance(l, list) and len(l) == len(self.atoms)][0]
