@@ -356,6 +356,7 @@ class UVVisSpectrum(ToolInstance):
         
 
         tabs.currentChanged.connect(lambda ndx: self.refresh_plot() if ndx == 1 else None)
+        tabs.currentChanged.connect(lambda ndx: self.check_units() if ndx == 4 else None)
 
         #menu bar for saving stuff
         menu = QMenuBar()
@@ -371,6 +372,30 @@ class UVVisSpectrum(ToolInstance):
         self.tool_window.ui_area.setLayout(layout)
         self.tool_window.manage(None)
 
+    def check_units(self):
+        units = self.x_units.currentText()
+        if self.section_table.rowCount() > 1:
+            centers = []
+            widths = []
+            for i in range(0, self.section_table.rowCount() - 1):
+                curr_units = self.section_table.cellWidget(i, 0).suffix().strip()
+                if curr_units == "nm" and units == "eV":
+                    val1 = self.section_table.cellWidget(i, 0).value()
+                    val1 = ValenceExcitations.nm_to_ev(val1)
+                    val2 = self.section_table.cellWidget(i, 1).value()
+                    val2 = ValenceExcitations.nm_to_ev(val2)
+                    self.section_table.cellWidget(i, 0).setValue(val2)
+                    self.section_table.cellWidget(i, 1).setValue(val1)
+                if curr_units == "eV" and units == "nm":
+                    val1 = self.section_table.cellWidget(i, 0).value()
+                    val1 = ValenceExcitations.ev_to_nm(val1)
+                    val2 = self.section_table.cellWidget(i, 1).value()
+                    val2 = ValenceExcitations.ev_to_nm(val2)
+                    self.section_table.cellWidget(i, 0).setValue(val2)
+                    self.section_table.cellWidget(i, 1).setValue(val1)
+                self.section_table.cellWidget(i, 0).setSuffix(" %s" % units)
+                self.section_table.cellWidget(i, 1).setSuffix(" %s" % units)
+        
     def add_mol_group(self, *args):
         row = self.tree.topLevelItemCount()
         
@@ -475,22 +500,30 @@ class UVVisSpectrum(ToolInstance):
         elif column == 2:
             self.section_table.removeRow(row)
     
-    def add_section(self, xmin=150, xmax=450):
+    def add_section(self, xmin=150.0, xmax=450.0):
         rows = self.section_table.rowCount()
+        units = self.x_units.currentText()
+        single_step = 25
+        if units == "eV":
+            x1 = ValenceExcitations.nm_to_ev(xmin)
+            x2 = ValenceExcitations.nm_to_ev(xmax)
+            xmax = x1
+            xmin = x2
+            single_step = 0.5
         if rows != 0:
             rows -= 1
             section_min = QDoubleSpinBox()
             section_min.setRange(0, 5000)
             section_min.setValue(xmin)
-            section_min.setSuffix(" nm")
-            section_min.setSingleStep(25)
+            section_min.setSuffix(" %s" % units)
+            section_min.setSingleStep(single_step)
             self.section_table.setCellWidget(rows, 0, section_min)
             
             section_max = QDoubleSpinBox()
             section_max.setRange(1, 5000)
             section_max.setValue(xmax)
-            section_max.setSuffix(" nm")
-            section_max.setSingleStep(25)
+            section_max.setSuffix(" %s" % units)
+            section_max.setSingleStep(single_step)
             self.section_table.setCellWidget(rows, 1, section_max)
             
             widget_that_lets_me_horizontally_align_an_icon = QWidget()
@@ -758,6 +791,7 @@ class UVVisSpectrum(ToolInstance):
             return
 
         self.figure.clear()
+        self.check_units()
         
         temperature=self.temperature.value()
         self.settings.temperature = temperature
@@ -822,7 +856,7 @@ class UVVisSpectrum(ToolInstance):
                 xmax = self.section_table.cellWidget(i, 1).value()
                 centers.append((xmin + xmax) / 2)
                 widths.append(abs(xmin - xmax))
-        
+
         mixed_spectra.plot_uv_vis(
             self.figure,
             centers=centers,
@@ -875,7 +909,7 @@ class UVVisSpectrum(ToolInstance):
             if use_nm:
                 nrg = ValenceExcitations.ev_to_nm(nrg)
             
-            if plot_type == "Transmittance":
+            if "transmittance" in plot_type:
                 y_vals = (10 ** (2 - 0.9), 100)
             elif plot_type == "ECD":
                 y_vals = (0, np.sign(item.rotatory_str_len))
