@@ -369,6 +369,7 @@ class UVVisSpectrum(ToolInstance):
         menu.setNativeMenuBar(False)
         self._menu = menu
         layout.setMenuBar(menu)        
+        menu.setVisible(True)
         self.tool_window.ui_area.setLayout(layout)
         self.tool_window.manage(None)
 
@@ -548,7 +549,11 @@ class UVVisSpectrum(ToolInstance):
     def save(self):
         filename, _ = QFileDialog.getSaveFileName(filter="CSV Files (*.csv)")
         if filename:
-            s = "wavelenth (nm),IR intensity\n"
+            units = self.x_units.currentText()
+            if units == "nm":
+                s = "wavelenth (nm),intensity\n"
+            else:
+                s = "hv (eV),intensity\n"
 
             mixed_uv_vis = self.get_mixed_spectrum()
         
@@ -570,7 +575,11 @@ class UVVisSpectrum(ToolInstance):
                 intensity_attr = "rotatory_str_len"
             elif plot_type.lower() == "ecd-velocity":
                 intensity_attr = "rotatory_str_vel"
-                
+
+            change_x_unit_func = None
+            if units == "nm":
+                change_x_unit_func = ValenceExcitations.ev_to_nm
+
             funcs, x_positions, intensities = mixed_uv_vis.get_spectrum_functions(
                 fwhm=fwhm,
                 peak_type=peak_type,
@@ -586,6 +595,7 @@ class UVVisSpectrum(ToolInstance):
                 peak_type=peak_type,
                 fwhm=fwhm,
                 normalize=False,
+                change_x_unit_func=change_x_unit_func,
             )
                 
             for x, y in zip(x_values, y_values):

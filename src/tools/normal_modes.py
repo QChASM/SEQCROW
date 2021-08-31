@@ -881,6 +881,7 @@ class IRPlot(ChildToolWindow):
         menu.setNativeMenuBar(False)
         self._menu = menu
         layout.setMenuBar(menu)        
+        menu.setVisible(True)
         self.ui_area.setLayout(layout)
         self.manage(None)
 
