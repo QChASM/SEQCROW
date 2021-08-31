@@ -297,6 +297,14 @@ class _SEQCROW_API(BundleAPI):
             from .tools import LigandSterimol
             return LigandSterimol(session, ti.name)
 
+        elif ti.name == "IR Spectrum":
+            from .tools import IRSpectrum
+            return IRSpectrum(session, ti.name)
+
+        elif ti.name == "UV/Vis Spectrum":
+            from .tools import UVVisSpectrum
+            return UVVisSpectrum(session, ti.name)
+
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)
 

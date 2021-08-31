@@ -30,7 +30,7 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
         format_name = "ORCA output file"
 
     try:
-        geom = ResidueCollection(fr, refresh_ranks=False)
+        geom = ResidueCollection(fr, refresh_ranks=False).copy(comment=fr.comment, copy_atoms=True)
     except Exception as e:
         s = "could not open %s" % file_name
         if "error" in fr.other and fr.other["error"]:
@@ -131,7 +131,7 @@ def open_nbo(session, path, file_name, format_name=None, orbitals=None):
     fr = FileReader((path, fmt, None), nbo_name=orbitals)
 
     try:
-        geom = ResidueCollection(fr, refresh_ranks=False)
+        geom = ResidueCollection(fr, refresh_ranks=False).copy(comment=fr.comment, copy_atoms=True)
     except Exception as e:
         s = "could not open %s" % file_name
         if "error" in fr.other and fr.other["error"]:

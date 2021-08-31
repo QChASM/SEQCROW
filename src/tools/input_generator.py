@@ -2705,6 +2705,7 @@ class MethodOption(QWidget):
         func = self.settings.previous_method
         disp = self.settings.previous_dispersion
         grid = self.settings.previous_grid
+        self.method_kw.setText(self.settings.previous_custom_func)
         self.setMethod(func)
         self.setGrid(grid)
         self.setDispersion(disp)

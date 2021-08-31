@@ -1,0 +1,1017 @@
+import re
+
+import numpy as np
+
+from chimerax.core.tools import ToolInstance
+from chimerax.ui.gui import MainToolWindow, ChildToolWindow
+from chimerax.ui.widgets import ColorButton
+from chimerax.std_commands.coordset_gui import CoordinateSetSlider
+from chimerax.core.settings import Settings
+from chimerax.core.configfile import Value
+from chimerax.core.commands.cli import FloatArg, TupleOf, IntArg
+from chimerax.core.commands import run
+
+from AaronTools.comp_output import CompOutput
+from AaronTools.const import FREQUENCY_SCALE_LIBS
+from AaronTools.geometry import Geometry
+from AaronTools.spectra import ValenceExcitations
+
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
+from matplotlib.figure import Figure
+from matplotlib import rcParams
+
+from Qt.QtCore import Qt, QRect, QItemSelectionModel, QVariant
+from Qt.QtGui import QValidator, QFont, QIcon
+from Qt.QtWidgets import (
+    QSpinBox,
+    QDoubleSpinBox,
+    QGridLayout,
+    QPushButton,
+    QTabWidget,
+    QComboBox,
+    QTableWidget,
+    QTableView,
+    QWidget,
+    QTableWidgetItem,
+    QFormLayout,
+    QCheckBox,
+    QHeaderView,
+    QMenuBar,
+    QFileDialog,
+    QStyle,
+    QGroupBox,
+    QLabel,
+    QHBoxLayout,
+    QLineEdit,
+    QTreeWidget,
+    QSizePolicy,
+    QTreeWidgetItem,
+)
+
+from SEQCROW.tools.per_frame_plot import NavigationToolbar
+from SEQCROW.utils import iter2str
+from SEQCROW.widgets import FilereaderComboBox
+
+
+rcParams["savefig.dpi"] = 300
+
+
+
+class _UVVisSpectrumSettings(Settings):
+    AUTO_SAVE = {
+        'fwhm': Value(0.5, FloatArg), 
+        'peak_type': 'Gaussian', 
+        'plot_type': 'uv-vis',
+        'voigt_mix': 0.5,
+        'exp_color': Value((0.0, 0.0, 1.0), TupleOf(FloatArg, 3), iter2str),
+        'figure_width': 5,
+        'figure_height': 3.5,
+        "fixed_size": False,
+        'w0': 100,
+        'temperature': 298.15,
+        'anharmonic': False,
+        "weight_method": "QRRHO",
+        'col_1': Value(150, IntArg), 
+        'col_2': Value(150, IntArg), 
+        'col_3': Value(150, IntArg), 
+        'x_units': "nm",
+}
+
+
+class UVVisSpectrum(ToolInstance):
+    SESSION_ENDURING = False
+    SESSION_SAVE = False
+    help = "tony forgot to add help"
+    
+    def __init__(self, session, name):
+        super().__init__(session, name)
+        
+        self.tool_window = MainToolWindow(self)        
+
+        self.settings = _UVVisSpectrumSettings(session, "UV-Vis Spectrum")
+
+        self.highlighted_mode = []
+        self.highlight_frs = []
+        self.highlighted_labels = []
+        self.highlighted_lines = []
+        self._last_mouse_xy = None
+        self._dragged = False
+        self._min_drag = 10	
+        self._drag_mode = None
+        self.press = None
+        self.drag_prev = None
+        self.dragging = False
+        self.exp_data = None
+        
+        self._build_ui()
+
+    def _build_ui(self):
+        layout = QGridLayout()
+        
+        tabs = QTabWidget()
+        layout.addWidget(tabs)
+        
+        self.tree = QTreeWidget()
+        self.tree.setColumnCount(4)
+        self.tree.setHeaderLabels(["uv/vis file", "frequency file", "energy file", "remove"])
+        self.tree.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.tree.resizeColumnToContents(3)
+        
+        component_widget = QWidget()
+        component_layout = QGridLayout(component_widget)
+        
+        root_item = self.tree.invisibleRootItem()
+        plus = QTreeWidgetItem(root_item)
+        plus_button = QPushButton("add molecule")
+        plus_button.setFlat(True)
+        plus_button.clicked.connect(self.add_mol_group)        
+        plus_button2 = QPushButton("")
+        plus_button2.setFlat(True)
+        plus_button2.clicked.connect(self.add_mol_group)
+        self.tree.setItemWidget(plus, 0, plus_button)
+        self.tree.setItemWidget(plus, 1, plus_button2)
+        self.tree.insertTopLevelItem(1, plus)
+        # TODO: have a setting save the size the thermo tool
+        self.tree.setColumnWidth(0, self.settings.col_1)
+        self.tree.setColumnWidth(1, self.settings.col_2)
+        
+        self.add_mol_group()
+        
+        component_layout.addWidget(self.tree, 0, 0, 1, 6)
+        
+        self.temperature = QDoubleSpinBox()
+        self.temperature.setDecimals(2)
+        self.temperature.setRange(0.01, 5000)
+        self.temperature.setSingleStep(1)
+        self.temperature.setValue(self.settings.temperature)
+        self.temperature.setSuffix(" K")
+        component_layout.addWidget(QLabel("T ="), 1, 2, 1, 1, Qt.AlignRight | Qt.AlignHCenter)
+        component_layout.addWidget(self.temperature, 1, 3, 1, 1, Qt.AlignLeft | Qt.AlignHCenter)
+        
+        self.w0 = QDoubleSpinBox()
+        self.w0.setDecimals(2)
+        self.w0.setRange(1, 250)
+        self.w0.setSingleStep(5)
+        self.w0.setValue(self.settings.w0)
+        self.w0.setSuffix(" cm\u207b\u00b9")
+        component_layout.addWidget(QLabel("𝜔<sub>0</sub> ="), 1, 4, 1, 1, Qt.AlignRight | Qt.AlignHCenter)
+        component_layout.addWidget(self.w0, 1, 5, 1, 1, Qt.AlignLeft | Qt.AlignHCenter)
+
+        self.weight_method = QComboBox()
+        self.weight_method.addItems([
+            "electronic",
+            "zero-point",
+            "enthalpy",
+            "free (RRHO)",
+            "free (Quasi-RRHO)",
+            "free (Quasi-harmonic)",
+        ])
+        self.weight_method.setItemData(0, CompOutput.ELECTRONIC_ENERGY)
+        self.weight_method.setItemData(1, CompOutput.ZEROPOINT_ENERGY)
+        self.weight_method.setItemData(2, CompOutput.RRHO_ENTHALPY)
+        self.weight_method.setItemData(3, CompOutput.RRHO)
+        self.weight_method.setItemData(4, CompOutput.QUASI_RRHO)
+        self.weight_method.setItemData(5, CompOutput.QUASI_HARMONIC)
+        ndx = self.weight_method.findData(self.settings.weight_method, flags=Qt.MatchExactly)
+        self.weight_method.setCurrentIndex(ndx)
+        component_layout.addWidget(QLabel("energy for weighting:"), 1, 0, 1, 1, Qt.AlignRight | Qt.AlignHCenter)
+        component_layout.addWidget(self.weight_method, 1, 1, 1, 1, Qt.AlignLeft | Qt.AlignHCenter)
+
+
+        tabs.addTab(component_widget, "components")
+        
+        
+        plot_widget = QWidget()
+        
+        plot_widget = QWidget()
+        plot_layout = QGridLayout(plot_widget)
+        
+        self.figure = Figure(figsize=(1.5, 1.5), dpi=100)
+        self.figure.subplots_adjust(bottom=0.15)
+        self.canvas = Canvas(self.figure)
+
+        self.canvas.mpl_connect('button_release_event', self.unclick)
+        self.canvas.mpl_connect('button_press_event', self.onclick)
+        self.canvas.mpl_connect('motion_notify_event', self.drag)
+        self.canvas.mpl_connect('scroll_event', self.zoom)
+        
+        self.canvas.setMinimumWidth(400)
+        # self.canvas.setMinimumHeight(300)
+
+        plot_layout.addWidget(self.canvas, 1, 0, 1, 7)
+
+        refresh_button = QPushButton()
+        refresh_button.setIcon(QIcon(refresh_button.style().standardIcon(QStyle.SP_BrowserReload)))
+        refresh_button.clicked.connect(self.refresh_plot)
+        plot_layout.addWidget(refresh_button, 2, 0, 1, 1, Qt.AlignVCenter)
+
+        toolbar_widget = QWidget()
+        self.toolbar = NavigationToolbar(self.canvas, toolbar_widget)
+        self.toolbar.setMaximumHeight(32)
+        plot_layout.addWidget(self.toolbar, 2, 1, 1, 1)
+
+        plot_layout.addWidget(QLabel("fixed size:"), 2, 2, 1, 1, Qt.AlignVCenter | Qt.AlignRight)
+
+        self.fixed_size = QCheckBox()
+        self.fixed_size.setCheckState(Qt.Checked if self.settings.fixed_size else Qt.Unchecked)
+        self.fixed_size.stateChanged.connect(self.change_figure_size)
+        plot_layout.addWidget(self.fixed_size, 2, 3, 1, 1, Qt.AlignVCenter | Qt.AlignLeft)
+
+        self.figure_width = QDoubleSpinBox()
+        self.figure_width.setRange(1, 24)
+        self.figure_width.setDecimals(2)
+        self.figure_width.setSingleStep(0.25)
+        self.figure_width.setSuffix(" in.")
+        self.figure_width.setValue(self.settings.figure_width)
+        self.figure_width.valueChanged.connect(self.change_figure_size)
+        plot_layout.addWidget(self.figure_width, 2, 4, 1, 1)
+     
+        plot_layout.addWidget(QLabel("x"), 2, 5, 1, 1, Qt.AlignVCenter | Qt.AlignHCenter)
+     
+        self.figure_height = QDoubleSpinBox()
+        self.figure_height.setRange(1, 24)
+        self.figure_height.setDecimals(2)
+        self.figure_height.setSingleStep(0.25)
+        self.figure_height.setSuffix(" in.")
+        self.figure_height.setValue(self.settings.figure_height)
+        self.figure_height.valueChanged.connect(self.change_figure_size)
+        plot_layout.addWidget(self.figure_height, 2, 6, 1, 1)
+
+        self.change_figure_size()
+
+        self.plot_type = QComboBox()
+        self.plot_type.addItems([
+            "UV/vis",
+            "UV/vis transmittance",
+            "UV/vis (dipole velocity)",
+            "UV/vis transmittance (dipole velocity)",
+            "ECD",
+            "ECD (dipole velocity)",
+        ])
+        self.plot_type.setItemData(0, "uv-vis")
+        self.plot_type.setItemData(1, "transmittance")
+        self.plot_type.setItemData(2, "uv-vis-velocity")
+        self.plot_type.setItemData(3, "transmittance-velocity")
+        self.plot_type.setItemData(4, "ecd")
+        self.plot_type.setItemData(5, "ecd-velocity")
+        ndx = self.plot_type.findData(self.settings.plot_type, flags=Qt.MatchExactly)
+        if ndx:
+            self.plot_type.setCurrentIndex(ndx)
+        self.plot_type.currentIndexChanged.connect(self.refresh_plot)
+        plot_layout.addWidget(QLabel("plot type:"), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
+        plot_layout.addWidget(self.plot_type, 0, 1, 1, 6, Qt.AlignLeft | Qt.AlignVCenter)
+        
+        plot_layout.setRowStretch(0, 0)
+        plot_layout.setRowStretch(1, 1)
+        plot_layout.setRowStretch(2, 0)
+        
+        tabs.addTab(plot_widget, "plot")
+
+        # peak style
+        plot_settings_widget = QWidget()
+        plot_settings_layout = QFormLayout(plot_settings_widget)
+
+        self.peak_type = QComboBox()
+        self.peak_type.addItems(['Gaussian', 'Lorentzian', 'pseudo-Voigt', 'Delta'])
+        ndx = self.peak_type.findText(self.settings.peak_type, Qt.MatchExactly)
+        self.peak_type.setCurrentIndex(ndx)
+        plot_settings_layout.addRow("peak type:", self.peak_type)
+        
+        self.fwhm = QDoubleSpinBox()
+        self.fwhm.setRange(0.01, 10.0)
+        self.fwhm.setSingleStep(0.01)
+        self.fwhm.setValue(self.settings.fwhm)
+        self.fwhm.setSuffix(" eV")
+        self.fwhm.setToolTip("width of peaks at half of their maximum value")
+        plot_settings_layout.addRow("FWHM:", self.fwhm)
+        
+        self.fwhm.setEnabled(self.peak_type.currentText() != "Delta")
+        self.peak_type.currentTextChanged.connect(lambda text, widget=self.fwhm: widget.setEnabled(text != "Delta"))
+        
+        self.voigt_mix = QDoubleSpinBox()
+        self.voigt_mix.setSingleStep(0.005)
+        self.voigt_mix.setDecimals(3)
+        self.voigt_mix.setRange(0, 1)
+        self.voigt_mix.setValue(self.settings.voigt_mix)
+        self.voigt_mix.setToolTip("fraction of pseudo-Voigt function that is Gaussian")
+        plot_settings_layout.addRow("Voigt mixing:", self.voigt_mix)
+        
+        self.voigt_mix.setEnabled(self.peak_type.currentText() == "pseudo-Voigt")
+        self.peak_type.currentTextChanged.connect(lambda text, widget=self.voigt_mix: widget.setEnabled(text == "pseudo-Voigt"))
+        
+        self.shift = QDoubleSpinBox()
+        self.shift.setRange(-5, 5)
+        self.shift.setSingleStep(0.1)
+        self.shift.setDecimals(2)
+        self.shift.setSuffix(" eV")
+        plot_settings_layout.addRow("shift excitation energies:", self.shift)
+
+        self.x_units = QComboBox()
+        self.x_units.addItems(["nm", "eV"])
+        ndx = self.x_units.findText(self.settings.x_units, Qt.MatchExactly)
+        self.x_units.setCurrentIndex(ndx)
+        plot_settings_layout.addRow("x-axis units:", self.x_units)
+        
+        tabs.addTab(plot_settings_widget, "plot settings")
+        
+        # plot experimental data alongside computed
+        experimental_widget = QWidget()
+        experimental_layout = QFormLayout(experimental_widget)
+        
+        self.skip_lines = QSpinBox()
+        self.skip_lines.setRange(0, 15)
+        experimental_layout.addRow("skip first lines:", self.skip_lines)
+        
+        browse_button = QPushButton("browse...")
+        browse_button.clicked.connect(self.load_data)
+        experimental_layout.addRow("load CSV data:", browse_button)
+        
+        self.line_color = ColorButton(has_alpha_channel=False, max_size=(16, 16))
+        self.line_color.set_color(self.settings.exp_color)
+        experimental_layout.addRow("line color:", self.line_color)
+        
+        clear_button = QPushButton("clear experimental data")
+        clear_button.clicked.connect(self.clear_data)
+        experimental_layout.addRow(clear_button)
+        
+        tabs.addTab(experimental_widget, "plot experimental data")
+        
+        # break x axis
+        interrupt_widget = QWidget()
+        interrupt_layout = QFormLayout(interrupt_widget)
+
+        self.section_table = QTableWidget()
+        self.section_table.setColumnCount(3)
+        self.section_table.setHorizontalHeaderLabels(["minimum", "maximum", "remove"])
+        self.section_table.cellClicked.connect(self.section_table_clicked)
+        self.section_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        interrupt_layout.addRow(self.section_table)
+        self.add_section()
+
+        # auto_section = QPushButton("automatically section")
+        # auto_section.clicked.connect(self.auto_breaks)
+        # interrupt_layout.addRow(auto_section)
+
+        tabs.addTab(interrupt_widget, "x-axis breaks")
+        
+
+        tabs.currentChanged.connect(lambda ndx: self.refresh_plot() if ndx == 1 else None)
+
+        #menu bar for saving stuff
+        menu = QMenuBar()
+        file = menu.addMenu("&Export")
+        file.addAction("&Save CSV...")
+        menu.setVisible(True)
+        
+        file.triggered.connect(self.save)
+        
+        menu.setNativeMenuBar(False)
+        self._menu = menu
+        layout.setMenuBar(menu)        
+        self.tool_window.ui_area.setLayout(layout)
+        self.tool_window.manage(None)
+
+    def add_mol_group(self, *args):
+        row = self.tree.topLevelItemCount()
+        
+        root_item = self.tree.invisibleRootItem()
+        
+        mol_group = QTreeWidgetItem(root_item)
+        self.tree.insertTopLevelItem(row, mol_group)
+        trash_button = QPushButton()
+        trash_button.setFlat(True)
+        
+        trash_button.clicked.connect(lambda *args, parent=mol_group: self.remove_mol_group(parent))
+        trash_button.setIcon(QIcon(self.tree.style().standardIcon(QStyle.SP_DialogDiscardButton)))
+        
+        add_conf_button = QPushButton("add conformer")
+        add_conf_button.setFlat(True)
+        add_conf_button.clicked.connect(lambda *args, conf_group_widget=mol_group: self.add_conf_group(conf_group_widget))
+        
+        add_conf_button2 = QPushButton("")
+        add_conf_button2.setFlat(True)
+        add_conf_button2.clicked.connect(lambda *args, conf_group_widget=mol_group: self.add_conf_group(conf_group_widget))
+        
+        add_conf_child = QTreeWidgetItem(mol_group)
+        self.tree.setItemWidget(add_conf_child, 0, add_conf_button)
+        self.tree.setItemWidget(add_conf_child, 1, add_conf_button2)
+        self.tree.setItemWidget(mol_group, 2, trash_button)
+        
+        mol_group.setText(0, "group %i" % row)
+        
+        mol_fraction = QDoubleSpinBox()
+        mol_fraction.setDecimals(2)
+        mol_fraction.setRange(0, 100)
+        mol_fraction.setSingleStep(0.01)
+        mol_fraction.setValue(1)
+        
+        mol_fraction_widget = QWidget()
+        mol_fraction_layout = QFormLayout(mol_fraction_widget)
+        mol_fraction_layout.addRow("ratio:", mol_fraction)
+        self.tree.setItemWidget(mol_group, 1, mol_fraction_widget)
+        
+        mol_group.addChild(add_conf_child)
+        self.add_conf_group(mol_group)
+
+        self.tree.expandItem(mol_group)
+    
+    def remove_mol_group(self, parent):
+        for conf_ndx in range(1, parent.childCount()):
+            conf = parent.child(conf_ndx)
+            self.tree.itemWidget(conf, 0).destroy()
+            self.tree.itemWidget(conf, 1).destroy()
+            self.tree.itemWidget(conf, 2).destroy()
+        
+        ndx = self.tree.indexOfTopLevelItem(parent)
+        self.tree.takeTopLevelItem(ndx)
+
+    def add_conf_group(self, conf_group_widget):
+        row = conf_group_widget.childCount()
+        
+        conformer_item = QTreeWidgetItem(conf_group_widget)
+        conf_group_widget.insertChild(row, conformer_item)
+        
+        uv_vis_combobox = FilereaderComboBox(self.session, otherItems=['uv_vis'])
+        nrg_combobox = FilereaderComboBox(self.session, otherItems=['energy'])
+        freq_combobox = FilereaderComboBox(self.session, otherItems=['frequency'])
+        
+        trash_button = QPushButton()
+        trash_button.setFlat(True)
+        trash_button.clicked.connect(lambda *args, combobox=uv_vis_combobox: combobox.deleteLater())
+        trash_button.clicked.connect(lambda *args, combobox=nrg_combobox: combobox.deleteLater())
+        trash_button.clicked.connect(lambda *args, combobox=freq_combobox: combobox.deleteLater())
+        trash_button.clicked.connect(lambda *args, child=conformer_item: conf_group_widget.removeChild(child))
+        trash_button.setIcon(QIcon(self.tree.style().standardIcon(QStyle.SP_DialogCancelButton)))
+        
+        self.tree.setItemWidget(conformer_item, 0, uv_vis_combobox)
+        self.tree.setItemWidget(conformer_item, 1, freq_combobox)
+        self.tree.setItemWidget(conformer_item, 2, nrg_combobox)
+        self.tree.setItemWidget(conformer_item, 3, trash_button)
+
+    def change_figure_size(self, *args):
+        if self.fixed_size.checkState() == Qt.Checked:
+            self.figure_height.setEnabled(True)
+            self.figure_width.setEnabled(True)
+            h = self.figure_height.value()
+            w = self.figure_width.value()
+            
+            self.figure.set_size_inches(w, h)
+            
+            self.canvas.setMinimumHeight(96 * h)
+            self.canvas.setMaximumHeight(96 * h)
+            self.canvas.setMinimumWidth(96 * w)
+            self.canvas.setMaximumWidth(96 * w)
+        else:
+            self.canvas.setMinimumHeight(1)
+            self.canvas.setMaximumHeight(100000)
+            self.canvas.setMinimumWidth(1)
+            self.canvas.setMaximumWidth(100000)
+            self.figure_height.setEnabled(False)
+            self.figure_width.setEnabled(False)
+    
+    def section_table_clicked(self, row, column):
+        if row == self.section_table.rowCount() - 1 or self.section_table.rowCount() == 1:
+            self.add_section()
+        elif column == 3:
+            self.section_table.removeRow(row)
+    
+    def add_section(self, xmin=150, xmax=450):
+        rows = self.section_table.rowCount()
+        if rows != 0:
+            rows -= 1
+            section_min = QDoubleSpinBox()
+            section_min.setRange(0, 5000)
+            section_min.setValue(xmin)
+            section_min.setSuffix(" nm")
+            section_min.setSingleStep(25)
+            self.section_table.setCellWidget(rows, 0, section_min)
+            
+            section_max = QDoubleSpinBox()
+            section_max.setRange(1, 5000)
+            section_max.setValue(xmax)
+            section_max.setSuffix(" nm")
+            section_max.setSingleStep(25)
+            self.section_table.setCellWidget(rows, 1, section_max)
+            
+            widget_that_lets_me_horizontally_align_an_icon = QWidget()
+            widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
+            section_remove = QLabel()
+            dim = int(1.5 * section_remove.fontMetrics().boundingRect("Q").height())
+            section_remove.setPixmap(QIcon(section_remove.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(dim, dim))
+            widget_layout.addWidget(section_remove, 0, Qt.AlignHCenter)
+            widget_layout.setContentsMargins(0, 0, 0, 0)
+            self.section_table.setCellWidget(rows, 2, widget_that_lets_me_horizontally_align_an_icon)
+            rows += 1
+
+        self.section_table.insertRow(rows)
+
+        widget_that_lets_me_horizontally_align_an_icon = QWidget()
+        widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
+        section_add = QLabel("add section")
+        widget_layout.addWidget(section_add, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(0, 0, 0, 0)
+        self.section_table.setCellWidget(rows, 1, widget_that_lets_me_horizontally_align_an_icon)
+    
+    def save(self):
+        filename, _ = QFileDialog.getSaveFileName(filter="CSV Files (*.csv)")
+        if filename:
+            s = "wavelenth (nm),IR intensity\n"
+
+            mixed_uv_vis = self.get_mixed_spectrum()
+        
+            fwhm = self.fwhm.value()
+            peak_type = self.peak_type.currentText()
+            plot_type = self.plot_type.currentData(Qt.UserRole)
+            voigt_mixing = self.voigt_mix.value()
+            shift = self.shift.value()
+            intensity_attr = "dipole_str"
+            if plot_type.lower() == "uv-vis-velocity":
+                intensity_attr = "dipole_vel"
+            elif plot_type.lower() == "transmittance-velocity":
+                intensity_attr = "dipole_vel"
+            elif plot_type.lower() == "transmittance":
+                intensity_attr = "dipole_str"
+            elif plot_type.lower() == "uv-vis":
+                intensity_attr = "dipole_str"
+            elif plot_type.lower() == "ecd":
+                intensity_attr = "rotatory_str_len"
+            elif plot_type.lower() == "ecd-velocity":
+                intensity_attr = "rotatory_str_vel"
+                
+            funcs, x_positions, intensities = mixed_uv_vis.get_spectrum_functions(
+                fwhm=fwhm,
+                peak_type=peak_type,
+                voigt_mixing=voigt_mixing,
+                scalar_scale=shift,
+                intensity_attr=intensity_attr,
+            )
+            
+            x_values, y_values = mixed_uv_vis.get_plot_data(
+                funcs,
+                x_positions,
+                transmittance="transmittance" in plot_type,
+                peak_type=peak_type,
+                fwhm=fwhm,
+                normalize=False,
+            )
+                
+            for x, y in zip(x_values, y_values):
+                s += "%f,%f\n" % (x, y)
+
+            with open(filename, 'w') as f:
+                f.write(s.strip())
+                
+            self.session.logger.info("saved to %s" % filename)
+
+    def zoom(self, event):
+        if event.xdata is None:
+            return
+        for a in self.figure.get_axes():
+            x0, x1 = a.get_xlim()
+            x_range = x1 - x0
+            xdiff = -0.05 * event.step * x_range
+            xshift = 0.2 * (event.xdata - (x0 + x1)/2)
+            nx0 = x0 - xdiff + xshift
+            nx1 = x1 + xdiff + xshift
+    
+            a.set_xlim(nx0, nx1)
+        self.canvas.draw()
+
+    def drag(self, event):
+        if self.toolbar.mode != "":
+            return
+
+        if event.button is not None and self.press is not None:
+            x, y, xpress, ypress = self.press
+            dx = event.x - x
+            dy = event.y - y
+            drag_dist = np.linalg.norm([dx, dy])
+            if self.dragging or drag_dist >= self._min_drag or event.button == 2:
+                self.dragging = True
+                if self.drag_prev is not None:
+                    x, y, xpress, ypress = self.drag_prev
+                    dx = event.x - x
+                    dy = event.y - y
+                
+                self.drag_prev = event.x, event.y, event.xdata, event.ydata
+                self.move(dx, dy)
+
+    def move(self, dx, dy):
+        for ax in self.figure.get_axes():
+            w = self.figure.get_figwidth() * self.figure.get_dpi()
+            x0, x1 = self.figure.gca().get_xlim()
+            xs = dx/w * (x1 - x0)
+            x0, x1 = ax.get_xlim()
+            nx0, nx1 = x0 - xs, x1 - xs
+            #y0, y1 = ax.get_ylim()
+            #ys = dy/h * (y1-y0)
+            #ny0, ny1 = y0-ys, y1-ys
+            ax.set_xlim(nx0, nx1)
+            #ax.set_ylim(ny0, ny1)
+        self.canvas.draw()
+
+    def onclick(self, event):
+        if self.toolbar.mode != "":
+            return
+
+        self.press = event.x, event.y, event.xdata, event.ydata
+        
+        if event.dblclick:
+            closest = None
+            for mol_ndx in range(1, self.tree.topLevelItemCount()):
+                mol = self.tree.topLevelItem(mol_ndx)
+                for conf_ndx in range(1, mol.childCount()):
+                    conf = mol.child(conf_ndx)
+                    fr = self.tree.itemWidget(conf, 0).currentData()
+                    if fr is None:
+                        continue
+                    uv_vis = fr.other["uv_vis"]
+                    
+                    excitations = np.array(
+                        [data.excitation_energy for data in uv_vis.data]
+                    )
+                    c0 = self.shift.value()
+                    excitations += c0
+                    if self.x_units.currentText() == "nm":
+                        excitations = ValenceExcitations.ev_to_nm(excitations)[0]
+                    diff = np.abs(
+                        event.xdata - excitations
+                    )
+                    min_arg = np.argmin(diff)
+                    if not closest or diff[min_arg] < closest[0]:
+                        closest = (diff[min_arg], uv_vis.data[min_arg], fr)
+            
+            if closest:
+                self.highlight(closest[1], closest[2])
+
+    def unclick(self, event):
+        if self.toolbar.mode != "":
+            return
+
+        self.press = None
+        self.drag_prev = None
+        self.dragging = False
+
+    def get_mixed_spectrum(self):
+        weight_method = self.weight_method.currentData(Qt.UserRole)
+        uv_vis_files = []
+        freqs = []
+        single_points = []
+        mol_fracs = []
+
+        for mol_ndx in range(1, self.tree.topLevelItemCount()):
+            uv_vis_files.append([])
+            freqs.append([])
+            single_points.append([])
+            mol = self.tree.topLevelItem(mol_ndx)
+            mol_fracs_widget = self.tree.itemWidget(mol, 1).layout().itemAt(1).widget()
+            mol_fracs.append(mol_fracs_widget.value())
+            
+            for conf_ndx in range(1, mol.childCount()):
+                conf = mol.child(conf_ndx)
+                uv_vis_file = self.tree.itemWidget(conf, 0).currentData()
+                if uv_vis_file is None:
+                    continue
+                uv_vis_files[-1].append(uv_vis_file.other["uv_vis"])
+
+                sp_file = self.tree.itemWidget(conf, 2).currentData()
+                single_points[-1].append(CompOutput(sp_file))
+
+                if weight_method != CompOutput.ELECTRONIC_ENERGY:
+                    print("hi")
+                    freq_file = self.tree.itemWidget(conf, 1).currentData()
+                    freqs[-1].append(CompOutput(freq_file))
+                
+                    rmsd = freqs[-1][-1].geometry.RMSD(
+                        single_points[-1][-1].geometry,
+                        sort=True,
+                    )
+                    if rmsd > 1e-2:
+                        s = "the structure of %s (frequencies) might not match" % freqs[-1][-1].geometry.name
+                        s += "the structure of %s (energy)" % single_points[-1][-1].geometry.name
+                        self.session.logger.warning(s)
+                else:
+                    freqs[-1].append(None)
+                
+                geom = Geometry(uv_vis_file)
+                rmsd = single_points[-1][-1].geometry.RMSD(
+                    geom,
+                    sort=True,
+                )
+                if rmsd > 1e-2:
+                    s = "the structure of %s (UV/vis) might not match" % geom.name
+                    s += "the structure of %s (energy)" % single_points[-1][-1].geometry.name
+                    self.session.logger.warning(s)
+                
+                
+            if not uv_vis_files[-1]:
+                uv_vis_files.pop(-1)
+                freqs.pop(-1)
+                single_points.pop(-1)
+                
+        if not freqs or all(not conf_group for conf_group in freqs):
+            return
+        
+        mixed_spectra = []
+        for i, (uv_vis, conf_freq, conf_nrg) in enumerate(zip(uv_vis_files, freqs, single_points)):
+            for j, nrg_co1 in enumerate(conf_nrg):
+                for k, nrg_co2 in enumerate(conf_nrg[:j]):
+                    rmsd = nrg_co1.geometry.RMSD(nrg_co2.geometry, sort=True)
+                    if rmsd < 1e-2:
+                        s = "%s and %s appear to be duplicate structures " % (
+                                nrg_co1.geometry.name, nrg_co2.geometry.name
+                            )
+                        self.session.logger.warning(s)
+            
+            if weight_method == CompOutput.ELECTRONIC_ENERGY:
+                conf_freq = conf_nrg
+            
+            weights = CompOutput.boltzmann_weights(
+                conf_freq,
+                nrg_cos=conf_nrg,
+                temperature=self.temperature.value(),
+                v0=self.w0.value(),
+                weighting=weight_method,
+            )
+            
+            conf_mixed = ValenceExcitations.get_mixed_signals(
+                uv_vis,
+                weights=weights,
+            )
+            mixed_spectra.append(conf_mixed)
+        
+        final_mixed = ValenceExcitations.get_mixed_signals(
+            mixed_spectra,
+            weights=np.array(mol_fracs),
+        )
+        
+        return final_mixed
+
+    def refresh_plot(self):
+        mixed_spectra = self.get_mixed_spectrum()
+        if not mixed_spectra:
+            return
+
+        self.figure.clear()
+        
+        temperature=self.temperature.value()
+        self.settings.temperature = temperature
+        w0=self.w0.value()
+        self.settings.w0 = w0
+        weight_method = self.weight_method.currentData(Qt.UserRole)
+        self.settings.weight_method = weight_method
+        plot_type = self.plot_type.currentData(Qt.UserRole)
+
+        model = self.plot_type.model()
+        uv_vis_vel_item = model.item(2)
+        uv_vis_trans_vel_item = model.item(3)
+        ecd_item = model.item(4)
+        ecd_vel_item = model.item(5)
+        if mixed_spectra.data[0].dipole_vel is None:
+            uv_vis_vel_item.setFlags(uv_vis_vel_item.flags() & ~Qt.ItemIsEnabled)
+            uv_vis_trans_vel_item.setFlags(uv_vis_trans_vel_item.flags() & ~Qt.ItemIsEnabled)
+            ecd_vel_item.setFlags(ecd_vel_item.flags() & ~Qt.ItemIsEnabled)
+        else:
+            uv_vis_vel_item.setFlags(uv_vis_vel_item.flags() | Qt.ItemIsEnabled)
+            uv_vis_trans_vel_item.setFlags(uv_vis_trans_vel_item.flags() | Qt.ItemIsEnabled)
+            ecd_vel_item.setFlags(ecd_vel_item.flags() | Qt.ItemIsEnabled)
+        if mixed_spectra.data[0].rotatory_str_len is None:
+            ecd_item.setFlags(ecd_item.flags() & ~Qt.ItemIsEnabled)
+        else:
+            ecd_item.setFlags(ecd_item.flags() | Qt.ItemIsEnabled)
+        if plot_type == "ecd":
+            if not all(data.rotatory_str_len for data in mixed_spectra.data):
+                self.plot_type.blockSignals(True)
+                self.plot_type.setCurrentIndex(0)
+                self.plot_type.blockSignals(False)
+        if "velocity" in plot_type:
+            if not all(data.dipole_vel for data in mixed_spectra.data):
+                self.plot_type.blockSignals(True)
+                self.plot_type.setCurrentIndex(0)
+                self.plot_type.blockSignals(False)
+
+        fwhm = self.fwhm.value()
+        self.settings.fwhm = fwhm
+        peak_type = self.peak_type.currentText()
+        self.settings.peak_type = peak_type
+        plot_type = self.plot_type.currentData(Qt.UserRole)
+        self.settings.plot_type = plot_type
+        voigt_mixing = self.voigt_mix.value()
+        self.settings.voigt_mix = voigt_mixing
+        shift = self.shift.value()
+        x_units = self.x_units.currentText()
+        self.settings.x_units = x_units
+
+        centers = None
+        widths = None
+        if self.section_table.rowCount() > 1:
+            centers = []
+            widths = []
+            for i in range(0, self.section_table.rowCount() - 1):
+                xmin = self.section_table.cellWidget(i, 0).value()
+                xmax = self.section_table.cellWidget(i, 1).value()
+                centers.append((xmin + xmax) / 2)
+                widths.append(abs(xmin - xmax))
+        
+        mixed_spectra.plot_uv_vis(
+            self.figure,
+            centers=centers,
+            widths=widths,
+            exp_data=self.exp_data,
+            plot_type=plot_type,
+            peak_type=peak_type,
+            fwhm=fwhm,
+            voigt_mixing=voigt_mixing,
+            scalar_scale=shift,
+            units=x_units,
+        )
+
+        self.canvas.draw()
+        if self.highlighted_mode:
+            mode = self.highlighted_mode
+            self.highlighted_mode = None
+            self.highlight(mode, self.highlight_frs)
+
+    def highlight(self, item, fr):
+        highlights = []
+        labels = []
+
+        excits = self.get_mixed_spectrum()
+        if not excits:
+            return
+
+        plot_type = self.plot_type.currentText()
+        
+        for ax in self.figure.get_axes():
+            for mode in self.highlighted_lines:
+                if mode in ax.collections:
+                    ax.collections.remove(mode)
+
+            for text in ax.texts:
+                text.remove()
+
+            if item is self.highlighted_mode:
+                continue
+                
+            for excit in excits.data:
+                if excit.excitation_energy == item.excitation_energy:
+                    break
+            else:
+                continue
+
+            c0 = self.shift.value()
+            nrg = excit.excitation_energy - c0
+            use_nm = self.x_units.currentText() == "nm"
+            if use_nm:
+                nrg = ValenceExcitations.ev_to_nm(nrg)
+            
+            if plot_type == "Transmittance":
+                y_vals = (10 ** (2 - 0.9), 100)
+            elif plot_type == "VCD":
+                y_vals = (0, np.sign(item.rotation))
+            else:
+                y_vals = (0, 1)
+            
+            if plot_type == "UV/vis":
+                y_rel = excit.dipole_str / item.dipole_str
+            elif plot_type == "UV/vis (dipole velocity)":
+                y_rel = excit.dipole_vel / item.dipole_vel
+            elif plot_type == "UV/vis transmittance":
+                y_rel = excit.dipole_str / item.dipole_str
+            elif plot_type == "UV/vis transmittance (dipole velocity)":
+                y_rel = excit.dipole_vel / item.dipole_vel
+            elif plot_type == "ECD":
+                y_rel = excit.rotatory_str_len / item.rotatory_str_len
+            elif plot_type == "ECD (dipole velocity)":
+                y_rel = excit.rotatory_str_vel / item.rotatory_str_vel
+       
+            mdl = self.session.filereader_manager.get_model(fr)
+            label = "%s" % mdl.name
+            label += "\n%.2f %s" % (nrg, "nm" if use_nm else "eV")
+            if c0:
+                label += "\n$\Delta_{corr}$ = %.2f %s" % (nrg - item.excitation_energy, "nm" if use_nm else "eV")
+            label += "\nintensity scaled by %.2e" % y_rel
+            
+            if nrg < min(ax.get_xlim()) or nrg > max(ax.get_xlim()):
+                continue
+            
+            x_mid = nrg < sum(ax.get_xlim()) / 2
+            label_x = nrg
+            if x_mid:
+                label_x += 0.01 * sum(ax.get_xlim())
+            else:
+                label_x -= 0.01 * sum(ax.get_xlim())
+            
+            labels.append(
+                ax.text(
+                    label_x,
+                    y_vals[1] / len(label.splitlines()),
+                    label,
+                    va="bottom" if y_vals[1] > 0 else "top",
+                    ha="left" if x_mid else "right",
+                )
+            )
+            
+            highlights.append(
+                ax.vlines(
+                    nrg, *y_vals, color='r', zorder=-1, label="highlight"
+                )
+            )
+        
+        if item is not self.highlighted_mode:
+            self.highlighted_mode = item
+            self.highlight_frs = fr
+        else:
+            self.highlighted_mode = None
+            self.highlight_frs = None
+
+        self.highlighted_lines = highlights
+        self.highlighted_labels = labels
+        self.canvas.draw()
+
+    def load_data(self, *args):
+        filename, _ = QFileDialog.getOpenFileName(filter="comma-separated values file (*.csv)")
+
+        if not filename:
+            return
+
+        data = np.loadtxt(filename, delimiter=",", skiprows=self.skip_lines.value())
+
+        color = self.line_color.get_color()
+        self.settings.exp_color = tuple([c / 255. for c in color[:-1]])
+        
+        # figure out hex code for specified color 
+        # color is RGBA tuple with values from 0 to 255
+        # python's hex turns that to base 16 (0 to ff)
+        # if value is < 16, there will only be one digit, so pad with 0
+        hex_code = "#"
+        for x in color[:-1]:
+            channel = str(hex(x))[2:]
+            if len(channel) == 1:
+                channel = "0" + channel
+            hex_code += channel
+
+        if self.exp_data is None:
+            self.exp_data = []
+
+        for i in range(1, data.shape[1]):
+            self.exp_data.append((data[:,0], data[:,i], hex_code))
+
+    def clear_data(self, *args):
+        self.exp_data = None
+
+    def cleanup(self):
+        self.settings.figure_height = self.figure_height.value()
+        self.settings.figure_width = self.figure_width.value()
+        self.settings.fixed_size = self.fixed_size.checkState() == Qt.Checked
+        self.settings.col_1 = self.tree.columnWidth(0)
+        self.settings.col_2 = self.tree.columnWidth(1)
+        self.settings.col_3 = self.tree.columnWidth(2)
+
+        for mol_index in range(1, self.tree.topLevelItemCount()):
+            mol = self.tree.topLevelItem(mol_index)
+            for conf_ndx in range(1, mol.childCount()):
+                conf = mol.child(conf_ndx)
+                self.tree.itemWidget(conf, 0).deleteLater()
+                self.tree.itemWidget(conf, 1).deleteLater()
+                self.tree.itemWidget(conf, 2).deleteLater()
+
+        super().cleanup()
+
+    def close(self):
+        self.settings.figure_height = self.figure_height.value()
+        self.settings.figure_width = self.figure_width.value()
+        self.settings.fixed_size = self.fixed_size.checkState() == Qt.Checked
+        self.settings.col_1 = self.tree.columnWidth(0)
+        self.settings.col_2 = self.tree.columnWidth(1)
+        self.settings.col_3 = self.tree.columnWidth(2)
+
+        for mol_index in range(1, self.tree.topLevelItemCount()):
+            mol = self.tree.topLevelItem(mol_index)
+            for conf_ndx in range(1, mol.childCount()):
+                conf = mol.child(conf_ndx)
+                self.tree.itemWidget(conf, 0).deleteLater()
+                self.tree.itemWidget(conf, 1).deleteLater()
+                self.tree.itemWidget(conf, 2).deleteLater()
+
+        super().close()
+
+    def delete(self):
+        self.settings.figure_height = self.figure_height.value()
+        self.settings.figure_width = self.figure_width.value()
+        self.settings.fixed_size = self.fixed_size.checkState() == Qt.Checked
+        self.settings.col_1 = self.tree.columnWidth(0)
+        self.settings.col_2 = self.tree.columnWidth(1)
+        self.settings.col_3 = self.tree.columnWidth(2)
+
+        for mol_index in range(1, self.tree.topLevelItemCount()):
+            mol = self.tree.topLevelItem(mol_index)
+            for conf_ndx in range(1, mol.childCount()):
+                conf = mol.child(conf_ndx)
+                self.tree.itemWidget(conf, 0).deleteLater()
+                self.tree.itemWidget(conf, 1).deleteLater()
+                self.tree.itemWidget(conf, 2).deleteLater()
+
+        super().delete()
+
+

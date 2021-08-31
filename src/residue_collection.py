@@ -459,11 +459,11 @@ class ResidueCollection(Geometry):
         if comment is None:
             comment = self.comment
         atoms = self._fix_connectivity(atoms)
-        if hasattr(self, "components") and self.components is not None:
+        if hasattr(self, "components") and self.components is not None and comment is None:
             self.fix_comment()
         if copy_atoms:
-            return ResidueCollection([a.copy() for a in atoms], name, comment)
-        return ResidueCollection(atoms, name, comment)
+            return ResidueCollection([a.copy() for a in atoms], name, comment=comment)
+        return ResidueCollection(atoms, name, comment=comment)
 
     def map_ligand(self, *args, **kwargs):
         """map_ligand, then put new atoms in the residue they are closest to"""
@@ -832,7 +832,6 @@ class ResidueCollection(Geometry):
             coordsets = np.array([self.coords])
         else:
             coordsets = np.zeros((len(filereader.all_geom) + 1, len(self.atoms), 3))
-            print("cs shape", coordsets.shape)
             for i, all_geom in enumerate(filereader.all_geom):
                 if not all([isinstance(a, Atom) for a in all_geom]):
                     atom_list = [l for l in all_geom if isinstance(l, list) and len(l) == len(self.atoms)][0]
