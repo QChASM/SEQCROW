@@ -984,12 +984,12 @@ class IRSpectrum(ToolInstance):
         else:
             raman_item.setFlags(raman_item.flags() | Qt.ItemIsEnabled)
         if plot_type == "VCD":
-            if not all(data.rotation for data in mixed_spectra.data):
+            if not all(data.rotation is not None for data in mixed_spectra.data):
                 self.plot_type.blockSignals(True)
                 self.plot_type.setCurrentIndex(0)
                 self.plot_type.blockSignals(False)
         if plot_type == "Raman":
-            if not all(data.raman_activity for data in mixed_spectra.data):
+            if not all(data.raman_activity is not None for data in mixed_spectra.data):
                 self.plot_type.blockSignals(True)
                 self.plot_type.setCurrentIndex(0)
                 self.plot_type.blockSignals(False)

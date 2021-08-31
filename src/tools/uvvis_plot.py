@@ -395,7 +395,7 @@ class UVVisSpectrum(ToolInstance):
         add_conf_child = QTreeWidgetItem(mol_group)
         self.tree.setItemWidget(add_conf_child, 0, add_conf_button)
         self.tree.setItemWidget(add_conf_child, 1, add_conf_button2)
-        self.tree.setItemWidget(mol_group, 2, trash_button)
+        self.tree.setItemWidget(mol_group, 3, trash_button)
         
         mol_group.setText(0, "group %i" % row)
         
@@ -472,7 +472,7 @@ class UVVisSpectrum(ToolInstance):
     def section_table_clicked(self, row, column):
         if row == self.section_table.rowCount() - 1 or self.section_table.rowCount() == 1:
             self.add_section()
-        elif column == 3:
+        elif column == 2:
             self.section_table.removeRow(row)
     
     def add_section(self, xmin=150, xmax=450):
@@ -678,9 +678,14 @@ class UVVisSpectrum(ToolInstance):
                 single_points[-1].append(CompOutput(sp_file))
 
                 if weight_method != CompOutput.ELECTRONIC_ENERGY:
-                    print("hi")
                     freq_file = self.tree.itemWidget(conf, 1).currentData()
+                    if freq_file is None:
+                        self.session.logger.error(
+                            "frequency jobs must be given if you are not weighting"
+                            " based on electronic energy"
+                        )
                     freqs[-1].append(CompOutput(freq_file))
+                    return
                 
                     rmsd = freqs[-1][-1].geometry.RMSD(
                         single_points[-1][-1].geometry,
@@ -767,25 +772,30 @@ class UVVisSpectrum(ToolInstance):
         uv_vis_trans_vel_item = model.item(3)
         ecd_item = model.item(4)
         ecd_vel_item = model.item(5)
-        if mixed_spectra.data[0].dipole_vel is None:
+        if any(data.dipole_vel is None for data in mixed_spectra.data):
             uv_vis_vel_item.setFlags(uv_vis_vel_item.flags() & ~Qt.ItemIsEnabled)
             uv_vis_trans_vel_item.setFlags(uv_vis_trans_vel_item.flags() & ~Qt.ItemIsEnabled)
-            ecd_vel_item.setFlags(ecd_vel_item.flags() & ~Qt.ItemIsEnabled)
         else:
             uv_vis_vel_item.setFlags(uv_vis_vel_item.flags() | Qt.ItemIsEnabled)
             uv_vis_trans_vel_item.setFlags(uv_vis_trans_vel_item.flags() | Qt.ItemIsEnabled)
-            ecd_vel_item.setFlags(ecd_vel_item.flags() | Qt.ItemIsEnabled)
-        if mixed_spectra.data[0].rotatory_str_len is None:
+        
+        if any(data.rotatory_str_len is None for data in mixed_spectra.data):
             ecd_item.setFlags(ecd_item.flags() & ~Qt.ItemIsEnabled)
         else:
             ecd_item.setFlags(ecd_item.flags() | Qt.ItemIsEnabled)
+        
+        if any(data.rotatory_str_vel is None for data in mixed_spectra.data):
+            ecd_vel_item.setFlags(ecd_vel_item.flags() & ~Qt.ItemIsEnabled)
+        else:
+            ecd_vel_item.setFlags(ecd_vel_item.flags() | Qt.ItemIsEnabled)
+
         if plot_type == "ecd":
-            if not all(data.rotatory_str_len for data in mixed_spectra.data):
+            if not all(data.rotatory_str_len is not None for data in mixed_spectra.data):
                 self.plot_type.blockSignals(True)
                 self.plot_type.setCurrentIndex(0)
                 self.plot_type.blockSignals(False)
-        if "velocity" in plot_type:
-            if not all(data.dipole_vel for data in mixed_spectra.data):
+        if plot_type == "uv-vis-velocity" or plot_type == "transmittance-velocity":
+            if not all(data.dipole_vel is not None for data in mixed_spectra.data):
                 self.plot_type.blockSignals(True)
                 self.plot_type.setCurrentIndex(0)
                 self.plot_type.blockSignals(False)
@@ -841,6 +851,7 @@ class UVVisSpectrum(ToolInstance):
             return
 
         plot_type = self.plot_type.currentText()
+        shift = self.shift.value()
         
         for ax in self.figure.get_axes():
             for mode in self.highlighted_lines:
@@ -859,16 +870,17 @@ class UVVisSpectrum(ToolInstance):
             else:
                 continue
 
-            c0 = self.shift.value()
-            nrg = excit.excitation_energy - c0
+            nrg = excit.excitation_energy + shift
             use_nm = self.x_units.currentText() == "nm"
             if use_nm:
                 nrg = ValenceExcitations.ev_to_nm(nrg)
             
             if plot_type == "Transmittance":
                 y_vals = (10 ** (2 - 0.9), 100)
-            elif plot_type == "VCD":
-                y_vals = (0, np.sign(item.rotation))
+            elif plot_type == "ECD":
+                y_vals = (0, np.sign(item.rotatory_str_len))
+            elif plot_type == "ECD (dipole velocity)":
+                y_vals = (0, np.sign(item.rotatory_str_vel))
             else:
                 y_vals = (0, 1)
             
@@ -888,8 +900,12 @@ class UVVisSpectrum(ToolInstance):
             mdl = self.session.filereader_manager.get_model(fr)
             label = "%s" % mdl.name
             label += "\n%.2f %s" % (nrg, "nm" if use_nm else "eV")
-            if c0:
-                label += "\n$\Delta_{corr}$ = %.2f %s" % (nrg - item.excitation_energy, "nm" if use_nm else "eV")
+            if shift:
+                if use_nm:
+                    delta = nrg - ValenceExcitations.ev_to_nm(item.excitation_energy)
+                else:
+                    delta = nrg - item.excitation_energy
+                label += "\n$\Delta_{corr}$ = %.2f %s" % (delta, "nm" if use_nm else "eV")
             label += "\nintensity scaled by %.2e" % y_rel
             
             if nrg < min(ax.get_xlim()) or nrg > max(ax.get_xlim()):
