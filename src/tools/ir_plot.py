@@ -83,7 +83,7 @@ class _IRSpectrumSettings(Settings):
 class IRSpectrum(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False
-    help = "tony forgot to add help"
+    help = "https://github.com/QChASM/SEQCROW/wiki/IR-Spectrum-Tool"
     
     def __init__(self, session, name):
         super().__init__(session, name)

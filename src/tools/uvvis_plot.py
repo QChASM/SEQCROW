@@ -81,7 +81,7 @@ class _UVVisSpectrumSettings(Settings):
 class UVVisSpectrum(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False
-    help = "tony forgot to add help"
+    help = "https://github.com/QChASM/SEQCROW/wiki/UV-Vis-Spectrum-Tool"
     
     def __init__(self, session, name):
         super().__init__(session, name)

@@ -101,7 +101,7 @@ class OrbitalTableItem(QTableWidgetItem):
 
 class OrbitalViewer(ToolInstance):
     
-    # help = "https://github.com/QChASM/SEQCROW/wiki/Coordination-Complex-Generator-Tool"
+    help = "https://github.com/QChASM/SEQCROW/wiki/Orbital-Tool"
     
     def __init__(self, session, name):       
         super().__init__(session, name)
