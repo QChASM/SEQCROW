@@ -396,7 +396,7 @@ class UVVisSpectrum(ToolInstance):
                     self.section_table.cellWidget(i, 1).setValue(val1)
                 self.section_table.cellWidget(i, 0).setSuffix(" %s" % units)
                 self.section_table.cellWidget(i, 1).setSuffix(" %s" % units)
-        
+
     def add_mol_group(self, *args):
         row = self.tree.topLevelItemCount()
         
@@ -727,8 +727,8 @@ class UVVisSpectrum(ToolInstance):
                             "frequency jobs must be given if you are not weighting"
                             " based on electronic energy"
                         )
+                        return
                     freqs[-1].append(CompOutput(freq_file))
-                    return
                 
                     rmsd = freqs[-1][-1].geometry.RMSD(
                         single_points[-1][-1].geometry,
