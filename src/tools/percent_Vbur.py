@@ -41,13 +41,16 @@ class _VburSettings(Settings):
         "delimiter": "comma",
         "steric_map": False,
         "use_scene": False,
+        "report_component": "total",
         "num_pts": 100,
         "include_vbur": True,
         "map_shape": "circle", 
         "auto_minmax": True,
         "map_max": 3.5,
         "map_min": -3.5,
+        "cutout_labels": "octants",
     }
+
 
 class PercentVolumeBuried(ToolInstance):
 
@@ -117,8 +120,9 @@ class PercentVolumeBuried(ToolInstance):
         
         self.method = QComboBox()
         self.method.addItems(["Lebedev", "Monte-Carlo"])
-        self.method.setToolTip("Lebedev: deterministic method\n" +
-                               "Monte-Carlo: non-deterministic method"
+        self.method.setToolTip(
+            "Lebedev: deterministic method\n" +
+            "Monte-Carlo: non-deterministic method"
         )
         ndx = self.method.findText(self.settings.method, Qt.MatchExactly)
         self.method.setCurrentIndex(ndx)
@@ -170,8 +174,27 @@ class PercentVolumeBuried(ToolInstance):
         elif self.settings.method == "Monte-Carlo":
             leb_widget.setVisible(False)
         
-        self.method.currentTextChanged.connect(lambda text, widget=leb_widget: widget.setVisible(text == "Lebedev"))
-        self.method.currentTextChanged.connect(lambda text, widget=mc_widget: widget.setVisible(text == "Monte-Carlo"))
+        self.report_component = QComboBox()
+        self.report_component.addItems(
+            ["total", "quadrants", "octants"]
+        )
+        ndx = self.report_component.findText(
+            self.settings.report_component, Qt.MatchExactly
+        )
+        self.report_component.setCurrentIndex(ndx)
+        settings_layout.addRow("report volume:", self.report_component)
+        
+        self.use_scene = QCheckBox()
+        self.use_scene.setChecked(self.settings.use_scene)
+        self.use_scene.setToolTip("quadrants/octants will use the orientation the molecule is displayed in")
+        settings_layout.addRow("use display orientation:", self.use_scene)
+
+        self.method.currentTextChanged.connect(
+            lambda text, widget=leb_widget: widget.setVisible(text == "Lebedev")
+        )
+        self.method.currentTextChanged.connect(
+            lambda text, widget=mc_widget: widget.setVisible(text == "Monte-Carlo")
+        )
 
         self.use_centroid = QCheckBox()
         self.use_centroid.setChecked(self.settings.use_centroid)
@@ -186,12 +209,7 @@ class PercentVolumeBuried(ToolInstance):
         self.steric_map.setChecked(self.settings.steric_map)
         self.steric_map.setToolTip("produce a 2D projection of steric bulk\ncauses buried volume to be reported for individual quadrants")
         steric_layout.addRow("create steric map:", self.steric_map)
-        
-        self.use_scene = QCheckBox()
-        self.use_scene.setChecked(self.settings.use_scene)
-        self.use_scene.setToolTip("steric map will use the orientation the molecule is displayed in")
-        steric_layout.addRow("use display orientation:", self.use_scene)
-        
+
         self.num_pts = QSpinBox()
         self.num_pts.setRange(25, 250)
         self.num_pts.setValue(self.settings.num_pts)
@@ -225,9 +243,6 @@ class PercentVolumeBuried(ToolInstance):
         self.map_max.setSingleStep(0.1)
         self.map_max.setValue(self.settings.map_max)
         steric_layout.addRow("maximum value:", self.map_max)
-        
-        self.use_scene.setEnabled(self.settings.steric_map)
-        self.steric_map.stateChanged.connect(lambda state, widget=self.use_scene: widget.setEnabled(state == Qt.Checked))
 
         self.num_pts.setEnabled(self.settings.steric_map)
         self.steric_map.stateChanged.connect(lambda state, widget=self.num_pts: widget.setEnabled(state == Qt.Checked))
@@ -289,11 +304,19 @@ class PercentVolumeBuried(ToolInstance):
         self.intersection_scale.setValue(self.settings.intersection_scale)
         vol_cutout_layout.addRow("intersection density:", self.intersection_scale)
         
+        self.cutout_labels = QComboBox()
+        self.cutout_labels.addItems(["none", "quadrants", "octants"])
+        ndx = self.cutout_labels.findText(self.settings.cutout_labels, Qt.MatchExactly)
+        self.cutout_labels.setCurrentIndex(ndx)
+        vol_cutout_layout.addRow("label sections:", self.cutout_labels)
+        
         self.point_spacing.setEnabled(self.settings.display_cutout != "no")
         self.intersection_scale.setEnabled(self.settings.display_cutout != "no")
+        self.cutout_labels.setEnabled(self.settings.display_cutout != "no")
         
         self.display_cutout.currentTextChanged.connect(lambda text, widget=self.point_spacing: widget.setEnabled(text != "no"))
         self.display_cutout.currentTextChanged.connect(lambda text, widget=self.intersection_scale: widget.setEnabled(text != "no"))
+        self.display_cutout.currentTextChanged.connect(lambda text, widget=self.cutout_labels: widget.setEnabled(text != "no"))
 
         calc_vbur_button = QPushButton("calculate % buried volume for selected centers")
         calc_vbur_button.clicked.connect(self.calc_vbur)
@@ -388,7 +411,8 @@ class PercentVolumeBuried(ToolInstance):
         menu.setNativeMenuBar(False)
         self._menu = menu
         layout.setMenuBar(menu)
-        
+        menu.setVisible(True)
+
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(None)
@@ -443,7 +467,7 @@ class PercentVolumeBuried(ToolInstance):
         
         use_scene = self.use_scene.checkState() == Qt.Checked
         self.settings.use_scene = use_scene
-        args["use_scene"] = use_scene
+        args["useScene"] = use_scene
         
         num_pts = self.num_pts.value()
         self.settings.num_pts = num_pts
@@ -459,6 +483,10 @@ class PercentVolumeBuried(ToolInstance):
         shape = self.map_shape.currentText()
         self.settings.map_shape = shape
         args["shape"] = shape
+
+        report_component = self.report_component.currentText()
+        self.settings.report_component = report_component
+        args["reportComponent"] = report_component
         
         method = self.method.currentText()
         self.settings.method = method
@@ -484,7 +512,7 @@ class PercentVolumeBuried(ToolInstance):
         if display_cutout != "no":
             args["displaySphere"] = display_cutout
 
-        if display_cutout is not None:
+        if display_cutout != "no":
             point_spacing = self.point_spacing.value()
             self.settings.point_spacing = point_spacing
             args["pointSpacing"] = point_spacing
@@ -492,6 +520,10 @@ class PercentVolumeBuried(ToolInstance):
             intersection_scale = self.intersection_scale.value()
             self.settings.intersection_scale = intersection_scale
             args["intersectionScale"] = intersection_scale
+
+            cutout_labels = self.cutout_labels.currentText()
+            self.settings.cutout_labels = cutout_labels
+            args["labels"] = cutout_labels
 
         if len(self.ligand_atoms) > 0:
             args["onlyAtoms"] = [a for a in self.ligand_atoms if not a.deleted]
@@ -522,7 +554,7 @@ class PercentVolumeBuried(ToolInstance):
                 self.table.insertRow(row)
                 
                 m = QTableWidgetItem()
-                m.setData(Qt.DisplayRole, mdl)
+                m.setData(Qt.DisplayRole, mdl.name)
                 self.table.setItem(row, 0, m)
                 
                 c = QTableWidgetItem()
@@ -530,15 +562,35 @@ class PercentVolumeBuried(ToolInstance):
                 self.table.setItem(row, 1, c)
                 
                 v = QTableWidgetItem()
-                if include_vbur:
-                    v.setData(Qt.DisplayRole, ",".join(["%.1f" % x for x in vbur]))
+                if report_component == "octants":
+                    v.setData(
+                        Qt.DisplayRole,
+                        ",".join(["%.1f" % x for x in vbur])
+                    )
+                elif report_component == "quadrants":
+                    v.setData(
+                        Qt.DisplayRole,
+                        ",".join("%.1f" % x for x in
+                            [
+                                vbur[0] + vbur[7],
+                                vbur[1] + vbur[6],
+                                vbur[2] + vbur[5],
+                                vbur[3] + vbur[4],
+                            ]
+                        )
+                    )
                 else:
-                    v.setData(Qt.DisplayRole, "%.1f" % sum(vbur))
+                    if hasattr(vbur, "__iter__"):
+                        v.setData(Qt.DisplayRole, "%.1f" % sum(vbur))
+                    else:
+                        v.setData(Qt.DisplayRole, "%.1f" % vbur)
                 v.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
                 self.table.setItem(row, 2, v)
                 
                 x, y, z, min_alt, max_alt = map_info
-                plot = self.tool_window.create_child_window("steric map of %s" % mdl, window_class=StericMap)
+                plot = self.tool_window.create_child_window(
+                    "steric map of %s" % mdl.name, window_class=StericMap
+                )
                 if auto_minmax:
                     plot.set_data(x, y, z, min_alt, max_alt, vbur, radius, include_vbur)
                 else:
@@ -550,7 +602,7 @@ class PercentVolumeBuried(ToolInstance):
                 self.table.insertRow(row)
                 
                 m = QTableWidgetItem()
-                m.setData(Qt.DisplayRole, mdl)
+                m.setData(Qt.DisplayRole, mdl.name)
                 self.table.setItem(row, 0, m)
                 
                 c = QTableWidgetItem()
@@ -558,7 +610,28 @@ class PercentVolumeBuried(ToolInstance):
                 self.table.setItem(row, 1, c)
                 
                 v = QTableWidgetItem()
-                v.setData(Qt.DisplayRole, "%.1f" % vbur)
+                if report_component == "octants":
+                    v.setData(
+                        Qt.DisplayRole,
+                        ",".join(["%.1f" % x for x in vbur])
+                    )
+                elif report_component == "quadrants":
+                    v.setData(
+                        Qt.DisplayRole,
+                        ",".join("%.1f" % x for x in
+                            [
+                                vbur[0] + vbur[7],
+                                vbur[1] + vbur[6],
+                                vbur[2] + vbur[5],
+                                vbur[3] + vbur[4],
+                            ]
+                        )
+                    )
+                else:
+                    if hasattr(vbur, "__iter__"):
+                        v.setData(Qt.DisplayRole, "%.1f" % sum(vbur))
+                    else:
+                        v.setData(Qt.DisplayRole, "%.1f" % vbur)
                 v.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
                 self.table.setItem(row, 2, v)
         
@@ -637,7 +710,12 @@ class StericMap(ChildToolWindow):
     
     def set_data(self, x, y, z, min_alt, max_alt, vbur, radius, include_vbur):
         fig, ax = plt.subplots()
-        steric_map = ax.contourf(x, y, z, extend="min", cmap=copy.copy(plt.cm.get_cmap("jet")), levels=np.linspace(min_alt, max_alt, num=21))
+        steric_map = ax.contourf(
+            x, y, z,
+            extend="min",
+            cmap=copy.copy(plt.cm.get_cmap("jet")),
+            levels=np.linspace(min_alt, max_alt, num=21)
+        )
         steric_map.cmap.set_under('w')
         ax.contour(
             x, y, z,
@@ -653,10 +731,14 @@ class StericMap(ChildToolWindow):
             ax.hlines(0, -radius, radius, color='k')
             ax.vlines(0, -radius, radius, color='k')
 
-            ax.text( 0.7 * radius,  0.9 * radius, "%.1f%%" % vbur[0])
-            ax.text(-0.9 * radius,  0.9 * radius, "%.1f%%" % vbur[1])
-            ax.text(-0.9 * radius, -0.9 * radius, "%.1f%%" % vbur[2])
-            ax.text( 0.7 * radius, -0.9 * radius, "%.1f%%" % vbur[3])
+            vbur_1 = vbur[0] + vbur[7]
+            vbur_2 = vbur[1] + vbur[6]
+            vbur_3 = vbur[2] + vbur[5]
+            vbur_4 = vbur[3] + vbur[4]
+            ax.text(+0.7 * radius, +0.9 * radius, "%.1f%%" % vbur_1)
+            ax.text(-0.9 * radius, +0.9 * radius, "%.1f%%" % vbur_2)
+            ax.text(-0.9 * radius, -0.9 * radius, "%.1f%%" % vbur_3)
+            ax.text(+0.7 * radius, -0.9 * radius, "%.1f%%" % vbur_4)
         
         if include_vbur:
             circle = plt.Circle((0, 0), radius, color="k", fill=False, linewidth=4)

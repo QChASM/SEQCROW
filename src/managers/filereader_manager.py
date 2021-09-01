@@ -47,6 +47,8 @@ class FileReaderManager(ProviderManager):
         """if a graphical preset is set in SEQCROW settings, apply that preset to models"""
         for model in models:
             if model in self.models:
+                if not model.session:
+                    continue
                 if model.session.ui.is_gui:
                     apply_seqcrow_preset(model)
             
@@ -148,6 +150,8 @@ def apply_seqcrow_preset(model, atoms=None, fallback=None):
 fmt_only = re.compile("(\S*):(.*)")
 
 def apply_non_seqcrow_preset(model):
+    if not model.session:
+        return
     preset = model.session.seqcrow_settings.settings.NON_SEQCROW_IO_PRESET
     atomspec = model.atomspec
     for line in preset:

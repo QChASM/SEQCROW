@@ -1,0 +1,1276 @@
+from json import loads, dumps
+import re
+
+import numpy as np
+
+from chimerax.core.tools import ToolInstance
+from chimerax.ui.gui import MainToolWindow, ChildToolWindow
+from chimerax.ui.widgets import ColorButton
+from chimerax.std_commands.coordset_gui import CoordinateSetSlider
+from chimerax.core.settings import Settings
+from chimerax.core.configfile import Value
+from chimerax.core.commands.cli import FloatArg, TupleOf, IntArg
+from chimerax.core.commands import run
+
+from AaronTools.comp_output import CompOutput
+from AaronTools.const import FREQUENCY_SCALE_LIBS
+from AaronTools.geometry import Geometry
+from AaronTools.spectra import Frequency
+
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
+from matplotlib.figure import Figure
+from matplotlib import rcParams
+
+from Qt.QtCore import Qt, QRect, QItemSelectionModel, QVariant
+from Qt.QtGui import QValidator, QFont, QIcon
+from Qt.QtWidgets import (
+    QSpinBox,
+    QDoubleSpinBox,
+    QGridLayout,
+    QPushButton,
+    QTabWidget,
+    QComboBox,
+    QTableWidget,
+    QTableView,
+    QWidget,
+    QTableWidgetItem,
+    QFormLayout,
+    QCheckBox,
+    QHeaderView,
+    QMenuBar,
+    QFileDialog,
+    QStyle,
+    QGroupBox,
+    QLabel,
+    QHBoxLayout,
+    QLineEdit,
+    QTreeWidget,
+    QSizePolicy,
+    QTreeWidgetItem,
+)
+
+from SEQCROW.tools.per_frame_plot import NavigationToolbar
+from SEQCROW.utils import iter2str
+from SEQCROW.widgets import FilereaderComboBox
+
+
+rcParams["savefig.dpi"] = 300
+
+
+
+class _IRSpectrumSettings(Settings):
+    AUTO_SAVE = {
+        'fwhm': Value(5, FloatArg), 
+        'peak_type': 'pseudo-Voigt', 
+        'plot_type': 'Absorbance',
+        'voigt_mix': 0.5,
+        'exp_color': Value((0.0, 0.0, 1.0), TupleOf(FloatArg, 3), iter2str),
+        'reverse_x': True,
+        'figure_width': 5,
+        'figure_height': 3.5,
+        "fixed_size": False,
+        "scales": "{}",
+        "version": 0,
+        'w0': 100,
+        'temperature': 298.15,
+        'anharmonic': False,
+        "weight_method": "QRRHO",
+        'col_1': Value(150, IntArg), 
+        'col_2': Value(150, IntArg), 
+}
+
+
+class IRSpectrum(ToolInstance):
+    SESSION_ENDURING = False
+    SESSION_SAVE = False
+    help = "https://github.com/QChASM/SEQCROW/wiki/IR-Spectrum-Tool"
+    
+    def __init__(self, session, name):
+        super().__init__(session, name)
+        
+        self.tool_window = MainToolWindow(self)        
+
+        self.settings = _IRSpectrumSettings(session, name)
+        if self.settings.version == 0:
+            self.update_scales()
+            self.settings.version = 1
+
+        self.highlighted_mode = []
+        self.highlight_frs = []
+        self.highlighted_labels = []
+        self.highlighted_lines = []
+        self._last_mouse_xy = None
+        self._dragged = False
+        self._min_drag = 10	
+        self._drag_mode = None
+        self.press = None
+        self.drag_prev = None
+        self.dragging = False
+        self.exp_data = None
+        
+        self._build_ui()
+
+    def _build_ui(self):
+        layout = QGridLayout()
+        
+        tabs = QTabWidget()
+        layout.addWidget(tabs)
+        
+        self.tree = QTreeWidget()
+        self.tree.setColumnCount(3)
+        self.tree.setHeaderLabels(["frequency file", "energy file", "remove"])
+        self.tree.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.tree.resizeColumnToContents(2)
+        
+        component_widget = QWidget()
+        component_layout = QGridLayout(component_widget)
+        
+        root_item = self.tree.invisibleRootItem()
+        plus = QTreeWidgetItem(root_item)
+        plus_button = QPushButton("add molecule")
+        plus_button.setFlat(True)
+        plus_button.clicked.connect(self.add_mol_group)        
+        plus_button2 = QPushButton("")
+        plus_button2.setFlat(True)
+        plus_button2.clicked.connect(self.add_mol_group)
+        self.tree.setItemWidget(plus, 0, plus_button)
+        self.tree.setItemWidget(plus, 1, plus_button2)
+        self.tree.insertTopLevelItem(1, plus)
+        # TODO: have a setting save the size the thermo tool
+        self.tree.setColumnWidth(0, self.settings.col_1)
+        self.tree.setColumnWidth(1, self.settings.col_2)
+        
+        self.add_mol_group()
+        
+        component_layout.addWidget(self.tree, 0, 0, 1, 6)
+        
+        self.temperature = QDoubleSpinBox()
+        self.temperature.setDecimals(2)
+        self.temperature.setRange(0.01, 5000)
+        self.temperature.setSingleStep(1)
+        self.temperature.setValue(self.settings.temperature)
+        self.temperature.setSuffix(" K")
+        component_layout.addWidget(QLabel("T ="), 1, 2, 1, 1, Qt.AlignRight | Qt.AlignHCenter)
+        component_layout.addWidget(self.temperature, 1, 3, 1, 1, Qt.AlignLeft | Qt.AlignHCenter)
+        
+        self.w0 = QDoubleSpinBox()
+        self.w0.setDecimals(2)
+        self.w0.setRange(1, 250)
+        self.w0.setSingleStep(5)
+        self.w0.setValue(self.settings.w0)
+        self.w0.setSuffix(" cm\u207b\u00b9")
+        component_layout.addWidget(QLabel("𝜔<sub>0</sub> ="), 1, 4, 1, 1, Qt.AlignRight | Qt.AlignHCenter)
+        component_layout.addWidget(self.w0, 1, 5, 1, 1, Qt.AlignLeft | Qt.AlignHCenter)
+
+        self.weight_method = QComboBox()
+        self.weight_method.addItems([
+            "electronic",
+            "zero-point",
+            "enthalpy",
+            "free (RRHO)",
+            "free (Quasi-RRHO)",
+            "free (Quasi-harmonic)",
+        ])
+        self.weight_method.setItemData(0, CompOutput.ELECTRONIC_ENERGY)
+        self.weight_method.setItemData(1, CompOutput.ZEROPOINT_ENERGY)
+        self.weight_method.setItemData(2, CompOutput.RRHO_ENTHALPY)
+        self.weight_method.setItemData(3, CompOutput.RRHO)
+        self.weight_method.setItemData(4, CompOutput.QUASI_RRHO)
+        self.weight_method.setItemData(5, CompOutput.QUASI_HARMONIC)
+        ndx = self.weight_method.findData(self.settings.weight_method, flags=Qt.MatchExactly)
+        self.weight_method.setCurrentIndex(ndx)
+        component_layout.addWidget(QLabel("energy for weighting:"), 1, 0, 1, 1, Qt.AlignRight | Qt.AlignHCenter)
+        component_layout.addWidget(self.weight_method, 1, 1, 1, 1, Qt.AlignLeft | Qt.AlignHCenter)
+
+
+        tabs.addTab(component_widget, "components")
+        
+        
+        plot_widget = QWidget()
+        
+        plot_widget = QWidget()
+        plot_layout = QGridLayout(plot_widget)
+        
+        self.figure = Figure(figsize=(1.5, 1.5), dpi=100)
+        self.figure.subplots_adjust(bottom=0.15)
+        self.canvas = Canvas(self.figure)
+
+        self.canvas.mpl_connect('button_release_event', self.unclick)
+        self.canvas.mpl_connect('button_press_event', self.onclick)
+        self.canvas.mpl_connect('motion_notify_event', self.drag)
+        self.canvas.mpl_connect('scroll_event', self.zoom)
+        
+        self.canvas.setMinimumWidth(400)
+        # self.canvas.setMinimumHeight(300)
+
+        plot_layout.addWidget(self.canvas, 1, 0, 1, 7)
+
+        refresh_button = QPushButton()
+        refresh_button.setIcon(QIcon(refresh_button.style().standardIcon(QStyle.SP_BrowserReload)))
+        refresh_button.clicked.connect(self.refresh_plot)
+        plot_layout.addWidget(refresh_button, 2, 0, 1, 1, Qt.AlignVCenter)
+
+        toolbar_widget = QWidget()
+        self.toolbar = NavigationToolbar(self.canvas, toolbar_widget)
+        self.toolbar.setMaximumHeight(32)
+        plot_layout.addWidget(self.toolbar, 2, 1, 1, 1)
+
+        plot_layout.addWidget(QLabel("fixed size:"), 2, 2, 1, 1, Qt.AlignVCenter | Qt.AlignRight)
+
+        self.fixed_size = QCheckBox()
+        self.fixed_size.setCheckState(Qt.Checked if self.settings.fixed_size else Qt.Unchecked)
+        self.fixed_size.stateChanged.connect(self.change_figure_size)
+        plot_layout.addWidget(self.fixed_size, 2, 3, 1, 1, Qt.AlignVCenter | Qt.AlignLeft)
+
+        self.figure_width = QDoubleSpinBox()
+        self.figure_width.setRange(1, 24)
+        self.figure_width.setDecimals(2)
+        self.figure_width.setSingleStep(0.25)
+        self.figure_width.setSuffix(" in.")
+        self.figure_width.setValue(self.settings.figure_width)
+        self.figure_width.valueChanged.connect(self.change_figure_size)
+        plot_layout.addWidget(self.figure_width, 2, 4, 1, 1)
+     
+        plot_layout.addWidget(QLabel("x"), 2, 5, 1, 1, Qt.AlignVCenter | Qt.AlignHCenter)
+     
+        self.figure_height = QDoubleSpinBox()
+        self.figure_height.setRange(1, 24)
+        self.figure_height.setDecimals(2)
+        self.figure_height.setSingleStep(0.25)
+        self.figure_height.setSuffix(" in.")
+        self.figure_height.setValue(self.settings.figure_height)
+        self.figure_height.valueChanged.connect(self.change_figure_size)
+        plot_layout.addWidget(self.figure_height, 2, 6, 1, 1)
+
+        self.change_figure_size()
+
+        self.plot_type = QComboBox()
+        self.plot_type.addItems([
+            "Absorbance",
+            "Transmittance",
+            "VCD",
+            "Raman",
+        ])
+        ndx = self.plot_type.findText(self.settings.plot_type, Qt.MatchExactly)
+        if ndx:
+            self.plot_type.setCurrentIndex(ndx)
+        self.plot_type.currentIndexChanged.connect(self.refresh_plot)
+        plot_layout.addWidget(QLabel("plot type:"), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
+        plot_layout.addWidget(self.plot_type, 0, 1, 1, 6, Qt.AlignLeft | Qt.AlignVCenter)
+        
+        plot_layout.setRowStretch(0, 0)
+        plot_layout.setRowStretch(1, 1)
+        plot_layout.setRowStretch(2, 0)
+        
+        tabs.addTab(plot_widget, "plot")
+
+        # peak style
+        plot_settings_widget = QWidget()
+        plot_settings_layout = QFormLayout(plot_settings_widget)
+
+        self.peak_type = QComboBox()
+        self.peak_type.addItems(['Gaussian', 'Lorentzian', 'pseudo-Voigt', 'Delta'])
+        ndx = self.peak_type.findText(self.settings.peak_type, Qt.MatchExactly)
+        self.peak_type.setCurrentIndex(ndx)
+        plot_settings_layout.addRow("peak type:", self.peak_type)
+        
+        self.fwhm = QDoubleSpinBox()
+        self.fwhm.setSingleStep(5)
+        self.fwhm.setRange(0.01, 200.0)
+        self.fwhm.setSuffix(" cm\u207b\u00b9")
+        self.fwhm.setValue(self.settings.fwhm)
+        self.fwhm.setToolTip("width of peaks at half of their maximum value")
+        plot_settings_layout.addRow("FWHM:", self.fwhm)
+        
+        self.fwhm.setEnabled(self.peak_type.currentText() != "Delta")
+        self.peak_type.currentTextChanged.connect(lambda text, widget=self.fwhm: widget.setEnabled(text != "Delta"))
+        
+        self.voigt_mix = QDoubleSpinBox()
+        self.voigt_mix.setSingleStep(0.005)
+        self.voigt_mix.setDecimals(3)
+        self.voigt_mix.setRange(0, 1)
+        self.voigt_mix.setValue(self.settings.voigt_mix)
+        self.voigt_mix.setToolTip("fraction of pseudo-Voigt function that is Gaussian")
+        plot_settings_layout.addRow("Voigt mixing:", self.voigt_mix)
+        
+        self.voigt_mix.setEnabled(self.peak_type.currentText() == "pseudo-Voigt")
+        self.peak_type.currentTextChanged.connect(lambda text, widget=self.voigt_mix: widget.setEnabled(text == "pseudo-Voigt"))
+        
+        self.anharmonic = QCheckBox()
+        if self.settings.anharmonic:
+            self.anharmonic.setCheckState(Qt.Checked)
+        plot_settings_layout.addRow("anharmonic:", self.anharmonic)
+        
+        self.reverse_x = QCheckBox()
+        self.reverse_x.setCheckState(Qt.Checked)
+        plot_settings_layout.addRow("reverse x-axis:", self.reverse_x)
+        
+        tabs.addTab(plot_settings_widget, "plot settings")
+        
+        # plot experimental data alongside computed
+        experimental_widget = QWidget()
+        experimental_layout = QFormLayout(experimental_widget)
+        
+        self.skip_lines = QSpinBox()
+        self.skip_lines.setRange(0, 15)
+        experimental_layout.addRow("skip first lines:", self.skip_lines)
+        
+        browse_button = QPushButton("browse...")
+        browse_button.clicked.connect(self.load_data)
+        experimental_layout.addRow("load CSV data:", browse_button)
+        
+        self.line_color = ColorButton(has_alpha_channel=False, max_size=(16, 16))
+        self.line_color.set_color(self.settings.exp_color)
+        experimental_layout.addRow("line color:", self.line_color)
+        
+        clear_button = QPushButton("clear experimental data")
+        clear_button.clicked.connect(self.clear_data)
+        experimental_layout.addRow(clear_button)
+        
+        tabs.addTab(experimental_widget, "plot experimental data")
+        
+        
+        # frequency scaling
+        scaling_group = QWidget()
+        scaling_layout = QFormLayout(scaling_group)
+        
+        desc = QLabel("")
+        desc.setText("<a href=\"test\" style=\"text-decoration: none;\">Δ<sub>anh</sub> ≈ c<sub>1</sub>𝜈<sub>e</sub> + c<sub>2</sub>𝜈<sub>e</sub><sup>2</sup></a>")
+        desc.setTextFormat(Qt.RichText)
+        desc.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        desc.linkActivated.connect(self.open_link)
+        desc.setToolTip("Crittenden and Sibaev's quadratic scaling for harmonic frequencies\nDOI 10.1021/acs.jpca.5b11386")
+        scaling_layout.addRow(desc)
+
+        self.linear = QDoubleSpinBox()
+        self.linear.setDecimals(6)
+        self.linear.setRange(-.2, .2)
+        self.linear.setSingleStep(0.001)
+        self.linear.setValue(0.)
+        scaling_layout.addRow("c<sub>1</sub> =", self.linear)
+
+        self.quadratic = QDoubleSpinBox()
+        self.quadratic.setDecimals(9)
+        self.quadratic.setRange(-.2, .2)
+        self.quadratic.setSingleStep(0.000001)
+        self.quadratic.setValue(0.)
+        scaling_layout.addRow("c<sub>2</sub> =", self.quadratic)
+        
+        save_scales = QPushButton("save current scale factors...")
+        save_scales.clicked.connect(self.open_save_scales)
+        scaling_layout.addRow(save_scales)
+        
+        set_zero = QPushButton("set scales to 0")
+        set_zero.clicked.connect(lambda *args: self.linear.setValue(0.))
+        set_zero.clicked.connect(lambda *args: self.quadratic.setValue(0.))
+        scaling_layout.addRow(set_zero)
+        
+        
+        lookup_scale = QGroupBox("scale factor lookup")
+        scaling_layout.addRow(lookup_scale)
+        lookup_layout = QFormLayout(lookup_scale)
+        
+        self.library = QComboBox()
+        lookup_layout.addRow("database:", self.library)
+        
+        self.method = QComboBox()
+        lookup_layout.addRow("method:", self.method)
+        
+        self.basis = QComboBox()
+        lookup_layout.addRow("basis set:", self.basis)
+        
+        self.fill_lib_options()
+        
+        desc = QLabel("")
+        desc.setText("view database online <a href=\"test\" style=\"text-decoration: none;\">here</a>")
+        desc.setTextFormat(Qt.RichText)
+        desc.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        desc.linkActivated.connect(self.open_scale_library_link)
+        desc.setToolTip("view library online")
+        lookup_layout.addRow(desc)
+
+        self.library.currentTextChanged.connect(self.change_scale_lib)
+        self.method.currentTextChanged.connect(self.change_method)
+        self.basis.currentTextChanged.connect(self.change_basis)
+
+        # fit_scale = QGroupBox("linear least squares fitting")
+        # scaling_layout.addRow(fit_scale)
+        # fit_layout = QFormLayout(fit_scale)
+        # 
+        # self.fit_c1 = QCheckBox()
+        # fit_layout.addRow("fit c<sub>1</sub>:", self.fit_c1)
+        # 
+        # self.fit_c2 = QCheckBox()
+        # fit_layout.addRow("fit c<sub>2</sub>:", self.fit_c2)
+        
+        tabs.addTab(scaling_group, "frequency scaling")
+        
+        
+        # break x axis
+        interrupt_widget = QWidget()
+        interrupt_layout = QFormLayout(interrupt_widget)
+
+        self.section_table = QTableWidget()
+        self.section_table.setColumnCount(3)
+        self.section_table.setHorizontalHeaderLabels(["minimum", "maximum", "remove"])
+        self.section_table.cellClicked.connect(self.section_table_clicked)
+        self.section_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        interrupt_layout.addRow(self.section_table)
+        self.add_section()
+
+        # auto_section = QPushButton("automatically section")
+        # auto_section.clicked.connect(self.auto_breaks)
+        # interrupt_layout.addRow(auto_section)
+
+        tabs.addTab(interrupt_widget, "x-axis breaks")
+        
+
+        tabs.currentChanged.connect(lambda ndx: self.refresh_plot() if ndx == 1 else None)
+
+        #menu bar for saving stuff
+        menu = QMenuBar()
+        file = menu.addMenu("&Export")
+        file.addAction("&Save CSV...")
+        menu.setVisible(True)
+        
+        file.triggered.connect(self.save)
+        
+        menu.setNativeMenuBar(False)
+        self._menu = menu
+        layout.setMenuBar(menu)        
+        menu.setVisible(True)
+        self.tool_window.ui_area.setLayout(layout)
+        self.tool_window.manage(None)
+
+    def add_mol_group(self, *args):
+        row = self.tree.topLevelItemCount()
+        
+        root_item = self.tree.invisibleRootItem()
+        
+        mol_group = QTreeWidgetItem(root_item)
+        self.tree.insertTopLevelItem(row, mol_group)
+        trash_button = QPushButton()
+        trash_button.setFlat(True)
+        
+        trash_button.clicked.connect(lambda *args, parent=mol_group: self.remove_mol_group(parent))
+        trash_button.setIcon(QIcon(self.tree.style().standardIcon(QStyle.SP_DialogDiscardButton)))
+        
+        add_conf_button = QPushButton("add conformer")
+        add_conf_button.setFlat(True)
+        add_conf_button.clicked.connect(lambda *args, conf_group_widget=mol_group: self.add_conf_group(conf_group_widget))
+        
+        add_conf_button2 = QPushButton("")
+        add_conf_button2.setFlat(True)
+        add_conf_button2.clicked.connect(lambda *args, conf_group_widget=mol_group: self.add_conf_group(conf_group_widget))
+        
+        add_conf_child = QTreeWidgetItem(mol_group)
+        self.tree.setItemWidget(add_conf_child, 0, add_conf_button)
+        self.tree.setItemWidget(add_conf_child, 1, add_conf_button2)
+        self.tree.setItemWidget(mol_group, 2, trash_button)
+        
+        mol_group.setText(0, "group %i" % row)
+        
+        mol_fraction = QDoubleSpinBox()
+        mol_fraction.setDecimals(2)
+        mol_fraction.setRange(0, 100)
+        mol_fraction.setSingleStep(0.01)
+        mol_fraction.setValue(1)
+        
+        mol_fraction_widget = QWidget()
+        mol_fraction_layout = QFormLayout(mol_fraction_widget)
+        mol_fraction_layout.addRow("ratio:", mol_fraction)
+        self.tree.setItemWidget(mol_group, 1, mol_fraction_widget)
+        
+        mol_group.addChild(add_conf_child)
+        self.add_conf_group(mol_group)
+
+        self.tree.expandItem(mol_group)
+    
+    def remove_mol_group(self, parent):
+        for conf_ndx in range(1, parent.childCount()):
+            conf = parent.child(conf_ndx)
+            self.tree.itemWidget(conf, 0).destroy()
+            self.tree.itemWidget(conf, 1).destroy()
+        
+        ndx = self.tree.indexOfTopLevelItem(parent)
+        self.tree.takeTopLevelItem(ndx)
+
+    def add_conf_group(self, conf_group_widget):
+        row = conf_group_widget.childCount()
+        
+        conformer_item = QTreeWidgetItem(conf_group_widget)
+        conf_group_widget.insertChild(row, conformer_item)
+        
+        nrg_combobox = FilereaderComboBox(self.session, otherItems=['energy'])
+        freq_combobox = FilereaderComboBox(self.session, otherItems=['frequency'])
+        
+        trash_button = QPushButton()
+        trash_button.setFlat(True)
+        trash_button.clicked.connect(lambda *args, combobox=nrg_combobox: combobox.deleteLater())
+        trash_button.clicked.connect(lambda *args, combobox=freq_combobox: combobox.deleteLater())
+        trash_button.clicked.connect(lambda *args, child=conformer_item: conf_group_widget.removeChild(child))
+        trash_button.setIcon(QIcon(self.tree.style().standardIcon(QStyle.SP_DialogCancelButton)))
+        
+        self.tree.setItemWidget(conformer_item, 0, freq_combobox)
+        self.tree.setItemWidget(conformer_item, 1, nrg_combobox)
+        self.tree.setItemWidget(conformer_item, 2, trash_button)
+
+#     def auto_breaks(self):
+#         fr = self.model_selector.currentData()
+#         if fr is None:
+#             return
+#         linear_scale = self.linear.value()
+#         quadratic_scale = self.quadratic.value()
+#         freq = fr.other["frequency"]
+#         frequencies = np.array(
+#             [mode.frequency for mode in freq.data if mode.frequency > 0]
+#         )
+#         fwhm = self.fwhm.value()
+#         frequencies -= linear_scale * frequencies + quadratic_scale * frequencies ** 2
+# 
+#         tolerance = max(2 * fwhm, 25)
+# 
+#         groups = []
+#         for freq in frequencies:
+#             added = False
+#             for group in groups:
+#                 for other_freq in group:
+#                     if abs(freq - other_freq) < (8 * tolerance):
+#                         group.append(freq)
+#                         added = True
+#                         break
+#                 if added:
+#                     break
+#             else:
+#                 groups.append([freq])
+#         
+#         for group in groups:
+#             width = 4 * tolerance + max(group) - min(group)
+#             center = min(group) + width / 2 - 2 * tolerance
+#             self.add_section(center=center, width=width)
+# 
+    def fill_lib_options(self):
+        cur_lib = self.library.currentIndex()
+        cur_method = self.method.currentText()
+        cur_basis = self.basis.currentText()
+        self.library.blockSignals(True)
+        self.method.blockSignals(True)
+        self.basis.blockSignals(True)
+        self.library.clear()
+        self.method.clear()
+        self.basis.clear()
+        lib_names = list(FREQUENCY_SCALE_LIBS.keys())
+        user_def = loads(self.settings.scales)
+        if user_def:
+            lib_names.append("user-defined")
+        
+        self.library.addItems(lib_names)
+        if cur_lib >= 0:
+            self.library.setCurrentIndex(cur_lib)
+
+        if self.library.currentText() != "user-defined":
+            self.method.addItems(
+                FREQUENCY_SCALE_LIBS[self.library.currentText()][1].keys()
+            )
+
+            self.basis.addItems(
+                FREQUENCY_SCALE_LIBS[lib_names[0]][1][self.method.currentText()].keys()
+            )
+
+        else:
+            user_def = loads(self.settings.scales)
+            self.method.addItems(user_def.keys())
+            ndx = self.method.findText(cur_method, Qt.MatchExactly)
+        
+        ndx = self.method.findText(cur_method, Qt.MatchExactly)
+        if ndx >= 0:
+            self.method.setCurrentIndex(ndx)
+
+        ndx = self.basis.findText(cur_basis, Qt.MatchExactly)
+        if ndx >= 0:
+            self.basis.setCurrentIndex(ndx)
+        
+        self.library.blockSignals(False)
+        self.method.blockSignals(False)
+        self.basis.blockSignals(False)
+
+    def update_scales(self):
+        from SEQCROW.tools.normal_modes import _NormalModeSettings
+        normal_mode_settings = _NormalModeSettings(self.session, "Visualize Normal Modes")
+        self.settings.scales = normal_mode_settings.scales
+
+    def open_save_scales(self):
+        c1 = self.linear.value()
+        c2 = self.quadratic.value()
+        self.tool_window.create_child_window(
+            "saving frequency scales",
+            window_class=SaveScales,
+            c1=c1,
+            c2=c2,
+        )
+
+    def change_figure_size(self, *args):
+        if self.fixed_size.checkState() == Qt.Checked:
+            self.figure_height.setEnabled(True)
+            self.figure_width.setEnabled(True)
+            h = self.figure_height.value()
+            w = self.figure_width.value()
+            
+            self.figure.set_size_inches(w, h)
+            
+            self.canvas.setMinimumHeight(96 * h)
+            self.canvas.setMaximumHeight(96 * h)
+            self.canvas.setMinimumWidth(96 * w)
+            self.canvas.setMaximumWidth(96 * w)
+        else:
+            self.canvas.setMinimumHeight(1)
+            self.canvas.setMaximumHeight(100000)
+            self.canvas.setMinimumWidth(1)
+            self.canvas.setMaximumWidth(100000)
+            self.figure_height.setEnabled(False)
+            self.figure_width.setEnabled(False)
+    
+    def section_table_clicked(self, row, column):
+        if row == self.section_table.rowCount() - 1 or self.section_table.rowCount() == 1:
+            self.add_section()
+        elif column == 2:
+            self.section_table.removeRow(row)
+    
+    def add_section(self, xmin=450, xmax=1900):
+        rows = self.section_table.rowCount()
+        if rows != 0:
+            rows -= 1
+            section_min = QDoubleSpinBox()
+            section_min.setRange(0, 5000)
+            section_min.setValue(xmin)
+            section_min.setSuffix(" cm\u207b\u00b9")
+            section_min.setSingleStep(25)
+            self.section_table.setCellWidget(rows, 0, section_min)
+            
+            section_max = QDoubleSpinBox()
+            section_max.setRange(1, 5000)
+            section_max.setValue(xmax)
+            section_max.setSuffix(" cm\u207b\u00b9")
+            section_max.setSingleStep(25)
+            self.section_table.setCellWidget(rows, 1, section_max)
+            
+            widget_that_lets_me_horizontally_align_an_icon = QWidget()
+            widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
+            section_remove = QLabel()
+            dim = int(1.5 * section_remove.fontMetrics().boundingRect("Q").height())
+            section_remove.setPixmap(QIcon(section_remove.style().standardIcon(QStyle.SP_DialogDiscardButton)).pixmap(dim, dim))
+            widget_layout.addWidget(section_remove, 0, Qt.AlignHCenter)
+            widget_layout.setContentsMargins(0, 0, 0, 0)
+            self.section_table.setCellWidget(rows, 2, widget_that_lets_me_horizontally_align_an_icon)
+            rows += 1
+
+        self.section_table.insertRow(rows)
+
+        widget_that_lets_me_horizontally_align_an_icon = QWidget()
+        widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
+        section_add = QLabel("add section")
+        widget_layout.addWidget(section_add, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(0, 0, 0, 0)
+        self.section_table.setCellWidget(rows, 1, widget_that_lets_me_horizontally_align_an_icon)
+    
+    def save(self):
+        filename, _ = QFileDialog.getSaveFileName(filter="CSV Files (*.csv)")
+        if filename:
+            s = "frequency (cm^-1),IR intensity\n"
+
+            mixed_freq = self.get_mixed_spectrum()
+        
+            fwhm = self.fwhm.value()
+            peak_type = self.peak_type.currentText()
+            plot_type = self.plot_type.currentText()
+            voigt_mixing = self.voigt_mix.value()
+            linear = self.linear.value()
+            quadratic = self.quadratic.value()
+            intensity_attr = "intensity"
+            if plot_type.lower() == "vcd":
+                intensity_attr = "rotation"
+            if plot_type.lower() == "raman":
+                intensity_attr = "raman_activity"
+
+            funcs, x_positions, intensities = mixed_freq.get_spectrum_functions(
+                fwhm=fwhm,
+                peak_type=peak_type,
+                voigt_mixing=voigt_mixing,
+                linear_scale=linear,
+                quadratic_scale=quadratic,
+                intensity_attr=intensity_attr,
+            )
+            
+            x_values, y_values = mixed_freq.get_plot_data(
+                funcs,
+                x_positions,
+                transmittance=plot_type == "transmittance",
+                peak_type=peak_type,
+                fwhm=fwhm,
+                normalize=False,
+            )
+                
+            for x, y in zip(x_values, y_values):
+                s += "%f,%f\n" % (x, y)
+
+            with open(filename, 'w') as f:
+                f.write(s.strip())
+                
+            self.session.logger.info("saved to %s" % filename)
+
+    def open_link(self, *args):
+        """open Crittenden's paper on scaling harmonic frequencies"""
+        run(self.session, "open https://doi.org/10.1021/acs.jpca.5b11386")
+
+    def open_scale_library_link(self, *args):
+        if self.library.currentText() != "user-defined":
+            run(self.session, "open %s" % FREQUENCY_SCALE_LIBS[self.library.currentText()][0])
+        else:
+            self.session.logger.info("that's your database")
+
+    def change_scale_lib(self, lib):
+        cur_method = self.method.currentText()
+        cur_basis = self.basis.currentText()
+        self.prev_basis = self.basis.currentText()
+        self.method.blockSignals(True)
+        self.method.clear()
+        self.method.blockSignals(False)
+        if lib in FREQUENCY_SCALE_LIBS:
+            self.basis.setEnabled(True)
+            self.method.addItems(FREQUENCY_SCALE_LIBS[lib][1].keys())
+            ndx = self.method.findText(cur_method, Qt.MatchExactly)
+            if ndx >= 0:
+                self.method.setCurrentIndex(ndx)
+            
+            ndx = self.basis.findText(cur_basis, Qt.MatchExactly)
+            if ndx >= 0:
+                self.basis.setCurrentIndex(ndx)
+        else:
+            self.basis.setEnabled(False)
+            user_def = loads(self.settings.scales)
+            self.method.addItems(user_def.keys())
+    
+    def change_method(self, method):
+        cur_basis = self.basis.currentText()
+        self.basis.blockSignals(True)
+        self.basis.clear()
+        self.basis.blockSignals(False)
+        if self.library.currentText() in FREQUENCY_SCALE_LIBS:
+            if isinstance(FREQUENCY_SCALE_LIBS[self.library.currentText()][1][method], dict):
+                self.basis.addItems(
+                    FREQUENCY_SCALE_LIBS[self.library.currentText()][1][method].keys()
+                )
+                ndx = self.basis.findText(cur_basis, Qt.MatchExactly)
+                if ndx >= 0:
+                    self.basis.setCurrentIndex(ndx)
+            else:
+                scale = FREQUENCY_SCALE_LIBS[self.library.currentText()][1][method]
+                self.linear.setValue(1 - scale)
+                self.quadratic.setValue(0.)
+        elif method:
+            user_def = loads(self.settings.scales)
+            c1, c2 = user_def[method]
+            self.linear.setValue(c1)
+            self.quadratic.setValue(c2)
+
+    def change_basis(self, basis):
+        scale = FREQUENCY_SCALE_LIBS[self.library.currentText()][1][self.method.currentText()][basis]
+        self.linear.setValue(1 - scale)
+        self.quadratic.setValue(0.)
+
+    def zoom(self, event):
+        if event.xdata is None:
+            return
+        for a in self.figure.get_axes():
+            x0, x1 = a.get_xlim()
+            x_range = x1 - x0
+            xdiff = -0.05 * event.step * x_range
+            xshift = 0.2 * (event.xdata - (x0 + x1)/2)
+            nx0 = x0 - xdiff + xshift
+            nx1 = x1 + xdiff + xshift
+    
+            a.set_xlim(nx0, nx1)
+        self.canvas.draw()
+
+    def drag(self, event):
+        if self.toolbar.mode != "":
+            return
+
+        if event.button is not None and self.press is not None:
+            x, y, xpress, ypress = self.press
+            dx = event.x - x
+            dy = event.y - y
+            drag_dist = np.linalg.norm([dx, dy])
+            if self.dragging or drag_dist >= self._min_drag or event.button == 2:
+                self.dragging = True
+                if self.drag_prev is not None:
+                    x, y, xpress, ypress = self.drag_prev
+                    dx = event.x - x
+                    dy = event.y - y
+                
+                self.drag_prev = event.x, event.y, event.xdata, event.ydata
+                self.move(dx, dy)
+
+    def move(self, dx, dy):
+        for ax in self.figure.get_axes():
+            w = self.figure.get_figwidth() * self.figure.get_dpi()
+            x0, x1 = self.figure.gca().get_xlim()
+            xs = dx/w * (x1 - x0)
+            x0, x1 = ax.get_xlim()
+            nx0, nx1 = x0 - xs, x1 - xs
+            #y0, y1 = ax.get_ylim()
+            #ys = dy/h * (y1-y0)
+            #ny0, ny1 = y0-ys, y1-ys
+            ax.set_xlim(nx0, nx1)
+            #ax.set_ylim(ny0, ny1)
+        self.canvas.draw()
+
+    def onclick(self, event):
+        if self.toolbar.mode != "":
+            return
+
+        self.press = event.x, event.y, event.xdata, event.ydata
+        
+        if event.dblclick:
+            anharmonic = self.anharmonic.checkState() == Qt.Checked
+            data_attr = "data"
+            if anharmonic:
+                data_attr = "anharm_data"
+            closest = None
+            for mol_ndx in range(1, self.tree.topLevelItemCount()):
+                mol = self.tree.topLevelItem(mol_ndx)
+                for conf_ndx in range(1, mol.childCount()):
+                    conf = mol.child(conf_ndx)
+                    fr = self.tree.itemWidget(conf, 0).currentData()
+                    if fr is None:
+                        continue
+                    freq = fr.other["frequency"]
+                    if anharmonic and not freq.anharm_data:
+                        self.session.logger.error(
+                            "anharmonic frequencies requested on the 'plot settings' "
+                            "tab, but anharmonic data was not parsed from %s" % fr.name
+                        )
+                        return
+                    
+                    data_list = getattr(freq, data_attr)
+                    frequencies = np.array(
+                        [data.frequency for data in data_list if data.frequency > 0]
+                    )
+                    c1 = self.linear.value()
+                    c2 = self.quadratic.value()
+                    frequencies -= c1 * frequencies + c2 * frequencies ** 2
+                    diff = np.abs(
+                        event.xdata - frequencies
+                    )
+                    min_arg = np.argmin(diff)
+                    if not closest or diff[min_arg] < closest[0]:
+                        closest = (diff[min_arg], data_list[min_arg], fr)
+            
+            if closest:
+                self.highlight(closest[1], closest[2])
+
+    def unclick(self, event):
+        if self.toolbar.mode != "":
+            return
+
+        self.press = None
+        self.drag_prev = None
+        self.dragging = False
+
+    def get_mixed_spectrum(self):
+        weight_method = self.weight_method.currentData(Qt.UserRole)
+        freqs = []
+        single_points = []
+        mol_fracs = []
+        anharmonic = self.anharmonic.checkState() == Qt.Checked
+        data_attr = "data"
+        if anharmonic:
+            data_attr = "anharm_data"
+        for mol_ndx in range(1, self.tree.topLevelItemCount()):
+            freqs.append([])
+            single_points.append([])
+            mol = self.tree.topLevelItem(mol_ndx)
+            mol_fracs_widget = self.tree.itemWidget(mol, 1).layout().itemAt(1).widget()
+            mol_fracs.append(mol_fracs_widget.value())
+            
+            for conf_ndx in range(1, mol.childCount()):
+                conf = mol.child(conf_ndx)
+                fr = self.tree.itemWidget(conf, 0).currentData()
+                if fr is None:
+                    continue
+                freqs[-1].append(CompOutput(fr))
+                if anharmonic and not freqs[-1][-1].frequency.anharm_data:
+                    self.session.logger.error(
+                        "anharmonic frequencies requested on the 'plot settings' "
+                        "tab, but anharmonic data was not parsed from %s" % freqs[-1][-1].geometry.name
+                    )
+                    return
+                
+                sp_file = self.tree.itemWidget(conf, 1).currentData()
+                single_points[-1].append(CompOutput(sp_file))
+                
+                rmsd = freqs[-1][-1].geometry.RMSD(
+                    single_points[-1][-1].geometry,
+                    sort=True,
+                )
+                if rmsd > 1e-2:
+                    s = "the structure of %s (frequencies) might not match" % freqs[-1][-1].geometry.name
+                    s += "the structure of %s (energy)" % single_points[-1][-1].geometry.name
+                    self.session.logger.warning(s)
+                
+            if not freqs[-1]:
+                freqs.pop(-1)
+                single_points.pop(-1)
+                
+        if not freqs or all(not conf_group for conf_group in freqs):
+            return
+        
+        mixed_freqs = []
+        for i, (conf_freq, conf_nrg) in enumerate(zip(freqs, single_points)):
+            for j, freq1 in enumerate(conf_freq):
+                for k, freq2 in enumerate(conf_freq[:j]):
+                    rmsd = freq1.geometry.RMSD(freq2.geometry, sort=True)
+                    if rmsd < 1e-2:
+                        s = "%s and %s appear to be duplicate structures " % (
+                                freq1.geometry.name, freq2.geometry.name
+                            )
+                        self.session.logger.warning(s)
+            weights = CompOutput.boltzmann_weights(
+                conf_freq,
+                nrg_cos=conf_nrg,
+                temperature=self.temperature.value(),
+                v0=self.w0.value(),
+                weighting=weight_method,
+            )
+            
+            conf_mixed = Frequency.get_mixed_signals(
+                [co.frequency for co in conf_freq],
+                weights=weights,
+                data_attr=data_attr,
+            )
+            mixed_freqs.append(conf_mixed)
+        
+        final_mixed = Frequency.get_mixed_signals(
+            mixed_freqs,
+            weights=np.array(mol_fracs),
+        )
+        
+        return final_mixed
+
+    def refresh_plot(self):
+        mixed_spectra = self.get_mixed_spectrum()
+
+        self.figure.clear()
+        
+        temperature=self.temperature.value()
+        self.settings.temperature = temperature
+        w0=self.w0.value()
+        self.settings.w0 = w0
+        anharmonic = self.anharmonic.checkState() == Qt.Checked
+        self.settings.anharmonic = anharmonic
+        weight_method = self.weight_method.currentData(Qt.UserRole)
+        self.settings.weight_method = weight_method
+        plot_type = self.plot_type.currentText()
+        self.settings.plot_type = plot_type
+        
+        model = self.plot_type.model()
+        vcd_item = model.item(2)
+        raman_item = model.item(3)
+        if mixed_spectra.data[0].rotation is None:
+            vcd_item.setFlags(vcd_item.flags() & ~Qt.ItemIsEnabled)
+        else:
+            vcd_item.setFlags(vcd_item.flags() | Qt.ItemIsEnabled)
+        if mixed_spectra.data[0].raman_activity is None:
+            raman_item.setFlags(raman_item.flags() & ~Qt.ItemIsEnabled)
+        else:
+            raman_item.setFlags(raman_item.flags() | Qt.ItemIsEnabled)
+        if plot_type == "VCD":
+            if not all(data.rotation is not None for data in mixed_spectra.data):
+                self.plot_type.blockSignals(True)
+                self.plot_type.setCurrentIndex(0)
+                self.plot_type.blockSignals(False)
+        if plot_type == "Raman":
+            if not all(data.raman_activity is not None for data in mixed_spectra.data):
+                self.plot_type.blockSignals(True)
+                self.plot_type.setCurrentIndex(0)
+                self.plot_type.blockSignals(False)
+
+        fwhm = self.fwhm.value()
+        self.settings.fwhm = fwhm
+        peak_type = self.peak_type.currentText()
+        self.settings.peak_type = peak_type
+        plot_type = self.plot_type.currentText()
+        self.settings.plot_type = plot_type
+        reverse_x = self.reverse_x.checkState() == Qt.Checked
+        voigt_mixing = self.voigt_mix.value()
+        self.settings.voigt_mix = voigt_mixing
+        linear = self.linear.value()
+        quadratic = self.quadratic.value()
+
+        centers = None
+        widths = None
+        if self.section_table.rowCount() > 1:
+            centers = []
+            widths = []
+            for i in range(0, self.section_table.rowCount() - 1):
+                xmin = self.section_table.cellWidget(i, 0).value()
+                xmax = self.section_table.cellWidget(i, 1).value()
+                centers.append((xmin + xmax) / 2)
+                widths.append(abs(xmin - xmax))
+        
+        mixed_spectra.plot_ir(
+            self.figure,
+            centers=centers,
+            widths=widths,
+            exp_data=self.exp_data,
+            plot_type=plot_type,
+            peak_type=peak_type,
+            reverse_x=reverse_x,
+            fwhm=fwhm,
+            voigt_mixing=voigt_mixing,
+            linear_scale=linear,
+            quadratic_scale=quadratic,
+        )
+
+        self.canvas.draw()
+        if self.highlighted_mode:
+            mode = self.highlighted_mode
+            self.highlighted_mode = None
+            self.highlight(mode, self.highlight_frs)
+
+    def highlight(self, item, fr):
+        highlights = []
+        labels = []
+
+        freqs = self.get_mixed_spectrum()
+        if not freqs:
+            return
+
+        anharmonic = self.anharmonic.checkState() == Qt.Checked
+        data_attr = "data"
+        if anharmonic:
+            data_attr = "anharm_data"
+
+        plot_type = self.plot_type.currentText()
+        
+        for ax in self.figure.get_axes():
+            for mode in self.highlighted_lines:
+                if mode in ax.collections:
+                    ax.collections.remove(mode)
+
+            for text in ax.texts:
+                text.remove()
+
+            if item is self.highlighted_mode:
+                continue
+                
+            for freq in getattr(freqs, data_attr):
+                if freq.frequency == item.frequency:
+                    break
+            else:
+                continue
+
+            c1 = self.linear.value()
+            c2 = self.quadratic.value()
+            frequency = freq.frequency
+            frequency -= c1 * frequency + c2 * frequency ** 2
+            
+            if plot_type == "Transmittance":
+                y_vals = (10 ** (2 - 0.9), 100)
+            elif plot_type == "VCD":
+                y_vals = (0, np.sign(item.rotation))
+            else:
+                y_vals = (0, 1)
+            
+            if plot_type == "Raman":
+                y_rel = freq.raman_activity / item.raman_activity
+            elif plot_type == "VCD":
+                y_rel = freq.rotation / item.rotation
+            else:
+                y_rel = freq.intensity / item.intensity
+            
+            mdl = self.session.filereader_manager.get_model(fr)
+            label = "%s" % mdl.name
+            label += "\n%.2f cm$^{-1}$" % frequency
+            if c1 or c2:
+                label += "\n$\Delta_{corr}$ = %.2f cm$^{-1}$" % (frequency - item.frequency)
+            if item.symmetry and item.symmetry != "A":
+                text = item.symmetry
+                if re.search("\d", text):
+                    text = re.sub(r"(\d+)", r"$_{\1", text)
+                if text.startswith("SG"):
+                    text = "$\Sigma$" + text[2:]
+                elif text.startswith("PI"):
+                    text = "$\Pi$" + text[2:]
+                elif text.startswith("DLT"):
+                    text = "$\Delta$" + text[3:]
+                    if text[1:] == "A":
+                        text = text[0]
+                if any(text.endswith(char) for char in "vhdugVHDUG"):
+                    if "_" not in text:
+                        text = text[:-1] + "$_{" + text[-1]
+                    text = text + text[-1].lower()
+                if "_" in text:
+                    text = text + "}$"
+                label += "\n%s" % text
+            label += "\nintensity scaled by %.2e" % y_rel
+            
+            if frequency < min(ax.get_xlim()) or frequency > max(ax.get_xlim()):
+                continue
+            
+            x_mid = frequency > sum(ax.get_xlim()) / 2
+            label_x = frequency
+            if x_mid:
+                label_x -= 0.01 * sum(ax.get_xlim())
+            else:
+                label_x += 0.01 * sum(ax.get_xlim())
+            
+            labels.append(
+                ax.text(
+                    label_x,
+                    y_vals[1] / len(label.splitlines()),
+                    label,
+                    va="bottom" if y_vals[1] > 0 else "top",
+                    ha="left" if x_mid else "right",
+                )
+            )
+            
+            highlights.append(
+                ax.vlines(
+                    frequency, *y_vals, color='r', zorder=-1, label="highlight"
+                )
+            )
+        
+        if item is not self.highlighted_mode:
+            self.highlighted_mode = item
+            self.highlight_frs = fr
+        else:
+            self.highlighted_mode = None
+            self.highlight_frs = None
+
+        self.highlighted_lines = highlights
+        self.highlighted_labels = labels
+        self.canvas.draw()
+
+    def load_data(self, *args):
+        filename, _ = QFileDialog.getOpenFileName(filter="comma-separated values file (*.csv)")
+
+        if not filename:
+            return
+
+        data = np.loadtxt(filename, delimiter=",", skiprows=self.skip_lines.value())
+
+        color = self.line_color.get_color()
+        self.settings.exp_color = tuple([c / 255. for c in color[:-1]])
+        
+        # figure out hex code for specified color 
+        # color is RGBA tuple with values from 0 to 255
+        # python's hex turns that to base 16 (0 to ff)
+        # if value is < 16, there will only be one digit, so pad with 0
+        hex_code = "#"
+        for x in color[:-1]:
+            channel = str(hex(x))[2:]
+            if len(channel) == 1:
+                channel = "0" + channel
+            hex_code += channel
+
+        if self.exp_data is None:
+            self.exp_data = []
+
+        for i in range(1, data.shape[1]):
+            self.exp_data.append((data[:,0], data[:,i], hex_code))
+
+    def clear_data(self, *args):
+        self.exp_data = None
+
+    def cleanup(self):
+        self.settings.figure_height = self.figure_height.value()
+        self.settings.figure_width = self.figure_width.value()
+        self.settings.fixed_size = self.fixed_size.checkState() == Qt.Checked
+        self.settings.col_1 = self.tree.columnWidth(0)
+        self.settings.col_2 = self.tree.columnWidth(1)
+
+        for mol_index in range(1, self.tree.topLevelItemCount()):
+            mol = self.tree.topLevelItem(mol_index)
+            for conf_ndx in range(1, mol.childCount()):
+                conf = mol.child(conf_ndx)
+                self.tree.itemWidget(conf, 0).deleteLater()
+                self.tree.itemWidget(conf, 1).deleteLater()
+
+        super().cleanup()
+
+    def close(self):
+        self.settings.figure_height = self.figure_height.value()
+        self.settings.figure_width = self.figure_width.value()
+        self.settings.fixed_size = self.fixed_size.checkState() == Qt.Checked
+        self.settings.col_1 = self.tree.columnWidth(0)
+        self.settings.col_2 = self.tree.columnWidth(1)
+
+        for mol_index in range(1, self.tree.topLevelItemCount()):
+            mol = self.tree.topLevelItem(mol_index)
+            for conf_ndx in range(1, mol.childCount()):
+                conf = mol.child(conf_ndx)
+                self.tree.itemWidget(conf, 0).deleteLater()
+                self.tree.itemWidget(conf, 1).deleteLater()
+
+        super().close()
+
+    def delete(self):
+        self.settings.figure_height = self.figure_height.value()
+        self.settings.figure_width = self.figure_width.value()
+        self.settings.fixed_size = self.fixed_size.checkState() == Qt.Checked
+        self.settings.col_1 = self.tree.columnWidth(0)
+        self.settings.col_2 = self.tree.columnWidth(1)
+
+        for mol_index in range(1, self.tree.topLevelItemCount()):
+            mol = self.tree.topLevelItem(mol_index)
+            for conf_ndx in range(1, mol.childCount()):
+                conf = mol.child(conf_ndx)
+                self.tree.itemWidget(conf, 0).deleteLater()
+                self.tree.itemWidget(conf, 1).deleteLater()
+
+        super().delete()
+
+
+class SaveScales(ChildToolWindow):
+    def __init__(self, tool_instance, title, *args, c1=0.0, c2=0.0, **kwargs):
+        super().__init__(tool_instance, title, *args, **kwargs)
+        
+        self.c1 = c1
+        self.c2 = c2
+        self._build_ui()
+    
+    def _build_ui(self):
+        layout = QFormLayout()
+        
+        self.scale_name = QLineEdit()
+        layout.addRow("name:", self.scale_name)
+        
+        do_it = QPushButton("save scales")
+        do_it.clicked.connect(self.save_scales)
+        layout.addRow(do_it)
+        
+        self.ui_area.setLayout(layout)
+        self.manage(None)
+    
+    def save_scales(self):
+        name = self.scale_name.text()
+        if not name:
+            self.session.logger.warning("no name entered")
+            return
+        
+        current = loads(self.tool_instance.settings.scales)
+        current[name] = (self.c1, self.c2)
+        self.tool_instance.settings.scales = dumps(current)
+        if self.tool_instance.ir_plot:
+            self.tool_instance.ir_plot.fill_lib_options()
+        
+        self.session.logger.info(
+            "saved frequency scale factors to user-defined database"
+        )
+        self.session.logger.status(
+            "saved frequency scale factors to user-defined database"
+        )
+
+        self.destroy()
+

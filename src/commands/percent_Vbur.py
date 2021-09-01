@@ -2,15 +2,38 @@ import numpy as np
 
 from chimerax.core.commands import BoolArg, StringArg, CmdDesc, EnumOf, FloatArg, IntArg, ModelsArg, Or, TupleOf, run
 from chimerax.atomic import AtomsArg, AtomicStructure
+from chimerax.label.label3d import ObjectLabel, ObjectLabels
 from chimerax.core.models import Surface
 
 from AaronTools.const import VDW_RADII, BONDI_RADII
-from AaronTools.utils.utils import rotation_matrix, fibonacci_sphere
+from AaronTools.utils.utils import rotation_matrix, fibonacci_sphere, perp_vector
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.finders import AtomSpec
 
 from scipy.spatial import distance_matrix, ConvexHull
+
+
+class VoidLabel(ObjectLabel):
+    def __init__(self, text, location, view):
+        self._location = location
+        super().__init__(None, view, text=text)
+    
+    def location(self, scene_position=None):
+        return self._location
+
+
+class VoidLabels(ObjectLabels):
+    def add_labels(self, labels):
+        self._labels.extend(labels)
+        self._count_pixel_sized_labels()
+        self.update_labels()
+    
+    def labels(self, objects=None):
+        if objects is None:
+            return self._labels
+        ol = self._object_label
+        return [ol[o] for o in objects if o in ol]
 
 
 vbur_description = CmdDesc(
@@ -37,6 +60,9 @@ vbur_description = CmdDesc(
         ("pointSpacing", FloatArg), 
         ("intersectionScale", FloatArg), 
         ("palette", StringArg), 
+        ("labels", EnumOf(["none", "quadrants", "octants"])), 
+        ("reportComponent", EnumOf(["total", "quadrants", "octants"])),
+        ("useScene", BoolArg), 
     ],
     synopsis="calculate volume buried by ligands around a center",
     url="https://github.com/QChASM/SEQCROW/wiki/Commands#percentVolumeBuried",
@@ -61,9 +87,11 @@ def percent_vbur(
         palette="rainbow",
         return_values=False,
         steric_map=False,
-        use_scene=False,
+        useScene=False,
         num_pts=100,
         shape="circle",
+        labels="none",
+        reportComponent="total",
 ):
     
     out = []
@@ -92,13 +120,17 @@ def percent_vbur(
         
         rescol = ResidueCollection(model)
         
-        if use_scene:
+        if useScene:
             oop_vector = session.view.camera.get_position().axes()[2]
             ip_vector = session.view.camera.get_position().axes()[1]
+            x_vec = session.view.camera.get_position().axes()[0]
+            basis = np.array([x_vec, ip_vector, oop_vector]).T
         
         else:
             oop_vector = None
             ip_vector = None
+            basis = None
+
         
         if len(mdl_center) == 0:
             rescol.detect_components()
@@ -106,19 +138,46 @@ def percent_vbur(
         elif not isinstance(center, np.ndarray):
             mdl_center = rescol.find([AtomSpec(c.atomspec) for c in center])
         
+        key_atoms = None
+
         if not useCentroid and not isinstance(center, np.ndarray):
             for c in mdl_center:
-                if steric_map:
-                    if targets is not None:
-                        key_atoms = []
-                        targets = rescol.find(targets)
-                        for atom in targets:
-                            if c in atom.connected or atom in c.connected:
-                                key_atoms.append(atom)
+                if targets is not None:
+                    key_atoms = []
+                    targets = rescol.find(targets)
+                    for atom in targets:
+                        if c in atom.connected or atom in c.connected:
+                            key_atoms.append(atom)
+                else:
+                    key_atoms = None
+                
+                if (labels != "none" or reportComponent != "total") and not useScene:
+                    if not key_atoms:
+                        session.logger.warning(
+                            "bonds between center and coordinating atoms is required to"
+                            " properly orient octants"
+                        )
+                    oop_vector = np.zeros(3)
+                    for atom in key_atoms:
+                        oop_vector += c.coords - atom.coords
+                    
+                    if len(key_atoms) == 1:
+                        ip_vector = perp_vector(oop_vector)
+                        x_vec = np.cross(ip_vector, oop_vector)
                     else:
-                        key_atoms = None
-
-                    x, y, z, min_alt, max_alt, basis, targets = rescol.steric_map(
+                        coords = [atom.coords for atom in key_atoms]
+                        coords.append(c.coords)
+                        coords = np.array(coords)
+                        ip_vector = perp_vector(coords)
+                        x_vec = np.cross(ip_vector, oop_vector)
+                        x_vec /= np.linalg.norm(x_vec)
+                        ip_vector = -np.cross(x_vec, oop_vector)
+                    ip_vector /= np.linalg.norm(ip_vector)
+                    
+                    basis = np.array([x_vec, ip_vector, oop_vector]).T
+                
+                if steric_map:
+                    x, y, z, min_alt, max_alt, basis, _ = rescol.steric_map(
                         center=c,
                         key_atoms=key_atoms,
                         radii=radii,
@@ -129,38 +188,41 @@ def percent_vbur(
                         num_pts=num_pts,
                         shape=shape,
                     )
-                    
-                    vbur = rescol.percent_buried_volume(
-                        targets=targets,
-                        basis=basis,
-                        center=c,
-                        radius=radius,
-                        radii=radii,
-                        scale=scale,
-                        method=method,
-                        rpoints=int(radialPoints),
-                        apoints=int(angularPoints),
-                        min_iter=minimumIterations,
-                    )
-                    
-                    out.append((model.name, c.atomspec, vbur, (x, y, z, min_alt, max_alt)))
+
+                vbur = rescol.percent_buried_volume(
+                    targets=targets,
+                    basis=basis,
+                    center=c,
+                    radius=radius,
+                    radii=radii,
+                    scale=scale,
+                    method=method,
+                    rpoints=int(radialPoints),
+                    apoints=int(angularPoints),
+                    min_iter=minimumIterations,
+                )
                 
+                if steric_map:
+                    out.append((model, c.atomspec, vbur, (x, y, z, min_alt, max_alt)))
                 else:
-                    vbur = rescol.percent_buried_volume(
-                        targets=targets,
-                        center=c,
-                        radius=radius,
-                        radii=radii,
-                        scale=scale,
-                        method=method,
-                        rpoints=int(radialPoints),
-                        apoints=int(angularPoints),
-                        min_iter=minimumIterations,
-                    )
-                        
-                    s += "%s\t%s\t%4.1f%%\n" % (model.name, c.atomspec, vbur)
-                
-                    out.append((model.name, c.atomspec, vbur))
+                    out.append((model, c.atomspec, vbur))
+                s += "%s\t%s\t" % (model.name, c.atomspec)
+                if hasattr(vbur, "__iter__"):
+                    if reportComponent == "octants":
+                        s += "%s\n" % ",".join(["%.1f%%" % v for v in vbur])
+                    elif reportComponent == "quadrants":
+                        s += "%s\n" % ",".join([
+                            "%.1f%%" % v for v in[
+                                vbur[0] + vbur[7],
+                                vbur[1] + vbur[6],
+                                vbur[2] + vbur[5],
+                                vbur[3] + vbur[4],
+                            ]
+                        ])
+                    else:
+                        s += "%.1f%%\n" % sum(vbur)
+                else:
+                    s += "%.1f%%\n" % vbur
         
                 if displaySphere is not None:
                     mdl = vbur_vis(
@@ -174,32 +236,68 @@ def percent_vbur(
                             pointSpacing,
                             intersectionScale,
                             displaySphere,
+                            vbur,
+                            labels,
+                            basis=basis,
                     )
-                    model.add([mdl])
-                    atomspec = mdl.atomspec
+                    model.add(mdl)
+                    atomspec = mdl[0].atomspec
                     center_coords = rescol.COM(c)
-                    #XXX: the center will be wrong if the models are tiled
                     args = [
                         "color", "radial", atomspec,
                         "center", ",".join(["%.4f" % x for x in center_coords]),
                         "palette", palette,
+                        "range", "0,%.2f" % radius,
+                        "coordinateSystem", model.atomspec,
                         ";",
                         "transparency", atomspec, "30", 
                     ]
                     
                     run(session, " ".join(args))
         else:
-            if steric_map:
-                if targets is not None:
-                    key_atoms = []
-                    targets = rescol.find(targets)
-                    for atom in targets:
-                        if any(c in atom.connected for c in mdl_center):
-                            key_atoms.append(atom)
+            if targets is not None:
+                key_atoms = []
+                targets = rescol.find(targets)
+                for atom in targets:
+                    if any(c in atom.connected for c in mdl_center):
+                        key_atoms.append(atom)
+            else:
+                key_atoms = None
+
+            if (labels != "none" or reportComponent != "total") and not useScene:
+                if not key_atoms:
+                    session.logger.warning(
+                        "bonds between center and coordinating atoms is required to"
+                        " properly orient octants"
+                    )
+                oop_vector = np.zeros(3)
+                for atom in key_atoms:
+                    if isinstance(mdl_center, np.ndarray):
+                        oop_vector += mdl_center - atom.coords
+                    else:
+                        for c in mdl_center:
+                            oop_vector += c.coords - atom.coords
+                
+                if len(key_atoms) == 1:
+                    ip_vector = perp_vector(oop_vector)
+                    x_vec = np.cross(ip_vector, oop_vector)
                 else:
-                    key_atoms = None
-                        
-                x, y, z, min_alt, max_alt, basis, targets = rescol.steric_map(
+                    coords = [atom.coords for atom in key_atoms]
+                    if isinstance(mdl_center, np.ndarray):
+                        coords.append(mdl_center)
+                    else:
+                        coords.extend([c.coords for c in mdl_center])
+                    coords = np.array(coords)
+                    ip_vector = perp_vector(coords)
+                    x_vec = np.cross(ip_vector, oop_vector)
+                    x_vec /= np.linalg.norm(x_vec)
+                    ip_vector = -np.cross(x_vec, oop_vector)
+                ip_vector /= np.linalg.norm(ip_vector)
+
+                basis = np.array([x_vec, ip_vector, oop_vector]).T
+
+            if steric_map:
+                x, y, z, min_alt, max_alt, basis, _ = rescol.steric_map(
                     center=mdl_center,
                     key_atoms=key_atoms,
                     radius=radius,
@@ -210,44 +308,49 @@ def percent_vbur(
                     num_pts=num_pts,
                     shape=shape,
                 )
-                
-                vbur = rescol.percent_buried_volume(
-                    targets=targets,
-                    basis=basis,
-                    center=mdl_center,
-                    radius=radius,
-                    radii=radii,
-                    scale=scale,
-                    method=method,
-                    rpoints=int(radialPoints),
-                    apoints=int(angularPoints),
-                    min_iter=minimumIterations,
-                )
-                
-                if not isinstance(mdl_center, np.ndarray):
-                    out.append((model.name, ",".join([c.atomspec for c in mdl_center]), vbur, (x, y, z, min_alt, max_alt)))
-                else:
-                    out.append((model.name, ",".join(["%.3f" % c for c in mdl_center]), vbur, (x, y, z, min_alt, max_alt)))
 
-            else:
-                vbur = rescol.percent_buried_volume(
-                    targets=targets,
-                    center=mdl_center,
-                    radius=radius,
-                    radii=radii,
-                    scale=scale,
-                    method=method,
-                    rpoints=int(radialPoints),
-                    apoints=int(angularPoints),
-                    min_iter=minimumIterations,
-                )
-                
+            vbur = rescol.percent_buried_volume(
+                targets=targets,
+                basis=basis,
+                center=mdl_center,
+                radius=radius,
+                radii=radii,
+                scale=scale,
+                method=method,
+                rpoints=int(radialPoints),
+                apoints=int(angularPoints),
+                min_iter=minimumIterations,
+            )
+            
+            if steric_map:
                 if not isinstance(mdl_center, np.ndarray):
-                    s += "%s\t%s\t%4.1f%%\n" % (model.name, ", ".join([c.atomspec for c in mdl_center]), vbur)
-                    out.append((model.name, ", ".join([c.atomspec for c in mdl_center]), vbur))
+                    out.append((model, ",".join([c.atomspec for c in mdl_center]), vbur, (x, y, z, min_alt, max_alt)))
                 else:
-                    s += "%s\t%s\t%4.1f%%\n" % (model.name, ",".join(["%.3f" % c for c in mdl_center]), vbur)
-                    out.append((model.name, ",".join(["%.3f" % c for c in mdl_center]), vbur))
+                    out.append((model, ",".join(["%.3f" % c for c in mdl_center]), vbur, (x, y, z, min_alt, max_alt)))
+            else:
+                if not isinstance(mdl_center, np.ndarray):
+                    s += "%s\t%s\t" % (model.name, ", ".join([c.atomspec for c in mdl_center]))
+                    out.append((model, ", ".join([c.atomspec for c in mdl_center]), vbur))
+                else:
+                    s += "%s\t%s\t" % (model.name, ",".join(["%.3f" % c for c in mdl_center]))
+                    out.append((model, ",".join(["%.3f" % c for c in mdl_center]), vbur))
+                
+            if hasattr(vbur, "__iter__"):
+                if reportComponent == "octants":
+                    s += "%s\n" % ",".join(["%.1f%%" % v for v in vbur])
+                elif reportComponent == "quadrants":
+                    s += "%s\n" % ",".join([
+                        "%.1f%%" % v for v in[
+                            vbur[0] + vbur[7],
+                            vbur[1] + vbur[6],
+                            vbur[2] + vbur[5],
+                            vbur[3] + vbur[4],
+                        ]
+                    ])
+                else:
+                    s += "%.1f%%\n" % sum(vbur)
+            else:
+                s += "%.1f%%\n" % vbur
 
             if displaySphere is not None:
                 mdl = vbur_vis(
@@ -261,9 +364,12 @@ def percent_vbur(
                         pointSpacing,
                         intersectionScale,
                         displaySphere,
+                        vbur,
+                        labels,
+                        basis=basis,
                 )
-                model.add([mdl])
-                atomspec = mdl.atomspec
+                model.add(mdl)
+                atomspec = mdl[0].atomspec
                 if not isinstance(mdl_center, np.ndarray):
                     center_coords = rescol.COM(mdl_center)
                 else:
@@ -273,6 +379,8 @@ def percent_vbur(
                     "color", "radial", atomspec,
                     "center", ",".join(["%.4f" % x for x in center_coords]),
                     "palette", palette,
+                    "range", "0,%.2f" % radius,
+                    "coordinateSystem", model.atomspec,
                     ";",
                     "transparency", atomspec, "30", 
                 ]
@@ -299,6 +407,10 @@ def vbur_vis(
         point_spacing, 
         intersection_scale,
         volume_type,
+        vbur,
+        labels,
+        basis=None,
+        key_atoms=None,
 ):
     # from cProfile import Profile
     # 
@@ -385,16 +497,7 @@ def vbur_vis(
             
             circ = 2 * np.pi * h
             n_added = int(np.ceil(intersection_scale * circ / point_spacing))
-            r_t = np.zeros(3)
-            for j in range(0, 3):
-                if v_n[j] != 0:
-                    if j == 0:
-                        r_t[1] = v_n[j]
-                        r_t[0] = v_n[1]
-                    else:
-                        r_t[0] = v_n[j]
-                        r_t[1] = v_n[0]
-                    break
+            r_t = perp_vector(v_n)
             
             r0 = np.cross(r_t, v_n)
             r0 *= h / np.linalg.norm(r0)
@@ -429,16 +532,7 @@ def vbur_vis(
                 
                 circ = 2 * np.pi * h
                 n_added = int(np.ceil(intersection_scale * circ / point_spacing))
-                r_t = np.zeros(3)
-                for k in range(0, 3):
-                    if v_n[k] != 0:
-                        if k == 0:
-                            r_t[1] = v_n[k]
-                            r_t[0] = v_n[1]
-                        else:
-                            r_t[0] = v_n[k]
-                            r_t[1] = v_n[0]
-                        break
+                r_t = perp_vector(v_n)
                 
                 r0 = np.cross(r_t, v_n)
                 r0 *= h / np.linalg.norm(r0)
@@ -634,5 +728,125 @@ def vbur_vis(
     # pstats.Stats(profile, stream=stream).strip_dirs().sort_stats(-1).print_stats()
     # stream.flush()
 
+    if labels != "none":   
+        d = model.new_drawing("octants")
+        d.display_style = d.Mesh
+        d.use_lighting = False
+        d.casts_shadows = False
+        d.pickable = False
+        
+        d_theta = np.pi / 180
+        oct_radius = 1.01 * radius
+        verts = [np.zeros(3)]
+        triangles = []
+        for k, v in enumerate(basis.T):            
+            if labels == "quadrants" and k == 2:
+                continue
+            
+            start_ndx = len(verts)
+            prev_vert = oct_radius * perp_vector(v)
+            verts.append(prev_vert)
+            R = rotation_matrix(d_theta, v)
+
+            for i in range(1, 360):
+                triangles.append([0, start_ndx + i - 1, start_ndx + i])
+                prev_vert = np.dot(R, prev_vert)
+                verts.append(prev_vert)
+            
+            triangles.append([0, start_ndx, start_ndx + i - 1])
+            
+            for v2 in basis.T[:k]:
+                v3 = np.cross(v, v2)
+                v3 /= np.linalg.norm(v3)
+                v3 *= oct_radius
+                ndx = len(verts)
+                verts.append(v)
+                verts.append(v3)
+                triangles.append([ndx, 0, ndx + 1])
+                ndx = len(verts)
+                verts.append(v)
+                verts.append(-v3)
+                triangles.append([ndx, 0, ndx + 1])
+                ndx = len(verts)
+                verts.append(-v)
+                verts.append(-v3)
+                triangles.append([ndx, 0, ndx + 1])
+                ndx = len(verts)
+                verts.append(-v)
+                verts.append(v3)
+                triangles.append([ndx, 0, ndx + 1])
+
+        norms = np.array(verts) / oct_radius
+        verts = np.array(verts) + center_coords
+        triangles = np.array(triangles)
+        
+        d.set_geometry(verts, norms, triangles)
+        d.set_edge_mask(2 * np.ones(len(triangles), dtype=int))
     
-    return model
+        label_list = []
+        x = basis.T[0]
+        x = x / np.linalg.norm(x)
+        y = basis.T[1]
+        y = y / np.linalg.norm(y)
+        z = basis.T[2]
+        z = z / np.linalg.norm(z)
+        if labels == "octants":
+            for i, val in enumerate(vbur):
+                coordinates = np.zeros(3)
+    
+                if any(i == n for n in [1, 2, 5, 6]):
+                    coordinates -= x
+                else:
+                    coordinates += x
+                if any(i == n for n in [2, 3, 4, 5]):
+                    coordinates -= y
+                else:
+                    coordinates += y
+                if i > 3:
+                    coordinates -= z
+                else:
+                    coordinates += z
+                if volume_type == "free":
+                    l = "%.1f%%" % (100 / 8 - val)
+                else:
+                    l = "%.1f%%" % (val)
+                coordinates /= np.linalg.norm(coordinates)
+                coordinates *= radius
+                coordinates += center_coords
+                label_list.append(
+                    VoidLabel(l, coordinates, session.main_view)
+                )
+        else:
+            quad_vbur = [
+                vbur[0] + vbur[7],
+                vbur[1] + vbur[6],
+                vbur[2] + vbur[5],
+                vbur[3] + vbur[4],
+            ]
+            for i, val in enumerate(quad_vbur):
+                coordinates = np.zeros(3)
+                if any(i == n for n in [1, 2]):
+                    coordinates -= x
+                else:
+                    coordinates += x
+                if any(i == n for n in [2, 3]):
+                    coordinates -= y
+                else:
+                    coordinates += y
+
+                if volume_type == "free":
+                    l = "%.1f%%" % (25 - val)
+                else:
+                    l = "%.1f%%" % (val)
+                coordinates /= np.linalg.norm(coordinates)
+                coordinates *= radius
+                coordinates += center_coords
+                label_list.append(
+                    VoidLabel(l, coordinates, session.main_view)
+                )
+        label_object = VoidLabels(session)
+        label_object.add_labels(label_list)
+        model.add([label_object])
+        return [model]
+    
+    return [model]

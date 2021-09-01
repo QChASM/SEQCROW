@@ -459,11 +459,11 @@ class ResidueCollection(Geometry):
         if comment is None:
             comment = self.comment
         atoms = self._fix_connectivity(atoms)
-        if hasattr(self, "components") and self.components is not None:
+        if hasattr(self, "components") and self.components is not None and comment is None:
             self.fix_comment()
         if copy_atoms:
-            return ResidueCollection([a.copy() for a in atoms], name, comment)
-        return ResidueCollection(atoms, name, comment)
+            return ResidueCollection([a.copy() for a in atoms], name, comment=comment)
+        return ResidueCollection(atoms, name, comment=comment)
 
     def map_ligand(self, *args, **kwargs):
         """map_ligand, then put new atoms in the residue they are closest to"""

@@ -28,6 +28,7 @@ class BuriedVolumeToolTest(TestWithSession):
         vbur_tool.use_centroid.setCheckState(Qt.Unchecked)
         vbur_tool.steric_map.setCheckState(Qt.Unchecked)
         vbur_tool.display_cutout.setCurrentIndex(0)
+        vbur_tool.report_component.setCurrentIndex(0)
         
         run(self.session, "select Cu")
         

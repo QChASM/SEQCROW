@@ -30,7 +30,7 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
         format_name = "ORCA output file"
 
     try:
-        geom = ResidueCollection(fr, refresh_ranks=False)
+        geom = ResidueCollection(fr, refresh_ranks=False).copy(comment=fr.comment, copy_atoms=True)
     except Exception as e:
         s = "could not open %s" % file_name
         if "error" in fr.other and fr.other["error"]:
@@ -40,11 +40,11 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
         session.logger.error(repr(e))
         return [], "SEQCROW failed to open %s" % file_name
 
-    structure = geom.get_chimera(session, coordsets=(fr.all_geom is not None and len(fr.all_geom) > 1), filereader=fr)
+    structure = geom.get_chimera(session, coordsets=bool(fr.all_geom), filereader=fr)
     #associate the AaronTools FileReader with each structure
     session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([structure], [fr]))
 
-    coordsets = coordsets and fr.all_geom is not None and len(fr.all_geom) > 1
+    coordsets = coordsets and fr.all_geom
 
     if coordsets:
         from chimerax.std_commands.coordset_gui import CoordinateSetSlider
@@ -59,7 +59,7 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
             else:
                 slider = CoordinateSetSlider(session, structure)
 
-                if len(fr.all_geom) > 1:
+                if fr.all_geom:
                     structure.active_coordset_id = structure.num_coordsets
                     if coordsets:
                         slider.set_slider(structure.num_coordsets)
@@ -131,7 +131,7 @@ def open_nbo(session, path, file_name, format_name=None, orbitals=None):
     fr = FileReader((path, fmt, None), nbo_name=orbitals)
 
     try:
-        geom = ResidueCollection(fr, refresh_ranks=False)
+        geom = ResidueCollection(fr, refresh_ranks=False).copy(comment=fr.comment, copy_atoms=True)
     except Exception as e:
         s = "could not open %s" % file_name
         if "error" in fr.other and fr.other["error"]:
