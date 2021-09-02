@@ -1139,7 +1139,7 @@ class UVVisSpectrum(ToolInstance):
 
         for mol_index in range(1, self.tree.topLevelItemCount()):
             mol = self.tree.topLevelItem(mol_index)
-            for conf_ndx in range(1, mol.childCount()):
+            for conf_ndx in range(1, mol.childCount(), 2):
                 conf = mol.child(conf_ndx)
                 self.tree.itemWidget(conf, 0).deleteLater()
                 self.tree.itemWidget(conf, 1).deleteLater()
@@ -1157,7 +1157,7 @@ class UVVisSpectrum(ToolInstance):
 
         for mol_index in range(1, self.tree.topLevelItemCount()):
             mol = self.tree.topLevelItem(mol_index)
-            for conf_ndx in range(1, mol.childCount()):
+            for conf_ndx in range(1, mol.childCount(), 2):
                 conf = mol.child(conf_ndx)
                 self.tree.itemWidget(conf, 0).deleteLater()
                 self.tree.itemWidget(conf, 1).deleteLater()
@@ -1175,7 +1175,7 @@ class UVVisSpectrum(ToolInstance):
 
         for mol_index in range(1, self.tree.topLevelItemCount()):
             mol = self.tree.topLevelItem(mol_index)
-            for conf_ndx in range(1, mol.childCount()):
+            for conf_ndx in range(1, mol.childCount(), 2):
                 conf = mol.child(conf_ndx)
                 self.tree.itemWidget(conf, 0).deleteLater()
                 self.tree.itemWidget(conf, 1).deleteLater()
