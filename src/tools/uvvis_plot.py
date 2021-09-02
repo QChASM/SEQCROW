@@ -20,8 +20,8 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
 from matplotlib import rcParams
 
-from Qt.QtCore import Qt, QRect, QItemSelectionModel, QVariant
-from Qt.QtGui import QValidator, QFont, QIcon
+from Qt.QtCore import Qt, QRect, QItemSelectionModel, QVariant, QSize
+from Qt.QtGui import QValidator, QFont, QIcon, QPixmap
 from Qt.QtWidgets import (
     QSpinBox,
     QDoubleSpinBox,
@@ -55,6 +55,50 @@ from SEQCROW.widgets import FilereaderComboBox
 
 rcParams["savefig.dpi"] = 300
 
+
+solid_line_pixmap = QPixmap([
+    "50  4  2  1",
+    "a c #FFFFFF",
+    "b c #000000",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbba",
+    "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbba",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+])
+solid_line = QIcon(solid_line_pixmap)
+
+dashed_line_pixmap = QPixmap([
+    "50  4  2  1",
+    "a c #FFFFFF",
+    "b c #000000",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "abbbbbbbbaabbbbbbbbaabbbbbbbbaabbbbbbbbaabbbbbbbba",
+    "abbbbbbbbaabbbbbbbbaabbbbbbbbaabbbbbbbbaabbbbbbbba",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+])
+dashed_line = QIcon(dashed_line_pixmap)
+
+dotted_line_pixmap = QPixmap([
+    "50  4  2  1",
+    "a c #FFFFFF",
+    "b c #000000",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "abbaabbaabbaabbaabbaabbaabbaabbaabbaabbaabbaabbaaa",
+    "abbaabbaabbaabbaabbaabbaabbaabbaabbaabbaabbaabbaaa",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+])
+dotted_line = QIcon(dotted_line_pixmap)
+
+dashdot_line_pixmap = QPixmap([
+    "50  4  2  1",
+    "a c #FFFFFF",
+    "b c #000000",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "abbbbbbbbaabbaabbbbbbbbaabbaabbbbbbbbaabbaabbbbbba",
+    "abbbbbbbbaabbaabbbbbbbbaabbaabbbbbbbbaabbaabbbbbba",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+])
+dashdot_line = QIcon(dashdot_line_pixmap)
 
 
 class _UVVisSpectrumSettings(Settings):
@@ -396,7 +440,7 @@ class UVVisSpectrum(ToolInstance):
                     self.section_table.cellWidget(i, 1).setValue(val1)
                 self.section_table.cellWidget(i, 0).setSuffix(" %s" % units)
                 self.section_table.cellWidget(i, 1).setSuffix(" %s" % units)
-        
+
     def add_mol_group(self, *args):
         row = self.tree.topLevelItemCount()
         
@@ -418,9 +462,14 @@ class UVVisSpectrum(ToolInstance):
         add_conf_button2.setFlat(True)
         add_conf_button2.clicked.connect(lambda *args, conf_group_widget=mol_group: self.add_conf_group(conf_group_widget))
         
+        add_conf_button3 = QPushButton("")
+        add_conf_button3.setFlat(True)
+        add_conf_button3.clicked.connect(lambda *args, conf_group_widget=mol_group: self.add_conf_group(conf_group_widget))
+        
         add_conf_child = QTreeWidgetItem(mol_group)
         self.tree.setItemWidget(add_conf_child, 0, add_conf_button)
         self.tree.setItemWidget(add_conf_child, 1, add_conf_button2)
+        self.tree.setItemWidget(add_conf_child, 2, add_conf_button3)
         self.tree.setItemWidget(mol_group, 3, trash_button)
         
         mol_group.setText(0, "group %i" % row)
@@ -447,6 +496,7 @@ class UVVisSpectrum(ToolInstance):
             self.tree.itemWidget(conf, 0).destroy()
             self.tree.itemWidget(conf, 1).destroy()
             self.tree.itemWidget(conf, 2).destroy()
+            self.tree.itemWidget(conf, 3).destroy()
         
         ndx = self.tree.indexOfTopLevelItem(parent)
         self.tree.takeTopLevelItem(ndx)
@@ -466,13 +516,54 @@ class UVVisSpectrum(ToolInstance):
         trash_button.clicked.connect(lambda *args, combobox=uv_vis_combobox: combobox.deleteLater())
         trash_button.clicked.connect(lambda *args, combobox=nrg_combobox: combobox.deleteLater())
         trash_button.clicked.connect(lambda *args, combobox=freq_combobox: combobox.deleteLater())
-        trash_button.clicked.connect(lambda *args, child=conformer_item: conf_group_widget.removeChild(child))
+        trash_button.clicked.connect(
+            lambda *args, child=conformer_item: conf_group_widget.removeChild(child)
+        )
         trash_button.setIcon(QIcon(self.tree.style().standardIcon(QStyle.SP_DialogCancelButton)))
         
         self.tree.setItemWidget(conformer_item, 0, uv_vis_combobox)
         self.tree.setItemWidget(conformer_item, 1, freq_combobox)
         self.tree.setItemWidget(conformer_item, 2, nrg_combobox)
         self.tree.setItemWidget(conformer_item, 3, trash_button)
+
+        style_group = QTreeWidgetItem(conf_group_widget)
+        conf_group_widget.insertChild(row + 1, style_group)
+
+        line_widget = QWidget()
+        line_widget_layout = QHBoxLayout(line_widget)
+        line_widget_layout.setContentsMargins(4, 0, 4, 0)
+        line_widget_layout.insertWidget(0, QLabel("show:"), 0, Qt.AlignLeft | Qt.AlignVCenter)
+        show_line = QCheckBox()
+        line_widget_layout.insertWidget(1, show_line, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        line_color = ColorButton(has_alpha_channel=False, max_size=(16, 16))
+        line_color.set_color((0.0, 0.0, 0.0))
+        line_color.setEnabled(False)
+        show_line.stateChanged.connect(
+            lambda state, widget=line_color: widget.setEnabled(state == Qt.Checked)
+        )
+        line_widget_layout.insertWidget(2, line_color, 1, Qt.AlignLeft | Qt.AlignVCenter)
+        
+        line_widget2 = QWidget()
+        line_widget_layout2 = QHBoxLayout(line_widget2)
+        line_widget_layout2.setContentsMargins(4, 0, 4, 0)
+        line_widget_layout2.insertWidget(0, QLabel("style:"), 0, Qt.AlignLeft | Qt.AlignVCenter)
+        line_style = QComboBox()
+        line_style.addItem(solid_line, "", "-")
+        line_style.addItem(dashed_line, "", "--")
+        line_style.addItem(dotted_line, "", ":")
+        line_style.addItem(dashdot_line, "", "-.")
+        line_style.setIconSize(QSize(50, 4))
+        line_widget_layout2.insertWidget(1, line_style, 1, Qt.AlignLeft | Qt.AlignVCenter)
+        line_widget2.setEnabled(False)
+        show_line.stateChanged.connect(
+            lambda state, widget=line_widget2: widget.setEnabled(state == Qt.Checked)
+        )
+        trash_button.clicked.connect(
+            lambda *args, child=conformer_item: conf_group_widget.removeChild(style_group)
+        )
+
+        self.tree.setItemWidget(style_group, 0, line_widget)
+        self.tree.setItemWidget(style_group, 1, line_widget2)
 
     def change_figure_size(self, *args):
         if self.fixed_size.checkState() == Qt.Checked:
@@ -555,7 +646,7 @@ class UVVisSpectrum(ToolInstance):
             else:
                 s = "hv (eV),intensity\n"
 
-            mixed_uv_vis = self.get_mixed_spectrum()
+            mixed_uv_vis, _ = self.get_mixed_spectrum()
         
             fwhm = self.fwhm.value()
             peak_type = self.peak_type.currentText()
@@ -663,7 +754,7 @@ class UVVisSpectrum(ToolInstance):
             closest = None
             for mol_ndx in range(1, self.tree.topLevelItemCount()):
                 mol = self.tree.topLevelItem(mol_ndx)
-                for conf_ndx in range(1, mol.childCount()):
+                for conf_ndx in range(1, mol.childCount(), 2):
                     conf = mol.child(conf_ndx)
                     fr = self.tree.itemWidget(conf, 0).currentData()
                     if fr is None:
@@ -701,6 +792,7 @@ class UVVisSpectrum(ToolInstance):
         freqs = []
         single_points = []
         mol_fracs = []
+        show_components = []
 
         for mol_ndx in range(1, self.tree.topLevelItemCount()):
             uv_vis_files.append([])
@@ -710,7 +802,8 @@ class UVVisSpectrum(ToolInstance):
             mol_fracs_widget = self.tree.itemWidget(mol, 1).layout().itemAt(1).widget()
             mol_fracs.append(mol_fracs_widget.value())
             
-            for conf_ndx in range(1, mol.childCount()):
+            for conf_ndx in range(1, mol.childCount(), 2):
+
                 conf = mol.child(conf_ndx)
                 uv_vis_file = self.tree.itemWidget(conf, 0).currentData()
                 if uv_vis_file is None:
@@ -751,7 +844,20 @@ class UVVisSpectrum(ToolInstance):
                     s += "the structure of %s (energy)" % single_points[-1][-1].geometry.name
                     self.session.logger.warning(s)
                 
-                
+                conf_style = mol.child(conf_ndx + 1)
+                show_comp = self.tree.itemWidget(conf_style, 0).layout().itemAt(1).widget()
+                if show_comp.checkState() == Qt.Checked:
+                    stop_ndx = sum(sum(len(uv_vis.data) for uv_vis in conf) for conf in uv_vis_files)
+                    start_ndx = stop_ndx - len(uv_vis_files[-1][-1].data)
+                    color = self.tree.itemWidget(conf_style, 0).layout().itemAt(2).widget().get_color()
+                    line_style = self.tree.itemWidget(conf_style, 1).layout().itemAt(1).widget().currentData(Qt.UserRole)
+                    show_components.append([
+                        (start_ndx, stop_ndx),
+                        [c / 255. for c in color],
+                        line_style,
+                        uv_vis_file.name,
+                    ])
+
             if not uv_vis_files[-1]:
                 uv_vis_files.pop(-1)
                 freqs.pop(-1)
@@ -793,10 +899,10 @@ class UVVisSpectrum(ToolInstance):
             weights=np.array(mol_fracs),
         )
         
-        return final_mixed
+        return final_mixed, show_components
 
     def refresh_plot(self):
-        mixed_spectra = self.get_mixed_spectrum()
+        mixed_spectra, show_components = self.get_mixed_spectrum()
         if not mixed_spectra:
             return
 
@@ -878,6 +984,7 @@ class UVVisSpectrum(ToolInstance):
             voigt_mixing=voigt_mixing,
             scalar_scale=shift,
             units=x_units,
+            show_functions=show_components,
         )
 
         self.canvas.draw()
@@ -890,7 +997,7 @@ class UVVisSpectrum(ToolInstance):
         highlights = []
         labels = []
 
-        excits = self.get_mixed_spectrum()
+        excits, _ = self.get_mixed_spectrum()
         if not excits:
             return
 
