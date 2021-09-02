@@ -1262,8 +1262,7 @@ class SaveScales(ChildToolWindow):
         current = loads(self.tool_instance.settings.scales)
         current[name] = (self.c1, self.c2)
         self.tool_instance.settings.scales = dumps(current)
-        if self.tool_instance.ir_plot:
-            self.tool_instance.ir_plot.fill_lib_options()
+        self.tool_instance.fill_lib_options()
         
         self.session.logger.info(
             "saved frequency scale factors to user-defined database"

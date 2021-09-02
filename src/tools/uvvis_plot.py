@@ -820,8 +820,8 @@ class UVVisSpectrum(ToolInstance):
                             "frequency jobs must be given if you are not weighting"
                             " based on electronic energy"
                         )
+                        return
                     freqs[-1].append(CompOutput(freq_file))
-                    return
                 
                     rmsd = freqs[-1][-1].geometry.RMSD(
                         single_points[-1][-1].geometry,
@@ -902,9 +902,11 @@ class UVVisSpectrum(ToolInstance):
         return final_mixed, show_components
 
     def refresh_plot(self):
-        mixed_spectra, show_components = self.get_mixed_spectrum()
+        mixed_spectra = self.get_mixed_spectrum()
         if not mixed_spectra:
             return
+
+        mixed_spectra, show_components = mixed_spectra
 
         self.figure.clear()
         self.check_units()
