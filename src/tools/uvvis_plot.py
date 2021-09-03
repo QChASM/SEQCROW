@@ -79,26 +79,46 @@ dashed_line_pixmap = QPixmap([
 dashed_line = QIcon(dashed_line_pixmap)
 
 dotted_line_pixmap = QPixmap([
-    "50  4  2  1",
+    "48  4  2  1",
     "a c #FFFFFF",
     "b c #000000",
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "abbaabbaabbaabbaabbaabbaabbaabbaabbaabbaabbaabbaaa",
-    "abbaabbaabbaabbaabbaabbaabbaabbaabbaabbaabbaabbaaa",
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "abbaabbaabbaabbaabbaabbaabbaabbaabbaabbaabbaabba",
+    "abbaabbaabbaabbaabbaabbaabbaabbaabbaabbaabbaabba",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 ])
 dotted_line = QIcon(dotted_line_pixmap)
 
 dashdot_line_pixmap = QPixmap([
+    "56  4  2  1",
+    "a c #FFFFFF",
+    "b c #000000",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "abbbbbbbbaabbaabbbbbbbbaabbaabbbbbbbbaabbaabbbbbbbbaabba",
+    "abbbbbbbbaabbaabbbbbbbbaabbaabbbbbbbbaabbaabbbbbbbbaabba",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+])
+dashdot_line = QIcon(dashdot_line_pixmap)
+
+dashdotdot_line_pixmap = QPixmap([
     "50  4  2  1",
     "a c #FFFFFF",
     "b c #000000",
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "abbbbbbbbaabbaabbbbbbbbaabbaabbbbbbbbaabbaabbbbbba",
-    "abbbbbbbbaabbaabbbbbbbbaabbaabbbbbbbbaabbaabbbbbba",
+    "abbbbbbbbaabbaabbaabbbbbbbbaabbaabbaabbbbbbbbaabba",
+    "abbbbbbbbaabbaabbaabbbbbbbbaabbaabbaabbbbbbbbaabba",
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 ])
-dashdot_line = QIcon(dashdot_line_pixmap)
+dashdotdot_line = QIcon(dashdotdot_line_pixmap)
+
+
+color_cycle = [
+    (1.0, 0.0, 0.0),
+    (0.0, 0.0, 1.0),
+    (0.0, 0.7, 0.1),
+    (0.9, 0.6, 0.2),
+    (0.8, 0.1, 0.8),
+]
 
 
 class _UVVisSpectrumSettings(Settings):
@@ -220,6 +240,21 @@ class UVVisSpectrum(ToolInstance):
         self.weight_method.setCurrentIndex(ndx)
         component_layout.addWidget(QLabel("energy for weighting:"), 1, 0, 1, 1, Qt.AlignRight | Qt.AlignHCenter)
         component_layout.addWidget(self.weight_method, 1, 1, 1, 1, Qt.AlignLeft | Qt.AlignHCenter)
+
+
+        show_conformers = QLabel("show contribution from conformers with a Boltzmann population above:")
+        component_layout.addWidget(show_conformers, 2, 0, 1, 4, Qt.AlignRight | Qt.AlignVCenter)
+        
+        self.boltzmann_pop_limit = QDoubleSpinBox()
+        self.boltzmann_pop_limit.setRange(1.0, 99.0)
+        self.boltzmann_pop_limit.setSingleStep(1.0)
+        self.boltzmann_pop_limit.setDecimals(1)
+        self.boltzmann_pop_limit.setValue(10.0)
+        self.boltzmann_pop_limit.setSuffix("%")
+        component_layout.addWidget(self.boltzmann_pop_limit, 2, 4, 1, 1, Qt.AlignLeft | Qt.AlignVCenter)
+        
+        self.show_boltzmann_pop = QCheckBox()
+        component_layout.addWidget(self.show_boltzmann_pop, 2, 5, 1, 1, Qt.AlignLeft | Qt.AlignVCenter)
 
 
         tabs.addTab(component_widget, "components")
@@ -431,6 +466,8 @@ class UVVisSpectrum(ToolInstance):
                     val2 = ValenceExcitations.nm_to_ev(val2)
                     self.section_table.cellWidget(i, 0).setValue(val2)
                     self.section_table.cellWidget(i, 1).setValue(val1)
+                    self.section_table.cellWidget(i, 0).setSingleStep(0.5)
+                    self.section_table.cellWidget(i, 1).setSingleStep(0.5)
                 if curr_units == "eV" and units == "nm":
                     val1 = self.section_table.cellWidget(i, 0).value()
                     val1 = ValenceExcitations.ev_to_nm(val1)
@@ -438,6 +475,8 @@ class UVVisSpectrum(ToolInstance):
                     val2 = ValenceExcitations.ev_to_nm(val2)
                     self.section_table.cellWidget(i, 0).setValue(val2)
                     self.section_table.cellWidget(i, 1).setValue(val1)
+                    self.section_table.cellWidget(i, 0).setSingleStep(25)
+                    self.section_table.cellWidget(i, 1).setSingleStep(25)
                 self.section_table.cellWidget(i, 0).setSuffix(" %s" % units)
                 self.section_table.cellWidget(i, 1).setSuffix(" %s" % units)
 
@@ -448,9 +487,45 @@ class UVVisSpectrum(ToolInstance):
         
         mol_group = QTreeWidgetItem(root_item)
         self.tree.insertTopLevelItem(row, mol_group)
+
+        line_widget = QWidget()
+        line_widget_layout = QHBoxLayout(line_widget)
+        line_widget_layout.setContentsMargins(4, 0, 4, 0)
+        line_widget_layout.insertWidget(0, QLabel("show:"), 0, Qt.AlignLeft | Qt.AlignVCenter)
+        show_line = QCheckBox()
+        line_widget_layout.insertWidget(1, show_line, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        line_color = ColorButton(has_alpha_channel=False, max_size=(16, 16))
+        color_ndx = (row - 1) % len(color_cycle) 
+        line_color.set_color(color_cycle[color_ndx - 1])
+        line_color.setEnabled(False)
+        show_line.stateChanged.connect(
+            lambda state, widget=line_color: widget.setEnabled(state == Qt.Checked)
+        )
+        line_widget_layout.insertWidget(2, line_color, 1, Qt.AlignLeft | Qt.AlignVCenter)
+        
+        line_widget2 = QWidget()
+        line_widget_layout2 = QHBoxLayout(line_widget2)
+        line_widget_layout2.setContentsMargins(4, 0, 4, 0)
+        line_widget_layout2.insertWidget(0, QLabel("style:"), 0, Qt.AlignLeft | Qt.AlignVCenter)
+        line_style = QComboBox()
+        line_style.addItem(solid_line, "", "-")
+        line_style.addItem(dashed_line, "", "--")
+        line_style.addItem(dotted_line, "", ":")
+        line_style.addItem(dashdot_line, "", "-.")
+        line_style.setIconSize(QSize(50, 4))
+        line_widget_layout2.insertWidget(1, line_style, 1, Qt.AlignLeft | Qt.AlignVCenter)
+        line_widget2.setEnabled(False)
+        show_line.stateChanged.connect(
+            lambda state, widget=line_widget2: widget.setEnabled(state == Qt.Checked)
+        )
+        
+        style_group = QTreeWidgetItem(mol_group)
+        self.tree.setItemWidget(style_group, 0, line_widget)
+        self.tree.setItemWidget(style_group, 1, line_widget2)
+        
+        
         trash_button = QPushButton()
         trash_button.setFlat(True)
-        
         trash_button.clicked.connect(lambda *args, parent=mol_group: self.remove_mol_group(parent))
         trash_button.setIcon(QIcon(self.tree.style().standardIcon(QStyle.SP_DialogDiscardButton)))
         
@@ -482,6 +557,7 @@ class UVVisSpectrum(ToolInstance):
         
         mol_fraction_widget = QWidget()
         mol_fraction_layout = QFormLayout(mol_fraction_widget)
+        mol_fraction_layout.setContentsMargins(4, 1, 4, 1)
         mol_fraction_layout.addRow("ratio:", mol_fraction)
         self.tree.setItemWidget(mol_group, 1, mol_fraction_widget)
         
@@ -491,12 +567,11 @@ class UVVisSpectrum(ToolInstance):
         self.tree.expandItem(mol_group)
     
     def remove_mol_group(self, parent):
-        for conf_ndx in range(1, parent.childCount()):
+        for conf_ndx in range(2, parent.childCount(), 2):
             conf = parent.child(conf_ndx)
             self.tree.itemWidget(conf, 0).destroy()
             self.tree.itemWidget(conf, 1).destroy()
             self.tree.itemWidget(conf, 2).destroy()
-            self.tree.itemWidget(conf, 3).destroy()
         
         ndx = self.tree.indexOfTopLevelItem(parent)
         self.tree.takeTopLevelItem(ndx)
@@ -531,27 +606,30 @@ class UVVisSpectrum(ToolInstance):
 
         line_widget = QWidget()
         line_widget_layout = QHBoxLayout(line_widget)
-        line_widget_layout.setContentsMargins(4, 0, 4, 0)
-        line_widget_layout.insertWidget(0, QLabel("show:"), 0, Qt.AlignLeft | Qt.AlignVCenter)
+        line_widget_layout.setContentsMargins(4, 0, 4, 2)
+        line_widget_layout.insertWidget(0, QLabel("show:"), 1, Qt.AlignRight | Qt.AlignVCenter)
         show_line = QCheckBox()
-        line_widget_layout.insertWidget(1, show_line, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        line_widget_layout.insertWidget(1, show_line, 0, Qt.AlignRight | Qt.AlignVCenter)
         line_color = ColorButton(has_alpha_channel=False, max_size=(16, 16))
-        line_color.set_color((0.0, 0.0, 0.0))
+        color_ndx = ((row - 1)// 2) % len(color_cycle) 
+        line_color.set_color(color_cycle[color_ndx])
         line_color.setEnabled(False)
         show_line.stateChanged.connect(
             lambda state, widget=line_color: widget.setEnabled(state == Qt.Checked)
         )
-        line_widget_layout.insertWidget(2, line_color, 1, Qt.AlignLeft | Qt.AlignVCenter)
+        line_widget_layout.insertWidget(2, line_color, 0, Qt.AlignRight | Qt.AlignVCenter)
         
         line_widget2 = QWidget()
         line_widget_layout2 = QHBoxLayout(line_widget2)
-        line_widget_layout2.setContentsMargins(4, 0, 4, 0)
+        line_widget_layout2.setContentsMargins(4, 0, 4, 2)
         line_widget_layout2.insertWidget(0, QLabel("style:"), 0, Qt.AlignLeft | Qt.AlignVCenter)
         line_style = QComboBox()
-        line_style.addItem(solid_line, "", "-")
         line_style.addItem(dashed_line, "", "--")
         line_style.addItem(dotted_line, "", ":")
         line_style.addItem(dashdot_line, "", "-.")
+        line_style.addItem(solid_line, "", "-")
+        # this doesn't work for some reason
+        # line_style.addItem(dashdotdot_line, "", (0, (3, 5, 1, 5, 1, 5)))
         line_style.setIconSize(QSize(50, 4))
         line_widget_layout2.insertWidget(1, line_style, 1, Qt.AlignLeft | Qt.AlignVCenter)
         line_widget2.setEnabled(False)
@@ -642,11 +720,20 @@ class UVVisSpectrum(ToolInstance):
         if filename:
             units = self.x_units.currentText()
             if units == "nm":
-                s = "wavelenth (nm),intensity\n"
+                s = "wavelenth (nm),intensity"
             else:
-                s = "hv (eV),intensity\n"
+                s = "hv (eV),intensity"
 
-            mixed_uv_vis, _ = self.get_mixed_spectrum()
+            data = self.get_mixed_spectrum()
+            if not data:
+                self.session.logger.error("no data to save")
+                return
+            
+            mixed_uv_vis, shown_confs = data
+        
+            for conf in shown_confs:
+                s += ",%s" % conf[-1]
+            s += "\n"
         
             fwhm = self.fwhm.value()
             peak_type = self.peak_type.currentText()
@@ -679,18 +766,26 @@ class UVVisSpectrum(ToolInstance):
                 intensity_attr=intensity_attr,
             )
             
-            x_values, y_values = mixed_uv_vis.get_plot_data(
+            show_functions = None
+            if shown_confs:
+                show_functions = [info[0] for info in shown_confs]
+            
+            x_values, y_values, other_y_list = mixed_uv_vis.get_plot_data(
                 funcs,
                 x_positions,
                 transmittance="transmittance" in plot_type,
                 peak_type=peak_type,
                 fwhm=fwhm,
                 normalize=False,
+                show_functions=show_functions,
                 change_x_unit_func=change_x_unit_func,
             )
                 
-            for x, y in zip(x_values, y_values):
-                s += "%f,%f\n" % (x, y)
+            for i, (x, y) in enumerate(zip(x_values, y_values)):
+                s += "%f,%f" % (x, y)
+                for y_vals in other_y_list:
+                    s += ",%f" % y_vals[i]
+                s += "\n"
 
             with open(filename, 'w') as f:
                 f.write(s.strip())
@@ -750,11 +845,11 @@ class UVVisSpectrum(ToolInstance):
 
         self.press = event.x, event.y, event.xdata, event.ydata
         
-        if event.dblclick:
+        if event.dblclick and event.xdata:
             closest = None
             for mol_ndx in range(1, self.tree.topLevelItemCount()):
                 mol = self.tree.topLevelItem(mol_ndx)
-                for conf_ndx in range(1, mol.childCount(), 2):
+                for conf_ndx in range(2, mol.childCount(), 2):
                     conf = mol.child(conf_ndx)
                     fr = self.tree.itemWidget(conf, 0).currentData()
                     if fr is None:
@@ -786,14 +881,46 @@ class UVVisSpectrum(ToolInstance):
         self.drag_prev = None
         self.dragging = False
 
-    def get_mixed_spectrum(self):
+    def show_conformers(self):
+        fracs = self.get_mixed_spectrum(weights_only=True)
+        if not fracs:
+            return
+        fracs, weights = fracs
+        min_pop = self.boltzmann_pop_limit.value() / 100.0
+        
+        i = 0
+        for mol_ndx in range(1, self.tree.topLevelItemCount()):
+            mol = self.tree.topLevelItem(mol_ndx)
+            w = weights[i]
+            j = 0
+            for conf_ndx in range(2, mol.childCount(), 2):
+                conf = mol.child(conf_ndx)
+                uv_vis_file = self.tree.itemWidget(conf, 0).currentData()
+                if uv_vis_file is None:
+                    continue
+                conf_style = mol.child(conf_ndx + 1)
+                show_button = self.tree.itemWidget(conf_style, 0).layout().itemAt(1).widget()
+                if w[j] > min_pop:
+                    show_button.setCheckState(Qt.Checked)
+                    self.session.logger.info(
+                        "Boltzmann population of %s: %.1f%%" % (
+                            uv_vis_file.name,
+                            100 * w[j],
+                        )
+                    )
+                else:
+                    show_button.setCheckState(Qt.Unchecked)
+                j += 1
+            if j > 0:
+                i += 1
+
+    def get_mixed_spectrum(self, weights_only=False):
         weight_method = self.weight_method.currentData(Qt.UserRole)
         uv_vis_files = []
         freqs = []
         single_points = []
         mol_fracs = []
         show_components = []
-
         for mol_ndx in range(1, self.tree.topLevelItemCount()):
             uv_vis_files.append([])
             freqs.append([])
@@ -801,8 +928,8 @@ class UVVisSpectrum(ToolInstance):
             mol = self.tree.topLevelItem(mol_ndx)
             mol_fracs_widget = self.tree.itemWidget(mol, 1).layout().itemAt(1).widget()
             mol_fracs.append(mol_fracs_widget.value())
-            
-            for conf_ndx in range(1, mol.childCount(), 2):
+
+            for conf_ndx in range(2, mol.childCount(), 2):
 
                 conf = mol.child(conf_ndx)
                 uv_vis_file = self.tree.itemWidget(conf, 0).currentData()
@@ -829,7 +956,7 @@ class UVVisSpectrum(ToolInstance):
                     )
                     if rmsd > 1e-2:
                         s = "the structure of %s (frequencies) might not match" % freqs[-1][-1].geometry.name
-                        s += "the structure of %s (energy)" % single_points[-1][-1].geometry.name
+                        s += " the structure of %s (energy)" % single_points[-1][-1].geometry.name
                         self.session.logger.warning(s)
                 else:
                     freqs[-1].append(None)
@@ -862,10 +989,25 @@ class UVVisSpectrum(ToolInstance):
                 uv_vis_files.pop(-1)
                 freqs.pop(-1)
                 single_points.pop(-1)
-                
+            else:
+                mol_style = mol.child(0)
+                show_mol = self.tree.itemWidget(mol_style, 0).layout().itemAt(1).widget()
+                if show_mol.checkState() == Qt.Checked:
+                    stop_ndx = sum(sum(len(uv_vis.data) for uv_vis in conf) for conf in uv_vis_files)
+                    start_ndx = stop_ndx - sum(len(f.data) for f in uv_vis_files[-1])
+                    color = self.tree.itemWidget(mol_style, 0).layout().itemAt(2).widget().get_color()
+                    line_style = self.tree.itemWidget(mol_style, 1).layout().itemAt(1).widget().currentData(Qt.UserRole)
+                    show_components.append([
+                        (start_ndx, stop_ndx),
+                        [c / 255. for c in color],
+                        line_style,
+                        "molecule %i" % mol_ndx,
+                    ])
+
         if not freqs or all(not conf_group for conf_group in freqs):
             return
         
+        weights_list = []
         mixed_spectra = []
         for i, (uv_vis, conf_freq, conf_nrg) in enumerate(zip(uv_vis_files, freqs, single_points)):
             for j, nrg_co1 in enumerate(conf_nrg):
@@ -887,6 +1029,7 @@ class UVVisSpectrum(ToolInstance):
                 v0=self.w0.value(),
                 weighting=weight_method,
             )
+            weights_list.append(weights)
             
             conf_mixed = ValenceExcitations.get_mixed_signals(
                 uv_vis,
@@ -899,9 +1042,14 @@ class UVVisSpectrum(ToolInstance):
             weights=np.array(mol_fracs),
         )
         
+        if weights_only:
+            return mol_fracs, weights_list
         return final_mixed, show_components
 
     def refresh_plot(self):
+        if self.show_boltzmann_pop.checkState() == Qt.Checked:
+            self.show_conformers()
+    
         mixed_spectra = self.get_mixed_spectrum()
         if not mixed_spectra:
             return
@@ -999,9 +1147,11 @@ class UVVisSpectrum(ToolInstance):
         highlights = []
         labels = []
 
-        excits, _ = self.get_mixed_spectrum()
+        excits = self.get_mixed_spectrum()
         if not excits:
             return
+        
+        excits, _ = excits
 
         plot_type = self.plot_type.currentText()
         shift = self.shift.value()
@@ -1139,7 +1289,7 @@ class UVVisSpectrum(ToolInstance):
 
         for mol_index in range(1, self.tree.topLevelItemCount()):
             mol = self.tree.topLevelItem(mol_index)
-            for conf_ndx in range(1, mol.childCount(), 2):
+            for conf_ndx in range(2, mol.childCount(), 2):
                 conf = mol.child(conf_ndx)
                 self.tree.itemWidget(conf, 0).deleteLater()
                 self.tree.itemWidget(conf, 1).deleteLater()
@@ -1157,7 +1307,7 @@ class UVVisSpectrum(ToolInstance):
 
         for mol_index in range(1, self.tree.topLevelItemCount()):
             mol = self.tree.topLevelItem(mol_index)
-            for conf_ndx in range(1, mol.childCount(), 2):
+            for conf_ndx in range(2, mol.childCount(), 2):
                 conf = mol.child(conf_ndx)
                 self.tree.itemWidget(conf, 0).deleteLater()
                 self.tree.itemWidget(conf, 1).deleteLater()
@@ -1175,7 +1325,7 @@ class UVVisSpectrum(ToolInstance):
 
         for mol_index in range(1, self.tree.topLevelItemCount()):
             mol = self.tree.topLevelItem(mol_index)
-            for conf_ndx in range(1, mol.childCount(), 2):
+            for conf_ndx in range(2, mol.childCount(), 2):
                 conf = mol.child(conf_ndx)
                 self.tree.itemWidget(conf, 0).deleteLater()
                 self.tree.itemWidget(conf, 1).deleteLater()

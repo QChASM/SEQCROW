@@ -85,7 +85,7 @@ class _OrbitalSettings(Settings):
         "ed_iso_val": 0.001,
         "ed_low_mem": False,
         "fd_color": Value((1.0, 0.0, 0.0, 0.5), TupleOf(FloatArg, 4), iter2str),
-        "fa_color": Value((0.0, 1.0, 0.0, 0.5), TupleOf(FloatArg, 4), iter2str),
+        "fa_color": Value((1.0, 1.0, 0.0, 0.5), TupleOf(FloatArg, 4), iter2str),
         "fd_iso_val": 0.01,
         "fukui_delta": 0.1,
         "fa_low_mem": False,

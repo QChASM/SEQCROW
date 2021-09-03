@@ -1072,17 +1072,34 @@ class IRPlot(ChildToolWindow):
             linear = self.linear.value()
             quadratic = self.quadratic.value()
             anharmonic = freq.anharm_data and self.anharm.checkState() == Qt.Checked
+            intensity_attr = "intensity"
+            if plot_type.lower() == "vcd":
+                intensity_attr = "rotation"
+            if plot_type.lower() == "raman":
+                intensity_attr = "raman_activity"
+            data_attr = "data"
+            if anharmonic:
+                data_attr = "anharm_data"
 
-            data = freq.get_ir_data(
-                plot_type=plot_type,
-                peak_type=peak_type,
+            funcs, x_positions, intensities = freq.get_spectrum_functions(
                 fwhm=fwhm,
+                peak_type=peak_type,
                 voigt_mixing=voigt_mixing,
                 linear_scale=linear,
                 quadratic_scale=quadratic,
-                anharmonic=anharmonic,
+                intensity_attr=intensity_attr,
+                data_attr=data_attr,
             )
-            x_values, y_values = data
+            
+            x_values, y_values, _ = freq.get_plot_data(
+                funcs,
+                x_positions,
+                transmittance="transmittance" in plot_type.lower(),
+                peak_type=peak_type,
+                fwhm=fwhm,
+                normalize=False,
+            )
+
             for x, y in zip(x_values, y_values):
                 s += "%f,%f\n" % (x, y)
 
