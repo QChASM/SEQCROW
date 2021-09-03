@@ -4,6 +4,7 @@ import re
 
 from AaronTools.atoms import Atom as AaronToolsAtom
 from AaronTools.const import METAL
+from AaronTools.fileIO import FileReader
 from AaronTools.geometry import Geometry
 from AaronTools.ring import Ring
 from AaronTools.finders import BondedTo
@@ -970,14 +971,12 @@ class ResidueCollection(Geometry):
             ):
                 struc.register_attr(
                     session,
-                    "aarontools_filereader",
+                    "filereader",
                     "SEQCROW",
-                    attr_type=list,
+                    attr_type=FileReader,
                 )
-            
-            if not hasattr(struc, "filereader") or struc.filereader is None:
-                struc.filereader = []
-            struc.filereader.append(filereader)
+
+            struc.filereader = filereader
             
 
         return struc
