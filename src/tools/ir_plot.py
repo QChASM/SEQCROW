@@ -21,7 +21,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
 from matplotlib import rcParams
 
-from Qt.QtCore import Qt, QRect, QItemSelectionModel, QVariant
+from Qt.QtCore import Qt, QRect, QItemSelectionModel, QVariant, QSize
 from Qt.QtGui import QValidator, QFont, QIcon
 from Qt.QtWidgets import (
     QSpinBox,
@@ -50,6 +50,14 @@ from Qt.QtWidgets import (
 )
 
 from SEQCROW.tools.per_frame_plot import NavigationToolbar
+from SEQCROW.tools.uvvis_plot import (
+    solid_line,
+    dashed_line, 
+    dotted_line,
+    dashdot_line,
+    color_cycle,
+)
+    
 from SEQCROW.utils import iter2str
 from SEQCROW.widgets import FilereaderComboBox
 
@@ -181,6 +189,21 @@ class IRSpectrum(ToolInstance):
         self.weight_method.setCurrentIndex(ndx)
         component_layout.addWidget(QLabel("energy for weighting:"), 1, 0, 1, 1, Qt.AlignRight | Qt.AlignHCenter)
         component_layout.addWidget(self.weight_method, 1, 1, 1, 1, Qt.AlignLeft | Qt.AlignHCenter)
+
+
+        show_conformers = QLabel("show contribution from conformers with a Boltzmann population above:")
+        component_layout.addWidget(show_conformers, 2, 0, 1, 4, Qt.AlignRight | Qt.AlignVCenter)
+        
+        self.boltzmann_pop_limit = QDoubleSpinBox()
+        self.boltzmann_pop_limit.setRange(1.0, 99.0)
+        self.boltzmann_pop_limit.setSingleStep(1.0)
+        self.boltzmann_pop_limit.setDecimals(1)
+        self.boltzmann_pop_limit.setValue(10.0)
+        self.boltzmann_pop_limit.setSuffix("%")
+        component_layout.addWidget(self.boltzmann_pop_limit, 2, 4, 1, 1, Qt.AlignLeft | Qt.AlignVCenter)
+        
+        self.show_boltzmann_pop = QCheckBox()
+        component_layout.addWidget(self.show_boltzmann_pop, 2, 5, 1, 1, Qt.AlignLeft | Qt.AlignVCenter)
 
 
         tabs.addTab(component_widget, "components")
@@ -449,6 +472,43 @@ class IRSpectrum(ToolInstance):
         
         mol_group = QTreeWidgetItem(root_item)
         self.tree.insertTopLevelItem(row, mol_group)
+
+        line_widget = QWidget()
+        line_widget_layout = QHBoxLayout(line_widget)
+        line_widget_layout.setContentsMargins(4, 0, 4, 0)
+        line_widget_layout.insertWidget(0, QLabel("show:"), 0, Qt.AlignLeft | Qt.AlignVCenter)
+        show_line = QCheckBox()
+        line_widget_layout.insertWidget(1, show_line, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        line_color = ColorButton(has_alpha_channel=False, max_size=(16, 16))
+        color_ndx = (row - 1) % len(color_cycle) 
+        line_color.set_color(color_cycle[color_ndx - 1])
+        line_color.setEnabled(False)
+        show_line.stateChanged.connect(
+            lambda state, widget=line_color: widget.setEnabled(state == Qt.Checked)
+        )
+        line_widget_layout.insertWidget(2, line_color, 1, Qt.AlignLeft | Qt.AlignVCenter)
+        
+        line_widget2 = QWidget()
+        line_widget_layout2 = QHBoxLayout(line_widget2)
+        line_widget_layout2.setContentsMargins(4, 0, 4, 0)
+        line_widget_layout2.insertWidget(0, QLabel("style:"), 0, Qt.AlignLeft | Qt.AlignVCenter)
+        line_style = QComboBox()
+        line_style.addItem(solid_line, "", "-")
+        line_style.addItem(dashed_line, "", "--")
+        line_style.addItem(dotted_line, "", ":")
+        line_style.addItem(dashdot_line, "", "-.")
+        line_style.setIconSize(QSize(50, 4))
+        line_widget_layout2.insertWidget(1, line_style, 1, Qt.AlignLeft | Qt.AlignVCenter)
+        line_widget2.setEnabled(False)
+        show_line.stateChanged.connect(
+            lambda state, widget=line_widget2: widget.setEnabled(state == Qt.Checked)
+        )
+        
+        style_group = QTreeWidgetItem(mol_group)
+        self.tree.setItemWidget(style_group, 0, line_widget)
+        self.tree.setItemWidget(style_group, 1, line_widget2)
+        
+
         trash_button = QPushButton()
         trash_button.setFlat(True)
         
@@ -479,6 +539,7 @@ class IRSpectrum(ToolInstance):
         mol_fraction_widget = QWidget()
         mol_fraction_layout = QFormLayout(mol_fraction_widget)
         mol_fraction_layout.addRow("ratio:", mol_fraction)
+        mol_fraction_layout.setContentsMargins(4, 1, 4, 1)
         self.tree.setItemWidget(mol_group, 1, mol_fraction_widget)
         
         mol_group.addChild(add_conf_child)
@@ -487,7 +548,7 @@ class IRSpectrum(ToolInstance):
         self.tree.expandItem(mol_group)
     
     def remove_mol_group(self, parent):
-        for conf_ndx in range(1, parent.childCount()):
+        for conf_ndx in range(2, parent.childCount(), 2):
             conf = parent.child(conf_ndx)
             self.tree.itemWidget(conf, 0).destroy()
             self.tree.itemWidget(conf, 1).destroy()
@@ -515,40 +576,48 @@ class IRSpectrum(ToolInstance):
         self.tree.setItemWidget(conformer_item, 1, nrg_combobox)
         self.tree.setItemWidget(conformer_item, 2, trash_button)
 
-#     def auto_breaks(self):
-#         fr = self.model_selector.currentData()
-#         if fr is None:
-#             return
-#         linear_scale = self.linear.value()
-#         quadratic_scale = self.quadratic.value()
-#         freq = fr.other["frequency"]
-#         frequencies = np.array(
-#             [mode.frequency for mode in freq.data if mode.frequency > 0]
-#         )
-#         fwhm = self.fwhm.value()
-#         frequencies -= linear_scale * frequencies + quadratic_scale * frequencies ** 2
-# 
-#         tolerance = max(2 * fwhm, 25)
-# 
-#         groups = []
-#         for freq in frequencies:
-#             added = False
-#             for group in groups:
-#                 for other_freq in group:
-#                     if abs(freq - other_freq) < (8 * tolerance):
-#                         group.append(freq)
-#                         added = True
-#                         break
-#                 if added:
-#                     break
-#             else:
-#                 groups.append([freq])
-#         
-#         for group in groups:
-#             width = 4 * tolerance + max(group) - min(group)
-#             center = min(group) + width / 2 - 2 * tolerance
-#             self.add_section(center=center, width=width)
-# 
+        style_group = QTreeWidgetItem(conf_group_widget)
+        conf_group_widget.insertChild(row + 1, style_group)
+
+        line_widget = QWidget()
+        line_widget_layout = QHBoxLayout(line_widget)
+        line_widget_layout.setContentsMargins(4, 0, 4, 2)
+        line_widget_layout.insertWidget(0, QLabel("show:"), 1, Qt.AlignRight | Qt.AlignVCenter)
+        show_line = QCheckBox()
+        line_widget_layout.insertWidget(1, show_line, 0, Qt.AlignRight | Qt.AlignVCenter)
+        line_color = ColorButton(has_alpha_channel=False, max_size=(16, 16))
+        color_ndx = ((row - 1)// 2) % len(color_cycle) 
+        line_color.set_color(color_cycle[color_ndx])
+        line_color.setEnabled(False)
+        show_line.stateChanged.connect(
+            lambda state, widget=line_color: widget.setEnabled(state == Qt.Checked)
+        )
+        line_widget_layout.insertWidget(2, line_color, 0, Qt.AlignRight | Qt.AlignVCenter)
+        
+        line_widget2 = QWidget()
+        line_widget_layout2 = QHBoxLayout(line_widget2)
+        line_widget_layout2.setContentsMargins(4, 0, 4, 2)
+        line_widget_layout2.insertWidget(0, QLabel("style:"), 0, Qt.AlignLeft | Qt.AlignVCenter)
+        line_style = QComboBox()
+        line_style.addItem(dashed_line, "", "--")
+        line_style.addItem(dotted_line, "", ":")
+        line_style.addItem(dashdot_line, "", "-.")
+        line_style.addItem(solid_line, "", "-")
+        # this doesn't work for some reason
+        # line_style.addItem(dashdotdot_line, "", (0, (3, 5, 1, 5, 1, 5)))
+        line_style.setIconSize(QSize(50, 4))
+        line_widget_layout2.insertWidget(1, line_style, 1, Qt.AlignLeft | Qt.AlignVCenter)
+        line_widget2.setEnabled(False)
+        show_line.stateChanged.connect(
+            lambda state, widget=line_widget2: widget.setEnabled(state == Qt.Checked)
+        )
+        trash_button.clicked.connect(
+            lambda *args, child=conformer_item: conf_group_widget.removeChild(style_group)
+        )
+
+        self.tree.setItemWidget(style_group, 0, line_widget)
+        self.tree.setItemWidget(style_group, 1, line_widget2)
+
     def fill_lib_options(self):
         cur_lib = self.library.currentIndex()
         cur_method = self.method.currentText()
@@ -676,9 +745,17 @@ class IRSpectrum(ToolInstance):
     def save(self):
         filename, _ = QFileDialog.getSaveFileName(filter="CSV Files (*.csv)")
         if filename:
-            s = "frequency (cm^-1),IR intensity\n"
+            s = "frequency (cm^-1),IR intensity"
 
             mixed_freq = self.get_mixed_spectrum()
+            if not mixed_freq:
+                return
+            
+            mixed_freq, shown_confs = mixed_freq
+        
+            for conf in shown_confs:
+                s += ",%s" % conf[-1]
+            s += "\n"
         
             fwhm = self.fwhm.value()
             peak_type = self.peak_type.currentText()
@@ -701,17 +778,25 @@ class IRSpectrum(ToolInstance):
                 intensity_attr=intensity_attr,
             )
             
-            x_values, y_values = mixed_freq.get_plot_data(
+            show_functions = None
+            if shown_confs:
+                show_functions = [info[0] for info in shown_confs]
+            
+            x_values, y_values, other_y_list = mixed_freq.get_plot_data(
                 funcs,
                 x_positions,
-                transmittance=plot_type == "transmittance",
+                transmittance="transmittance" in plot_type.lower(),
                 peak_type=peak_type,
                 fwhm=fwhm,
+                show_functions=show_functions,
                 normalize=False,
             )
                 
-            for x, y in zip(x_values, y_values):
-                s += "%f,%f\n" % (x, y)
+            for i, (x, y) in enumerate(zip(x_values, y_values)):
+                s += "%f,%f" % (x, y)
+                for y_vals in other_y_list:
+                    s += ",%f" % y_vals[i]
+                s += "\n"
 
             with open(filename, 'w') as f:
                 f.write(s.strip())
@@ -831,7 +916,7 @@ class IRSpectrum(ToolInstance):
 
         self.press = event.x, event.y, event.xdata, event.ydata
         
-        if event.dblclick:
+        if event.dblclick and event.xdata:
             anharmonic = self.anharmonic.checkState() == Qt.Checked
             data_attr = "data"
             if anharmonic:
@@ -839,7 +924,7 @@ class IRSpectrum(ToolInstance):
             closest = None
             for mol_ndx in range(1, self.tree.topLevelItemCount()):
                 mol = self.tree.topLevelItem(mol_ndx)
-                for conf_ndx in range(1, mol.childCount()):
+                for conf_ndx in range(2, mol.childCount(), 2):
                     conf = mol.child(conf_ndx)
                     fr = self.tree.itemWidget(conf, 0).currentData()
                     if fr is None:
@@ -877,11 +962,45 @@ class IRSpectrum(ToolInstance):
         self.drag_prev = None
         self.dragging = False
 
-    def get_mixed_spectrum(self):
+    def show_conformers(self):
+        fracs = self.get_mixed_spectrum(weights_only=True)
+        if not fracs:
+            return
+        fracs, weights = fracs
+        min_pop = self.boltzmann_pop_limit.value() / 100.0
+        
+        i = 0
+        for mol_ndx in range(1, self.tree.topLevelItemCount()):
+            mol = self.tree.topLevelItem(mol_ndx)
+            w = weights[i]
+            j = 0
+            for conf_ndx in range(2, mol.childCount(), 2):
+                conf = mol.child(conf_ndx)
+                uv_vis_file = self.tree.itemWidget(conf, 0).currentData()
+                if uv_vis_file is None:
+                    continue
+                conf_style = mol.child(conf_ndx + 1)
+                show_button = self.tree.itemWidget(conf_style, 0).layout().itemAt(1).widget()
+                if w[j] > min_pop:
+                    show_button.setCheckState(Qt.Checked)
+                    self.session.logger.info(
+                        "Boltzmann population of %s: %.1f%%" % (
+                            uv_vis_file.name,
+                            100 * w[j],
+                        )
+                    )
+                else:
+                    show_button.setCheckState(Qt.Unchecked)
+                j += 1
+            if j > 0:
+                i += 1
+
+    def get_mixed_spectrum(self, weights_only=False):
         weight_method = self.weight_method.currentData(Qt.UserRole)
         freqs = []
         single_points = []
         mol_fracs = []
+        show_components = []
         anharmonic = self.anharmonic.checkState() == Qt.Checked
         data_attr = "data"
         if anharmonic:
@@ -893,7 +1012,7 @@ class IRSpectrum(ToolInstance):
             mol_fracs_widget = self.tree.itemWidget(mol, 1).layout().itemAt(1).widget()
             mol_fracs.append(mol_fracs_widget.value())
             
-            for conf_ndx in range(1, mol.childCount()):
+            for conf_ndx in range(2, mol.childCount(), 2):
                 conf = mol.child(conf_ndx)
                 fr = self.tree.itemWidget(conf, 0).currentData()
                 if fr is None:
@@ -915,16 +1034,45 @@ class IRSpectrum(ToolInstance):
                 )
                 if rmsd > 1e-2:
                     s = "the structure of %s (frequencies) might not match" % freqs[-1][-1].geometry.name
-                    s += "the structure of %s (energy)" % single_points[-1][-1].geometry.name
+                    s += " the structure of %s (energy)" % single_points[-1][-1].geometry.name
                     self.session.logger.warning(s)
                 
+                conf_style = mol.child(conf_ndx + 1)
+                show_comp = self.tree.itemWidget(conf_style, 0).layout().itemAt(1).widget()
+                if show_comp.checkState() == Qt.Checked:
+                    stop_ndx = sum(sum(len(freq.frequency.data) for freq in conf) for conf in freqs)
+                    start_ndx = stop_ndx - len(freqs[-1][-1].frequency.data)
+                    color = self.tree.itemWidget(conf_style, 0).layout().itemAt(2).widget().get_color()
+                    line_style = self.tree.itemWidget(conf_style, 1).layout().itemAt(1).widget().currentData(Qt.UserRole)
+                    show_components.append([
+                        (start_ndx, stop_ndx),
+                        [c / 255. for c in color],
+                        line_style,
+                        fr.name,
+                    ])
+
             if not freqs[-1]:
                 freqs.pop(-1)
                 single_points.pop(-1)
-                
+            else:
+                mol_style = mol.child(0)
+                show_mol = self.tree.itemWidget(mol_style, 0).layout().itemAt(1).widget()
+                if show_mol.checkState() == Qt.Checked:
+                    stop_ndx = sum(sum(len(freq.frequency.data) for freq in conf) for conf in freq)
+                    start_ndx = stop_ndx - sum(len(f.frequency.data) for f in freq[-1])
+                    color = self.tree.itemWidget(mol_style, 0).layout().itemAt(2).widget().get_color()
+                    line_style = self.tree.itemWidget(mol_style, 1).layout().itemAt(1).widget().currentData(Qt.UserRole)
+                    show_components.append([
+                        (start_ndx, stop_ndx),
+                        [c / 255. for c in color],
+                        line_style,
+                        "molecule %i" % mol_ndx,
+                    ])
+
         if not freqs or all(not conf_group for conf_group in freqs):
             return
         
+        weights_list = []
         mixed_freqs = []
         for i, (conf_freq, conf_nrg) in enumerate(zip(freqs, single_points)):
             for j, freq1 in enumerate(conf_freq):
@@ -942,7 +1090,8 @@ class IRSpectrum(ToolInstance):
                 v0=self.w0.value(),
                 weighting=weight_method,
             )
-            
+            weights_list.append(weights)
+
             conf_mixed = Frequency.get_mixed_signals(
                 [co.frequency for co in conf_freq],
                 weights=weights,
@@ -955,10 +1104,19 @@ class IRSpectrum(ToolInstance):
             weights=np.array(mol_fracs),
         )
         
-        return final_mixed
+        if weights_only:
+            return mol_fracs, weights_list
+        return final_mixed, show_components
 
     def refresh_plot(self):
+        if self.show_boltzmann_pop.checkState() == Qt.Checked:
+            self.show_conformers()
+    
         mixed_spectra = self.get_mixed_spectrum()
+        if not mixed_spectra:
+            return
+
+        mixed_spectra, show_components = mixed_spectra
 
         self.figure.clear()
         
@@ -1030,6 +1188,7 @@ class IRSpectrum(ToolInstance):
             voigt_mixing=voigt_mixing,
             linear_scale=linear,
             quadratic_scale=quadratic,
+            show_functions=show_components,
         )
 
         self.canvas.draw()
@@ -1045,6 +1204,8 @@ class IRSpectrum(ToolInstance):
         freqs = self.get_mixed_spectrum()
         if not freqs:
             return
+
+        freqs, _ = freqs
 
         anharmonic = self.anharmonic.checkState() == Qt.Checked
         data_attr = "data"
@@ -1192,7 +1353,7 @@ class IRSpectrum(ToolInstance):
 
         for mol_index in range(1, self.tree.topLevelItemCount()):
             mol = self.tree.topLevelItem(mol_index)
-            for conf_ndx in range(1, mol.childCount()):
+            for conf_ndx in range(2, mol.childCount(), 2):
                 conf = mol.child(conf_ndx)
                 self.tree.itemWidget(conf, 0).deleteLater()
                 self.tree.itemWidget(conf, 1).deleteLater()
@@ -1208,7 +1369,7 @@ class IRSpectrum(ToolInstance):
 
         for mol_index in range(1, self.tree.topLevelItemCount()):
             mol = self.tree.topLevelItem(mol_index)
-            for conf_ndx in range(1, mol.childCount()):
+            for conf_ndx in range(2, mol.childCount(), 2):
                 conf = mol.child(conf_ndx)
                 self.tree.itemWidget(conf, 0).deleteLater()
                 self.tree.itemWidget(conf, 1).deleteLater()
@@ -1224,7 +1385,7 @@ class IRSpectrum(ToolInstance):
 
         for mol_index in range(1, self.tree.topLevelItemCount()):
             mol = self.tree.topLevelItem(mol_index)
-            for conf_ndx in range(1, mol.childCount()):
+            for conf_ndx in range(2, mol.childCount(), 2):
                 conf = mol.child(conf_ndx)
                 self.tree.itemWidget(conf, 0).deleteLater()
                 self.tree.itemWidget(conf, 1).deleteLater()

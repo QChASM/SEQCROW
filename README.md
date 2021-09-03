@@ -15,6 +15,7 @@ More information about SEQCROW features can be found on the [GitHub wiki](https:
 3. If you have a personal AaronTools library already, you can specify the path to it in the SEQCROW settings. Open ChimeraX and go Favorites &rarr; Settings... &rarr; SEQCROW. You will have to restart ChimeraX if you change this setting. 
 
 
+
 ## Citation
 If you use SEQCROW, please cite the following:
 
