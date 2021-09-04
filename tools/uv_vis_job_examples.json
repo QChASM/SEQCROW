@@ -112,18 +112,24 @@
                 },
                 "basis": {
                     "name": [
+                        "aug-cc-pVTZ",
                         "aug-cc-pVTZ"
                     ],
                     "elements": [
                         [
                             "all"
+                        ],
+                        [
+                            "all"
                         ]
                     ],
                     "file": [
+                        false,
                         false
                     ],
                     "auxiliary": [
-                        null
+                        null,
+                        "C"
                     ]
                 }
             }
