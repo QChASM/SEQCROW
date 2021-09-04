@@ -1,0 +1,225 @@
+{
+    "Gaussian": {
+        "TD-DFT": {
+            "use_job_type": true,
+            "use_job_resources": true,
+            "use_solvent": true,
+            "use_method": true,
+            "use_basis": true,
+            "use_other": true,
+            "theory": {
+                "_type": "Theory",
+                "method": "B3LYP",
+                "semi-empirical": false,
+                "other": {
+                    "link0": {},
+                    "route": {
+                        "TD": [
+                            "NStates=10"
+                        ]
+                    }
+                },
+                "basis": {
+                    "name": [
+                        "aug-cc-pVTZ"
+                    ],
+                    "elements": [
+                        [
+                            "all"
+                        ]
+                    ],
+                    "file": [
+                        false
+                    ],
+                    "auxiliary": [
+                        null
+                    ]
+                }
+            }
+        }
+    },
+    "ORCA": {
+        "STEOM-DLPNO solvent": {
+            "use_job_type": false,
+            "use_job_resources": false,
+            "use_solvent": true,
+            "use_method": true,
+            "use_basis": true,
+            "use_other": true,
+            "theory": {
+                "_type": "Theory",
+                "method": "STEOM-DLPNO-CCSD",
+                "semi-empirical": false,
+                "solvent model": "CPCM",
+                "solvent": "CCl4",
+                "other": {
+                    "simple": [
+                        "TightSCF"
+                    ],
+                    "blocks": {
+                        "mdci": [
+                            "NRoots 15",
+                            "DOSOLV true"
+                        ]
+                    }
+                },
+                "basis": {
+                    "name": [
+                        "aug-cc-pVTZ",
+                        "aug-cc-pVTZ"
+                    ],
+                    "elements": [
+                        [
+                            "all"
+                        ],
+                        [
+                            "all"
+                        ]
+                    ],
+                    "file": [
+                        false,
+                        false
+                    ],
+                    "auxiliary": [
+                        null,
+                        "C"
+                    ]
+                }
+            }
+        },
+        "ADC(2)": {
+            "use_job_type": true,
+            "use_job_resources": false,
+            "use_solvent": true,
+            "use_method": true,
+            "use_basis": true,
+            "use_other": true,
+            "theory": {
+                "_type": "Theory",
+                "method": "ADC2",
+                "semi-empirical": false,
+                "nproc": 6,
+                "mem": 8,
+                "other": {
+                    "simple": [
+                        "TightSCF"
+                    ],
+                    "blocks": {
+                        "mdci": [
+                            "NRoots 5"
+                        ]
+                    }
+                },
+                "basis": {
+                    "name": [
+                        "aug-cc-pVTZ",
+                        "aug-cc-pVTZ"
+                    ],
+                    "elements": [
+                        [
+                            "all"
+                        ],
+                        [
+                            "all"
+                        ]
+                    ],
+                    "file": [
+                        false,
+                        false
+                    ],
+                    "auxiliary": [
+                        null,
+                        "C"
+                    ]
+                }
+            }
+        }
+    },
+    "Psi4": {
+        "TD-DFT": {
+            "use_job_type": true,
+            "use_job_resources": false,
+            "use_solvent": true,
+            "use_method": true,
+            "use_basis": true,
+            "use_other": true,
+            "theory": {
+                "_type": "Theory",
+                "method": "B3LYP",
+                "semi-empirical": false,
+                "other": {
+                    "job": {
+                        "energy": [
+                            "return_wfn=True"
+                        ]
+                    },
+                    "after_job": [
+                        "res = tdscf_excitations(wfn, states=10)"
+                    ],
+                    "before_molecule": [
+                        "from psi4.driver.procrouting.response.scf_response import tdscf_excitations"
+                    ]
+                },
+                "basis": {
+                    "name": [
+                        "aug-cc-pVTZ"
+                    ],
+                    "elements": [
+                        [
+                            "all"
+                        ]
+                    ],
+                    "file": [
+                        false
+                    ],
+                    "auxiliary": [
+                        null
+                    ]
+                }
+            }
+        },
+        "EOM-CC": {
+            "use_job_type": true,
+            "use_job_resources": true,
+            "use_solvent": true,
+            "use_method": true,
+            "use_basis": true,
+            "use_other": true,
+            "theory": {
+                "_type": "Theory",
+                "method": "eom-ccsd",
+                "semi-empirical": false,
+                "nproc": 6,
+                "mem": 8,
+                "other": {
+                    "settings": {
+                        "roots_per_irrep": [
+                            "[5]"
+                        ]
+                    },
+                    "job": {
+                        "properties": [
+                            "properties=[\"oscillator_strength\", \"rotational_strength\"]"
+                        ]
+                    }
+                },
+                "basis": {
+                    "name": [
+                        "aug-cc-pVTZ"
+                    ],
+                    "elements": [
+                        [
+                            "all"
+                        ]
+                    ],
+                    "file": [
+                        false
+                    ],
+                    "auxiliary": [
+                        null
+                    ]
+                }
+            }
+        }
+    }
+}
