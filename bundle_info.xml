@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="1.2.2">
+            version="1.3a2">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -317,7 +317,7 @@
                 <ChimeraXClassifier>ChimeraX :: Tool :: Ligand Sterimol                :: Structure Analysis :: Calculate Sterimol parameters for ligands on organo- or organometallic catalysts</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: IR Spectrum                    :: AaronTools         :: plot simulated IR spectra</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: UV/Vis Spectrum                :: AaronTools         :: plot simulated UV/vis spectra</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Molecule Builder               :: AaronTools         :: build molecule</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: 2D Builder                     :: Structure Editing  :: molecule using ChemDoodle Web Components</ChimeraXClassifier>
                 <!--<ChimeraXClassifier>ChimeraX :: Tool :: AaronJr Input Builder          :: AaronJr            :: Create input files for AaronJr</ChimeraXClassifier>-->
                 <!--ChimeraXClassifier>ChimeraX :: Tool :: AARON Input Builder :: AARON :: Build AARON input file</ChimeraXClassifier-->
                 
@@ -404,5 +404,6 @@
     <DataFiles>
         <DataDir>docs</DataDir>
         <DataDir>icons</DataDir>
+        <DataDir>ChemDoodleWebComponents</DataDir>
     </DataFiles>
 </BundleInfo>

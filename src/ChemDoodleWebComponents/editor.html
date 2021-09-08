@@ -1,0 +1,54 @@
+<html>
+<head>
+<meta http-equiv="X-UA-Compatible" content="chrome=1">
+<link rel="stylesheet" href="install/ChemDoodleWeb.css" type="text/css">
+<link rel="stylesheet" href="install/uis/jquery-ui-1.11.4.css" type="text/css">
+
+<script type="text/javascript" src="install/ChemDoodleWeb.js"></script>
+<script type="text/javascript" src="install/uis/ChemDoodleWeb-uis.js"></script>
+<title>ChemDoodle Web Component Sketcher (Single Molecule Sketcher)</title>
+</head>
+<body>
+    <center>
+        <br>
+        <script>
+            ChemDoodle.ELEMENT['H'].jmolColor = 'black';
+            ChemDoodle.ELEMENT['S'].jmolColor = '#B9A130';
+            var sketcher = new ChemDoodle.SketcherCanvas(
+                'sketcher', 300, 300, {useServices:false, oneMolecule:true, resizable:true}
+            );
+            sketcher.styles.atoms_displayTerminalCarbonLabels_2D = false;
+            sketcher.styles.atoms_useJMOLColors = false;
+            sketcher.styles.bonds_clearOverlaps_2D = true;
+            sketcher.repaint();
+        </script>
+        <br>
+        <form id="form" method="get">
+        <input type="text" name="molfile" value="" id="form_value" hidden="true"/>
+        <input id="test" class="submit" type="submit" formaction="editor:mol" value="open molecule"/>
+        <br>
+        <label for="opt" style="font-family: sans-serif">Optimize:</label>
+        <select id="opt" name="method">
+            <option value="no">no</option>
+            <option value="am1">AM1</option>
+            <option value="PM6">PM6</option>
+            <option value="RM1">RM1</option>
+        </select>
+        </form>
+        <!--<p id="molout"></p>-->
+        <script>
+            var button = document.getElementById("test");
+            var form = document.getElementById("form");
+            var form_val = document.getElementById("form_value");
+            button.onclick = function(){
+                var mol = sketcher.getMolecule();
+                var out = ChemDoodle.writeMOL(mol).replace(/\n/g, "\\n").replace(/\s/g, "sPaCe");
+                form_val.value = out;
+                // document.getElementById("molout").innerHTML = "<div>" + "editor:" + out + "</div>";
+                form.submit();
+            };
+
+        </script>
+    </center>
+</body>
+</html>

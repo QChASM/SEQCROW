@@ -1,0 +1,8 @@
+August 2021
+some portions of install/ChemDoodleWeb.js and install/uis/ChemDoodleWeb-uis.js
+have been commented out or deleted
+those files have also been modified for readability
+see those files for details about the changes
+the data, samples, and tests folders have also been deleted to reduce file size
+
+

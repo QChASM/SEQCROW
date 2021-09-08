@@ -305,7 +305,7 @@ class _SEQCROW_API(BundleAPI):
             from .tools import UVVisSpectrum
             return UVVisSpectrum(session, ti.name)
 
-        elif ti.name == "Molecule Builder":
+        elif ti.name == "2D Builder":
             from .tools import MolBuilder
             return MolBuilder(session, ti.name)
 

@@ -58,7 +58,8 @@ class ElementButton(QPushButton):
     
     def changeElement(self, element):
         self.ele_color = tuple(list(element_color(ELEMENTS.index(element)))[:-1])
-        self._changeState()
+        self.setText(element)
+        self._changeState(state=self.state)
     
     def setState(self, state):
         self._changeState(state=state)

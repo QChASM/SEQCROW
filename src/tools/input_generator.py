@@ -115,6 +115,7 @@ class BuildQM(ToolInstance):
 
         self.display_name = "QM Input Generator"
 
+        self.theory = None
         self.tool_window = MainToolWindow(self)
         self.preview_window = None
         self.warning_window = None
@@ -614,7 +615,7 @@ class BuildQM(ToolInstance):
         self.job_widget.blockSignals(True)
         self.other_keywords_widget.blockSignals(True)
 
-        theory = preset["theory"]
+        theory = preset["theory"].copy()
 
         if "use_job_type" in preset and preset["use_job_type"]:
             self.job_widget.do_geom_opt.setChecked(False)
@@ -655,7 +656,9 @@ class BuildQM(ToolInstance):
 
         if "use_basis" in preset and preset["use_basis"]:
             if self.model_selector.currentData():
-                rescol = ResidueCollection(self.model_selector.currentData(), bonds_matter=False)
+                rescol = ResidueCollection(
+                    self.model_selector.currentData(), bonds_matter=False
+                )
                 if theory.basis:
                     theory.basis.refresh_elements(rescol)
             self.basis_widget.setBasis(theory.basis)
@@ -1795,7 +1798,7 @@ class JobTypeOption(QWidget):
     def setSolvent(self, solvent):
         """sets solvent to match the given ImplicitSolvent"""
         if isinstance(solvent, ImplicitSolvent):
-            ndx = self.solvent_option.findText(solvent.name)
+            ndx = self.solvent_option.findText(solvent.solvent_model)
             if ndx >= 0:
                 self.solvent_option.setCurrentIndex(ndx)
     
@@ -5261,6 +5264,17 @@ class SavePreset(ChildToolWindow):
         
         self.tool_instance.update_theory(update_settings=True)
         preset["theory"] = self.tool_instance.theory
+        
+        basis_elements, ecp_elements = self.basis_elements.getElements()
+        if preset["theory"].basis.basis:
+            for basis, eles in zip(preset["theory"].basis.basis, basis_elements):
+                basis.ele_selection = eles
+        
+        if preset["theory"].basis.ecp:
+            for basis, eles in zip(preset["theory"].basis.ecp, basis_elements):
+                basis.ele_selection = eles
+        
+        preset["theory"] = preset["theory"].copy()
 
         self.tool_instance.presets[program][name] = preset
 
