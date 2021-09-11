@@ -19,7 +19,14 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
     elif format_name == "sqm output file":
         fmt = "sqmout"
 
-    fr = FileReader((file_name, fmt, stream), just_geom=False, get_all=True)
+    max_length = session.seqcrow_settings.settings.MAX_FCHK_ARRAY
+
+    fr = FileReader(
+        (file_name, fmt, stream),
+        just_geom=False,
+        get_all=True,
+        max_length=max_length,
+    )
 
     if hasattr(stream, "close") and callable(stream.close):
         stream.close()

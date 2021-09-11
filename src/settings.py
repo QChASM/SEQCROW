@@ -1,7 +1,7 @@
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
 from chimerax.core.commands.cli import StringArg, EnumOf
-from chimerax.ui.options import InputFolderOption, EnumOption, StringsOption
+from chimerax.ui.options import InputFolderOption, EnumOption, StringsOption, IntOption
 
 from os import getenv, path
 
@@ -48,6 +48,7 @@ class _SEQCROWSettings(Settings):
             EnumOf(FreqOptions.values),
         ),
         'NON_SEQCROW_IO_PRESET': [],
+        'MAX_FCHK_ARRAY': 10000000,
     }
 
 
@@ -107,6 +108,14 @@ def register_settings_options(session):
             "whether or not to open the Normal Modes tool when a file with orbital info is opened",
         ),
         
+        "MAX_FCHK_ARRAY": (
+            "max. FCHK array size:",
+            IntOption,
+            """maximum array size to read from FCHK files
+can speed up reading large files, but may need to be
+increased if not all data is read""",
+        ),
+        
         "NON_SEQCROW_IO_PRESET" : (
             """commands executed when a model is added:
 use <model> in place of model ID
@@ -163,15 +172,21 @@ from that file type
                 opt.settings.AARONLIB = val
                 os.environ[setting] = val
                 warn("Environment variable has been set for ChimeraX. Please restart ChimeraX for changes to take effect.")
-            
+        
+        kwargs = {
+            "attr_name": setting,
+            "settings": settings,
+            "balloon": balloon,
+            "auto_set_attr": False,
+        }
+        if opt_class is IntOption:
+            kwargs["min"] = 0
+        
         opt = opt_class(
             opt_name,
             getattr(settings, setting),
             _opt_cb,
-            attr_name=setting,
-            settings=settings,
-            balloon=balloon,
-            auto_set_attr=False,
+            **kwargs,
         )
         
         session.ui.main_window.add_settings_option("SEQCROW", opt)

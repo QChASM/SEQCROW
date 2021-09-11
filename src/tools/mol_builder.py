@@ -6,9 +6,12 @@ import ssl
 from AaronTools.config import Config
 from AaronTools.fileIO import FileReader
 from AaronTools.geometry import CACTUS_HOST
+from AaronTools.theory import Theory, OptimizationJob
 
+from chimerax.core.commands import run
 from chimerax.ui import HtmlToolInstance
 
+from SEQCROW.jobs import SQMJob
 from SEQCROW.managers.filereader_manager import apply_seqcrow_preset
 from SEQCROW.residue_collection import ResidueCollection
 
@@ -539,13 +542,13 @@ class ToolButtonGroup:
 class MolBuilder(HtmlToolInstance):
 
     help = "TODO"
-    CUSTOM_SCHEME = "editor"
+    CUSTOM_SCHEME = ["editor", "cxcmd"]
     SESSION_ENDURING = False
     SESSION_SAVE = False
     PLACEMENT = None
     
     def __init__(self, session, name):       
-        super().__init__(session, name, size_hint=(450, 450))
+        super().__init__(session, name, size_hint=(475, 450))
 
         self.display_name = "Tutorial — HTML-based"
 
@@ -556,9 +559,17 @@ class MolBuilder(HtmlToolInstance):
         self.html_view.setUrl(pathlib.Path(html_file).as_uri())
 
     def handle_scheme(self, url):
-        
+
         query = urllib.parse.parse_qs(url.query())
-        
+
+        if "link" in query:
+            link = query["link"][0]
+            if link == "AmberTools":
+                run(self.session, "open \"https://ambermd.org/AmberTools.php\"")
+            elif link == "NCI/CADD":
+                run(self.session, "open \"https://cactus.nci.nih.gov/\"")
+            return
+
         molfile = query["molfile"][0].replace("sPaCe", " ").replace("\\n", "\n")
         url = "https://cactus.nci.nih.gov/cgi-bin/translate.tcl?smiles=&format=sdf&astyle=kekule&dim=3D&file=%s" % urllib.parse.quote_plus(molfile)
         s_sd_get = urlopen(url, context=ssl.SSLContext())
@@ -590,13 +601,34 @@ class MolBuilder(HtmlToolInstance):
             .read()
             .decode("utf8")
         )
-        fr = FileReader(("new", "sd", s_sd))
+        name = query["name"][0]
+        fr = FileReader((name, "sd", s_sd))
         rescol = ResidueCollection(fr)
-        struc = rescol.get_chimera(self.session, filereader=fr)
-        self.session.models.add([struc])
-        apply_seqcrow_preset(
-            struc, fallback="Ball-Stick-Endcap",
+        if query["method"][0] == "no":
+            struc = rescol.get_chimera(self.session, filereader=fr)
+            self.session.models.add([struc])
+            apply_seqcrow_preset(
+                struc, fallback="Ball-Stick-Endcap",
+            )
+            return
+        
+        theory = Theory(
+            method=query["method"][0],
+            charge=fr.other["charge"],
+            job_type=OptimizationJob(),
         )
+        
+        job = SQMJob(
+            name, self.session, theory, rescol, auto_open=True,
+        )
+        self.session.logger.info(
+            "structure will appear when optimization completes"
+        )
+        self.session.logger.status(
+            "structure will appear when optimization completes"
+        )
+        self.session.seqcrow_job_manager.add_job(job)
+        
     # def _build_ui(self):
     #     layout = QGridLayout()
     # 

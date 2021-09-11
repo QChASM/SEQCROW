@@ -290,7 +290,10 @@ class SQMJob(LocalJob):
         self.write_file(infile_path)
 
         exec_dir = os.path.dirname(sys.executable)
-        sqm_exe = os.path.join(exec_dir, "amber20", "bin", "sqm")
+        for f in os.listdir(exec_dir):
+            if f.startswith("amber"):
+                sqm_exe = os.path.join(exec_dir, f, "bin", "sqm")
+                break
         if not os.path.exists(sqm_exe):
             # add .exe for windows only?
             sqm_exe += ".exe"
