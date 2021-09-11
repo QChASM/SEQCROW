@@ -274,7 +274,7 @@ class SQMJob(LocalJob):
         return "local sqm job \"%s\"" % self.name
 
     def run(self):
-        import sys
+        from chimerax.amber_info import amber_bin
         self.start_time = asctime(localtime())
 
         self.scratch_dir = os.path.join(
@@ -289,11 +289,7 @@ class SQMJob(LocalJob):
         infile_path = os.path.join(self.scratch_dir, infile)
         self.write_file(infile_path)
 
-        exec_dir = os.path.dirname(sys.executable)
-        for f in os.listdir(exec_dir):
-            if f.startswith("amber"):
-                sqm_exe = os.path.join(exec_dir, f, "bin", "sqm")
-                break
+        sqm_exe = os.path.join(amber_bin, "sqm")
         if not os.path.exists(sqm_exe):
             # add .exe for windows only?
             sqm_exe += ".exe"
