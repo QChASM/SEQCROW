@@ -114,6 +114,9 @@
                 };
                 // submit the form - kicks it back to python with all the info
                 form.submit();
+                if (!method.value.match("no")) {
+                    alert("structure will open when optimization finishes");
+                };
             };
             button.onclick = submitForm;
         </script>

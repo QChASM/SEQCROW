@@ -611,7 +611,6 @@ class MolBuilder(HtmlToolInstance):
                 struc, fallback="Ball-Stick-Endcap",
             )
             return
-        
         theory = Theory(
             method=query["method"][0],
             charge=fr.other["charge"],

@@ -34,6 +34,9 @@ from Qt.QtWidgets import (
     QLabel,
 )
 
+from AaronTools.fileIO import Orbitals
+
+from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.widgets import FilereaderComboBox
 from SEQCROW.utils import iter2str
 
@@ -247,7 +250,7 @@ class OrbitalViewer(ToolInstance):
         self.ed_iso_value.setValue(self.settings.ed_iso_val)
         e_density_layout.addRow("isosurface:", self.ed_iso_value)
 
-        show_e_density = QPushButton("calculate electron density")
+        show_e_density = QPushButton("calculate SCF electron density")
         show_e_density.clicked.connect(self.show_e_density)
         e_density_layout.addRow(show_e_density)
         
@@ -483,79 +486,11 @@ class OrbitalViewer(ToolInstance):
         spacing = self.spacing.value()
         padding = self.padding.value()
 
-        geom_coords = np.array([atom.coords for atom in fr.atoms])
-        def get_standard_axis():
-            """returns info to set up a grid along the x, y, and z axes"""
-
-            # get range of geom's coordinates
-            x_min = np.min(geom_coords[:,0])
-            x_max = np.max(geom_coords[:,0])
-            y_min = np.min(geom_coords[:,1])
-            y_max = np.max(geom_coords[:,1])
-            z_min = np.min(geom_coords[:,2])
-            z_max = np.max(geom_coords[:,2])
-
-            # add padding, figure out vectors
-            r1 = 2 * padding + x_max - x_min
-            n_pts1 = int(r1 // spacing) + 1
-            d1 = r1 / (n_pts1 - 1)
-            v1 = np.array((d1, 0., 0.))
-            r2 = 2 * padding + y_max - y_min
-            n_pts2 = int(r2 // spacing) + 1
-            d2 = r2 / (n_pts2 - 1)
-            v2 = np.array((0., d2, 0.))
-            r3 = 2 * padding + z_max - z_min
-            n_pts3 = int(r3 // spacing) + 1
-            d3 = r3 / (n_pts3 - 1)
-            v3 = np.array((0., 0., d3))
-            com = np.array([x_min, y_min, z_min]) - padding
-            return n_pts1, n_pts2, n_pts3, v1, v2, v3, com
-
-        test_coords = geom_coords - np.mean(geom_coords, axis=0)
-        covar = np.dot(test_coords.T, test_coords)
-        try:
-            # use SVD on the coordinate covariance matrix
-            # this decreases the volume of the box we're making
-            # that means less work for higher resolution
-            # for many structures, this only decreases the volume
-            # by like 5%
-            u, s, vh = np.linalg.svd(covar)
-            v1 = u[:,0]
-            v2 = u[:,1]
-            v3 = u[:,2]
-            # change basis of coordinates to the singular vectors
-            # this is how we determine the range + padding
-            new_coords = np.dot(test_coords, u)
-            xr_max = np.max(new_coords[:,0])
-            xr_min = np.min(new_coords[:,0])
-            yr_max = np.max(new_coords[:,1])
-            yr_min = np.min(new_coords[:,1])
-            zr_max = np.max(new_coords[:,2])
-            zr_min = np.min(new_coords[:,2])
-            com = np.array([xr_min, yr_min, zr_min]) - padding
-            # move the COM back to the xyz space of the original molecule
-            com = np.dot(u, com)
-            com += np.mean(geom_coords, axis=0)
-            r1 = 2 * padding + np.linalg.norm(xr_max - xr_min)
-            r2 = 2 * padding + np.linalg.norm(yr_max - yr_min)
-            r3 = 2 * padding + np.linalg.norm(zr_max - zr_min)
-            n_pts1 = int(r1 // spacing) + 1
-            n_pts2 = int(r2 // spacing) + 1
-            n_pts3 = int(r3 // spacing) + 1
-            v1 = v1 * r1 / (n_pts1 - 1)
-            v2 = v2 * r2 / (n_pts2 - 1)
-            v3 = v3 * r3 / (n_pts3 - 1)
-        except np.linalg.LinAlgError:
-            n_pts1, n_pts2, n_pts3, v1, v2, v3, com = get_standard_axis()
-            u = np.eye(3)
-
-        ndx = np.vstack(
-            np.mgrid[0:n_pts1, 0:n_pts2, 0:n_pts3]
-        ).reshape(3, np.prod([n_pts1, n_pts2, n_pts3])).T
-        coords = np.matmul(ndx, [v1, v2, v3])
-        coords += com
-        
-        return coords, com, u, n_pts1, n_pts2, n_pts3, v1, v2, v3
+        return Orbitals.get_cube_array(
+            ResidueCollection(fr, refresh_connected=False, refresh_ranks=False),
+            padding=padding,
+            spacing=spacing,
+        )
 
     def show_orbit(self):
         fr = self.model_selector.currentData()
@@ -592,11 +527,11 @@ class OrbitalViewer(ToolInstance):
         keep_open = self.keep_open.checkState() == Qt.Checked
         self.settings.keep_open = keep_open
         
-        coords = self.get_coords()
-        if coords is False:
+        cube = self.get_coords()
+        if cube is False:
             return
-        coords, com, u, n_pts1, n_pts2, n_pts3, v1, v2, v3 = coords
-        
+        n_pts1, n_pts2, n_pts3, v1, v2, v3, com, u = cube
+
         if keep_open:
             found = False
             hide_vols = []
@@ -649,13 +584,17 @@ class OrbitalViewer(ToolInstance):
                 return
 
         n_val = n_pts1 * n_pts2 * n_pts3
-        n_val *= 8 * (4 * threads + max(len(fr.atoms) - threads, 0))
-        gb = n_val * 1e-9
-        if n_val > (0.9 * virtual_memory().free):
+        mem = orbits.memory_estimate(
+            "mo_value",
+            n_points=n_val,
+            n_atoms=len(fr.atoms),
+            n_jobs=threads,
+        )
+        if mem * 1e9 > (0.9 * virtual_memory().free):
             are_you_sure = QMessageBox.warning(
                 self.mo_table,
                 "Memory Limit Warning",
-                "Estimated peak memory usage (%.1fGB) is above or close to\n" % gb +
+                "Estimated peak memory usage (%.1fGB) is above or close to\n" % mem +
                 "the available memory (%.1fGB).\n" % (virtual_memory().free * 1e-9) +
                 "Exceeding available memory might affect the stability of your\n"
                 "computer. You may attempt to continue, but it is recommended\n" +
@@ -667,6 +606,10 @@ class OrbitalViewer(ToolInstance):
             )
             if are_you_sure != QMessageBox.Ok:
                 return False
+        
+        coords, _ = orbits.get_cube_points(
+            n_pts1, n_pts2, n_pts3, v1, v2, v3, com, sort=False
+        )
         
         val = orbits.mo_value(mo, coords, alpha=alpha, n_jobs=threads)
         val = np.reshape(val, (n_pts1, n_pts2, n_pts3))
@@ -723,15 +666,11 @@ class OrbitalViewer(ToolInstance):
         keep_open = self.keep_open.checkState() == Qt.Checked
         self.settings.keep_open = keep_open
         low_mem_mode = self.low_mem_mode.checkState() == Qt.Checked
-
-        mem_scale = orbits.n_mos / (2 * max(threads, len(fr.atoms)))
-        if low_mem_mode:
-            mem_scale = 1
-
-        coords = self.get_coords()
-        if coords is False:
+        
+        cube = self.get_coords()
+        if cube is False:
             return
-        coords, com, u, n_pts1, n_pts2, n_pts3, v1, v2, v3 = coords
+        n_pts1, n_pts2, n_pts3, v1, v2, v3, com, u = cube
 
         if keep_open:
             found = False
@@ -781,14 +720,17 @@ class OrbitalViewer(ToolInstance):
                 return
 
         n_val = n_pts1 * n_pts2 * n_pts3
-        n_val *= 8 * 4 * max(threads, len(fr.atoms))
-        n_val *= mem_scale
-        gb = n_val * 1e-9
-        if n_val > (0.9 * virtual_memory().free):
+        mem = orbits.memory_estimate(
+            "density_value",
+            n_points=n_val,
+            n_atoms=len(fr.atoms),
+            n_jobs=threads,
+        )
+        if mem * 1e9 > (0.9 * virtual_memory().free):
             are_you_sure = QMessageBox.warning(
                 self.mo_table,
                 "Memory Limit Warning",
-                "Estimated peak memory usage (%.1fGB) is above or close to\n" % gb +
+                "Estimated peak memory usage (%.1fGB) is above or close to\n" % mem +
                 "the available memory (%.1fGB).\n" % (virtual_memory().free * 1e-9) +
                 "Exceeding available memory might affect the stability of your\n"
                 "computer. You may attempt to continue, but it is recommended\n" +
@@ -800,6 +742,10 @@ class OrbitalViewer(ToolInstance):
             )
             if are_you_sure != QMessageBox.Ok:
                 return False
+        
+        coords, _ = orbits.get_cube_points(
+            n_pts1, n_pts2, n_pts3, v1, v2, v3, com, sort=False
+        )
         
         val = orbits.density_value(
             coords, n_jobs=threads, low_mem=low_mem_mode
@@ -862,15 +808,11 @@ class OrbitalViewer(ToolInstance):
         if delta != self.settings.fukui_delta:
             keep_open = False
         self.settings.fukui_delta = delta
-
-        mem_scale = orbits.n_mos / (2 * max(threads, len(fr.atoms)))
-        if low_mem_mode:
-            mem_scale = 1
-
-        coords = self.get_coords()
-        if coords is False:
+        
+        cube = self.get_coords()
+        if cube is False:
             return
-        coords, com, u, n_pts1, n_pts2, n_pts3, v1, v2, v3 = coords
+        n_pts1, n_pts2, n_pts3, v1, v2, v3, com, u = cube
 
         if keep_open:
             found = False
@@ -920,14 +862,17 @@ class OrbitalViewer(ToolInstance):
                 return
 
         n_val = n_pts1 * n_pts2 * n_pts3
-        n_val *= 8 * 4 * max(threads, len(fr.atoms))
-        n_val *= mem_scale
-        gb = n_val * 1e-9
-        if n_val > (0.9 * virtual_memory().free):
+        mem = orbits.memory_estimate(
+            "fukui_donor_value",
+            n_points=n_val,
+            n_atoms=len(fr.atoms),
+            n_jobs=threads,
+        )
+        if mem * 1e9 > (0.9 * virtual_memory().free):
             are_you_sure = QMessageBox.warning(
                 self.mo_table,
                 "Memory Limit Warning",
-                "Estimated peak memory usage (%.1fGB) is above or close to\n" % gb +
+                "Estimated peak memory usage (%.1fGB) is above or close to\n" % mem +
                 "the available memory (%.1fGB).\n" % (virtual_memory().free * 1e-9) +
                 "Exceeding available memory might affect the stability of your\n"
                 "computer. You may attempt to continue, but it is recommended\n" +
@@ -939,6 +884,10 @@ class OrbitalViewer(ToolInstance):
             )
             if are_you_sure != QMessageBox.Ok:
                 return False
+        
+        coords, _ = orbits.get_cube_points(
+            n_pts1, n_pts2, n_pts3, v1, v2, v3, com, sort=False
+        )
         
         val = orbits.fukui_donor_value(
             coords, n_jobs=threads, low_mem=low_mem_mode, delta=delta,
@@ -1001,16 +950,12 @@ class OrbitalViewer(ToolInstance):
         if delta != self.settings.fukui_delta:
             keep_open = False
         self.settings.fukui_delta = delta
-
-        mem_scale = orbits.n_mos / (2 * max(threads, len(fr.atoms)))
-        if low_mem_mode:
-            mem_scale = 1
-
-        coords = self.get_coords()
-        if coords is False:
+        
+        cube = self.get_coords()
+        if cube is False:
             return
-        coords, com, u, n_pts1, n_pts2, n_pts3, v1, v2, v3 = coords
-
+        n_pts1, n_pts2, n_pts3, v1, v2, v3, com, u = cube
+        
         if keep_open:
             found = False
             hide_vols = []
@@ -1059,14 +1004,17 @@ class OrbitalViewer(ToolInstance):
                 return
 
         n_val = n_pts1 * n_pts2 * n_pts3
-        n_val *= 8 * 4 * max(threads, len(fr.atoms))
-        n_val *= mem_scale
-        gb = n_val * 1e-9
-        if n_val > (0.9 * virtual_memory().free):
+        mem = orbits.memory_estimate(
+            "fukui_acceptor_value",
+            n_points=n_val,
+            n_atoms=len(fr.atoms),
+            n_jobs=threads,
+        )
+        if mem * 1e9 > (0.9 * virtual_memory().free):
             are_you_sure = QMessageBox.warning(
                 self.mo_table,
                 "Memory Limit Warning",
-                "Estimated peak memory usage (%.1fGB) is above or close to\n" % gb +
+                "Estimated peak memory usage (%.1fGB) is above or close to\n" % mem +
                 "the available memory (%.1fGB).\n" % (virtual_memory().free * 1e-9) +
                 "Exceeding available memory might affect the stability of your\n"
                 "computer. You may attempt to continue, but it is recommended\n" +
@@ -1078,6 +1026,10 @@ class OrbitalViewer(ToolInstance):
             )
             if are_you_sure != QMessageBox.Ok:
                 return False
+        
+        coords, _ = orbits.get_cube_points(
+            n_pts1, n_pts2, n_pts3, v1, v2, v3, com, sort=False
+        )
         
         val = orbits.fukui_acceptor_value(
             coords, n_jobs=threads, low_mem=low_mem_mode, delta=delta,
@@ -1142,15 +1094,11 @@ class OrbitalViewer(ToolInstance):
         if delta != self.settings.fukui_delta:
             keep_open = False
         self.settings.fukui_delta = delta
-
-        mem_scale = orbits.n_mos / (2 * max(threads, len(fr.atoms)))
-        if low_mem_mode:
-            mem_scale = 1
-
-        coords = self.get_coords()
-        if coords is False:
+        
+        cube = self.get_coords()
+        if cube is False:
             return
-        coords, com, u, n_pts1, n_pts2, n_pts3, v1, v2, v3 = coords
+        n_pts1, n_pts2, n_pts3, v1, v2, v3, com, u = cube
 
         if keep_open:
             found = False
@@ -1206,14 +1154,17 @@ class OrbitalViewer(ToolInstance):
                 return
 
         n_val = n_pts1 * n_pts2 * n_pts3
-        n_val *= 8 * 4 * max(threads, len(fr.atoms))
-        n_val *= mem_scale
-        gb = n_val * 1e-9
-        if n_val > (0.9 * virtual_memory().free):
+        mem = orbits.memory_estimate(
+            "fukui_dual_value",
+            n_points=n_val,
+            n_atoms=len(fr.atoms),
+            n_jobs=threads,
+        )
+        if mem * 1e9 > (0.9 * virtual_memory().free):
             are_you_sure = QMessageBox.warning(
                 self.mo_table,
                 "Memory Limit Warning",
-                "Estimated peak memory usage (%.1fGB) is above or close to\n" % gb +
+                "Estimated peak memory usage (%.1fGB) is above or close to\n" % mem +
                 "the available memory (%.1fGB).\n" % (virtual_memory().free * 1e-9) +
                 "Exceeding available memory might affect the stability of your\n"
                 "computer. You may attempt to continue, but it is recommended\n" +
@@ -1225,6 +1176,10 @@ class OrbitalViewer(ToolInstance):
             )
             if are_you_sure != QMessageBox.Ok:
                 return False
+        
+        coords, _ = orbits.get_cube_points(
+            n_pts1, n_pts2, n_pts3, v1, v2, v3, com, sort=False
+        )
         
         val = orbits.fukui_dual_value(
             coords, n_jobs=threads, low_mem=low_mem_mode, delta=delta,

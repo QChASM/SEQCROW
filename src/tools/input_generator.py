@@ -1979,7 +1979,7 @@ class JobTypeOption(QWidget):
             self.constrained_angle_table.resizeRowToContents(row)
 
         #try to use ordered selection so that if the user selected 1 -> 2 -> 3, they appear in that order
-        current_atoms = [atom for atom in self.session.seqcrow_ordered_selection_manager.selection if atom.structure is self.structure]
+        current_atoms = [atom for atom in selected_atoms(self.session) if atom.structure is self.structure]
         #if the user didn't pick the atoms one by one, fall back on selected_atoms
         if len(current_atoms) != 3:
             current_atoms = [atom for atom in selected_atoms(self.session) if atom.structure is self.structure]
@@ -2120,7 +2120,7 @@ class JobTypeOption(QWidget):
 
             self.constrained_torsion_table.resizeRowToContents(row)
 
-        current_atoms = [atom for atom in self.session.seqcrow_ordered_selection_manager.selection if atom.structure is self.structure]
+        current_atoms = [atom for atom in selected_atoms(self.session) if atom.structure is self.structure]
         #if the user didn't pick the atoms one by one, fall back on selected_atoms
         if len(current_atoms) != 4:
             current_atoms = [atom for atom in selected_atoms(self.session) if atom.structure is self.structure]
