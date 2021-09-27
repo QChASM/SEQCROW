@@ -5333,17 +5333,40 @@ class RemovePreset(ChildToolWindow):
                 remove_widget = QWidget()
                 remove_layout = QGridLayout(remove_widget)
                 remove = QPushButton()
-                remove.setIcon(QIcon(remove_widget.style().standardIcon(QStyle.SP_DialogDiscardButton)))
-                remove.setFlat(True)
-                remove.clicked.connect(
-                    lambda *args, name=preset, form=program, tool=self.tool_instance: tool.presets[form].pop(name)
+                remove.setIcon(
+                    QIcon(
+                        remove_widget.style().standardIcon(
+                            QStyle.SP_DialogDiscardButton
+                        )
+                    )
                 )
-                remove.clicked.connect(self.tool_instance.refresh_presets)
-                remove.clicked.connect(lambda *args, item=preset_item, parent=section: parent.removeChild(item))
+                remove.setFlat(True)
+
+                remove.clicked.connect(
+                    lambda *args, item=preset_item, parent=section: self.really_remove(
+                        parent,
+                        item,
+                    )
+                )
                 remove_layout.addWidget(remove, 0, 0, 1, 1, Qt.AlignLeft)
                 remove_layout.setColumnStretch(0, 0)
                 remove_layout.setContentsMargins(0, 0, 0, 0)
                 self.tree.setItemWidget(preset_item, 1, remove_widget)
+
+    def really_remove(self, parent, item):
+        program = parent.data(0, Qt.DisplayRole)
+        name = item.data(0, Qt.DisplayRole)
+        are_you_sure = QMessageBox.question(
+            None,
+            "Delete preset?",
+            "Are you sure you want to delete the '%s' preset for %s?" % (name, program),
+            defaultButton=QMessageBox.No,
+        )
+        if are_you_sure != QMessageBox.Yes:
+            return
+        parent.removeChild(item)
+        self.tool_instance.presets[program].pop(name)
+        self.tool_instance.refresh_presets()
 
     def cleanup(self):
         self.tool_instance.remove_preset_window = None

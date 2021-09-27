@@ -247,7 +247,7 @@ class EditStructure(ToolInstance):
         changeelement_tab = QWidget()
         changeelement_layout = QFormLayout(changeelement_tab)
         
-        self.element = ElementButton("C")
+        self.element = ElementButton("C", single_state=True)
         self.element.clicked.connect(self.open_ptable)
         changeelement_layout.addRow("element:", self.element)
         

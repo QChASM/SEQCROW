@@ -18,6 +18,7 @@ from SEQCROW.utils import iter2str
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.selectors import get_fragment
 from SEQCROW.tools.structure_editing import PTable
+from SEQCROW.widgets.periodic_table import ElementButton
 from SEQCROW.utils import contrast_bw
 
 from AaronTools.finders import AnyTransitionMetal
@@ -234,35 +235,13 @@ class BondEditor(ToolInstance):
             0, 0,
         )
         
-        self.ele1 = QPushButton("C")
-        self.ele1.setMinimumWidth(int(1.3*self.ele1.fontMetrics().boundingRect("QQ").width()))
-        self.ele1.setMaximumWidth(int(1.3*self.ele1.fontMetrics().boundingRect("QQ").width()))
-        self.ele1.setMinimumHeight(int(1.5*self.ele1.fontMetrics().boundingRect("QQ").height()))
-        self.ele1.setMaximumHeight(int(1.5*self.ele1.fontMetrics().boundingRect("QQ").height()))
-        self.ele1.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
-        ele_color = tuple(list(element_color(ELEMENTS.index("C")))[:-1])
-        self.ele1.setStyleSheet(
-            "QPushButton { background: rgb(%i, %i, %i); color: %s; font-weight: bold; }" % (
-                *ele_color, contrast_bw(ele_color)
-            )
-        )
+        self.ele1 = ElementButton("C", single_state=True)
         self.ele1.clicked.connect(lambda *args, button=self.ele1: self.open_ptable(button))
         bond_lookup_layout.addWidget(self.ele1, 0, 1, Qt.AlignRight | Qt.AlignTop)
         
         bond_lookup_layout.addWidget(QLabel("-"), 0, 2, Qt.AlignHCenter | Qt.AlignVCenter)
         
-        self.ele2 = QPushButton("C")
-        self.ele2.setMinimumWidth(int(1.3*self.ele2.fontMetrics().boundingRect("QQ").width()))
-        self.ele2.setMaximumWidth(int(1.3*self.ele2.fontMetrics().boundingRect("QQ").width()))
-        self.ele2.setMinimumHeight(int(1.5*self.ele2.fontMetrics().boundingRect("QQ").height()))
-        self.ele2.setMaximumHeight(int(1.5*self.ele2.fontMetrics().boundingRect("QQ").height()))
-        self.ele2.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
-        ele_color = tuple(list(element_color(ELEMENTS.index("C")))[:-1])
-        self.ele2.setStyleSheet(
-            "QPushButton { background: rgb(%i, %i, %i); color: %s; font-weight: bold; }" % (
-                *ele_color, contrast_bw(ele_color)
-            )
-        )
+        self.ele2 = ElementButton("C", single_state=True)
         self.ele2.clicked.connect(lambda *args, button=self.ele2: self.open_ptable(button))
         bond_lookup_layout.addWidget(self.ele2, 0, 3, Qt.AlignLeft | Qt.AlignTop)
         

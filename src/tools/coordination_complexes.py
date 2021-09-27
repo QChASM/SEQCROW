@@ -27,23 +27,14 @@ from SEQCROW.libraries import LigandTable
 from SEQCROW.managers.filereader_manager import apply_seqcrow_preset
 from SEQCROW.tools.structure_editing import _PTable
 from SEQCROW.utils import contrast_bw
+from SEQCROW.widgets.periodic_table import ElementButton
 
 def create_coord_items(tool, layout, allow_minimization=True, default_ele="Ca"):
     """
     add widgets to the layout and set appropriate attributes for tool
     this is used by this tool and the AaronJr input builder
     """
-    tool.element = QPushButton(default_ele)
-    tool.element.setMinimumWidth(int(1.3*tool.element.fontMetrics().boundingRect("QQ").width()))
-    tool.element.setMaximumWidth(int(1.3*tool.element.fontMetrics().boundingRect("QQ").width()))
-    tool.element.setMinimumHeight(int(1.5*tool.element.fontMetrics().boundingRect("QQ").height()))
-    tool.element.setMaximumHeight(int(1.5*tool.element.fontMetrics().boundingRect("QQ").height()))
-    ele_color = tuple(list(element_color(ELEMENTS.index(default_ele)))[:-1])
-    tool.element.setStyleSheet(
-        "QPushButton { background: rgb(%i, %i, %i); color: %s; font-weight: bold; }" % (
-            *ele_color, contrast_bw(ele_color)
-        )
-    )
+    tool.element = ElementButton(default_ele, single_state=True)
     tool.element.clicked.connect(lambda *args, t=tool: open_ptable(t))
     layout.addRow("element:", tool.element)
 
