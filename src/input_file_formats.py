@@ -739,13 +739,14 @@ class ORCAFileInfo(QMInputFileInfo):
     def get_file_contents(self, theory):
         """creates ORCA input file using AaronTools"""
         header, header_warnings = theory.make_header(style="orca", return_warnings=True)
+        footer = theory.make_footer(style="orca", return_warnings=False)
         molecule = ""
         fmt = "{:<3s} {: 10.6f} {: 10.6f} {: 10.6f}\n"
         for atom in theory.geometry.atoms:
             molecule += fmt.format(atom.element, *atom.coords)
 
         molecule += "*\n"
-        contents = header + molecule
+        contents = header + molecule + footer
         warnings = header_warnings
         return contents, warnings
 

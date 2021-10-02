@@ -1058,8 +1058,8 @@ class IRSpectrum(ToolInstance):
                 mol_style = mol.child(0)
                 show_mol = self.tree.itemWidget(mol_style, 0).layout().itemAt(1).widget()
                 if show_mol.checkState() == Qt.Checked:
-                    stop_ndx = sum(sum(len(freq.frequency.data) for freq in conf) for conf in freq)
-                    start_ndx = stop_ndx - sum(len(f.frequency.data) for f in freq[-1])
+                    stop_ndx = sum(sum(len(freq.frequency.data) for freq in conf) for conf in freqs)
+                    start_ndx = stop_ndx - sum(len(f.frequency.data) for f in freqs[-1])
                     color = self.tree.itemWidget(mol_style, 0).layout().itemAt(2).widget().get_color()
                     line_style = self.tree.itemWidget(mol_style, 1).layout().itemAt(1).widget().currentData(Qt.UserRole)
                     show_components.append([

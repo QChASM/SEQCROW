@@ -391,6 +391,23 @@ class _SEQCROW_API(BundleAPI):
 
                 return Info()
 
+            elif name == "Q-Chem output file":
+                class Info(OpenerInfo):
+                    def open(self, session, data, file_name, **kw):
+                        return open_aarontools(
+                            session,
+                            data,
+                            file_name,
+                            format_name="Q-Chem output file",
+                            **kw
+                        )
+
+                    @property
+                    def open_args(self):
+                        return {'coordsets': BoolArg}
+
+                return Info()
+
             elif name == "XYZ file":
                 class Info(OpenerInfo):
                     def open(self, session, data, file_name, **kw):

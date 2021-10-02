@@ -20,8 +20,8 @@ class ElementButton(QPushButton):
         self._tristate = False
         self._single_state = single_state
 
-        self.setMinimumWidth(int(1.3*self.fontMetrics().boundingRect("QQ").width()))
-        self.setMaximumWidth(int(1.3*self.fontMetrics().boundingRect("QQ").width()))
+        self.setMinimumWidth(int(1.4*self.fontMetrics().boundingRect("QQ").width()))
+        self.setMaximumWidth(int(1.4*self.fontMetrics().boundingRect("QQ").width()))
         self.setMinimumHeight(int(1.5*self.fontMetrics().boundingRect("QQ").height()))
         self.setMaximumHeight(int(1.5*self.fontMetrics().boundingRect("QQ").height()))
         
@@ -29,7 +29,7 @@ class ElementButton(QPushButton):
         
         if not single_state:
             self.state = 0
-            self.setStyleSheet("QPushButton { background: whitesmoke; color: dimgray; font-weight: normal; }")
+            self.setStyleSheet("QPushButton { background: whitesmoke; color: DarkSlateGray; font-weight: normal; }")
             self.clicked.connect(self._changeState)
         else:
             self.state = 1
@@ -55,7 +55,7 @@ class ElementButton(QPushButton):
 
         if self.state == self.Unchecked:
             self.setStyleSheet(
-                "QPushButton { background: whitesmoke; color: dimgray; font-weight: normal; };"
+                "QPushButton { background: whitesmoke; color: DarkSlateGray; font-weight: normal; };"
             )
         elif self.state == self.Checked:
             #weird function to decide if text color is white or black based on jmol color

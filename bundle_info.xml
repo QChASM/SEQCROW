@@ -103,7 +103,7 @@
                           reference_url="http://gaussian.com/input/"
                           synopsis="Gaussian input file"
                 />
-                          
+
                 <Provider name="Gaussian output file" 
                           category="Molecular structure" 
                           suffixes=".log" 
@@ -111,7 +111,7 @@
                           nicknames="log" 
                           synopsis="Gaussian output file"
                 />
-                          
+
                 <Provider name="ORCA output file" 
                           category="Molecular structure" 
                           suffixes=".out" 
@@ -119,13 +119,21 @@
                           nicknames="out" 
                           synopsis="ORCA output file"
                 />
-                          
+
                 <Provider name="Psi4 output file" 
                           category="Molecular structure" 
                           suffixes=".dat,.out" 
                           encoding="utf-8" 
                           nicknames="dat" 
                           synopsis="Psi4 output file"
+                />
+
+                <Provider name="Q-Chem output file" 
+                          category="Molecular structure" 
+                          suffixes=".qout,.out" 
+                          encoding="utf-8" 
+                          nicknames="qout" 
+                          synopsis="Q-Chem output file"
                 />
                 
                 <Provider name="XYZ file" 

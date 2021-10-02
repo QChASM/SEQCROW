@@ -564,17 +564,17 @@ class OrbitalViewer(ToolInstance):
                                 hex2, hex1,
                             )
                         )
-                    elif child.name.startswith("MO") and child.shown():
+                    elif child.name.startswith("MO") and child.visible:
                         hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("MO") and child.shown():
+                elif isinstance(child, Volume) and child.name.startswith("MO") and child.visible:
                     hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("electron density") and child.shown():
+                elif isinstance(child, Volume) and child.name.startswith("electron density") and child.visible:
                     hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("fukui donor") and child.shown():
+                elif isinstance(child, Volume) and child.name.startswith("fukui donor") and child.visible:
                     hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("fukui acceptor") and child.shown():
+                elif isinstance(child, Volume) and child.name.startswith("fukui acceptor") and child.visible:
                     hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("fukui dual") and child.shown():
+                elif isinstance(child, Volume) and child.name.startswith("fukui dual") and child.visible:
                     hide_vols.append(child)
 
             for child in hide_vols:
@@ -638,12 +638,11 @@ class OrbitalViewer(ToolInstance):
         )
         vol.matrix_value_statistics(read_matrix=True)
         vol.update_drawings()
-        for child in model.child_models():
-            if isinstance(child, Volume) and child.name.startswith("MO"):
-                if keep_open:
-                    run(self.session, "hide %s" % child.atomspec)
-                else:
-                    run(self.session, "close %s" % child.atomspec)
+        if not keep_open:
+            for child in model.child_models():
+                if isinstance(child, Volume) and child.name.startswith("MO"):
+                    if keep_open:
+                        run(self.session, "close %s" % child.atomspec)
         self.session.models.add([vol], parent=model)
 
     def show_e_density(self):
@@ -776,11 +775,9 @@ class OrbitalViewer(ToolInstance):
         )
         vol.matrix_value_statistics(read_matrix=True)
         vol.update_drawings()
-        for child in model.child_models():
-            if isinstance(child, Volume) and child.name.startswith("electron density"):
-                if keep_open:
-                    run(self.session, "hide %s" % child.atomspec)
-                else:
+        if not keep_open:
+            for child in model.child_models():
+                if isinstance(child, Volume) and child.name.startswith("electron density"):
                     run(self.session, "close %s" % child.atomspec)
         self.session.models.add([vol], parent=model)
 
@@ -918,11 +915,9 @@ class OrbitalViewer(ToolInstance):
         )
         vol.matrix_value_statistics(read_matrix=True)
         vol.update_drawings()
-        for child in model.child_models():
-            if isinstance(child, Volume) and child.name.startswith("fukui donor"):
-                if keep_open:
-                    run(self.session, "hide %s" % child.atomspec)
-                else:
+        if not keep_open:
+            for child in model.child_models():
+                if isinstance(child, Volume) and child.name.startswith("fukui donor"):
                     run(self.session, "close %s" % child.atomspec)
         self.session.models.add([vol], parent=model)
 
@@ -1060,11 +1055,9 @@ class OrbitalViewer(ToolInstance):
         )
         vol.matrix_value_statistics(read_matrix=True)
         vol.update_drawings()
-        for child in model.child_models():
-            if isinstance(child, Volume) and child.name.startswith("fukui acceptor"):
-                if keep_open:
-                    run(self.session, "hide %s" % child.atomspec)
-                else:
+        if not keep_open:
+            for child in model.child_models():
+                if isinstance(child, Volume) and child.name.startswith("fukui acceptor"):
                     run(self.session, "close %s" % child.atomspec)
         self.session.models.add([vol], parent=model)
 
@@ -1210,11 +1203,9 @@ class OrbitalViewer(ToolInstance):
         )
         vol.matrix_value_statistics(read_matrix=True)
         vol.update_drawings()
-        for child in model.child_models():
-            if isinstance(child, Volume) and child.name.startswith("fukui dual"):
-                if keep_open:
-                    run(self.session, "hide %s" % child.atomspec)
-                else:
+        if not keep_open:
+            for child in model.child_models():
+                if isinstance(child, Volume) and child.name.startswith("fukui dual"):
                     run(self.session, "close %s" % child.atomspec)
         self.session.models.add([vol], parent=model)
 

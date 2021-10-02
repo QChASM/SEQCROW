@@ -15,16 +15,43 @@ from configparser import ConfigParser
 
 from Qt.QtCore import Qt, QRegularExpression, Signal
 from Qt.QtGui import QKeySequence, QFontDatabase, QIcon
-from Qt.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, QLineEdit, \
-    QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, \
-    QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, \
-    QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView, QTextBrowser, \
-    QStatusBar, QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem, QSizePolicy, \
-    QStyle 
+from Qt.QtWidgets import (
+    QCheckBox,
+    QLabel,
+    QGridLayout,
+    QComboBox,
+    QSplitter,
+    QLineEdit,
+    QSpinBox,
+    QMenuBar,
+    QFileDialog,
+    QAction,
+    QApplication,
+    QPushButton,
+    QTabWidget,
+    QWidget,
+    QGroupBox,
+    QListWidget,
+    QTableWidget,
+    QTableWidgetItem,
+    QHBoxLayout,
+    QFormLayout,
+    QDoubleSpinBox,
+    QHeaderView,
+    QTextBrowser,
+    QStatusBar,
+    QTextEdit,
+    QMessageBox,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QSizePolicy,
+    QStyle,
+    QListWidgetItem,
+)
 
 from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.utils import iter2str
-from SEQCROW.widgets.periodic_table import PeriodicTable
+from SEQCROW.widgets.periodic_table import PeriodicTable, ElementButton
 from SEQCROW.widgets.comboboxes import ModelComboBox
 from SEQCROW.finders import AtomSpec
 
@@ -2948,17 +2975,17 @@ class BasisOption(QWidget):
         self.basis_option.currentIndexChanged.connect(self.basis_changed)
         self.basis_name_options.addRow(self.basis_option)
 
-        self.elements = QListWidget()
+        self.elements = QTableWidget()
+        self.elements.setColumnCount(1)
+        self.elements.verticalHeader().setVisible(False)
+        self.elements.horizontalHeader().setVisible(False)
         #make element list roughly as wide as two characters + a scroll bar
         #this keeps the widget as narrow as possible so it doesn't take up the entire screen
         scroll_width = self.style().pixelMetric(QStyle.PM_ScrollBarExtent)
-        self.elements.setMinimumWidth(scroll_width + int(1.5*self.fontMetrics().boundingRect("QQ").width()))
-        self.elements.setMaximumWidth(scroll_width + int(2*self.fontMetrics().boundingRect("QQ").width()))
+        self.elements.setMinimumWidth(scroll_width + int(1.4 * self.fontMetrics().boundingRect("QQ").width()))
+        self.elements.setMaximumWidth(scroll_width + int(1.5 * self.fontMetrics().boundingRect("QQ").width()))
         #set the max. height too b/c I can't seem to get it to respect setRowStretch
         self.elements.setMaximumHeight(int(6*self.fontMetrics().boundingRect("QQ").height()))
-        self.elements.setSelectionMode(QListWidget.MultiSelection)
-        self.elements.itemSelectionChanged.connect(lambda *args, s=self: self.parent.check_elements(s))
-        self.elements.itemSelectionChanged.connect(lambda *args, s=self: self.parent.something_changed())
         self.layout.addWidget(self.elements, 0, 2, 3, 1, Qt.AlignTop)
 
         self.custom_basis_kw = QLineEdit()
@@ -3033,6 +3060,9 @@ class BasisOption(QWidget):
         self.layout.setColumnStretch(1, 1)
         self.layout.setColumnStretch(2, 0)
         self.layout.setRowStretch(0, 0)
+        self.layout.setRowStretch(1, 0)
+        self.layout.setRowStretch(2, 0)
+        self.layout.setRowStretch(3, 0)
         self.layout.setRowStretch(4, 1)
 
         self.setOptions(self.form)
@@ -3155,7 +3185,7 @@ class BasisOption(QWidget):
         if self.aux_available and self.getAuxType() != "no":
             basis_name += "/%s" % self.getAuxType()
 
-        self.parent_toolbox.setTabText(ndx, "%s %s" % (basis_name, elements))
+        self.parent_toolbox.setTabText(ndx, "%s%s" % (basis_name, elements))
 
     def show_elements(self, value):
         """hides/shows element list"""
@@ -3172,11 +3202,17 @@ class BasisOption(QWidget):
 
     def currentElements(self):
         """returns a list of element names that are selected"""
-        return [self.elements.item(i).text() for i in range(0, self.elements.count()) if self.elements.item(i).isSelected()]
+        elements = []
+        for i in range(0, self.elements.rowCount()):
+            button = self.elements.cellWidget(i, 0)
+            if button.state == ElementButton.Checked:
+                elements.append(button.text())
+
+        return elements
 
     def allElements(self):
         """returns a list of all available element names"""
-        return [self.elements.item(i).text() for i in range(0, self.elements.count())]
+        return [self.elements.cellWidget(i, 0).text() for i in range(0, self.elements.rowCount())]
 
     def currentBasis(self, update_settings=False, index=0):
         """get current basis info
@@ -3319,43 +3355,56 @@ class BasisOption(QWidget):
 
     def setElements(self, elements):
         """sets the available elements"""
-        for i in range(self.elements.count(), -1, -1):
-            self.elements.takeItem(i)
+        for i in range(0, self.elements.rowCount()):
+            print(i)
+            item = self.elements.cellWidget(i, 0)
+            item.deleteLater()
+            item.removeRow(i)
 
-        self.elements.addItems(elements)
-        self.elements.sortItems()
+        for i, ele in enumerate(elements):
+            self.elements.insertRow(i)
+            ele_button = ElementButton(ele)
+            ele_button.setState(ElementButton.Unchecked)
+            ele_button.stateChanged.connect(lambda *args, s=self: self.parent.check_elements(s))
+            ele_button.stateChanged.connect(lambda *args, s=self: self.parent.something_changed())
+            self.elements.setCellWidget(i, 0, ele_button)
+            self.elements.setRowHeight(i, int(1.5*self.fontMetrics().boundingRect("QQ").height()))
+
+        self.elements.sortItems(0)
 
     def setSelectedElements(self, elements):
         """sets the selected elements"""
-        for i in range(0, self.elements.count()):
-            row = self.elements.item(i)
-            row.setSelected(False)
+        for i in range(0, self.elements.rowCount()):
+            button = self.elements.cellWidget(i, 0)
+            button.setState(ElementButton.Unchecked)
 
         for element in elements:
             if element not in self.allElements():
                 if element.lower() == "tm" or elements == "tm":
                     #all transition metals
-                    for element in TMETAL.keys():
-                        items = self.elements.findItems(element, Qt.MatchExactly)
-                        if len(items) > 0:
-                            for item in items:
-                                item.setSelected(True)
+                    for row in range(0, self.elements.rowCount()):
+                        button = self.elements.cellWidget(row, 0)
+                        if any(button.text() == x for x in TMETAL.keys()):
+                            button.setState(ElementButton.Checked)
 
                 elif element.lower() == "!tm" or elements == "!tm":
-                    for i in range(0, self.elements.count()):
-                        item = self.elements.item(i)
+                    for i in range(0, self.elements.rowCount()):
+                        button = self.elements.cellWidget(i, 0)
                         if item.text() not in TMETAL:
-                            item.setSelected(True)
+                            button.setState(ElementButton.Checked)
 
                 elif element.lower() == "all" or elements == "all":
-                    for i in range(0, self.elements.count()):
-                        item = self.elements.item(i)
-                        item.setSelected(True)
+                    for i in range(0, self.elements.rowCount()):
+                        button = self.elements.cellWidget(i, 0)
+                        button.setState(ElementButton.Checked)
 
                 continue
 
-            row = self.elements.findItems(element, Qt.MatchExactly)[0]
-            row.setSelected(True)
+            for row in range(0, self.elements.rowCount()):
+                button = self.elements.cellWidget(row, 0)
+                if button.text() == element:
+                    button.setState(ElementButton.Checked)
+                    break
 
     def remove_saved_basis(self, row, column):
         """removes the row from the table of previously used basis sets
@@ -3452,7 +3501,7 @@ class ECPOption(BasisOption):
         elements = "(%s)" % ", ".join(self.currentElements())
         ndx = self.parent_toolbox.indexOf(self)
 
-        self.parent_toolbox.setTabText(ndx, "%s %s" % (basis_name, elements))
+        self.parent_toolbox.setTabText(ndx, "%s%s" % (basis_name, elements))
 
 
 class BasisWidget(QWidget):
@@ -3799,17 +3848,21 @@ class BasisWidget(QWidget):
         if isinstance(exclude_option, ECPOption):
             for option in self.ecp_options:
                 if option is not exclude_option:
-                    for i in range(0, option.elements.count()):
-                        if option.elements.item(i).text() in element_list:
-                            option.elements.item(i).setSelected(False)
+                    for i in range(0, option.elements.rowCount()):
+                        if option.elements.cellWidget(i, 0).text() in element_list:
+                            option.elements.cellWidget(i, 0).blockSignals(True)
+                            option.elements.cellWidget(i, 0).setState(ElementButton.Unchecked)
+                            option.elements.cellWidget(i, 0).blockSignals(False)
 
         else:
             aux = exclude_option.getAuxType()
             for option in self.basis_options:
                 if option is not exclude_option and option.getAuxType() == aux:
-                    for i in range(0, option.elements.count()):
-                        if option.elements.item(i).text() in element_list:
-                            option.elements.item(i).setSelected(False)
+                    for i in range(0, option.elements.rowCount()):
+                        if option.elements.cellWidget(i, 0).text() in element_list:
+                            option.elements.cellWidget(i, 0).blockSignals(True)
+                            option.elements.cellWidget(i, 0).setState(ElementButton.Unchecked)
+                            option.elements.cellWidget(i, 0).blockSignals(False)
 
     def setOptions(self, file_info):
         """changes the basis set options to display what's available for the specified program"""
@@ -3851,17 +3904,28 @@ class BasisWidget(QWidget):
                     elements_with_different_basis.extend(other_basis.currentElements())
 
             if len(del_elements) > 0:
-                for i in range(basis.elements.count()-1, -1, -1):
-                    if basis.elements.item(i).text() in del_elements:
-                        basis.elements.takeItem(i)
+                for i in range(basis.elements.rowCount() - 1, -1, -1):
+                    if basis.elements.cellWidget(i, 0).text() in del_elements:
+                        button = basis.elements.cellWidget(i, 0)
+                        button.deleteLater()
+                        basis.elements.removeRow(i)
 
             if len(new_elements) > 0:
-                basis.elements.addItems(new_elements)
-                basis.elements.sortItems()
+                for element in new_elements:
+                    row = basis.elements.rowCount()
+                    basis.elements.insertRow(row)
+                    button = ElementButton(element)
+                    button.stateChanged.connect(lambda *args, s=basis: self.check_elements(s))
+                    button.stateChanged.connect(lambda *args, s=basis: self.something_changed())
+                    basis.elements.setCellWidget(row, 0, button)
+                    basis.elements.setRowHeight(row, int(1.5*self.fontMetrics().boundingRect("QQ").height()))
+                    
                 if j < len(self.settings.last_basis_elements):
                     previous_elements = self.settings.last_basis_elements[j].split(",")
                     if len(previous_elements) > 0:
-                        basis.setSelectedElements([x for x in previous_elements + basis.currentElements() if x not in elements_with_different_basis])
+                        basis.setSelectedElements(
+                            [x for x in previous_elements + basis.currentElements() if x not in elements_with_different_basis]
+                        )
 
         for j, basis in enumerate(self.ecp_options):
             elements_with_different_basis = []
@@ -3870,17 +3934,28 @@ class BasisWidget(QWidget):
                     elements_with_different_basis.extend(other_basis.currentElements())
 
             if len(del_elements) > 0:
-                for i in range(basis.elements.count()-1, -1, -1):
-                    if basis.elements.item(i).text() in del_elements:
-                        basis.elements.takeItem(i)
+                for i in range(basis.elements.rowCount() - 1, -1, -1):
+                    if basis.elements.cellWidget(i, 0).text() in del_elements:
+                        button = basis.elements.cellWidget(i, 0)
+                        button.deleteLater()
+                        basis.elements.removeRow(i)
 
             if len(new_elements) > 0:
-                basis.elements.addItems(new_elements)
-                basis.elements.sortItems()
+                for element in new_elements:
+                    row = basis.elements.rowCount()
+                    basis.elements.insertRow(row)
+                    button = ElementButton(element)
+                    button.stateChanged.connect(lambda *args, s=basis: self.check_elements(s))
+                    button.stateChanged.connect(lambda *args, s=basis: self.something_changed())
+                    basis.elements.setCellWidget(row, 0, button)
+                    basis.elements.setRowHeight(row, int(1.5*self.fontMetrics().boundingRect("QQ").height()))
+                
                 if j < len(self.settings.last_ecp_elements):
                     previous_elements = self.settings.last_ecp_elements[j].split(",")
                     if len(previous_elements) > 0:
-                        basis.setSelectedElements([x for x in previous_elements + basis.currentElements() if x not in elements_with_different_basis])
+                        basis.setSelectedElements(
+                            [x for x in previous_elements + basis.currentElements() if x not in elements_with_different_basis]
+                        )
 
         if len(self.basis_options) == 1 and len(self.ecp_options) == 0:
             self.basis_options[0].setSelectedElements(self.elements)
@@ -4742,7 +4817,6 @@ class TwoLayerKeyWordOption(QWidget):
     def setCurrentSettings(self, kw_dict):
         """change current keywords and options to match kw_dict"""
         self.clearCurrentSettings()
-
         self.last_dict = kw_dict.copy()
 
         for kw in self.last_dict:
@@ -4843,7 +4917,7 @@ class KeywordOptions(QWidget):
     def setKeywords(self, current_dict):
         """sets all option widgets to match current_dict"""
         for item in self.widgets.keys():
-            if self.items[item] in current_dict:
+            if any(key == self.items[item] for key in current_dict):
                 self.widgets[item].setCurrentSettings(current_dict[self.items[item]])
 
             elif hasattr(self, "old_items") and item in self.old_items and self.old_items[item] in current_dict:
@@ -5271,7 +5345,7 @@ class SavePreset(ChildToolWindow):
                 basis.ele_selection = eles
         
         if preset["theory"].basis.ecp:
-            for basis, eles in zip(preset["theory"].basis.ecp, basis_elements):
+            for basis, eles in zip(preset["theory"].basis.ecp, ecp_elements):
                 basis.ele_selection = eles
         
         preset["theory"] = preset["theory"].copy()
