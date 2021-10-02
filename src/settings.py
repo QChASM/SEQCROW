@@ -26,7 +26,7 @@ class FreqOptions(EnumOption):
 # 'settings' module attribute will be set by manager initialization
 class _SEQCROWSettings(Settings):
     EXPLICIT_SAVE = {
-        'AARONLIB': Value(getenv('AARONLIB', path.join(path.expanduser('~'), "AARON_libs")), StringArg),
+        'AARONLIB': Value(getenv('AARONLIB', path.join(path.expanduser('~'), "Aaron_libs")), StringArg),
         'ORCA_EXE': Value("orca.exe" if platform == "win32" else "orca", StringArg),
         'GAUSSIAN_EXE': Value("g09.exe" if platform == "win32" else "g09", StringArg),
         'PSI4_EXE': Value("psi4", StringArg),
