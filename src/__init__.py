@@ -528,6 +528,9 @@ class _SEQCROW_API(BundleAPI):
             elif name == "SQM":
                 from SEQCROW.input_file_formats import SQMFileInfo
                 return SQMFileInfo()
+            elif name == "Q-Chem":
+                from SEQCROW.input_file_formats import QChemFileInfo
+                return QChemFileInfo()
 
         elif mgr is session.seqcrow_job_manager:
             if name == "Gaussian":
@@ -716,7 +719,6 @@ class _SEQCROW_API(BundleAPI):
         elif name == "Atom":
             from AaronTools.atoms import Atom
             return Atom
-
 
     @staticmethod
     def finish(session, bundle_info):

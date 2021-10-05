@@ -130,7 +130,7 @@
 
                 <Provider name="Q-Chem output file" 
                           category="Molecular structure" 
-                          suffixes=".qout,.out" 
+                          suffixes=".qout,.out,.dat" 
                           encoding="utf-8" 
                           nicknames="qout" 
                           synopsis="Q-Chem output file"
@@ -208,6 +208,7 @@
                 <Provider name="ORCA"/>
                 <Provider name="Psi4"/>
                 <Provider name="SQM"/>
+                <Provider name="Q-Chem"/>
             </Providers>
             
             <Providers manager="test_manager">

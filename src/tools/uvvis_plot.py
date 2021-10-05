@@ -133,7 +133,7 @@ class _UVVisSpectrumSettings(Settings):
         "fixed_size": False,
         'w0': 100,
         'temperature': 298.15,
-        'anharmonic': False,
+        'transient': False,
         "weight_method": "QRRHO",
         'col_1': Value(150, IntArg), 
         'col_2': Value(150, IntArg), 
@@ -390,6 +390,11 @@ class UVVisSpectrum(ToolInstance):
         ndx = self.x_units.findText(self.settings.x_units, Qt.MatchExactly)
         self.x_units.setCurrentIndex(ndx)
         plot_settings_layout.addRow("x-axis units:", self.x_units)
+        
+        self.transient = QCheckBox()
+        self.transient.setCheckState(Qt.Checked if self.settings.transient else Qt.Unchecked)
+        self.transient.setToolTip("use transient excitation data")
+        plot_settings_layout.addRow("transient excitations:", self.transient)
         
         tabs.addTab(plot_settings_widget, "plot settings")
         
@@ -856,8 +861,12 @@ class UVVisSpectrum(ToolInstance):
                         continue
                     uv_vis = fr.other["uv_vis"]
                     
+                    data_attr = "data"
+                    if self.transient.checkState() == Qt.Checked:
+                        data_attr = "transient_data"
+                    
                     excitations = np.array(
-                        [data.excitation_energy for data in uv_vis.data]
+                        [data.excitation_energy for data in getattr(uv_vis, data_attr)]
                     )
                     c0 = self.shift.value()
                     excitations += c0
@@ -868,7 +877,7 @@ class UVVisSpectrum(ToolInstance):
                     )
                     min_arg = np.argmin(diff)
                     if not closest or diff[min_arg] < closest[0]:
-                        closest = (diff[min_arg], uv_vis.data[min_arg], fr)
+                        closest = (diff[min_arg], getattr(uv_vis, data_attr)[min_arg], fr)
             
             if closest:
                 self.highlight(closest[1], closest[2])
@@ -916,6 +925,7 @@ class UVVisSpectrum(ToolInstance):
 
     def get_mixed_spectrum(self, weights_only=False):
         weight_method = self.weight_method.currentData(Qt.UserRole)
+        transient = self.transient.checkState() == Qt.Checked
         uv_vis_files = []
         freqs = []
         single_points = []
@@ -1034,6 +1044,7 @@ class UVVisSpectrum(ToolInstance):
             conf_mixed = ValenceExcitations.get_mixed_signals(
                 uv_vis,
                 weights=weights,
+                data_attr="transient_data" if transient else "data",
             )
             mixed_spectra.append(conf_mixed)
         
@@ -1066,6 +1077,8 @@ class UVVisSpectrum(ToolInstance):
         weight_method = self.weight_method.currentData(Qt.UserRole)
         self.settings.weight_method = weight_method
         plot_type = self.plot_type.currentData(Qt.UserRole)
+        transient = self.transient.checkState() == Qt.Checked
+        self.settings.transient = transient
 
         model = self.plot_type.model()
         uv_vis_vel_item = model.item(2)
@@ -1091,6 +1104,11 @@ class UVVisSpectrum(ToolInstance):
 
         if plot_type == "ecd":
             if not all(data.rotatory_str_len is not None for data in mixed_spectra.data):
+                self.plot_type.blockSignals(True)
+                self.plot_type.setCurrentIndex(0)
+                self.plot_type.blockSignals(False)
+        if plot_type == "ecd-velocity":
+            if not all(data.rotatory_str_vel is not None for data in mixed_spectra.data):
                 self.plot_type.blockSignals(True)
                 self.plot_type.setCurrentIndex(0)
                 self.plot_type.blockSignals(False)

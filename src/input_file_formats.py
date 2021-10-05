@@ -307,15 +307,17 @@ class ORCAKeywordOptions(KeywordOptions):
 
 
 class Psi4KeywordOptions(KeywordOptions):
-    items = {'settings': PSI4_SETTINGS, \
-             'job': PSI4_JOB, \
-             'molecule': PSI4_MOLECULE, \
-             'before job': PSI4_BEFORE_JOB, \
-             'after job': PSI4_AFTER_JOB, \
-             'optking': PSI4_OPTKING, \
-             'before molecule': PSI4_BEFORE_GEOM, \
-             'comment': PSI4_COMMENT, \
-            }
+    items = {
+        'settings': PSI4_SETTINGS, 
+        'job': PSI4_JOB, 
+        'molecule': PSI4_MOLECULE, 
+        'before job': PSI4_BEFORE_JOB, 
+        'after job': PSI4_AFTER_JOB, 
+        'optking': PSI4_OPTKING, 
+        'before molecule': PSI4_BEFORE_GEOM, 
+        'PCM solver': PSI4_SOLVENT,
+        'comment': PSI4_COMMENT, 
+    }
 
     old_items = {'settings': "1", \
                  'before molecule': "2", \
@@ -424,6 +426,29 @@ class Psi4KeywordOptions(KeywordOptions):
                 allow_dup=True,
             )
 
+        elif name == "PCM solver":
+            if last is None:
+                last_dict = {}
+            else:
+                last_dict = last
+
+            if previous is None:
+                previous_dict = {}
+            else:
+                previous_dict = previous
+
+            def check_single_kw(kw):
+                return any(kw.strip().lower() == sk for sk in Theory.FORCED_PSI4_SOLVENT_SINGLE)
+
+            return TwoLayerKeyWordOption(
+                "PCM solver",
+                last_dict,
+                previous_dict,
+                "double click to use \"pcm = { %s = %s }\"",
+                one_opt_per_kw=check_single_kw,
+                allow_dup=False,
+            )
+
         elif name == "optking":
             if last is None:
                 last_dict = {}
@@ -465,16 +490,17 @@ class Psi4KeywordOptions(KeywordOptions):
 
 class SQMKeywordOptions(KeywordOptions):
     items = {
-    'settings': "qmmm",
-    'comment': 'comment',
+        'settings': SQM_QMMM,
+        'comment': SQM_COMMENT,
     }
+
 
     previous_option_name = "previous_sqm_options"
     last_option_name = "last_sqm_options"
 
     @classmethod
     def get_options_for(cls, name, last, previous):
-        if name == "settings":
+        if name == 'settings':
             if last is None:
                 last_dict = {}
             else:
@@ -494,7 +520,7 @@ class SQMKeywordOptions(KeywordOptions):
                 allow_dup=False,
             )
 
-        elif name == "comment":
+        elif name == 'comment':
             if last is None:
                 last_list = []
             else:
@@ -510,6 +536,76 @@ class SQMKeywordOptions(KeywordOptions):
                 last_list,
                 previous_list,
                 multiline=True,
+            )
+
+
+class QChemKeywordOptions(KeywordOptions):
+    items = {
+        'settings': QCHEM_REM,
+        'sections': QCHEM_SETTINGS,
+        'comment': QCHEM_COMMENT,
+    }
+
+    previous_option_name = "previous_qchem_options"
+    last_option_name = "last_qchem_options"
+
+    @classmethod
+    def get_options_for(cls, name, last, previous):
+        if name == 'settings':
+            if last is None:
+                last_dict = {}
+            else:
+                last_dict = last
+
+            if previous is None:
+                previous_dict = {}
+            else:
+                previous_dict = previous
+
+            return TwoLayerKeyWordOption(
+                'settings',
+                last_dict,
+                previous_dict,
+                "double click to use $rem\n\t\"%s %s\"\n$end",
+                one_opt_per_kw=True,
+                allow_dup=False,
+            )
+
+        elif name == 'comment':
+            if last is None:
+                last_list = []
+            else:
+                last_list = last
+
+            if previous is None:
+                previous_list = []
+            else:
+                previous_list = previous
+
+            return OneLayerKeyWordOption(
+                'comment',
+                last_list,
+                previous_list,
+                multiline=True,
+            )
+
+        elif name == 'sections':
+            if last is None:
+                last_dict = {}
+            else:
+                last_dict = last
+
+            if previous is None:
+                previous_dict = {}
+            else:
+                previous_dict = previous
+
+            return TwoLayerKeyWordOption(
+                'sections',
+                last_dict,
+                previous_dict,
+                "double click to use $%s\n\t%s\n$end",
+                one_opt_per_kw=False
             )
 
 
@@ -880,6 +976,8 @@ class Psi4FileInfo(QMInputFileInfo):
         "aug-cc-pVTZ",
         "6-311+G**",
     ]
+    solvent_models = ImplicitSolvent.KNOWN_PSI4_MODELS
+    solvents = ImplicitSolvent.KNOWN_PSI4_SOLVENTS
     aux_options = BasisSet.PSI4_AUX
     keyword_options = Psi4KeywordOptions
     
@@ -950,3 +1048,104 @@ class SQMFileInfo(QMInputFileInfo):
         warnings = header_warnings + mol_warnings
         return contents, warnings
 
+
+class QChemFileInfo(QMInputFileInfo):
+    name = "Q-Chem"
+    
+    initial_presets = {
+        "quick optimize":{
+            "theory": Theory(
+                job_type=OptimizationJob(),
+                method="HF-3c",
+                basis="MINIX",
+                rem={"JOB_TYPE": "SP"},
+            ),
+            "use_method": True,
+            "use_job_type": True,
+            "use_other": True,
+            "use_basis": True,
+        },
+    }
+    
+    initial_options = {
+        QCHEM_REM: {"SCF_MAX_CYCLES": "150"},
+    }
+    
+    save_file_filter = "Q-Chem input files (*.inp,*.inq)"
+    basis_file_filter = "Basis Set Files (*.basis)"
+    raman_available = True
+    methods = [
+        "B3LYP",
+        "M06",
+        "M06-L",
+        "M06-2X",
+        "ωB97X-D3",
+        "B3PW91",
+        "B97-D3",
+        "BP86",
+        "PBE0",
+        "HF-3c",
+    ]
+    dispersion = [
+        "Grimme D2",
+        "Modified Zero-damped Grimme D3",
+        "Zero-damped Grimme D3",
+        "Becke-Johnson damped Grimme D3",
+        "Becke-Johnson damped modified Grimme D3",
+        "Chai & Head-Gordon",
+    ]
+    grids = [
+        "SG-3", 
+        "SG-2", 
+        "SG-1", 
+        "(250, 974)",
+        "(175, 974)",
+        "(60, 770)",
+        "(99, 590)",
+        "(55, 590)",
+        "(50, 434)",
+        "(75, 302)",
+    ]
+    basis_sets = [
+        "def2-SVP",
+        "def2-TZVP",
+        "cc-pVDZ",
+        "cc-pVTZ",
+        "aug-cc-pVDZ",
+        "aug-cc-pVTZ",
+        "6-311+G**",
+    ]
+    ecps = ["LANL2DZ"]
+    keyword_options = ORCAKeywordOptions
+    
+    def get_file_contents(self, theory):
+        """creates Q-Chem input file using AaronTools"""
+        fmt = "{:<3s} {: 9.5f} {: 9.5f} {: 9.5f}\n"
+        header, header_warnings = theory.make_header(
+            style="qchem", return_warnings=True,
+        )
+        mol, mol_warnings = theory.make_molecule(
+            style="qchem", return_warnings=True,
+        )
+
+        out = header + mol
+        warnings = header_warnings + mol_warnings
+        
+        return out, warnings
+
+    def get_job_kw_dict(
+            self,
+            optimize,
+            frequencies,
+            raman,
+            hpmodes,
+            read_checkpoint,
+            checkpoint_file,
+    ):
+        rem = {}
+
+        if frequencies:
+            if raman:
+                rem['DORAMAN'] = 'TRUE'
+
+        return {QCHEM_REM: rem}

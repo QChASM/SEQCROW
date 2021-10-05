@@ -174,7 +174,9 @@ class BuildQM(ToolInstance):
 
         self.changed = False
         self._changes = global_triggers.add_handler("changes", self.check_changes)
-        self._changes_done = global_triggers.add_handler("changes done", self.struc_mod_update_preview)
+        self._changes_done = global_triggers.add_handler(
+            "changes done", self.struc_mod_update_preview
+        )
 
         # this tool is big by default
         # unless the user has saved its position, make it small
@@ -832,6 +834,7 @@ class BuildQM(ToolInstance):
     def struc_mod_update_preview(self, *args, **kwargs):
         """whenever a setting is changed, this should be called to update the preview"""
         if self.changed:
+            self.job_widget.check_constraints()
             self.update_preview()
             self.changed = False
 
@@ -1717,7 +1720,35 @@ class JobTypeOption(QWidget):
         self.constrained_angles = []
         self.constrained_torsions = []
 
+        for i in range(self.constrained_atom_table.rowCount() - 1, -1, -1):
+            atom = self.constrained_atoms[i]
+            if atom.deleted:
+                self.constrain_atoms.pop(i)
+                self.constrained_atom_table.removeRow(i)
+
+        for i in range(self.constrained_bond_table.rowCount() - 1, -1, -1):
+            bond = self.constrained_bonds[i]
+            if any(atom.deleted for atom in bond):
+                self.constrained_bonds.pop(i)
+                self.constrained_bond_table.removeRow(i)
+
+        for i in range(self.constrained_angle_table.rowCount() - 1, -1, -1):
+            angle = self.constrained_bonds[i]
+            if any(atom.deleted for atom in angle):
+                self.constrained_angles.pop(i)
+                self.constrained_angle_table.removeRow(i)
+
+        for i in range(self.constrained_torsion_table.rowCount() - 1, -1, -1):
+            torsion = self.constrained_bonds[i]
+            if any(atom.deleted for atom in torsion):
+                self.constrained_torsions.pop(i)
+                self.constrained_torsion_table.removeRow(i)
+
+        self.jobTypeChanged.emit()
+
+    def check_constraints(self):
         for i in range(self.constrained_atom_table.rowCount(), -1, -1):
+            
             self.constrained_atom_table.removeRow(i)
 
         for i in range(self.constrained_bond_table.rowCount(), -1, -1):
@@ -1777,32 +1808,55 @@ class JobTypeOption(QWidget):
                 constraints = self.getConstraints()
                 new_constraints = {}
                 if "atoms" in constraints:
-                    new_constraints["atoms"] = [AtomSpec(atom.atomspec) for atom in constraints["atoms"]]
+                    for atom in constraints["atoms"]:
+                        new_constraints["atoms"] = []
+                        if atom.deleted:
+                            continue
+                        new_constraints["atoms"].append(AtomSpec(atom.atomspec))
+
                     for key in ["bonds", "angles", "torsions"]:
                         if key in constraints:
                             if key in constraints:
                                 new_constraints[key] = []
                                 for constraint in constraints[key]:
-                                    new_constraints[key].append([AtomSpec(atom.atomspec) for atom in constraint])
+                                    for atom in constraint:
+                                        if atom.deleted:
+                                            break
+                                    
+                                    else:
+                                        new_constraints[key].append(
+                                            [AtomSpec(atom.atomspec) for atom in constraint]
+                                        )
 
                 constraints = new_constraints
             else:
                 constraints = None
 
-            job_types.append(OptimizationJob(transition_state=self.ts_opt.checkState() == Qt.Checked,
-                                             constraints=constraints)
-                            )
+            job_types.append(
+                OptimizationJob(
+                    transition_state=self.ts_opt.checkState() == Qt.Checked,
+                    constraints=constraints
+                )
+            )
 
         if self.do_freq.checkState() == Qt.Checked:
             if self.form == "ORCA":
-                job_types.append(FrequencyJob(numerical=(self.num_freq.checkState() == Qt.Checked or
-                                                        self.raman.checkState() == Qt.Checked),
-                                            temperature=self.temp.value())
-                                )
+                job_types.append(
+                    FrequencyJob(
+                        numerical=(
+                            self.num_freq.checkState() == Qt.Checked or
+                            self.raman.checkState() == Qt.Checked
+                        ),
+                        temperature=self.temp.value()
+                    )
+                )
             else:
-                job_types.append(FrequencyJob(numerical=self.num_freq.checkState() == Qt.Checked,
-                                              temperature=self.temp.value())
-                                )
+                job_types.append(
+                    FrequencyJob(
+                        numerical=self.num_freq.checkState() == Qt.Checked,
+                        temperature=self.temp.value()
+                    )
+                )
 
         return job_types
 
@@ -2249,10 +2303,12 @@ class JobTypeOption(QWidget):
             return None
 
         else:
-            return {'atoms':self.constrained_atoms, \
-                    'bonds':self.constrained_bonds, \
-                    'angles':self.constrained_angles, \
-                    'torsions':self.constrained_torsions}
+            return {
+                'atoms': self.constrained_atoms, \
+                'bonds': self.constrained_bonds, \
+                'angles': self.constrained_angles, \
+                'torsions': self.constrained_torsions
+            }
 
     def getNProc(self, update_settings=False):
         """returns number of processors"""
