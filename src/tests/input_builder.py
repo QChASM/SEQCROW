@@ -294,7 +294,7 @@ SDD
             self.assertTrue(False)
 
         ref_file = """#benzene_1-NO2_4-Cl.xyz 12,11=>H
-! M062X D3ZERO DefGrid3 def2-TZVP Opt
+! M062X Opt def2-TZVP DefGrid3 D3ZERO
 
 *xyz 0 1
 C    -1.976956  -2.327177   0.001258
@@ -310,6 +310,8 @@ H    -0.579922  -2.963602  -1.525852
 H    -0.037665   1.033485  -0.000129
 H    -2.521911  -3.271171   0.001704
 *
+
+
 """
 
         content_lines = contents.splitlines()
@@ -360,7 +362,7 @@ H    -2.521911  -3.271171   0.001704
             self.assertTrue(False)
 
         ref_file = """#benzene_1-NO2_4-Cl.xyz 12,11=>H
-! M062X DefGrid3 def2-SVP NumFreq
+! M062X NumFreq def2-SVP DefGrid3
 %freq
     Temp    298.15
 end
@@ -379,6 +381,8 @@ H    -0.579922  -2.963602  -1.525852
 H    -0.037665   1.033485  -0.000129
 H    -2.521911  -3.271171   0.001704
 *
+
+
 """
 
         content_lines = contents.splitlines()

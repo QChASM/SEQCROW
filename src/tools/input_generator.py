@@ -56,13 +56,17 @@ from SEQCROW.widgets.comboboxes import ModelComboBox
 from SEQCROW.finders import AtomSpec
 
 from AaronTools.config import Config
-from AaronTools.const import TMETAL
+from AaronTools.const import TMETAL, ELEMENTS
 from AaronTools.theory import *
 from AaronTools.theory.method import KNOWN_SEMI_EMPIRICAL
 from AaronTools.utils.utils import combine_dicts
 from AaronTools.json_extension import ATDecoder, ATEncoder
 
 # import cProfile
+
+class UserRoleSortableTableWidget(QTableWidgetItem):
+    def __lt__(self, other):
+        return self.data(Qt.UserRole) < other.data(Qt.UserRole)
 
 
 class _InputGeneratorSettings(Settings):
@@ -3436,10 +3440,13 @@ class BasisOption(QWidget):
         for i, ele in enumerate(elements):
             self.elements.insertRow(i)
             ele_button = ElementButton(ele)
+            placeholder = UserRoleSortableTableWidget()
+            placeholder.setData(Qt.UserRole, ELEMENTS.index(ele))
             ele_button.setState(ElementButton.Unchecked)
             ele_button.stateChanged.connect(lambda *args, s=self: self.parent.check_elements(s))
             ele_button.stateChanged.connect(lambda *args, s=self: self.parent.something_changed())
             self.elements.setCellWidget(i, 0, ele_button)
+            self.elements.setItem(i, 0, placeholder)
             self.elements.setRowHeight(i, int(1.5*self.fontMetrics().boundingRect("QQ").height()))
 
         self.elements.sortItems(0)
@@ -3987,9 +3994,12 @@ class BasisWidget(QWidget):
                     row = basis.elements.rowCount()
                     basis.elements.insertRow(row)
                     button = ElementButton(element)
+                    placeholder = UserRoleSortableTableWidget()
+                    placeholder.setData(Qt.UserRole, ELEMENTS.index(element))
                     button.stateChanged.connect(lambda *args, s=basis: self.check_elements(s))
                     button.stateChanged.connect(lambda *args, s=basis: self.something_changed())
                     basis.elements.setCellWidget(row, 0, button)
+                    basis.elements.setItem(row, 0, placeholder)
                     basis.elements.setRowHeight(row, int(1.5*self.fontMetrics().boundingRect("QQ").height()))
                     
                 if j < len(self.settings.last_basis_elements):
@@ -3998,6 +4008,8 @@ class BasisWidget(QWidget):
                         basis.setSelectedElements(
                             [x for x in previous_elements + basis.currentElements() if x not in elements_with_different_basis]
                         )
+            
+            basis.elements.sortItems(0)
 
         for j, basis in enumerate(self.ecp_options):
             elements_with_different_basis = []
@@ -4017,9 +4029,12 @@ class BasisWidget(QWidget):
                     row = basis.elements.rowCount()
                     basis.elements.insertRow(row)
                     button = ElementButton(element)
+                    placeholder = UserRoleSortableTableWidget()
+                    placeholder.setData(Qt.UserRole, ELEMENTS.index(element))
                     button.stateChanged.connect(lambda *args, s=basis: self.check_elements(s))
                     button.stateChanged.connect(lambda *args, s=basis: self.something_changed())
                     basis.elements.setCellWidget(row, 0, button)
+                    basis.elements.setItem(row, 0, placeholder)
                     basis.elements.setRowHeight(row, int(1.5*self.fontMetrics().boundingRect("QQ").height()))
                 
                 if j < len(self.settings.last_ecp_elements):
@@ -4028,6 +4043,8 @@ class BasisWidget(QWidget):
                         basis.setSelectedElements(
                             [x for x in previous_elements + basis.currentElements() if x not in elements_with_different_basis]
                         )
+            
+            basis.elements.sortItems(0)
 
         if len(self.basis_options) == 1 and len(self.ecp_options) == 0:
             self.basis_options[0].setSelectedElements(self.elements)
