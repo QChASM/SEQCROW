@@ -30,6 +30,7 @@ class _SEQCROWSettings(Settings):
         'ORCA_EXE': Value("orca.exe" if platform == "win32" else "orca", StringArg),
         'GAUSSIAN_EXE': Value("g09.exe" if platform == "win32" else "g09", StringArg),
         'PSI4_EXE': Value("psi4", StringArg),
+        'QCHEM_EXE': Value("qchem", StringArg),
         'SCRATCH_DIR': Value(path.join(path.expanduser('~'), "SEQCROW_SCRATCH"), StringArg), 
         'JOB_FINISHED_NOTIFICATION': Value(
             'log notification', 
@@ -75,7 +76,14 @@ class FileOption(InputFolderOption):
             start_folder = os.getcwd()
         else:
             start_folder = self.start_folder
-        file = QFileDialog.getOpenFileName(self.widget, self.browser_title, start_folder, "All files (*)", "", QFileDialog.HideNameFilterDetails)
+        file = QFileDialog.getOpenFileName(
+            self.widget,
+            self.browser_title,
+            start_folder,
+            "All files (*)",
+            "",
+            QFileDialog.HideNameFilterDetails,
+        )
         #file is a tuple of (filename, selected filter)
         #unless no file was selected (e.g. dialog was closed by clicking 'cancel')
         if len(file) == 2:
@@ -145,6 +153,12 @@ from that file type
             "Psi4 executable", 
             FileOption, 
             "Path to Psi4 executable"
+        ), 
+
+        "QCHEM_EXE" : (
+            "Q-Chem executable", 
+            FileOption, 
+            "Path to Q-Chem executable"
         ), 
         
         "SCRATCH_DIR" : (

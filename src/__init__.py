@@ -545,6 +545,9 @@ class _SEQCROW_API(BundleAPI):
             elif name == "SQM":
                 from SEQCROW.jobs import SQMJob
                 return SQMJob
+            elif name == "Q-Chem":
+                from SEQCROW.jobs import QChemJob
+                return QChemJob
 
         elif mgr is session.test_manager:
             if name == "fuseRing_command":

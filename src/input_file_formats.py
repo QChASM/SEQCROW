@@ -49,6 +49,9 @@ class QMInputFileInfo:
     # whether frequency jobs are available
     frequency = True
     
+    # only one job type per input file
+    single_job_type = False
+    
     # file filter for QFileDialog.getOpenFileName
     # if None, will be disabled when 'read checkpoint' is checked
     save_checkpoint_filter = None
@@ -566,7 +569,7 @@ class QChemKeywordOptions(KeywordOptions):
                 'settings',
                 last_dict,
                 previous_dict,
-                "double click to use $rem\n\t\"%s %s\"\n$end",
+                "double click to use $rem\n\t%s = %s\n$end",
                 one_opt_per_kw=True,
                 allow_dup=False,
             )
@@ -605,7 +608,9 @@ class QChemKeywordOptions(KeywordOptions):
                 last_dict,
                 previous_dict,
                 "double click to use $%s\n\t%s\n$end",
-                one_opt_per_kw=False
+                one_opt_per_kw=False,
+                allow_dup=True,
+                banned_settings=["rem"],
             )
 
 
@@ -1052,13 +1057,14 @@ class SQMFileInfo(QMInputFileInfo):
 class QChemFileInfo(QMInputFileInfo):
     name = "Q-Chem"
     
+    single_job_type = True
+    
     initial_presets = {
         "quick optimize":{
             "theory": Theory(
                 job_type=OptimizationJob(),
                 method="HF-3c",
                 basis="MINIX",
-                rem={"JOB_TYPE": "SP"},
             ),
             "use_method": True,
             "use_job_type": True,
@@ -1068,10 +1074,14 @@ class QChemFileInfo(QMInputFileInfo):
     }
     
     initial_options = {
-        QCHEM_REM: {"SCF_MAX_CYCLES": "150"},
+        QCHEM_REM: {
+            "SCF_MAX_CYCLES": ["150"],
+            "JOB_TYPE": ["NMR", "Force", "SP"],
+            "IQMOL_FCHK": ["TRUE"],
+        },
     }
     
-    save_file_filter = "Q-Chem input files (*.inp,*.inq)"
+    save_file_filter = "Q-Chem input files (*.inp *.inq)"
     basis_file_filter = "Basis Set Files (*.basis)"
     raman_available = True
     methods = [
@@ -1116,7 +1126,7 @@ class QChemFileInfo(QMInputFileInfo):
         "6-311+G**",
     ]
     ecps = ["LANL2DZ"]
-    keyword_options = ORCAKeywordOptions
+    keyword_options = QChemKeywordOptions
     
     def get_file_contents(self, theory):
         """creates Q-Chem input file using AaronTools"""

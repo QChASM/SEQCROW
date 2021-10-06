@@ -1547,6 +1547,10 @@ class JobTypeOption(QWidget):
         """when optimization is checked, switch the tab widget to show optimization settings"""
         if state == Qt.Checked:
             self.job_type_opts.setCurrentIndex(1)
+            if self.form.single_job_type:
+                self.do_freq.blockSignals(True)
+                self.do_freq.setCheckState(Qt.Unchecked)
+                self.do_freq.blockSignals(False)
         elif self.job_type_opts.currentIndex() == 1:
             self.job_type_opts.setCurrentIndex(0)
 
@@ -1554,8 +1558,12 @@ class JobTypeOption(QWidget):
         """when frequency is checked, switch the tab widget to show freq settings"""
         if state == Qt.Checked:
             self.job_type_opts.setCurrentIndex(2)
+            if self.form.single_job_type:
+                self.do_geom_opt.blockSignals(True)
+                self.do_geom_opt.setCheckState(Qt.Unchecked)
+                self.do_geom_opt.blockSignals(False)
         elif self.job_type_opts.currentIndex() == 2:
-            self.job_type_opts.setCurrentIndex(0)
+            self.job_type_opts.setCurrentIndex(0) 
 
     def chk_state_changed(self, state):
         if state == Qt.Checked:
@@ -1614,6 +1622,14 @@ class JobTypeOption(QWidget):
             (self.use_checkpoint.checkState() == Qt.Checked and bool(file_info.read_checkpoint_filter)) or 
             (self.use_checkpoint.checkState() == Qt.Unchecked and bool(file_info.save_checkpoint_filter))
         )
+
+        if file_info.single_job_type:
+            if (
+                self.do_geom_opt.checkState() == Qt.Checked and
+                self.do_freq.checkState() == Qt.Checked
+            ):
+                self.do_geom_opt.setCheckState(Qt.Unchecked)
+                self.do_freq.setCheckState(Qt.Unchecked)
 
         self.solvent_names.sortItems()
 
@@ -4353,7 +4369,8 @@ class TwoLayerKeyWordOption(QWidget):
             opt_fmt,
             one_opt_per_kw=False,
             parent=None,
-            allow_dup=False
+            allow_dup=False,
+            banned_settings=None,
     ):
         """
         name                    - name of the left groupbox
@@ -4365,6 +4382,7 @@ class TwoLayerKeyWordOption(QWidget):
                                     keyword can accept > 1 option
         opt_fmt                 - str; format when displaying options for selected keyword
         allow_dup               - bool; allow duplicate values in the option table
+        banned_settings         - list of top layer settings that are not allowed
         """
 
         self.name = name
@@ -4373,6 +4391,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.one_opt_per_kw = one_opt_per_kw
         self.opt_fmt = opt_fmt
         self.allow_dup = allow_dup
+        self.banned_settings = banned_settings
 
         super().__init__(parent)
 
@@ -4555,6 +4574,9 @@ class TwoLayerKeyWordOption(QWidget):
 
     def add_item_to_current_kw_table(self, kw):
         """add kw to 'current keyword' table"""
+        if self.banned_settings:
+            if any(x.lower() == kw.lower() for x in self.banned_settings):
+                return
         row = self.current_kw_table.rowCount()
         self.current_kw_table.insertRow(row)
         item = QTableWidgetItem(kw)
@@ -4685,6 +4707,9 @@ class TwoLayerKeyWordOption(QWidget):
         """add button was clicked for keyword
         add the text to the table"""
         kw = self.new_kw.text()
+        if self.banned_settings:
+            if any(x.lower() == kw.lower() for x in self.banned_settings):
+                return
         if len(kw.strip()) == 0:
             return
 

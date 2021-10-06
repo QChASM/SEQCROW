@@ -278,9 +278,9 @@ class SQMJob(LocalJob):
         self.start_time = asctime(localtime())
 
         self.scratch_dir = os.path.join(
-                        os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
-                        "%s %s" % (self.name, self.start_time.replace(':', '.')), \
-                    )
+            os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
+            "%s %s" % (self.name, self.start_time.replace(':', '.')), \
+        )
 
         if not os.path.exists(self.scratch_dir):
             os.makedirs(self.scratch_dir)
@@ -312,4 +312,64 @@ class SQMJob(LocalJob):
     def get_json(self):
         d = super().get_json()
         d["format"] = "SQM"
+        return d
+
+
+class QChemJob(LocalJob):
+    format_name = "out"
+    info_type = "Q-Chem"
+    def __repr__(self):
+        return "local Q-Chem job \"%s\"" % self.name
+
+    def run(self):
+        self.start_time = asctime(localtime())
+
+        self.scratch_dir = os.path.join(
+            os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
+            "%s %s" % (self.name, self.start_time.replace(':', '.')), \
+        )
+
+        if not os.path.exists(self.scratch_dir):
+            os.makedirs(self.scratch_dir)
+
+        infile = self.name.replace(" ", "_") + '.inp'
+        infile_path = os.path.join(self.scratch_dir, infile)
+        self.write_file(infile_path)
+
+        executable = os.path.abspath(self.session.seqcrow_settings.settings.QCHEM_EXE)
+        if not os.path.exists(executable):
+            executable = self.session.seqcrow_settings.settings.QCHEM_EXE
+
+        self.output_name = os.path.join(self.scratch_dir, self.name.replace(" ", "_") + '.out')
+        outfile = open(self.output_name, 'w')
+
+        args = [
+            executable,
+            "-nt %i" % self.theory.processors,
+            infile,
+        ]
+
+        print(args)
+
+        log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
+        log.write("executing:\n%s\n\n" % " ".join(args))
+
+        if platform == "win32":
+            self.process = subprocess.Popen(
+                args, cwd=self.scratch_dir, stdout=outfile, stderr=log,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+        else:
+            self.process = subprocess.Popen(
+                args, cwd=self.scratch_dir, stdout=outfile, stderr=log
+            )
+
+        self.process.communicate()
+        self.process = None
+
+        return 
+
+    def get_json(self):
+        d = super().get_json()
+        d["format"] = "Q-Chem"
         return d
