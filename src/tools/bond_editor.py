@@ -1,7 +1,6 @@
 import numpy as np
 
 from chimerax.atomic import selected_atoms, selected_bonds, selected_pseudobonds, AtomicStructure
-from chimerax.atomic.colors import element_color
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow
 from chimerax.ui.widgets import ColorButton
@@ -11,7 +10,7 @@ from chimerax.core.commands import run, BoolArg, FloatArg, IntArg, TupleOf
 
 from Qt.QtCore import Qt
 from Qt.QtWidgets import QGridLayout, QFormLayout, QCheckBox, QTabWidget, QPushButton, \
-                         QSpinBox, QDoubleSpinBox, QWidget, QLabel, QStatusBar, QSizePolicy, \
+                         QSpinBox, QDoubleSpinBox, QWidget, QLabel, QStatusBar, \
                          QGroupBox, QComboBox
 
 from SEQCROW.utils import iter2str
@@ -19,11 +18,9 @@ from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.selectors import get_fragment
 from SEQCROW.tools.structure_editing import PTable
 from SEQCROW.widgets.periodic_table import ElementButton
-from SEQCROW.utils import contrast_bw
 
 from AaronTools.finders import AnyTransitionMetal
 from AaronTools.atoms import BondOrder
-from AaronTools.const import ELEMENTS
 
 ORDER_BOND_ORDER = BondOrder()
 

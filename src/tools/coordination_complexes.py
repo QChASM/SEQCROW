@@ -1,4 +1,3 @@
-from chimerax.atomic.colors import element_color
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 
@@ -19,14 +18,12 @@ from Qt.QtWidgets import (
     QHeaderView,
 )
 
-from AaronTools.const import ELEMENTS
 from AaronTools.component import Component
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.libraries import LigandTable
 from SEQCROW.managers.filereader_manager import apply_seqcrow_preset
 from SEQCROW.tools.structure_editing import _PTable
-from SEQCROW.utils import contrast_bw
 from SEQCROW.widgets.periodic_table import ElementButton
 
 def create_coord_items(tool, layout, allow_minimization=True, default_ele="Ca"):

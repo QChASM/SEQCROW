@@ -3,7 +3,6 @@ from AaronTools.component import Component
 from AaronTools.ring import Ring
 
 from chimerax.atomic import selected_atoms, PseudobondGroup
-from chimerax.atomic.colors import element_color
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.core.settings import Settings
@@ -16,7 +15,7 @@ from Qt.QtWidgets import (
     QWidget, QFormLayout, QCheckBox, QCompleter
 )
 
-from AaronTools.const import ELEMENTS, RADII
+from AaronTools.const import RADII
 from AaronTools.atoms import Atom
 
 from SEQCROW.residue_collection import ResidueCollection
@@ -25,7 +24,6 @@ from SEQCROW.commands.substitute import guessAttachmentTargets
 from SEQCROW.finders import AtomSpec
 from SEQCROW.widgets import PeriodicTable, ModelComboBox, ElementButton
 from SEQCROW.managers.filereader_manager import apply_seqcrow_preset
-from SEQCROW.utils import contrast_bw
 
 import numpy as np
 

@@ -6,7 +6,6 @@ import numpy as np
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.ui.widgets import ColorButton
-from chimerax.std_commands.coordset_gui import CoordinateSetSlider
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
 from chimerax.core.commands.cli import FloatArg, TupleOf, IntArg
@@ -14,15 +13,14 @@ from chimerax.core.commands import run
 
 from AaronTools.comp_output import CompOutput
 from AaronTools.const import FREQUENCY_SCALE_LIBS
-from AaronTools.geometry import Geometry
 from AaronTools.spectra import Frequency
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
 from matplotlib import rcParams
 
-from Qt.QtCore import Qt, QRect, QItemSelectionModel, QVariant, QSize
-from Qt.QtGui import QValidator, QFont, QIcon
+from Qt.QtCore import Qt, QSize
+from Qt.QtGui import QIcon
 from Qt.QtWidgets import (
     QSpinBox,
     QDoubleSpinBox,
@@ -31,12 +29,9 @@ from Qt.QtWidgets import (
     QTabWidget,
     QComboBox,
     QTableWidget,
-    QTableView,
     QWidget,
-    QTableWidgetItem,
     QFormLayout,
     QCheckBox,
-    QHeaderView,
     QMenuBar,
     QFileDialog,
     QStyle,

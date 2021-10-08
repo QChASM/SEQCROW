@@ -21,10 +21,19 @@ DEFAULT_CONFIG = Config(quiet=True)
 # AaronTools config
 if not DEFAULT_CONFIG["DEFAULT"].getboolean("local_only"):
     import urllib.parse
-    from urllib.error import HTTPError
     from urllib.request import urlopen
 
 """
+I was hoping for a python 2D builder, but all the ones I found were based on RDKit
+the RDKit that is available on pypi doesn't work with the Qt that comes with ChimeraX
+it relies on SVG, which our Qt doesn't have a module for
+I think it also wasn't available for windows (or maybe the editor that uses rdkit
+isn't available for windows)
+so I tried to make my own, but that wasn't going well
+lines were jagged, you can't draw double bonds yet, hydrogens don't move
+like they need to
+but this is it, in case I need it again
+possibly just a reference for putting drawings on an interactable graphics scene
 class MolGraphicsScene(QGraphicsScene):
     def __init__(self, *args, tools=None, element=None, **kwargs):
         self._tools = tools
@@ -550,7 +559,12 @@ class MolBuilder(HtmlToolInstance):
     def __init__(self, session, name):       
         super().__init__(session, name, size_hint=(475, 450))
 
-        self.display_name = "Tutorial — HTML-based"
+        self.display_name = "2D Builder"
+        if DEFAULT_CONFIG["DEFAULT"].getboolean("local_only"):
+            self.session.logger.error(
+                "this tool will not work while 'local_only' is enabled in your AaronTools config\n"
+                "please disable 'local_only' in your AaronTools config and restart ChimeraX"
+            )
 
         self._build_ui()
 
@@ -562,6 +576,8 @@ class MolBuilder(HtmlToolInstance):
 
         query = urllib.parse.parse_qs(url.query())
 
+        # tool has URL's to acknowledge how we get the structure
+        # clicking those opens these links
         if "link" in query:
             link = query["link"][0]
             if link == "AmberTools":
@@ -570,13 +586,17 @@ class MolBuilder(HtmlToolInstance):
                 run(self.session, "open \"https://cactus.nci.nih.gov/\"")
             return
 
+        # this is the 2D mol file that we will convert to a 3D structure
+        # as some point in the HTML file, spaces are turned into sPaCe so they don't get nuked
         molfile = query["molfile"][0].replace("sPaCe", " ").replace("\\n", "\n")
+        # copy-paste from AaronTools.from_string
+        # instead of smiles, we have a file
         url = "https://cactus.nci.nih.gov/cgi-bin/translate.tcl?smiles=&format=sdf&astyle=kekule&dim=3D&file=%s" % urllib.parse.quote_plus(molfile)
         s_sd_get = urlopen(url, context=ssl.SSLContext())
         msg, status = s_sd_get.msg, s_sd_get.status
         if msg != "OK":
             self.session.logger.error(
-                "Issue contacting %s for SMILES lookup (status: %s)",
+                "Issue contacting %s for MOL lookup (status: %s)",
                 CACTUS_HOST,
                 status,
             )
@@ -604,6 +624,7 @@ class MolBuilder(HtmlToolInstance):
         name = query["name"][0]
         fr = FileReader((name, "sd", s_sd))
         rescol = ResidueCollection(fr)
+        # if not optimization was requested, open the new molecule
         if query["method"][0] == "no":
             struc = rescol.get_chimera(self.session, filereader=fr)
             self.session.models.add([struc])
@@ -611,6 +632,8 @@ class MolBuilder(HtmlToolInstance):
                 struc, fallback="Ball-Stick-Endcap",
             )
             return
+        
+        # if optimization was requested, run the SQM job with auto_open=True
         theory = Theory(
             method=query["method"][0],
             charge=fr.other["charge"],

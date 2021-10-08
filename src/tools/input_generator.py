@@ -46,7 +46,6 @@ from Qt.QtWidgets import (
     QTreeWidgetItem,
     QSizePolicy,
     QStyle,
-    QListWidgetItem,
 )
 
 from SEQCROW.residue_collection import ResidueCollection, Residue
@@ -3506,7 +3505,7 @@ class BasisOption(QWidget):
                 elif element.lower() == "!tm" or elements == "!tm":
                     for i in range(0, self.elements.rowCount()):
                         button = self.elements.cellWidget(i, 0)
-                        if item.text() not in TMETAL:
+                        if button.text() not in TMETAL:
                             button.setState(ElementButton.Checked)
 
                 elif element.lower() == "all" or elements == "all":

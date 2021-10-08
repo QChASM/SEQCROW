@@ -11,7 +11,7 @@ from Qt.QtGui import QKeySequence
 from Qt.QtWidgets import QPushButton, QFormLayout, QComboBox, QCheckBox, QMenuBar, QAction, \
     QFileDialog, QApplication, QTableWidget, QTableWidgetItem, \
     QHeaderView, QSpinBox, QWidget, QGridLayout, \
-    QTabWidget, QGroupBox, QDoubleSpinBox, QMessageBox
+    QTabWidget, QDoubleSpinBox, QMessageBox
 
 from SEQCROW.commands.percent_Vbur import percent_vbur as percent_vbur_cmd
 from SEQCROW.tools.per_frame_plot import NavigationToolbar

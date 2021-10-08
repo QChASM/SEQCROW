@@ -225,6 +225,7 @@
                 <Provider name="buried_volume"/>
                 <Provider name="lookDown_command"/>
                 <Provider name="cone_angle"/>
+                <Provider name="substituent_sterimol"/>
             </Providers>
   
             <!--

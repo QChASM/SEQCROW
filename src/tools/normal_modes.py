@@ -23,7 +23,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
 from matplotlib import rcParams
 
-from Qt.QtCore import Qt, QRect, QItemSelectionModel, QVariant
+from Qt.QtCore import Qt, QRect, QItemSelectionModel
 from Qt.QtGui import QValidator, QFont, QIcon
 from Qt.QtWidgets import (
     QSpinBox,

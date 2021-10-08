@@ -6,3 +6,5 @@ see those files for details about the changes
 the data, samples, and tests folders have also been deleted to reduce file size
 
 
+October 8. 2021
+deleted src folder - source code that is used is in install

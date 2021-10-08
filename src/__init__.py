@@ -578,6 +578,10 @@ class _SEQCROW_API(BundleAPI):
                 from .tests.cone_angle import ConeAngleToolTest
                 return ConeAngleToolTest
 
+            elif name == "substituent_sterimol":
+                from .tests.substituent_sterimol import SubstituentSterimolToolTest
+                return SubstituentSterimolToolTest
+
     @staticmethod
     def register_command(bundle_info, command_info, logger):
         """

@@ -574,3 +574,72 @@ nrg = energy('CCSD(T)')
 
         for ref, test in zip(ref_lines, content_lines):
             self.assertEqual(ref, test)
+
+    def test_qchem_opt(self):
+        run(self.session, "open %s" % self.benzene)
+
+        qm_input_tool = self.open_tool("Build QM Input")
+        self.assertTrue(bool(qm_input_tool))
+
+        ndx = qm_input_tool.file_type.findText("Q-Chem", Qt.MatchExactly)
+        qm_input_tool.file_type.setCurrentIndex(ndx)
+
+        qm_input_tool.job_widget.do_geom_opt.setCheckState(Qt.Checked)
+        qm_input_tool.job_widget.ts_opt.setCheckState(Qt.Unchecked)
+        qm_input_tool.job_widget.charge.setValue(0)
+        qm_input_tool.job_widget.multiplicity.setValue(1)
+        qm_input_tool.job_widget.nprocs.setValue(0)
+        qm_input_tool.job_widget.mem.setValue(0)
+
+        qm_input_tool.method_widget.setMethod("M06-2X")
+        qm_input_tool.method_widget.setGrid("SG-3")
+        qm_input_tool.method_widget.setDispersion("Zero-damped Grimme D3")
+
+        basis = BasisSet("def2-TZVP")
+        qm_input_tool.basis_widget.setBasis(basis)
+
+        qm_input_tool.other_keywords_widget.setKeywords({})
+
+        contents, warnings = qm_input_tool.get_file_contents()
+        qm_input_tool.delete()
+        if warnings:
+            # there were warnings - I don't expect any
+            self.assertTrue(False)
+
+        ref_file = """$rem
+    JOB_TYPE             =   OPT
+    DFT_D                =   D3_ZERO
+    XC_GRID              =   3
+    BASIS                =   def2-TZVP
+    METHOD               =   M06-2X
+$end
+
+$comments
+    benzene_1-NO2_4-Cl.xyz 12,11=>H
+$end
+
+$molecule
+    0 1
+    C     -1.97696     -2.32718      0.00126
+    C     -2.36814     -1.29554      0.85518
+    C     -1.67136     -0.08735      0.85440
+    C     -0.58210      0.08919      0.00026
+    C     -0.19077     -0.94241     -0.85309
+    C     -0.88848     -2.15056     -0.85289
+    H     -3.22679     -1.43483      1.52790
+    H     -1.98002      0.72606      1.52699
+    H      0.66766     -0.80358     -1.52636
+    H     -0.57992     -2.96360     -1.52585
+    H     -0.03766      1.03348     -0.00013
+    H     -2.52191     -3.27117      0.00170
+$end
+"""
+
+        content_lines = contents.splitlines()
+        ref_lines = ref_file.splitlines()
+
+        self.assertEqual(len(content_lines), len(ref_lines))
+
+        for ref, test in zip(ref_lines, content_lines):
+            self.assertEqual(ref, test)
+
