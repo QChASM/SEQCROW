@@ -189,6 +189,7 @@
                 <Provider name="sqm output file" want_path="false"/>
                 <Provider name="NBO input file" want_path="true"/>
                 <Provider name="NBO output file" want_path="true"/>
+                <Provider name="Q-Chem output file" want_path="false"/>
             </Providers>
             
             <!--we can save Gaussian input files, but not with the save command-->

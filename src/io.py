@@ -18,6 +18,8 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
         fmt = "fchk"
     elif format_name == "sqm output file":
         fmt = "sqmout"
+    elif format_name == "Q-Chem output file":
+        fmt = "qout"
 
     max_length = session.seqcrow_settings.settings.MAX_FCHK_ARRAY
 
