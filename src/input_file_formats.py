@@ -111,6 +111,11 @@ class QMInputFileInfo:
     # will be appended with "other", which allows users to enter ECP info
     ecps = None
     
+    # ECP differs (or can be specified separate from) valence basis set
+    # if this is false, putting an element in an ECP will remove it
+    # from the basis set and vice versa
+    valence_basis_differs_from_ecp = True
+    
     # misc. options
     # should be None ('additional options' tab will be disabled) or
     # a KeywordOptions subclass (not an instance, just the class)
@@ -1091,7 +1096,7 @@ class QChemFileInfo(QMInputFileInfo):
         "M06-2X",
         "ωB97X-D3",
         "B3PW91",
-        "B97-D3",
+        "B97-D3(0)",
         "BP86",
         "PBE0",
         "HF-3c",
@@ -1125,7 +1130,7 @@ class QChemFileInfo(QMInputFileInfo):
         "aug-cc-pVTZ",
         "6-311+G**",
     ]
-    ecps = ["LANL2DZ"]
+    ecps = ["fit-LANL2DZ", "def2-ECP", "SRLC", "SRSC"]
     keyword_options = QChemKeywordOptions
     
     def get_file_contents(self, theory):
