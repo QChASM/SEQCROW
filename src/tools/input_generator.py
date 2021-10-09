@@ -3561,11 +3561,14 @@ class BasisOption(QWidget):
         """set options to match these options"""
         if name is not None:
             ndx = self.basis_option.findData(name, Qt.MatchExactly)
-            if ndx < 0:
+            if ndx < 0 and name:
                 ndx = self.basis_option.findData("other", Qt.MatchExactly)
                 self.custom_basis_kw.setText(name)
 
             self.basis_option.setCurrentIndex(ndx)
+        
+        else:
+            self.basis_option.setCurrentIndex(0)
 
         if custom_kw is not None:
             self.custom_basis_kw.setText(custom_kw)
