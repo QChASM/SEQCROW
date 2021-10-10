@@ -3172,6 +3172,22 @@ class BasisOption(QWidget):
 
         self.setOptions(self.form)
         self.aux_type.currentIndexChanged.connect(self.basis_changed)
+        self.aux_type.currentIndexChanged.connect(self.check_aux_basis_options)
+
+    def check_aux_basis_options(self):
+        basis_options = getattr(self.form, self.info_attribute)
+        if not isinstance(basis_options, dict):
+            return
+        
+        self.basis_option.clear()
+        aux = self.getAuxType()
+        if aux in basis_options:
+            basis_options = basis_options[aux]
+        else:
+            basis_options = basis_options["no"]
+
+        self.basis_option.addItems(basis_options)
+        self.basis_option.addItem("other")
 
     def setOptions(self, file_info):
         """display options that are available in the specified program"""
@@ -3186,7 +3202,13 @@ class BasisOption(QWidget):
             self.blockSignals(False)
             return
 
-        self.basis_option.addItems(getattr(file_info, self.info_attribute))
+        basis_options = getattr(file_info, self.info_attribute)
+        if isinstance(basis_options, dict):
+            if aux in basis_options:
+                basis_options = basis_options[aux]
+            else:
+                basis_options = basis_options["no"]
+        self.basis_option.addItems(basis_options)
         self.basis_option.addItem("other")
         
         if not file_info.aux_options and self.getAuxType() != "no":

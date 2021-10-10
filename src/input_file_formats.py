@@ -827,17 +827,65 @@ class ORCAFileInfo(QMInputFileInfo):
         "Grid5 (ORCA 4)": "Grid5",
         "Grid4 (ORCA 4)": "Grid4",
     }
-    basis_sets = [
-        "def2-SVP",
-        "def2-TZVP",
-        "cc-pVDZ",
-        "cc-pVTZ",
-        "aug-cc-pVDZ",
-        "aug-cc-pVTZ",
-        "6-311+G**",
-        "SDD",
-        "LANL2DZ"
-    ]
+    basis_sets = {
+        "no": [
+            "def2-SVP",
+            "def2-TZVP",
+            "cc-pVDZ",
+            "cc-pVTZ",
+            "aug-cc-pVDZ",
+            "aug-cc-pVTZ",
+            "6-311+G**",
+            "ZORA-def2-SVP",
+            "SARC-ZORA-SVP",
+            "ZORA-def2-TZVP",
+            "SARC-ZORA-TZVP",
+            "DKH-def2-TZVP",
+            "SARC-DKH-TZVP",
+            "SDD",
+            "LANL2DZ",
+        ],
+        "C": [
+            "def2-SVP",
+            "def2-TZVP",
+            "cc-pVDZ",
+            "cc-pVTZ",
+            "cc-pVDZ-PP",
+            "cc-pVTZ-PP",
+            "aug-cc-pVDZ",
+            "aug-cc-pVTZ",
+            "aug-cc-pVDZ-PP",
+            "aug-cc-pVTZ-PP",
+        ],
+        "J": [
+            "def2",
+            "SARC",
+        ],
+        "JK": [
+            "def2",
+            "cc-pVDZ",
+            "cc-pVTZ",
+            "cc-pVQZ",
+            "aug-cc-pVDZ",
+            "aug-cc-pVTZ",
+            "aug-cc-pVQZ",
+        ],
+        "CABS": [
+            "cc-pVDZ-F12",
+            "cc-pVTZ-F12",
+            "cc-pVQZ-F12",
+        ],
+        "OptRI CABS": [
+            "cc-pVDZ-F12",
+            "cc-pVTZ-F12",
+            "cc-pVQZ-F12",
+            "aug-cc-pVDZ-F12",
+            "aug-cc-pVTZ-F12",
+            "aug-cc-pVQZ-F12",
+            "aug-cc-pVDZ-PP-F12",
+            "aug-cc-pVTZ-PP-F12",
+        ],
+    }
     aux_options = BasisSet.ORCA_AUX
     ecps = ["SDD", "LANL2DZ", "def2-ECP", "SK-MCDHF-RSC", "HayWadt"]
     keyword_options = ORCAKeywordOptions
@@ -915,7 +963,9 @@ class Psi4FileInfo(QMInputFileInfo):
             'cubeprop_tasks': ["frontier_orbitals"],
         },
         PSI4_BEFORE_GEOM: [],
-        PSI4_BEFORE_JOB: ['activate(auto_fragments())'],
+        PSI4_BEFORE_JOB: [
+            'activate(auto_fragments())', "mol = get_active_molecule()"
+        ],
         PSI4_JOB: {
             'energy': ['return_wfn=True'],
             'optimize': ['return_wfn=True', "engine='geometric'"],
@@ -1121,15 +1171,48 @@ class QChemFileInfo(QMInputFileInfo):
         "(50, 434)",
         "(75, 302)",
     ]
-    basis_sets = [
-        "def2-SVP",
-        "def2-TZVP",
-        "cc-pVDZ",
-        "cc-pVTZ",
-        "aug-cc-pVDZ",
-        "aug-cc-pVTZ",
-        "6-311+G**",
-    ]
+    basis_sets = {
+        "no": [
+            "def2-SVP",
+            "def2-TZVP",
+            "cc-pVDZ",
+            "cc-pVTZ",
+            "aug-cc-pVDZ",
+            "aug-cc-pVTZ",
+            "6-311+G**",
+        ],
+        "RI": [
+            "RIMP2-def2-SVP",
+            "RIMP2-def2-SVPD",
+            "RIMP2-def2-TZVP",
+            "RIMP2-def2-TZVPD",
+            "RIMP2-aug-cc-pVDZ",
+            "RIMP2-cc-pVTZ",
+            "RIMP2-aug-cc-pVTZ",
+        ],
+        "corr": [
+            "RIMP2-def2-SVP",
+            "RIMP2-def2-SVPD",
+            "RIMP2-def2-TZVP",
+            "RIMP2-def2-TZVPD",
+            "RIMP2-aug-cc-pVDZ",
+            "RIMP2-cc-pVTZ",
+            "RIMP2-aug-cc-pVTZ",
+        ],
+        "J": [
+            "RIJ-def2-SVP",
+            "RIJ-def2-SVPD",
+            "RIJ-def2-TZVP",
+            "RIJ-def2-TZVPD",
+        ],
+        "K": [
+            "RIJK-def2-SVP",
+            "RIJK-def2-SVPD",
+            "RIJK-def2-TZVP",
+            "RIJK-def2-TZVPD",
+        ],
+    }
+    aux_options = BasisSet.QCHEM_AUX
     ecps = ["fit-LANL2DZ", "def2-ECP", "SRLC", "SRSC"]
     keyword_options = QChemKeywordOptions
     
