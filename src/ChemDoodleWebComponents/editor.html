@@ -1,0 +1,125 @@
+<html>
+<head>
+<meta http-equiv="X-UA-Compatible" content="chrome=1">
+<link rel="stylesheet" href="install/ChemDoodleWeb.css" type="text/css">
+<link rel="stylesheet" href="install/uis/jquery-ui-1.11.4.css" type="text/css">
+
+<script type="text/javascript" src="install/ChemDoodleWeb.js"></script>
+<script type="text/javascript" src="install/uis/ChemDoodleWeb-uis.js"></script>
+<title>ChemDoodle Web Component Sketcher (Single Molecule Sketcher)</title>
+</head>
+
+<style>
+    label {
+        font-family: sans-serif;
+    }
+    input, select {
+        margin-bottom: 4px;
+    }
+    button {
+        margin-bottom: 4px;
+    }
+
+    $buttonBaseColor: #336699;
+    $disableDuration: 2s;
+</style>
+
+<body>
+    <center>
+        <br>
+        <script>
+            ChemDoodle.ELEMENT['H'].jmolColor = 'black';
+            ChemDoodle.ELEMENT['S'].jmolColor = '#B9A130';
+            var sketcher = new ChemDoodle.SketcherCanvas(
+                'sketcher', 425, 250, {useServices:false, oneMolecule:true, resizable:true}
+            );
+            sketcher.styles.atoms_displayTerminalCarbonLabels_2D = false;
+            sketcher.styles.atoms_useJMOLColors = false;
+            sketcher.styles.bonds_clearOverlaps_2D = true;
+            sketcher.repaint();
+        </script>
+        <form id="form" method="get" action="editor:mol">
+            <input name="molfile" value="" id="form_value" hidden="true"/>
+            <br>
+                <button type="button" id="test">open molecule</button>
+            <br>
+                <label for="opt" style="font-family: sans-serif">optimize:</label>
+                <select id="opt" name="method">
+                    <option value="no">no</option>
+                    <option value="PM6">PM6</option>
+                    <option value="am1">AM1</option>
+                    <option value="RM1">RM1</option>
+                </select>
+                <br>
+                <label for="name" style="">model name:</label>
+                <input type="text" id="name" name="name" value="new" required="true">
+        </form>
+        <form method="get" action="cxcmd:open">
+            <p style="font-family: sans-serif">
+                3D structures generated using
+                <input type="submit" name="link"
+                style="border: 0; background: none; box-shadow: none; border-radius: 0px; color: blue;"
+                value="NCI/CADD"/>
+                <br>
+                Optimizations utilize SQM from
+                <input type="submit" name="link"
+                style="border: 0; background: none; box-shadow: none; border-radius: 0px; color: blue;"
+                value="AmberTools"/>
+            </p>
+        </form>
+        </form>
+        <!--<p id="molout"></p>-->
+        <script>
+            var button = document.getElementById("test");
+            var method = document.getElementById("opt");
+            var form = document.getElementById("form");
+            var form_val = document.getElementById("form_value");
+            // cooldown so people can't spam cactus
+            var cooldown = 5;
+            function submitForm() {
+                var model_name = document.getElementById("name").value;
+                // make sure the user entered a name
+                if (model_name.match(/^\s*$/)) {
+                    alert("please enter a name for this molecule");
+                    exit;
+                };
+                // get a mol file for the molecule
+                var mol = sketcher.getMolecule();
+                // the spaces and newlines get nuked(I think?), so replace them
+                //sPaCe gets converted to " " once we get back to Python
+                var out = ChemDoodle.writeMOL(mol).replace(/\n/g, "\\n").replace(/\s/g, "sPaCe");
+                // put this on a form item so it gets passed to python
+                form_val.value = out;
+                // turn off the button for cooldown seconds
+                button.disabled = true;
+                // change the text so it shows the time until the user
+                // can click it again
+                button.innerHTML = "open molecule (" + (cooldown - 1).toString() + "s)";
+                for (let t=1; t < cooldown; t++) {
+                    setTimeout(
+                        function(time) {
+                            if (time == cooldown - 1) {
+                                // time's up! re-enable the button
+                                button.disabled = false;
+                                button.innerHTML = "open molecule";
+                            } else {
+                                // label is changed every second
+                                var diff = cooldown - time - 1;
+                                button.innerHTML = "open molecule (" + diff.toString() + "s)";
+                            }
+                        },
+                        1000 * t,
+                        t,
+                    );
+                };
+                // submit the form - kicks it back to python with all the info
+                form.submit();
+                if (!method.value.match("no")) {
+                    alert("structure will open when optimization finishes");
+                };
+            };
+            button.onclick = submitForm;
+        </script>
+    </center>
+</body>
+</html>

@@ -18,8 +18,17 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
         fmt = "fchk"
     elif format_name == "sqm output file":
         fmt = "sqmout"
+    elif format_name == "Q-Chem output file":
+        fmt = "qout"
 
-    fr = FileReader((file_name, fmt, stream), just_geom=False, get_all=True)
+    max_length = session.seqcrow_settings.settings.MAX_FCHK_ARRAY
+
+    fr = FileReader(
+        (file_name, fmt, stream),
+        just_geom=False,
+        get_all=True,
+        max_length=max_length,
+    )
 
     if hasattr(stream, "close") and callable(stream.close):
         stream.close()
@@ -28,6 +37,8 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
         format_name = "Psi4 output file"
     elif fr.file_type == "out":
         format_name = "ORCA output file"
+    elif fr.file_type == "qout":
+        format_name = "Q-Chem output file"
 
     try:
         geom = ResidueCollection(fr, refresh_ranks=False).copy(comment=fr.comment, copy_atoms=True)
@@ -78,6 +89,8 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
         a_or_an = "an"
     elif format_name == "sqm output file":
         a_or_an = "an"
+    elif format_name == "Q-Chem output file":
+        a_or_an = "a"
         
     status = "Opened %s as %s %s %s" % (file_name, a_or_an, format_name, "movie" if coordsets else "")
 

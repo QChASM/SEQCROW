@@ -15,27 +15,57 @@ from configparser import ConfigParser
 
 from Qt.QtCore import Qt, QRegularExpression, Signal
 from Qt.QtGui import QKeySequence, QFontDatabase, QIcon
-from Qt.QtWidgets import QCheckBox, QLabel, QGridLayout, QComboBox, QSplitter, QLineEdit, \
-    QSpinBox, QMenuBar, QFileDialog, QAction, QApplication, QPushButton, \
-    QTabWidget, QWidget, QGroupBox, QListWidget, QTableWidget, QTableWidgetItem, \
-    QHBoxLayout, QFormLayout, QDoubleSpinBox, QHeaderView, QTextBrowser, \
-    QStatusBar, QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem, QSizePolicy, \
-    QStyle 
+from Qt.QtWidgets import (
+    QCheckBox,
+    QLabel,
+    QGridLayout,
+    QComboBox,
+    QSplitter,
+    QLineEdit,
+    QSpinBox,
+    QMenuBar,
+    QFileDialog,
+    QAction,
+    QApplication,
+    QPushButton,
+    QTabWidget,
+    QWidget,
+    QGroupBox,
+    QListWidget,
+    QTableWidget,
+    QTableWidgetItem,
+    QHBoxLayout,
+    QFormLayout,
+    QDoubleSpinBox,
+    QHeaderView,
+    QTextBrowser,
+    QStatusBar,
+    QTextEdit,
+    QMessageBox,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QSizePolicy,
+    QStyle,
+)
 
 from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.utils import iter2str
-from SEQCROW.widgets.periodic_table import PeriodicTable
+from SEQCROW.widgets.periodic_table import PeriodicTable, ElementButton
 from SEQCROW.widgets.comboboxes import ModelComboBox
 from SEQCROW.finders import AtomSpec
 
 from AaronTools.config import Config
-from AaronTools.const import TMETAL
+from AaronTools.const import TMETAL, ELEMENTS
 from AaronTools.theory import *
 from AaronTools.theory.method import KNOWN_SEMI_EMPIRICAL
 from AaronTools.utils.utils import combine_dicts
 from AaronTools.json_extension import ATDecoder, ATEncoder
 
 # import cProfile
+
+class UserRoleSortableTableWidget(QTableWidgetItem):
+    def __lt__(self, other):
+        return self.data(Qt.UserRole) < other.data(Qt.UserRole)
 
 
 class _InputGeneratorSettings(Settings):
@@ -115,6 +145,7 @@ class BuildQM(ToolInstance):
 
         self.display_name = "QM Input Generator"
 
+        self.theory = None
         self.tool_window = MainToolWindow(self)
         self.preview_window = None
         self.warning_window = None
@@ -146,7 +177,9 @@ class BuildQM(ToolInstance):
 
         self.changed = False
         self._changes = global_triggers.add_handler("changes", self.check_changes)
-        self._changes_done = global_triggers.add_handler("changes done", self.struc_mod_update_preview)
+        self._changes_done = global_triggers.add_handler(
+            "changes done", self.struc_mod_update_preview
+        )
 
         # this tool is big by default
         # unless the user has saved its position, make it small
@@ -614,7 +647,7 @@ class BuildQM(ToolInstance):
         self.job_widget.blockSignals(True)
         self.other_keywords_widget.blockSignals(True)
 
-        theory = preset["theory"]
+        theory = preset["theory"].copy()
 
         if "use_job_type" in preset and preset["use_job_type"]:
             self.job_widget.do_geom_opt.setChecked(False)
@@ -655,7 +688,9 @@ class BuildQM(ToolInstance):
 
         if "use_basis" in preset and preset["use_basis"]:
             if self.model_selector.currentData():
-                rescol = ResidueCollection(self.model_selector.currentData(), bonds_matter=False)
+                rescol = ResidueCollection(
+                    self.model_selector.currentData(), bonds_matter=False
+                )
                 if theory.basis:
                     theory.basis.refresh_elements(rescol)
             self.basis_widget.setBasis(theory.basis)
@@ -802,6 +837,7 @@ class BuildQM(ToolInstance):
     def struc_mod_update_preview(self, *args, **kwargs):
         """whenever a setting is changed, this should be called to update the preview"""
         if self.changed:
+            self.job_widget.check_constraints()
             self.update_preview()
             self.changed = False
 
@@ -1189,11 +1225,33 @@ class JobTypeOption(QWidget):
 
         job_type_layout.addRow("multiplicity:", self.multiplicity)
 
+        job_choice_widget = QWidget()
+        checkbox_layout = QHBoxLayout(job_choice_widget)
+        margins = checkbox_layout.contentsMargins()
+        checkbox_layout.setContentsMargins(
+            margins.left(),
+            margins.top(),
+            margins.right(),
+            0,
+        )
+        
+        checkbox_layout.insertWidget(
+            0, QLabel("geometry optimization:"), stretch=0, alignment=Qt.AlignRight | Qt.AlignVCenter
+        )
         self.do_geom_opt = QCheckBox()
-        job_type_layout.addRow("geometry optimization:", self.do_geom_opt)
+        checkbox_layout.insertWidget(
+            1, self.do_geom_opt, stretch=1, alignment=Qt.AlignLeft | Qt.AlignVCenter,
+        )
 
+        checkbox_layout.insertWidget(
+            2, QLabel("frequency calculation:"), stretch=1, alignment=Qt.AlignRight | Qt.AlignVCenter
+        )
         self.do_freq = QCheckBox()
-        job_type_layout.addRow("frequency calculation:", self.do_freq)
+        checkbox_layout.insertWidget(
+            3, self.do_freq, stretch=0, alignment=Qt.AlignLeft | Qt.AlignVCenter,
+        )
+        
+        job_type_layout.addRow(job_choice_widget)
 
         self.job_type_opts = QTabWidget()
 
@@ -1514,6 +1572,10 @@ class JobTypeOption(QWidget):
         """when optimization is checked, switch the tab widget to show optimization settings"""
         if state == Qt.Checked:
             self.job_type_opts.setCurrentIndex(1)
+            if self.form.single_job_type:
+                self.do_freq.blockSignals(True)
+                self.do_freq.setCheckState(Qt.Unchecked)
+                self.do_freq.blockSignals(False)
         elif self.job_type_opts.currentIndex() == 1:
             self.job_type_opts.setCurrentIndex(0)
 
@@ -1521,8 +1583,12 @@ class JobTypeOption(QWidget):
         """when frequency is checked, switch the tab widget to show freq settings"""
         if state == Qt.Checked:
             self.job_type_opts.setCurrentIndex(2)
+            if self.form.single_job_type:
+                self.do_geom_opt.blockSignals(True)
+                self.do_geom_opt.setCheckState(Qt.Unchecked)
+                self.do_geom_opt.blockSignals(False)
         elif self.job_type_opts.currentIndex() == 2:
-            self.job_type_opts.setCurrentIndex(0)
+            self.job_type_opts.setCurrentIndex(0) 
 
     def chk_state_changed(self, state):
         if state == Qt.Checked:
@@ -1581,6 +1647,14 @@ class JobTypeOption(QWidget):
             (self.use_checkpoint.checkState() == Qt.Checked and bool(file_info.read_checkpoint_filter)) or 
             (self.use_checkpoint.checkState() == Qt.Unchecked and bool(file_info.save_checkpoint_filter))
         )
+
+        if file_info.single_job_type:
+            if (
+                self.do_geom_opt.checkState() == Qt.Checked and
+                self.do_freq.checkState() == Qt.Checked
+            ):
+                self.do_geom_opt.setCheckState(Qt.Unchecked)
+                self.do_freq.setCheckState(Qt.Unchecked)
 
         self.solvent_names.sortItems()
 
@@ -1687,7 +1761,35 @@ class JobTypeOption(QWidget):
         self.constrained_angles = []
         self.constrained_torsions = []
 
+        for i in range(self.constrained_atom_table.rowCount() - 1, -1, -1):
+            atom = self.constrained_atoms[i]
+            if atom.deleted:
+                self.constrain_atoms.pop(i)
+                self.constrained_atom_table.removeRow(i)
+
+        for i in range(self.constrained_bond_table.rowCount() - 1, -1, -1):
+            bond = self.constrained_bonds[i]
+            if any(atom.deleted for atom in bond):
+                self.constrained_bonds.pop(i)
+                self.constrained_bond_table.removeRow(i)
+
+        for i in range(self.constrained_angle_table.rowCount() - 1, -1, -1):
+            angle = self.constrained_bonds[i]
+            if any(atom.deleted for atom in angle):
+                self.constrained_angles.pop(i)
+                self.constrained_angle_table.removeRow(i)
+
+        for i in range(self.constrained_torsion_table.rowCount() - 1, -1, -1):
+            torsion = self.constrained_bonds[i]
+            if any(atom.deleted for atom in torsion):
+                self.constrained_torsions.pop(i)
+                self.constrained_torsion_table.removeRow(i)
+
+        self.jobTypeChanged.emit()
+
+    def check_constraints(self):
         for i in range(self.constrained_atom_table.rowCount(), -1, -1):
+            
             self.constrained_atom_table.removeRow(i)
 
         for i in range(self.constrained_bond_table.rowCount(), -1, -1):
@@ -1747,32 +1849,55 @@ class JobTypeOption(QWidget):
                 constraints = self.getConstraints()
                 new_constraints = {}
                 if "atoms" in constraints:
-                    new_constraints["atoms"] = [AtomSpec(atom.atomspec) for atom in constraints["atoms"]]
+                    for atom in constraints["atoms"]:
+                        new_constraints["atoms"] = []
+                        if atom.deleted:
+                            continue
+                        new_constraints["atoms"].append(AtomSpec(atom.atomspec))
+
                     for key in ["bonds", "angles", "torsions"]:
                         if key in constraints:
                             if key in constraints:
                                 new_constraints[key] = []
                                 for constraint in constraints[key]:
-                                    new_constraints[key].append([AtomSpec(atom.atomspec) for atom in constraint])
+                                    for atom in constraint:
+                                        if atom.deleted:
+                                            break
+                                    
+                                    else:
+                                        new_constraints[key].append(
+                                            [AtomSpec(atom.atomspec) for atom in constraint]
+                                        )
 
                 constraints = new_constraints
             else:
                 constraints = None
 
-            job_types.append(OptimizationJob(transition_state=self.ts_opt.checkState() == Qt.Checked,
-                                             constraints=constraints)
-                            )
+            job_types.append(
+                OptimizationJob(
+                    transition_state=self.ts_opt.checkState() == Qt.Checked,
+                    constraints=constraints
+                )
+            )
 
         if self.do_freq.checkState() == Qt.Checked:
             if self.form == "ORCA":
-                job_types.append(FrequencyJob(numerical=(self.num_freq.checkState() == Qt.Checked or
-                                                        self.raman.checkState() == Qt.Checked),
-                                            temperature=self.temp.value())
-                                )
+                job_types.append(
+                    FrequencyJob(
+                        numerical=(
+                            self.num_freq.checkState() == Qt.Checked or
+                            self.raman.checkState() == Qt.Checked
+                        ),
+                        temperature=self.temp.value()
+                    )
+                )
             else:
-                job_types.append(FrequencyJob(numerical=self.num_freq.checkState() == Qt.Checked,
-                                              temperature=self.temp.value())
-                                )
+                job_types.append(
+                    FrequencyJob(
+                        numerical=self.num_freq.checkState() == Qt.Checked,
+                        temperature=self.temp.value()
+                    )
+                )
 
         return job_types
 
@@ -1795,7 +1920,7 @@ class JobTypeOption(QWidget):
     def setSolvent(self, solvent):
         """sets solvent to match the given ImplicitSolvent"""
         if isinstance(solvent, ImplicitSolvent):
-            ndx = self.solvent_option.findText(solvent.name)
+            ndx = self.solvent_option.findText(solvent.solvent_model)
             if ndx >= 0:
                 self.solvent_option.setCurrentIndex(ndx)
     
@@ -1976,7 +2101,7 @@ class JobTypeOption(QWidget):
             self.constrained_angle_table.resizeRowToContents(row)
 
         #try to use ordered selection so that if the user selected 1 -> 2 -> 3, they appear in that order
-        current_atoms = [atom for atom in self.session.seqcrow_ordered_selection_manager.selection if atom.structure is self.structure]
+        current_atoms = [atom for atom in selected_atoms(self.session) if atom.structure is self.structure]
         #if the user didn't pick the atoms one by one, fall back on selected_atoms
         if len(current_atoms) != 3:
             current_atoms = [atom for atom in selected_atoms(self.session) if atom.structure is self.structure]
@@ -2117,7 +2242,7 @@ class JobTypeOption(QWidget):
 
             self.constrained_torsion_table.resizeRowToContents(row)
 
-        current_atoms = [atom for atom in self.session.seqcrow_ordered_selection_manager.selection if atom.structure is self.structure]
+        current_atoms = [atom for atom in selected_atoms(self.session) if atom.structure is self.structure]
         #if the user didn't pick the atoms one by one, fall back on selected_atoms
         if len(current_atoms) != 4:
             current_atoms = [atom for atom in selected_atoms(self.session) if atom.structure is self.structure]
@@ -2219,10 +2344,12 @@ class JobTypeOption(QWidget):
             return None
 
         else:
-            return {'atoms':self.constrained_atoms, \
-                    'bonds':self.constrained_bonds, \
-                    'angles':self.constrained_angles, \
-                    'torsions':self.constrained_torsions}
+            return {
+                'atoms': self.constrained_atoms, \
+                'bonds': self.constrained_bonds, \
+                'angles': self.constrained_angles, \
+                'torsions': self.constrained_torsions
+            }
 
     def getNProc(self, update_settings=False):
         """returns number of processors"""
@@ -2891,6 +3018,13 @@ class MethodOption(QWidget):
         self.method_option.setCurrentIndex(ndx)
 
 
+class CompactElementList(QTableWidget):
+    def sizeHintForRow(self, row):
+        if self.cellWidget(row, 0):
+            return self.cellWidget(row, 0).maximumHeight()
+        return int(1.5 * self.fontMetrics().boundingRect("QQ").width())
+
+
 class BasisOption(QWidget):
     """widget for basis set options
     requires a parent object and a Settings object with
@@ -2945,17 +3079,18 @@ class BasisOption(QWidget):
         self.basis_option.currentIndexChanged.connect(self.basis_changed)
         self.basis_name_options.addRow(self.basis_option)
 
-        self.elements = QListWidget()
+        self.elements = CompactElementList()
+        self.elements.setColumnCount(1)
+        self.elements.verticalHeader().setVisible(False)
+        self.elements.horizontalHeader().setVisible(False)
+        self.elements.setShowGrid(False)
         #make element list roughly as wide as two characters + a scroll bar
         #this keeps the widget as narrow as possible so it doesn't take up the entire screen
         scroll_width = self.style().pixelMetric(QStyle.PM_ScrollBarExtent)
-        self.elements.setMinimumWidth(scroll_width + int(1.5*self.fontMetrics().boundingRect("QQ").width()))
-        self.elements.setMaximumWidth(scroll_width + int(2*self.fontMetrics().boundingRect("QQ").width()))
+        self.elements.setMinimumWidth(2 + scroll_width + int(1.5 * self.fontMetrics().boundingRect("QQ").width()))
+        self.elements.setMaximumWidth(2 + scroll_width + int(1.5 * self.fontMetrics().boundingRect("QQ").width()))
         #set the max. height too b/c I can't seem to get it to respect setRowStretch
         self.elements.setMaximumHeight(int(6*self.fontMetrics().boundingRect("QQ").height()))
-        self.elements.setSelectionMode(QListWidget.MultiSelection)
-        self.elements.itemSelectionChanged.connect(lambda *args, s=self: self.parent.check_elements(s))
-        self.elements.itemSelectionChanged.connect(lambda *args, s=self: self.parent.something_changed())
         self.layout.addWidget(self.elements, 0, 2, 3, 1, Qt.AlignTop)
 
         self.custom_basis_kw = QLineEdit()
@@ -3030,10 +3165,29 @@ class BasisOption(QWidget):
         self.layout.setColumnStretch(1, 1)
         self.layout.setColumnStretch(2, 0)
         self.layout.setRowStretch(0, 0)
+        self.layout.setRowStretch(1, 0)
+        self.layout.setRowStretch(2, 0)
+        self.layout.setRowStretch(3, 0)
         self.layout.setRowStretch(4, 1)
 
         self.setOptions(self.form)
         self.aux_type.currentIndexChanged.connect(self.basis_changed)
+        self.aux_type.currentIndexChanged.connect(self.check_aux_basis_options)
+
+    def check_aux_basis_options(self):
+        basis_options = getattr(self.form, self.info_attribute)
+        if not isinstance(basis_options, dict):
+            return
+        
+        self.basis_option.clear()
+        aux = self.getAuxType()
+        if aux in basis_options:
+            basis_options = basis_options[aux]
+        else:
+            basis_options = basis_options["no"]
+
+        self.basis_option.addItems(basis_options)
+        self.basis_option.addItem("other")
 
     def setOptions(self, file_info):
         """display options that are available in the specified program"""
@@ -3048,7 +3202,13 @@ class BasisOption(QWidget):
             self.blockSignals(False)
             return
 
-        self.basis_option.addItems(getattr(file_info, self.info_attribute))
+        basis_options = getattr(file_info, self.info_attribute)
+        if isinstance(basis_options, dict):
+            if aux in basis_options:
+                basis_options = basis_options[aux]
+            else:
+                basis_options = basis_options["no"]
+        self.basis_option.addItems(basis_options)
         self.basis_option.addItem("other")
         
         if not file_info.aux_options and self.getAuxType() != "no":
@@ -3144,7 +3304,14 @@ class BasisOption(QWidget):
         """sets the name of self's tab"""
         basis_name = self.currentBasis().name
         ndx = self.parent_toolbox.indexOf(self)
-        if len(self.parent.basis_options) != 1 or len(self.parent.ecp_options) != 0:
+        
+        if (
+            isinstance(self, BasisOption) and (
+                len(self.parent.basis_options) != 1 and self.parent.form.valence_basis_differs_from_ecp
+            ) or (
+                    not self.parent.form.valence_basis_differs_from_ecp and self.parent.ecp_options 
+                )
+            ) or isinstance(self, ECPOption):
             elements = "(%s)" % ", ".join(self.currentElements())
         else:
             elements = ""
@@ -3152,7 +3319,7 @@ class BasisOption(QWidget):
         if self.aux_available and self.getAuxType() != "no":
             basis_name += "/%s" % self.getAuxType()
 
-        self.parent_toolbox.setTabText(ndx, "%s %s" % (basis_name, elements))
+        self.parent_toolbox.setTabText(ndx, "%s%s" % (basis_name, elements))
 
     def show_elements(self, value):
         """hides/shows element list"""
@@ -3169,11 +3336,17 @@ class BasisOption(QWidget):
 
     def currentElements(self):
         """returns a list of element names that are selected"""
-        return [self.elements.item(i).text() for i in range(0, self.elements.count()) if self.elements.item(i).isSelected()]
+        elements = []
+        for i in range(0, self.elements.rowCount()):
+            button = self.elements.cellWidget(i, 0)
+            if button.state == ElementButton.Checked:
+                elements.append(button.text())
+
+        return elements
 
     def allElements(self):
         """returns a list of all available element names"""
-        return [self.elements.item(i).text() for i in range(0, self.elements.count())]
+        return [self.elements.cellWidget(i, 0).text() for i in range(0, self.elements.rowCount())]
 
     def currentBasis(self, update_settings=False, index=0):
         """get current basis info
@@ -3316,43 +3489,59 @@ class BasisOption(QWidget):
 
     def setElements(self, elements):
         """sets the available elements"""
-        for i in range(self.elements.count(), -1, -1):
-            self.elements.takeItem(i)
+        for i in range(0, self.elements.rowCount()):
+            print(i)
+            item = self.elements.cellWidget(i, 0)
+            item.deleteLater()
+            item.removeRow(i)
 
-        self.elements.addItems(elements)
-        self.elements.sortItems()
+        for i, ele in enumerate(elements):
+            self.elements.insertRow(i)
+            ele_button = ElementButton(ele)
+            placeholder = UserRoleSortableTableWidget()
+            placeholder.setData(Qt.UserRole, ELEMENTS.index(ele))
+            ele_button.setState(ElementButton.Unchecked)
+            ele_button.stateChanged.connect(lambda *args, s=self: self.parent.check_elements(s))
+            ele_button.stateChanged.connect(lambda *args, s=self: self.parent.something_changed())
+            self.elements.setCellWidget(i, 0, ele_button)
+            self.elements.setItem(i, 0, placeholder)
+            self.elements.resizeRowToContents(i)
+
+        self.elements.sortItems(0)
 
     def setSelectedElements(self, elements):
         """sets the selected elements"""
-        for i in range(0, self.elements.count()):
-            row = self.elements.item(i)
-            row.setSelected(False)
+        for i in range(0, self.elements.rowCount()):
+            button = self.elements.cellWidget(i, 0)
+            button.setState(ElementButton.Unchecked)
 
         for element in elements:
             if element not in self.allElements():
                 if element.lower() == "tm" or elements == "tm":
                     #all transition metals
-                    for element in TMETAL.keys():
-                        items = self.elements.findItems(element, Qt.MatchExactly)
-                        if len(items) > 0:
-                            for item in items:
-                                item.setSelected(True)
+                    for row in range(0, self.elements.rowCount()):
+                        button = self.elements.cellWidget(row, 0)
+                        if any(button.text() == x for x in TMETAL.keys()):
+                            button.setState(ElementButton.Checked)
 
                 elif element.lower() == "!tm" or elements == "!tm":
-                    for i in range(0, self.elements.count()):
-                        item = self.elements.item(i)
-                        if item.text() not in TMETAL:
-                            item.setSelected(True)
+                    for i in range(0, self.elements.rowCount()):
+                        button = self.elements.cellWidget(i, 0)
+                        if button.text() not in TMETAL:
+                            button.setState(ElementButton.Checked)
 
                 elif element.lower() == "all" or elements == "all":
-                    for i in range(0, self.elements.count()):
-                        item = self.elements.item(i)
-                        item.setSelected(True)
+                    for i in range(0, self.elements.rowCount()):
+                        button = self.elements.cellWidget(i, 0)
+                        button.setState(ElementButton.Checked)
 
                 continue
 
-            row = self.elements.findItems(element, Qt.MatchExactly)[0]
-            row.setSelected(True)
+            for row in range(0, self.elements.rowCount()):
+                button = self.elements.cellWidget(row, 0)
+                if button.text() == element:
+                    button.setState(ElementButton.Checked)
+                    break
 
     def remove_saved_basis(self, row, column):
         """removes the row from the table of previously used basis sets
@@ -3394,11 +3583,14 @@ class BasisOption(QWidget):
         """set options to match these options"""
         if name is not None:
             ndx = self.basis_option.findData(name, Qt.MatchExactly)
-            if ndx < 0:
+            if ndx < 0 and name:
                 ndx = self.basis_option.findData("other", Qt.MatchExactly)
                 self.custom_basis_kw.setText(name)
 
             self.basis_option.setCurrentIndex(ndx)
+        
+        else:
+            self.basis_option.setCurrentIndex(0)
 
         if custom_kw is not None:
             self.custom_basis_kw.setText(custom_kw)
@@ -3449,7 +3641,7 @@ class ECPOption(BasisOption):
         elements = "(%s)" % ", ".join(self.currentElements())
         ndx = self.parent_toolbox.indexOf(self)
 
-        self.parent_toolbox.setTabText(ndx, "%s %s" % (basis_name, elements))
+        self.parent_toolbox.setTabText(ndx, "%s%s" % (basis_name, elements))
 
 
 class BasisWidget(QWidget):
@@ -3519,6 +3711,13 @@ class BasisWidget(QWidget):
 
         for i in range(0, self.settings.last_number_basis):
             self.new_basis(use_saved=i)
+
+        if (
+            self.settings.last_number_basis == 1 and self.form.valence_basis_differs_from_ecp
+        ) or (
+            not self.form.valence_basis_differs_from_ecp and self.settings.last_number_ecp == 0
+        ) or self.settings.last_number_basis > 1:
+            self.basis_options[0].setSelectedElements(self.elements)
 
         for i in range(0, self.settings.last_number_ecp):
             self.new_ecp(use_saved=i)
@@ -3605,6 +3804,12 @@ class BasisWidget(QWidget):
             if not any([element in basis.currentElements() for basis in self.basis_options if basis.getAuxType() == new_aux]):
                 elements_without_basis.append(element)
 
+        if not self.form.valence_basis_differs_from_ecp and new_aux == "no":
+            for ecp in self.ecp_options:
+                for element in ecp.currentElements():
+                    if element in elements_without_basis:
+                        elements_without_basis.remove(element)
+
         new_basis.setSelectedElements(elements_without_basis)
 
         self.basis_options.append(new_basis)
@@ -3614,9 +3819,11 @@ class BasisWidget(QWidget):
         #new_basis.setOptions(self.form)
         new_basis.basis_changed()
 
-        if len(self.basis_options) == 1 and len(self.ecp_options) == 0:
-            self.basis_options[0].setSelectedElements(self.elements)
-            self.basis_warning.setVisible(False)
+        self.basis_warning.setVisible(
+            len(self.basis_options) > 1 or (
+                len(self.ecp_options) > 0 and not self.form.valence_basis_differs_from_ecp
+            )
+        )
 
         self.check_elements()
 
@@ -3641,7 +3848,11 @@ class BasisWidget(QWidget):
             self.basis_options.remove(basis)
             self.refresh_basis()
 
-        if len(self.basis_options) == 1 and len(self.ecp_options) == 0:
+        if len(self.basis_options) == 1 and (
+            self.form.valence_basis_differs_from_ecp or (
+                not self.form.valence_basis_differs_from_ecp and len(self.ecp_options) == 0
+            )
+        ):
             self.basis_options[0].setSelectedElements(self.elements)
             self.basis_options[0].update_tooltab()
             self.basis_options[0].show_elements(False)
@@ -3651,21 +3862,37 @@ class BasisWidget(QWidget):
         self.basisChanged.emit()
 
     def refresh_basis(self):
-        """repositions all BasisOptions and shows element lists if appropriate
-        if only one BasisOption (and not ECPOptions) remain, sets the elements too"""
+        """
+        repositions all BasisOptions and shows element lists if appropriate
+        """
         for i, basis in enumerate(self.basis_options):
             basis.update_tooltab()
 
-            basis.show_elements(not (len(self.basis_options) == 1 and len(self.ecp_options) == 0))
+            basis.show_elements(
+                len(self.basis_options) > 1 or (
+                    not self.form.valence_basis_differs_from_ecp and len(self.ecp_options) > 0
+                )
+            )
+
+        if (
+            len(self.basis_options) == 1 and self.form.valence_basis_differs_from_ecp
+        ) or (
+            not self.form.valence_basis_differs_from_ecp and len(self.ecp_options) == 0
+        ):
+            self.basis_options[0].setSelectedElements(self.elements)
+            self.basis_options[0].update_tooltab()
+            self.basis_options[0].show_elements(False)
 
     def check_elements(self, child=None):
-        """check to see if any elements don't have a (valence) basis set
+        """
+        check to see if any elements don't have a (valence) basis set
         if child is not None, all selected elements from child will be deselected from
-        other children of the same type (calls remove_elements_from_all_but)"""
+        other children of the same type (calls remove_elements_from_all_but)
+        """
         if child is not None:
             self.remove_elements_from_all_but(child, child.currentElements())
 
-        elements_without_basis = {"no":self.elements.copy()}
+        elements_without_basis = {"no": self.elements.copy()}
         for basis in self.basis_options:
             aux = basis.getAuxType()
             if aux not in elements_without_basis:
@@ -3674,6 +3901,12 @@ class BasisWidget(QWidget):
             for element in basis.currentElements():
                 if element in elements_without_basis[aux]:
                     elements_without_basis[aux].remove(element)
+
+        if not self.form.valence_basis_differs_from_ecp:
+            for ecp in self.ecp_options:
+                for element in ecp.currentElements():
+                    if element in elements_without_basis["no"]:
+                        elements_without_basis["no"].remove(element)
 
         for basis in self.basis_options + self.ecp_options:
             basis.update_tooltab()
@@ -3703,7 +3936,7 @@ class BasisWidget(QWidget):
         for i, basis in enumerate(self.ecp_options):
             basis.update_tooltab()
 
-            basis.show_elements(not (len(self.basis_options) == 1 and len(self.ecp_options) == 0))
+            basis.show_elements(True)
 
     def get_basis(self, update_settings=True):
         """returns ([Basis], [ECP]) corresponding to the current settings"""
@@ -3751,7 +3984,7 @@ class BasisWidget(QWidget):
     
                 self.basis_options[i].setBasis(basis.name, basis_path=basis.user_defined)
                 self.basis_options[i].setAux(basis.aux_type)
-                if len(basis_set.basis) == 1 and (basis_set.ecp is None or len(basis_set.ecp) == 0):
+                if len(basis_set.basis) == 1:
                     #a preset might have only saved one basis set
                     #we'll use it for all elements
                     self.basis_options[i].setSelectedElements(['all'])
@@ -3796,17 +4029,40 @@ class BasisWidget(QWidget):
         if isinstance(exclude_option, ECPOption):
             for option in self.ecp_options:
                 if option is not exclude_option:
-                    for i in range(0, option.elements.count()):
-                        if option.elements.item(i).text() in element_list:
-                            option.elements.item(i).setSelected(False)
+                    for i in range(0, option.elements.rowCount()):
+                        if option.elements.cellWidget(i, 0).text() in element_list:
+                            option.elements.cellWidget(i, 0).blockSignals(True)
+                            option.elements.cellWidget(i, 0).setState(ElementButton.Unchecked)
+                            option.elements.cellWidget(i, 0).blockSignals(False)
+            
+            if not self.form.valence_basis_differs_from_ecp:
+                for option in self.basis_options:
+                    if option is not exclude_option and option.getAuxType() == "no":
+                        for i in range(0, option.elements.rowCount()):
+                            if option.elements.cellWidget(i, 0).text() in element_list:
+                                option.elements.cellWidget(i, 0).blockSignals(True)
+                                option.elements.cellWidget(i, 0).setState(ElementButton.Unchecked)
+                                option.elements.cellWidget(i, 0).blockSignals(False)
+
 
         else:
             aux = exclude_option.getAuxType()
             for option in self.basis_options:
                 if option is not exclude_option and option.getAuxType() == aux:
-                    for i in range(0, option.elements.count()):
-                        if option.elements.item(i).text() in element_list:
-                            option.elements.item(i).setSelected(False)
+                    for i in range(0, option.elements.rowCount()):
+                        if option.elements.cellWidget(i, 0).text() in element_list:
+                            option.elements.cellWidget(i, 0).blockSignals(True)
+                            option.elements.cellWidget(i, 0).setState(ElementButton.Unchecked)
+                            option.elements.cellWidget(i, 0).blockSignals(False)
+            
+            if aux == "no" and not self.form.valence_basis_differs_from_ecp:
+                for option in self.ecp_options:
+                    if option is not exclude_option:
+                        for i in range(0, option.elements.rowCount()):
+                            if option.elements.cellWidget(i, 0).text() in element_list:
+                                option.elements.cellWidget(i, 0).blockSignals(True)
+                                option.elements.cellWidget(i, 0).setState(ElementButton.Unchecked)
+                                option.elements.cellWidget(i, 0).blockSignals(False)
 
     def setOptions(self, file_info):
         """changes the basis set options to display what's available for the specified program"""
@@ -3815,6 +4071,10 @@ class BasisWidget(QWidget):
         # like if auxiliary basis sets aren't available in the program
         # also need to set elements after settings the options b/c things get changed and that could cause elements
         # of other basis sets to be cleared
+        for basis, elements in zip(self.ecp_options[::-1], [basis.currentElements() for basis in self.ecp_options[::-1]]):
+            basis.setOptions(file_info)
+            basis.setSelectedElements(elements)
+        
         for basis, elements in zip(self.basis_options[::-1], [basis.currentElements() for basis in self.basis_options[::-1]]):
             basis.setOptions(file_info)
             basis.setSelectedElements(elements)
@@ -3827,6 +4087,8 @@ class BasisWidget(QWidget):
             self.ecp_widget.setVisible(True)
             for ecp in self.ecp_options:
                 ecp.setOptions(file_info)
+
+        self.refresh_basis()
 
     def setElements(self, element_list):
         """sets the available elements in all child BasisOptions
@@ -3848,17 +4110,33 @@ class BasisWidget(QWidget):
                     elements_with_different_basis.extend(other_basis.currentElements())
 
             if len(del_elements) > 0:
-                for i in range(basis.elements.count()-1, -1, -1):
-                    if basis.elements.item(i).text() in del_elements:
-                        basis.elements.takeItem(i)
+                for i in range(basis.elements.rowCount() - 1, -1, -1):
+                    if basis.elements.cellWidget(i, 0).text() in del_elements:
+                        button = basis.elements.cellWidget(i, 0)
+                        button.deleteLater()
+                        basis.elements.removeRow(i)
 
             if len(new_elements) > 0:
-                basis.elements.addItems(new_elements)
-                basis.elements.sortItems()
+                for element in new_elements:
+                    row = basis.elements.rowCount()
+                    basis.elements.insertRow(row)
+                    button = ElementButton(element)
+                    placeholder = UserRoleSortableTableWidget()
+                    placeholder.setData(Qt.UserRole, ELEMENTS.index(element))
+                    button.stateChanged.connect(lambda *args, s=basis: self.check_elements(s))
+                    button.stateChanged.connect(lambda *args, s=basis: self.something_changed())
+                    basis.elements.setCellWidget(row, 0, button)
+                    basis.elements.setItem(row, 0, placeholder)
+                    basis.elements.resizeRowToContents(row)
+                    
                 if j < len(self.settings.last_basis_elements):
                     previous_elements = self.settings.last_basis_elements[j].split(",")
                     if len(previous_elements) > 0:
-                        basis.setSelectedElements([x for x in previous_elements + basis.currentElements() if x not in elements_with_different_basis])
+                        basis.setSelectedElements(
+                            [x for x in previous_elements + basis.currentElements() if x not in elements_with_different_basis]
+                        )
+            
+            basis.elements.sortItems(0)
 
         for j, basis in enumerate(self.ecp_options):
             elements_with_different_basis = []
@@ -3867,20 +4145,41 @@ class BasisWidget(QWidget):
                     elements_with_different_basis.extend(other_basis.currentElements())
 
             if len(del_elements) > 0:
-                for i in range(basis.elements.count()-1, -1, -1):
-                    if basis.elements.item(i).text() in del_elements:
-                        basis.elements.takeItem(i)
+                for i in range(basis.elements.rowCount() - 1, -1, -1):
+                    if basis.elements.cellWidget(i, 0).text() in del_elements:
+                        button = basis.elements.cellWidget(i, 0)
+                        button.deleteLater()
+                        basis.elements.removeRow(i)
 
             if len(new_elements) > 0:
-                basis.elements.addItems(new_elements)
-                basis.elements.sortItems()
+                for element in new_elements:
+                    row = basis.elements.rowCount()
+                    basis.elements.insertRow(row)
+                    button = ElementButton(element)
+                    placeholder = UserRoleSortableTableWidget()
+                    placeholder.setData(Qt.UserRole, ELEMENTS.index(element))
+                    button.stateChanged.connect(lambda *args, s=basis: self.check_elements(s))
+                    button.stateChanged.connect(lambda *args, s=basis: self.something_changed())
+                    basis.elements.setCellWidget(row, 0, button)
+                    basis.elements.setItem(row, 0, placeholder)
+                    basis.elements.resizeRowToContents(row)
+
                 if j < len(self.settings.last_ecp_elements):
                     previous_elements = self.settings.last_ecp_elements[j].split(",")
                     if len(previous_elements) > 0:
-                        basis.setSelectedElements([x for x in previous_elements + basis.currentElements() if x not in elements_with_different_basis])
+                        basis.setSelectedElements(
+                            [x for x in previous_elements + basis.currentElements() if x not in elements_with_different_basis]
+                        )
+            
+            basis.elements.sortItems(0)
 
-        if len(self.basis_options) == 1 and len(self.ecp_options) == 0:
+        if len(self.basis_options) == 1 and self.form.valence_basis_differs_from_ecp or (
+            not self.form.valence_basis_differs_from_ecp and len(self.ecp_options) == 0
+        ):
             self.basis_options[0].setSelectedElements(self.elements)
+        else:
+            for option in self.basis_options:
+                option.show_elements(True)
 
         self.check_elements()
 
@@ -4219,7 +4518,8 @@ class TwoLayerKeyWordOption(QWidget):
             opt_fmt,
             one_opt_per_kw=False,
             parent=None,
-            allow_dup=False
+            allow_dup=False,
+            banned_settings=None,
     ):
         """
         name                    - name of the left groupbox
@@ -4231,6 +4531,7 @@ class TwoLayerKeyWordOption(QWidget):
                                     keyword can accept > 1 option
         opt_fmt                 - str; format when displaying options for selected keyword
         allow_dup               - bool; allow duplicate values in the option table
+        banned_settings         - list of top layer settings that are not allowed
         """
 
         self.name = name
@@ -4239,6 +4540,7 @@ class TwoLayerKeyWordOption(QWidget):
         self.one_opt_per_kw = one_opt_per_kw
         self.opt_fmt = opt_fmt
         self.allow_dup = allow_dup
+        self.banned_settings = banned_settings
 
         super().__init__(parent)
 
@@ -4421,6 +4723,9 @@ class TwoLayerKeyWordOption(QWidget):
 
     def add_item_to_current_kw_table(self, kw):
         """add kw to 'current keyword' table"""
+        if self.banned_settings:
+            if any(x.lower() == kw.lower() for x in self.banned_settings):
+                return
         row = self.current_kw_table.rowCount()
         self.current_kw_table.insertRow(row)
         item = QTableWidgetItem(kw)
@@ -4551,6 +4856,9 @@ class TwoLayerKeyWordOption(QWidget):
         """add button was clicked for keyword
         add the text to the table"""
         kw = self.new_kw.text()
+        if self.banned_settings:
+            if any(x.lower() == kw.lower() for x in self.banned_settings):
+                return
         if len(kw.strip()) == 0:
             return
 
@@ -4739,7 +5047,6 @@ class TwoLayerKeyWordOption(QWidget):
     def setCurrentSettings(self, kw_dict):
         """change current keywords and options to match kw_dict"""
         self.clearCurrentSettings()
-
         self.last_dict = kw_dict.copy()
 
         for kw in self.last_dict:
@@ -4840,7 +5147,7 @@ class KeywordOptions(QWidget):
     def setKeywords(self, current_dict):
         """sets all option widgets to match current_dict"""
         for item in self.widgets.keys():
-            if self.items[item] in current_dict:
+            if any(key == self.items[item] for key in current_dict):
                 self.widgets[item].setCurrentSettings(current_dict[self.items[item]])
 
             elif hasattr(self, "old_items") and item in self.old_items and self.old_items[item] in current_dict:
@@ -5261,6 +5568,17 @@ class SavePreset(ChildToolWindow):
         
         self.tool_instance.update_theory(update_settings=True)
         preset["theory"] = self.tool_instance.theory
+        
+        basis_elements, ecp_elements = self.basis_elements.getElements()
+        if preset["theory"].basis.basis:
+            for basis, eles in zip(preset["theory"].basis.basis, basis_elements):
+                basis.ele_selection = eles
+        
+        if preset["theory"].basis.ecp:
+            for basis, eles in zip(preset["theory"].basis.ecp, ecp_elements):
+                basis.ele_selection = eles
+        
+        preset["theory"] = preset["theory"].copy()
 
         self.tool_instance.presets[program][name] = preset
 
@@ -5319,17 +5637,40 @@ class RemovePreset(ChildToolWindow):
                 remove_widget = QWidget()
                 remove_layout = QGridLayout(remove_widget)
                 remove = QPushButton()
-                remove.setIcon(QIcon(remove_widget.style().standardIcon(QStyle.SP_DialogDiscardButton)))
-                remove.setFlat(True)
-                remove.clicked.connect(
-                    lambda *args, name=preset, form=program, tool=self.tool_instance: tool.presets[form].pop(name)
+                remove.setIcon(
+                    QIcon(
+                        remove_widget.style().standardIcon(
+                            QStyle.SP_DialogDiscardButton
+                        )
+                    )
                 )
-                remove.clicked.connect(self.tool_instance.refresh_presets)
-                remove.clicked.connect(lambda *args, item=preset_item, parent=section: parent.removeChild(item))
+                remove.setFlat(True)
+
+                remove.clicked.connect(
+                    lambda *args, item=preset_item, parent=section: self.really_remove(
+                        parent,
+                        item,
+                    )
+                )
                 remove_layout.addWidget(remove, 0, 0, 1, 1, Qt.AlignLeft)
                 remove_layout.setColumnStretch(0, 0)
                 remove_layout.setContentsMargins(0, 0, 0, 0)
                 self.tree.setItemWidget(preset_item, 1, remove_widget)
+
+    def really_remove(self, parent, item):
+        program = parent.data(0, Qt.DisplayRole)
+        name = item.data(0, Qt.DisplayRole)
+        are_you_sure = QMessageBox.question(
+            None,
+            "Delete preset?",
+            "Are you sure you want to delete the '%s' preset for %s?" % (name, program),
+            defaultButton=QMessageBox.No,
+        )
+        if are_you_sure != QMessageBox.Yes:
+            return
+        parent.removeChild(item)
+        self.tool_instance.presets[program].pop(name)
+        self.tool_instance.refresh_presets()
 
     def cleanup(self):
         self.tool_instance.remove_preset_window = None

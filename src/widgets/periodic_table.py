@@ -14,46 +14,66 @@ class ElementButton(QPushButton):
     
     stateChanged = Signal([int])
     
-    def __init__(self, element, *args, **kwargs):
+    def __init__(self, element, *args, single_state=False, **kwargs):
         super().__init__(element, *args, **kwargs)
 
         self._tristate = False
+        self._single_state = single_state
 
-        self.state = 0
-        self.setMinimumWidth(int(1.3*self.fontMetrics().boundingRect("QQ").width()))
-        self.setMaximumWidth(int(1.3*self.fontMetrics().boundingRect("QQ").width()))
+        self.setMinimumWidth(int(1.4*self.fontMetrics().boundingRect("QQ").width()))
+        self.setMaximumWidth(int(1.4*self.fontMetrics().boundingRect("QQ").width()))
         self.setMinimumHeight(int(1.5*self.fontMetrics().boundingRect("QQ").height()))
         self.setMaximumHeight(int(1.5*self.fontMetrics().boundingRect("QQ").height()))
         
         self.ele_color = tuple(list(element_color(ELEMENTS.index(element)))[:-1])
-        self.setStyleSheet("QPushButton { background: whitesmoke; color: dimgray; font-weight: normal; }")
+        
+        if not single_state:
+            self.state = 0
+            self.setStyleSheet("QPushButton { background: whitesmoke; color: DarkSlateGray; font-weight: normal; }")
+            self.clicked.connect(self._changeState)
+        else:
+            self.state = 1
+            #weird function to decide if text color is white or black based on jmol color
+            #it's harder to see white on green, but easier to see white on blue
+            style = "{ background: rgb(%i, %i, %i); " % self.ele_color + \
+            "alternate-background-color: rgb(%i, %i, %i); " % self.ele_color + \
+            "color: %s; font-weight: bold; }" % contrast_bw(self.ele_color) 
 
-        self.clicked.connect(self._changeState)
+            self.setStyleSheet("QPushButton, QPushButton:down %s" % style)
     
-    def _changeState(self, bool=None, state=None):
+    def _changeState(self, b=None, state=None):
         if self._tristate:
             self.state = (self.state + 1) % 3        
         elif not self._tristate:
             self.state = (self.state + 1) % 2
 
+        if self._single_state:
+            state = 1
+
         if state is not None:
             self.state = state
 
         if self.state == self.Unchecked:
-            self.setStyleSheet("QPushButton { background: whitesmoke; color: dimgray; font-weight: normal; }")
+            self.setStyleSheet(
+                "QPushButton { background: whitesmoke; color: DarkSlateGray; font-weight: normal; };"
+            )
         elif self.state == self.Checked:
             #weird function to decide if text color is white or black based on jmol color
             #it's harder to see white on green, but easier to see white on blue
-            self.setStyleSheet(
-                "QPushButton { background: rgb(%i, %i, %i); color: %s; font-weight: bold; }" % (
-                    *self.ele_color,
-                    contrast_bw(self.ele_color),
-                )
-            )
+            style = "{ background: rgb(%i, %i, %i); " % self.ele_color + \
+            "alternate-background-color: rgb(%i, %i, %i); " % self.ele_color + \
+            "color: %s; font-weight: bold; }" % contrast_bw(self.ele_color) 
+
+            self.setStyleSheet("QPushButton, QPushButton:down %s" % style)
         elif self.state == self.Excluded:
             self.setStyleSheet("QPushButton { background: black; color: gray; font-weight: normal; }")
         
         self.stateChanged.emit(self.state)
+    
+    def changeElement(self, element):
+        self.ele_color = tuple(list(element_color(ELEMENTS.index(element)))[:-1])
+        self.setText(element)
+        self._changeState(state=self.state)
     
     def setState(self, state):
         self._changeState(state=state)

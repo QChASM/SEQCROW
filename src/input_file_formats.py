@@ -49,6 +49,9 @@ class QMInputFileInfo:
     # whether frequency jobs are available
     frequency = True
     
+    # only one job type per input file
+    single_job_type = False
+    
     # file filter for QFileDialog.getOpenFileName
     # if None, will be disabled when 'read checkpoint' is checked
     save_checkpoint_filter = None
@@ -107,6 +110,11 @@ class QMInputFileInfo:
     # if there are no ECP's, the ECP widget will be hidden
     # will be appended with "other", which allows users to enter ECP info
     ecps = None
+    
+    # ECP differs (or can be specified separate from) valence basis set
+    # if this is false, putting an element in an ECP will remove it
+    # from the basis set and vice versa
+    valence_basis_differs_from_ecp = True
     
     # misc. options
     # should be None ('additional options' tab will be disabled) or
@@ -307,15 +315,17 @@ class ORCAKeywordOptions(KeywordOptions):
 
 
 class Psi4KeywordOptions(KeywordOptions):
-    items = {'settings': PSI4_SETTINGS, \
-             'job': PSI4_JOB, \
-             'molecule': PSI4_MOLECULE, \
-             'before job': PSI4_BEFORE_JOB, \
-             'after job': PSI4_AFTER_JOB, \
-             'optking': PSI4_OPTKING, \
-             'before molecule': PSI4_BEFORE_GEOM, \
-             'comment': PSI4_COMMENT, \
-            }
+    items = {
+        'settings': PSI4_SETTINGS, 
+        'job': PSI4_JOB, 
+        'molecule': PSI4_MOLECULE, 
+        'before job': PSI4_BEFORE_JOB, 
+        'after job': PSI4_AFTER_JOB, 
+        'optking': PSI4_OPTKING, 
+        'before molecule': PSI4_BEFORE_GEOM, 
+        'PCM solver': PSI4_SOLVENT,
+        'comment': PSI4_COMMENT, 
+    }
 
     old_items = {'settings': "1", \
                  'before molecule': "2", \
@@ -424,6 +434,29 @@ class Psi4KeywordOptions(KeywordOptions):
                 allow_dup=True,
             )
 
+        elif name == "PCM solver":
+            if last is None:
+                last_dict = {}
+            else:
+                last_dict = last
+
+            if previous is None:
+                previous_dict = {}
+            else:
+                previous_dict = previous
+
+            def check_single_kw(kw):
+                return any(kw.strip().lower() == sk for sk in Theory.FORCED_PSI4_SOLVENT_SINGLE)
+
+            return TwoLayerKeyWordOption(
+                "PCM solver",
+                last_dict,
+                previous_dict,
+                "double click to use \"pcm = { %s = %s }\"",
+                one_opt_per_kw=check_single_kw,
+                allow_dup=False,
+            )
+
         elif name == "optking":
             if last is None:
                 last_dict = {}
@@ -465,16 +498,17 @@ class Psi4KeywordOptions(KeywordOptions):
 
 class SQMKeywordOptions(KeywordOptions):
     items = {
-    'settings': "qmmm",
-    'comment': 'comment',
+        'settings': SQM_QMMM,
+        'comment': SQM_COMMENT,
     }
+
 
     previous_option_name = "previous_sqm_options"
     last_option_name = "last_sqm_options"
 
     @classmethod
     def get_options_for(cls, name, last, previous):
-        if name == "settings":
+        if name == 'settings':
             if last is None:
                 last_dict = {}
             else:
@@ -494,7 +528,7 @@ class SQMKeywordOptions(KeywordOptions):
                 allow_dup=False,
             )
 
-        elif name == "comment":
+        elif name == 'comment':
             if last is None:
                 last_list = []
             else:
@@ -510,6 +544,78 @@ class SQMKeywordOptions(KeywordOptions):
                 last_list,
                 previous_list,
                 multiline=True,
+            )
+
+
+class QChemKeywordOptions(KeywordOptions):
+    items = {
+        'settings': QCHEM_REM,
+        'sections': QCHEM_SETTINGS,
+        'comment': QCHEM_COMMENT,
+    }
+
+    previous_option_name = "previous_qchem_options"
+    last_option_name = "last_qchem_options"
+
+    @classmethod
+    def get_options_for(cls, name, last, previous):
+        if name == 'settings':
+            if last is None:
+                last_dict = {}
+            else:
+                last_dict = last
+
+            if previous is None:
+                previous_dict = {}
+            else:
+                previous_dict = previous
+
+            return TwoLayerKeyWordOption(
+                'settings',
+                last_dict,
+                previous_dict,
+                "double click to use $rem\n\t%s = %s\n$end",
+                one_opt_per_kw=True,
+                allow_dup=False,
+            )
+
+        elif name == 'comment':
+            if last is None:
+                last_list = []
+            else:
+                last_list = last
+
+            if previous is None:
+                previous_list = []
+            else:
+                previous_list = previous
+
+            return OneLayerKeyWordOption(
+                'comment',
+                last_list,
+                previous_list,
+                multiline=True,
+            )
+
+        elif name == 'sections':
+            if last is None:
+                last_dict = {}
+            else:
+                last_dict = last
+
+            if previous is None:
+                previous_dict = {}
+            else:
+                previous_dict = previous
+
+            return TwoLayerKeyWordOption(
+                'sections',
+                last_dict,
+                previous_dict,
+                "double click to use $%s\n\t%s\n$end",
+                one_opt_per_kw=False,
+                allow_dup=True,
+                banned_settings=["rem"],
             )
 
 
@@ -721,31 +827,80 @@ class ORCAFileInfo(QMInputFileInfo):
         "Grid5 (ORCA 4)": "Grid5",
         "Grid4 (ORCA 4)": "Grid4",
     }
-    basis_sets = [
-        "def2-SVP",
-        "def2-TZVP",
-        "cc-pVDZ",
-        "cc-pVTZ",
-        "aug-cc-pVDZ",
-        "aug-cc-pVTZ",
-        "6-311+G**",
-        "SDD",
-        "LANL2DZ"
-    ]
+    basis_sets = {
+        "no": [
+            "def2-SVP",
+            "def2-TZVP",
+            "cc-pVDZ",
+            "cc-pVTZ",
+            "aug-cc-pVDZ",
+            "aug-cc-pVTZ",
+            "6-311+G**",
+            "ZORA-def2-SVP",
+            "SARC-ZORA-SVP",
+            "ZORA-def2-TZVP",
+            "SARC-ZORA-TZVP",
+            "DKH-def2-TZVP",
+            "SARC-DKH-TZVP",
+            "SDD",
+            "LANL2DZ",
+        ],
+        "C": [
+            "def2-SVP",
+            "def2-TZVP",
+            "cc-pVDZ",
+            "cc-pVTZ",
+            "cc-pVDZ-PP",
+            "cc-pVTZ-PP",
+            "aug-cc-pVDZ",
+            "aug-cc-pVTZ",
+            "aug-cc-pVDZ-PP",
+            "aug-cc-pVTZ-PP",
+        ],
+        "J": [
+            "def2",
+            "SARC",
+        ],
+        "JK": [
+            "def2",
+            "cc-pVDZ",
+            "cc-pVTZ",
+            "cc-pVQZ",
+            "aug-cc-pVDZ",
+            "aug-cc-pVTZ",
+            "aug-cc-pVQZ",
+        ],
+        "CABS": [
+            "cc-pVDZ-F12",
+            "cc-pVTZ-F12",
+            "cc-pVQZ-F12",
+        ],
+        "OptRI CABS": [
+            "cc-pVDZ-F12",
+            "cc-pVTZ-F12",
+            "cc-pVQZ-F12",
+            "aug-cc-pVDZ-F12",
+            "aug-cc-pVTZ-F12",
+            "aug-cc-pVQZ-F12",
+            "aug-cc-pVDZ-PP-F12",
+            "aug-cc-pVTZ-PP-F12",
+        ],
+    }
     aux_options = BasisSet.ORCA_AUX
-    ecps = ["SDD", "LANL2DZ"]
+    ecps = ["SDD", "LANL2DZ", "def2-ECP", "SK-MCDHF-RSC", "HayWadt"]
     keyword_options = ORCAKeywordOptions
     
     def get_file_contents(self, theory):
         """creates ORCA input file using AaronTools"""
         header, header_warnings = theory.make_header(style="orca", return_warnings=True)
+        footer = theory.make_footer(style="orca", return_warnings=False)
         molecule = ""
         fmt = "{:<3s} {: 10.6f} {: 10.6f} {: 10.6f}\n"
         for atom in theory.geometry.atoms:
             molecule += fmt.format(atom.element, *atom.coords)
 
         molecule += "*\n"
-        contents = header + molecule
+        contents = header + molecule + footer
         warnings = header_warnings
         return contents, warnings
 
@@ -808,7 +963,9 @@ class Psi4FileInfo(QMInputFileInfo):
             'cubeprop_tasks': ["frontier_orbitals"],
         },
         PSI4_BEFORE_GEOM: [],
-        PSI4_BEFORE_JOB: ['activate(auto_fragments())'],
+        PSI4_BEFORE_JOB: [
+            'activate(auto_fragments())', "mol = get_active_molecule()"
+        ],
         PSI4_JOB: {
             'energy': ['return_wfn=True'],
             'optimize': ['return_wfn=True', "engine='geometric'"],
@@ -879,6 +1036,8 @@ class Psi4FileInfo(QMInputFileInfo):
         "aug-cc-pVTZ",
         "6-311+G**",
     ]
+    solvent_models = ImplicitSolvent.KNOWN_PSI4_MODELS
+    solvents = ImplicitSolvent.KNOWN_PSI4_SOLVENTS
     aux_options = BasisSet.PSI4_AUX
     keyword_options = Psi4KeywordOptions
     
@@ -949,3 +1108,142 @@ class SQMFileInfo(QMInputFileInfo):
         warnings = header_warnings + mol_warnings
         return contents, warnings
 
+
+class QChemFileInfo(QMInputFileInfo):
+    name = "Q-Chem"
+    
+    single_job_type = True
+    
+    initial_presets = {
+        "quick optimize":{
+            "theory": Theory(
+                job_type=OptimizationJob(),
+                method="HF-3c",
+                basis="MINIX",
+            ),
+            "use_method": True,
+            "use_job_type": True,
+            "use_other": True,
+            "use_basis": True,
+        },
+    }
+    
+    initial_options = {
+        QCHEM_REM: {
+            "SCF_MAX_CYCLES": ["150"],
+            "JOB_TYPE": ["NMR", "Force", "SP"],
+            "IQMOL_FCHK": ["TRUE"],
+        },
+    }
+    
+    save_file_filter = "Q-Chem input files (*.inp *.inq)"
+    basis_file_filter = "Basis Set Files (*.basis)"
+    raman_available = True
+    methods = [
+        "B3LYP",
+        "M06",
+        "M06-L",
+        "M06-2X",
+        "ωB97X-D3",
+        "B3PW91",
+        "B97-D3",
+        "BP86",
+        "PBE0",
+        "HF-3c",
+    ]
+    dispersion = [
+        "Grimme D2",
+        "Modified Zero-damped Grimme D3",
+        "Zero-damped Grimme D3",
+        "Becke-Johnson damped Grimme D3",
+        "Becke-Johnson damped modified Grimme D3",
+        "Chai & Head-Gordon",
+    ]
+    grids = [
+        "SG-3", 
+        "SG-2", 
+        "SG-1", 
+        "(250, 974)",
+        "(175, 974)",
+        "(60, 770)",
+        "(99, 590)",
+        "(55, 590)",
+        "(50, 434)",
+        "(75, 302)",
+    ]
+    basis_sets = {
+        "no": [
+            "def2-SVP",
+            "def2-TZVP",
+            "cc-pVDZ",
+            "cc-pVTZ",
+            "aug-cc-pVDZ",
+            "aug-cc-pVTZ",
+            "6-311+G**",
+        ],
+        "RI": [
+            "RIMP2-def2-SVP",
+            "RIMP2-def2-SVPD",
+            "RIMP2-def2-TZVP",
+            "RIMP2-def2-TZVPD",
+            "RIMP2-aug-cc-pVDZ",
+            "RIMP2-cc-pVTZ",
+            "RIMP2-aug-cc-pVTZ",
+        ],
+        "corr": [
+            "RIMP2-def2-SVP",
+            "RIMP2-def2-SVPD",
+            "RIMP2-def2-TZVP",
+            "RIMP2-def2-TZVPD",
+            "RIMP2-aug-cc-pVDZ",
+            "RIMP2-cc-pVTZ",
+            "RIMP2-aug-cc-pVTZ",
+        ],
+        "J": [
+            "RIJ-def2-SVP",
+            "RIJ-def2-SVPD",
+            "RIJ-def2-TZVP",
+            "RIJ-def2-TZVPD",
+        ],
+        "K": [
+            "RIJK-def2-SVP",
+            "RIJK-def2-SVPD",
+            "RIJK-def2-TZVP",
+            "RIJK-def2-TZVPD",
+        ],
+    }
+    aux_options = BasisSet.QCHEM_AUX
+    ecps = ["fit-LANL2DZ", "def2-ECP", "SRLC", "SRSC"]
+    keyword_options = QChemKeywordOptions
+    
+    def get_file_contents(self, theory):
+        """creates Q-Chem input file using AaronTools"""
+        fmt = "{:<3s} {: 9.5f} {: 9.5f} {: 9.5f}\n"
+        header, header_warnings = theory.make_header(
+            style="qchem", return_warnings=True,
+        )
+        mol, mol_warnings = theory.make_molecule(
+            style="qchem", return_warnings=True,
+        )
+
+        out = header + mol
+        warnings = header_warnings + mol_warnings
+        
+        return out, warnings
+
+    def get_job_kw_dict(
+            self,
+            optimize,
+            frequencies,
+            raman,
+            hpmodes,
+            read_checkpoint,
+            checkpoint_file,
+    ):
+        rem = {}
+
+        if frequencies:
+            if raman:
+                rem['DORAMAN'] = 'TRUE'
+
+        return {QCHEM_REM: rem}

@@ -1,7 +1,7 @@
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
 from chimerax.core.commands.cli import StringArg, EnumOf
-from chimerax.ui.options import InputFolderOption, EnumOption, StringsOption
+from chimerax.ui.options import InputFolderOption, EnumOption, StringsOption, IntOption
 
 from os import getenv, path
 
@@ -26,10 +26,11 @@ class FreqOptions(EnumOption):
 # 'settings' module attribute will be set by manager initialization
 class _SEQCROWSettings(Settings):
     EXPLICIT_SAVE = {
-        'AARONLIB': Value(getenv('AARONLIB', path.join(path.expanduser('~'), "AARON_libs")), StringArg),
+        'AARONLIB': Value(getenv('AARONLIB', path.join(path.expanduser('~'), "Aaron_libs")), StringArg),
         'ORCA_EXE': Value("orca.exe" if platform == "win32" else "orca", StringArg),
         'GAUSSIAN_EXE': Value("g09.exe" if platform == "win32" else "g09", StringArg),
         'PSI4_EXE': Value("psi4", StringArg),
+        'QCHEM_EXE': Value("qchem", StringArg),
         'SCRATCH_DIR': Value(path.join(path.expanduser('~'), "SEQCROW_SCRATCH"), StringArg), 
         'JOB_FINISHED_NOTIFICATION': Value(
             'log notification', 
@@ -48,6 +49,7 @@ class _SEQCROWSettings(Settings):
             EnumOf(FreqOptions.values),
         ),
         'NON_SEQCROW_IO_PRESET': [],
+        'MAX_FCHK_ARRAY': 10000000,
     }
 
 
@@ -74,7 +76,14 @@ class FileOption(InputFolderOption):
             start_folder = os.getcwd()
         else:
             start_folder = self.start_folder
-        file = QFileDialog.getOpenFileName(self.widget, self.browser_title, start_folder, "All files (*)", "", QFileDialog.HideNameFilterDetails)
+        file = QFileDialog.getOpenFileName(
+            self.widget,
+            self.browser_title,
+            start_folder,
+            "All files (*)",
+            "",
+            QFileDialog.HideNameFilterDetails,
+        )
         #file is a tuple of (filename, selected filter)
         #unless no file was selected (e.g. dialog was closed by clicking 'cancel')
         if len(file) == 2:
@@ -107,6 +116,14 @@ def register_settings_options(session):
             "whether or not to open the Normal Modes tool when a file with orbital info is opened",
         ),
         
+        "MAX_FCHK_ARRAY": (
+            "max. FCHK array size:",
+            IntOption,
+            """maximum array size to read from FCHK files
+can speed up reading large files, but may need to be
+increased if not all data is read""",
+        ),
+        
         "NON_SEQCROW_IO_PRESET" : (
             """commands executed when a model is added:
 use <model> in place of model ID
@@ -137,6 +154,12 @@ from that file type
             FileOption, 
             "Path to Psi4 executable"
         ), 
+
+        "QCHEM_EXE" : (
+            "Q-Chem executable", 
+            FileOption, 
+            "Path to Q-Chem executable"
+        ), 
         
         "SCRATCH_DIR" : (
             "Scratch directory",
@@ -163,15 +186,21 @@ from that file type
                 opt.settings.AARONLIB = val
                 os.environ[setting] = val
                 warn("Environment variable has been set for ChimeraX. Please restart ChimeraX for changes to take effect.")
-            
+        
+        kwargs = {
+            "attr_name": setting,
+            "settings": settings,
+            "balloon": balloon,
+            "auto_set_attr": False,
+        }
+        if opt_class is IntOption:
+            kwargs["min"] = 0
+        
         opt = opt_class(
             opt_name,
             getattr(settings, setting),
             _opt_cb,
-            attr_name=setting,
-            settings=settings,
-            balloon=balloon,
-            auto_set_attr=False,
+            **kwargs,
         )
         
         session.ui.main_window.add_settings_option("SEQCROW", opt)

@@ -3,7 +3,6 @@ from AaronTools.component import Component
 from AaronTools.ring import Ring
 
 from chimerax.atomic import selected_atoms, PseudobondGroup
-from chimerax.atomic.colors import element_color
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.core.settings import Settings
@@ -16,16 +15,15 @@ from Qt.QtWidgets import (
     QWidget, QFormLayout, QCheckBox, QCompleter
 )
 
-from AaronTools.const import ELEMENTS, RADII
+from AaronTools.const import RADII
 from AaronTools.atoms import Atom
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.libraries import SubstituentTable, LigandTable, RingTable
 from SEQCROW.commands.substitute import guessAttachmentTargets
 from SEQCROW.finders import AtomSpec
-from SEQCROW.widgets import PeriodicTable, ModelComboBox
+from SEQCROW.widgets import PeriodicTable, ModelComboBox, ElementButton
 from SEQCROW.managers.filereader_manager import apply_seqcrow_preset
-from SEQCROW.utils import contrast_bw
 
 import numpy as np
 
@@ -247,17 +245,7 @@ class EditStructure(ToolInstance):
         changeelement_tab = QWidget()
         changeelement_layout = QFormLayout(changeelement_tab)
         
-        self.element = QPushButton("C")
-        self.element.setMinimumWidth(int(1.3*self.element.fontMetrics().boundingRect("QQ").width()))
-        self.element.setMaximumWidth(int(1.3*self.element.fontMetrics().boundingRect("QQ").width()))
-        self.element.setMinimumHeight(int(1.5*self.element.fontMetrics().boundingRect("QQ").height()))
-        self.element.setMaximumHeight(int(1.5*self.element.fontMetrics().boundingRect("QQ").height()))
-        ele_color = tuple(list(element_color(ELEMENTS.index("C")))[:-1])
-        self.element.setStyleSheet(
-            "QPushButton { background: rgb(%i, %i, %i); color: %s; font-weight: bold; }" % (
-                *ele_color, contrast_bw(ele_color)
-            )
-        )
+        self.element = ElementButton("C", single_state=True)
         self.element.clicked.connect(self.open_ptable)
         changeelement_layout.addRow("element:", self.element)
         
@@ -819,13 +807,7 @@ class PTable(ChildToolWindow):
         
         if len(elements) == 1:
             element = elements[0]
-            self.button.setText(element)
-            ele_color = tuple(list(element_color(ELEMENTS.index(element)))[:-1])
-            self.button.setStyleSheet(
-                "QPushButton { background: rgb(%i, %i, %i); color: %s; font-weight: bold; }" % (
-                    *ele_color, contrast_bw(ele_color)
-                )
-            )
+            self.button.changeElement(element)
 
 
 class _PTable(PTable):

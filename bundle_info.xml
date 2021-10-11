@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="1.2.2">
+            version="1.3">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -66,7 +66,7 @@
             </Description>
             
             <Dependencies>
-                <Dependency name="ChimeraX-Core" version="~=1.2"/>
+                <Dependency name="ChimeraX-Core" version="&gt;=1.2, &lt;=1.3"/>
                 <Dependency name="scipy"/>
                 <Dependency name="Send2Trash"/>
                 <Dependency name="psutil"/>
@@ -103,7 +103,7 @@
                           reference_url="http://gaussian.com/input/"
                           synopsis="Gaussian input file"
                 />
-                          
+
                 <Provider name="Gaussian output file" 
                           category="Molecular structure" 
                           suffixes=".log" 
@@ -111,7 +111,7 @@
                           nicknames="log" 
                           synopsis="Gaussian output file"
                 />
-                          
+
                 <Provider name="ORCA output file" 
                           category="Molecular structure" 
                           suffixes=".out" 
@@ -119,13 +119,21 @@
                           nicknames="out" 
                           synopsis="ORCA output file"
                 />
-                          
+
                 <Provider name="Psi4 output file" 
                           category="Molecular structure" 
                           suffixes=".dat,.out" 
                           encoding="utf-8" 
                           nicknames="dat" 
                           synopsis="Psi4 output file"
+                />
+
+                <Provider name="Q-Chem output file" 
+                          category="Molecular structure" 
+                          suffixes=".qout,.out,.dat" 
+                          encoding="utf-8" 
+                          nicknames="qout" 
+                          synopsis="Q-Chem output file"
                 />
                 
                 <Provider name="XYZ file" 
@@ -181,6 +189,7 @@
                 <Provider name="sqm output file" want_path="false"/>
                 <Provider name="NBO input file" want_path="true"/>
                 <Provider name="NBO output file" want_path="true"/>
+                <Provider name="Q-Chem output file" want_path="false"/>
             </Providers>
             
             <!--we can save Gaussian input files, but not with the save command-->
@@ -193,6 +202,11 @@
                 <Provider name="ORCA"/>
                 <Provider name="Psi4"/>
                 <Provider name="SQM"/>
+                <!--
+                I have not gotten this to work
+                maybe something in ChimeraX's environment conflicts with Q-Chem
+                <Provider name="Q-Chem"/>
+                -->
             </Providers>
             
             <Providers manager="seqcrow_qm_input_manager">
@@ -200,6 +214,7 @@
                 <Provider name="ORCA"/>
                 <Provider name="Psi4"/>
                 <Provider name="SQM"/>
+                <Provider name="Q-Chem"/>
             </Providers>
             
             <Providers manager="test_manager">
@@ -210,6 +225,7 @@
                 <Provider name="buried_volume"/>
                 <Provider name="lookDown_command"/>
                 <Provider name="cone_angle"/>
+                <Provider name="substituent_sterimol"/>
             </Providers>
   
             <!--
@@ -316,7 +332,8 @@
                 <ChimeraXClassifier>ChimeraX :: Tool :: Orbital Viewer                 :: AaronTools         :: View molecular orbitals</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Ligand Sterimol                :: Structure Analysis :: Calculate Sterimol parameters for ligands on organo- or organometallic catalysts</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: IR Spectrum                    :: AaronTools         :: plot simulated IR spectra</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: UV/Vis Spectrum                    :: AaronTools         :: plot simulated UV/vis spectra</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: UV/Vis Spectrum                :: AaronTools         :: plot simulated UV/vis spectra</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: 2D Builder                     :: Structure Editing  :: molecule using ChemDoodle Web Components</ChimeraXClassifier>
                 <!--<ChimeraXClassifier>ChimeraX :: Tool :: AaronJr Input Builder          :: AaronJr            :: Create input files for AaronJr</ChimeraXClassifier>-->
                 <!--ChimeraXClassifier>ChimeraX :: Tool :: AARON Input Builder :: AARON :: Build AARON input file</ChimeraXClassifier-->
                 
@@ -377,6 +394,10 @@
     <AdditionalPackages>
         <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools"/>
         <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
+        <!--
+        <Package name="AaronTools" folder="/home/tony/Documents/GitHub/AaronTools"/>
+        <Package name="AaronTools.test" folder="/home/tony/Documents/GitHub/AaronTools/test"/>
+        -->
     </AdditionalPackages>
 
     <DataFiles package="AaronTools">
@@ -403,5 +424,6 @@
     <DataFiles>
         <DataDir>docs</DataDir>
         <DataDir>icons</DataDir>
+        <DataDir>ChemDoodleWebComponents</DataDir>
     </DataFiles>
 </BundleInfo>

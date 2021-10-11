@@ -6,7 +6,6 @@ import numpy as np
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.ui.widgets import ColorButton
-from chimerax.std_commands.coordset_gui import CoordinateSetSlider
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
 from chimerax.core.commands.cli import FloatArg, TupleOf, IntArg
@@ -14,15 +13,14 @@ from chimerax.core.commands import run
 
 from AaronTools.comp_output import CompOutput
 from AaronTools.const import FREQUENCY_SCALE_LIBS
-from AaronTools.geometry import Geometry
 from AaronTools.spectra import Frequency
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
 from matplotlib import rcParams
 
-from Qt.QtCore import Qt, QRect, QItemSelectionModel, QVariant, QSize
-from Qt.QtGui import QValidator, QFont, QIcon
+from Qt.QtCore import Qt, QSize
+from Qt.QtGui import QIcon
 from Qt.QtWidgets import (
     QSpinBox,
     QDoubleSpinBox,
@@ -31,12 +29,9 @@ from Qt.QtWidgets import (
     QTabWidget,
     QComboBox,
     QTableWidget,
-    QTableView,
     QWidget,
-    QTableWidgetItem,
     QFormLayout,
     QCheckBox,
-    QHeaderView,
     QMenuBar,
     QFileDialog,
     QStyle,
@@ -1058,8 +1053,8 @@ class IRSpectrum(ToolInstance):
                 mol_style = mol.child(0)
                 show_mol = self.tree.itemWidget(mol_style, 0).layout().itemAt(1).widget()
                 if show_mol.checkState() == Qt.Checked:
-                    stop_ndx = sum(sum(len(freq.frequency.data) for freq in conf) for conf in freq)
-                    start_ndx = stop_ndx - sum(len(f.frequency.data) for f in freq[-1])
+                    stop_ndx = sum(sum(len(freq.frequency.data) for freq in conf) for conf in freqs)
+                    start_ndx = stop_ndx - sum(len(f.frequency.data) for f in freqs[-1])
                     color = self.tree.itemWidget(mol_style, 0).layout().itemAt(2).widget().get_color()
                     line_style = self.tree.itemWidget(mol_style, 1).layout().itemAt(1).widget().currentData(Qt.UserRole)
                     show_components.append([

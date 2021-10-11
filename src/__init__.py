@@ -305,6 +305,10 @@ class _SEQCROW_API(BundleAPI):
             from .tools import UVVisSpectrum
             return UVVisSpectrum(session, ti.name)
 
+        elif ti.name == "2D Builder":
+            from .tools import MolBuilder
+            return MolBuilder(session, ti.name)
+
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)
 
@@ -378,6 +382,23 @@ class _SEQCROW_API(BundleAPI):
                             data,
                             file_name,
                             format_name="Psi4 output file",
+                            **kw
+                        )
+
+                    @property
+                    def open_args(self):
+                        return {'coordsets': BoolArg}
+
+                return Info()
+
+            elif name == "Q-Chem output file":
+                class Info(OpenerInfo):
+                    def open(self, session, data, file_name, **kw):
+                        return open_aarontools(
+                            session,
+                            data,
+                            file_name,
+                            format_name="Q-Chem output file",
                             **kw
                         )
 
@@ -507,6 +528,9 @@ class _SEQCROW_API(BundleAPI):
             elif name == "SQM":
                 from SEQCROW.input_file_formats import SQMFileInfo
                 return SQMFileInfo()
+            elif name == "Q-Chem":
+                from SEQCROW.input_file_formats import QChemFileInfo
+                return QChemFileInfo()
 
         elif mgr is session.seqcrow_job_manager:
             if name == "Gaussian":
@@ -521,6 +545,9 @@ class _SEQCROW_API(BundleAPI):
             elif name == "SQM":
                 from SEQCROW.jobs import SQMJob
                 return SQMJob
+            elif name == "Q-Chem":
+                from SEQCROW.jobs import QChemJob
+                return QChemJob
 
         elif mgr is session.test_manager:
             if name == "fuseRing_command":
@@ -550,6 +577,10 @@ class _SEQCROW_API(BundleAPI):
             elif name == "cone_angle":
                 from .tests.cone_angle import ConeAngleToolTest
                 return ConeAngleToolTest
+
+            elif name == "substituent_sterimol":
+                from .tests.substituent_sterimol import SubstituentSterimolToolTest
+                return SubstituentSterimolToolTest
 
     @staticmethod
     def register_command(bundle_info, command_info, logger):
@@ -669,43 +700,32 @@ class _SEQCROW_API(BundleAPI):
 
     @staticmethod
     def get_class(name):
-        """get tool classes"""
-        if name == "BondEditor":
-            from .tools import BondEditor
-            return BondEditor
-        elif name == "AaronTools_Library":
-            from .tools import AaronTools_Library
-            return AaronTools_Library
-        elif name == "Thermochem":
-            from .tools import Thermochem
-            return Thermochem
-        elif name == "FileReaderPanel":
-            from .tools import FileReaderPanel
-            return FileReaderPanel
-        elif name == "BuildQM":
-            from .tools import BuildQM
-            return BuildQM
-        elif name == "JobQueue":
-            from .tools import JobQueue
-            return JobQueue
-        elif name == "LibAdd":
-            from .tools import LibAdd
-            return LibAdd
-        elif name == "NormalModes":
-            from .tools import NormalModes
-            return NormalModes
-        elif name == "EnergyPlot":
-            from .tools import EnergyPlot
-            return EnergyPlot
-        elif name == "PrecisionRotate":
-            from .tools import PrecisionRotate
-            return PrecisionRotate
-        elif name == "Sterimol":
-            from .tools import Sterimol
-            return Sterimol
-        elif name == "EditStructure":
-            from .tools import EditStructure
-            return EditStructure
+        print(name)
+        """AaronTools/SEQCROW classes for saving things"""
+        if name == "FileReader":
+            from AaronTools.fileIO import FileReader
+            return FileReader
+        elif name == "Orbitals":
+            from AaronTools.fileIO import Orbitals
+            return Orbitals
+        elif name == "Frequency":
+            from AaronTools.spectra import Frequency
+            return Frequency
+        elif name == "ValenceExcitations":
+            from AaronTools.spectra import ValenceExcitations
+            return ValenceExcitations
+        elif name == "HarmonicVibration":
+            from AaronTools.spectra import HarmonicVibration
+            return HarmonicVibration
+        elif name == "AnharmonicVibration":
+            from AaronTools.spectra import AnharmonicVibration
+            return AnharmonicVibration
+        elif name == "ValenceExcitation":
+            from AaronTools.spectra import ValenceExcitation
+            return ValenceExcitation
+        elif name == "Atom":
+            from AaronTools.atoms import Atom
+            return Atom
 
     @staticmethod
     def finish(session, bundle_info):
@@ -718,7 +738,7 @@ class _SEQCROW_API(BundleAPI):
     def open_useful_tools(cls, trigger_name, models):
         for model in models:
             if hasattr(model, "filereader") and model.filereader is not None:
-                fr = model.filereader[-1]
+                fr = model.filereader
                 if (
                     "orbitals" in fr.other and
                     model.session.seqcrow_settings.settings.ORBIT_OPEN != "do nothing"
