@@ -550,7 +550,7 @@ class ToolButtonGroup:
     
 class MolBuilder(HtmlToolInstance):
 
-    help = "TODO"
+    help = "https://github.com/QChASM/SEQCROW/wiki/2D-Builder"
     CUSTOM_SCHEME = ["editor", "cxcmd"]
     SESSION_ENDURING = False
     SESSION_SAVE = False
