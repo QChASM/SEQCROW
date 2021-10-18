@@ -1,4 +1,5 @@
 {
+    "comment": "save the contents of this file to a file with a .json extension",
     "Gaussian": {
         "TD-DFT": {
             "use_job_type": true,
@@ -158,7 +159,12 @@
                     ],
                     "before_molecule": [
                         "from psi4.driver.procrouting.response.scf_response import tdscf_excitations"
-                    ]
+                    ],
+                    "settings": {
+                        "save_jk": [
+                            "true"
+                        ]
+                    }
                 },
                 "basis": {
                     "name": [
