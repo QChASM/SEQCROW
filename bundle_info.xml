@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="1.3">
+            version="1.4a1">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -337,41 +337,85 @@
                 <!--<ChimeraXClassifier>ChimeraX :: Tool :: AaronJr Input Builder          :: AaronJr            :: Create input files for AaronJr</ChimeraXClassifier>-->
                 <!--ChimeraXClassifier>ChimeraX :: Tool :: AARON Input Builder :: AARON :: Build AARON input file</ChimeraXClassifier-->
                 
-                <ChimeraXClassifier>ChimeraX :: Selector :: tm        :: Transition metals</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: Ad        :: Adamantyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: BF2       :: Difluoroboro substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CCH       :: Alkynyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CF3       :: Trifluoromethyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CH2Cl     :: Chloromethyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CH2F      :: Fluoromethyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CH2OH     :: Hydroxymethyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CHCH2     :: Vinyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CHCl2     :: Dichloromethyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CHF2      :: Difluoromethyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CHO       :: Formyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CN        :: Cyano substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: COCH3     :: Acetyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: COOCH3    :: Methylcarboxyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: Cy        :: Cyclohexyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: Et        :: Ethyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: iPr       :: iso-Propyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: Me        :: Methyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: Mes       :: Mesityl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: NH2       :: Amino substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: NHOH      :: Hydroxylamino substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: NO        :: Nitroso substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: NO2       :: Nitro substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: OCF3      :: Trifluoromethoxy substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: OH        :: Hydroxyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: OMe       :: Methoxy substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: Ph        :: Phenyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: SCH3      :: Methylthio substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: SH        :: Thio substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: SiF3      :: Trifluorosilyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: SiH3      :: Silyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: SuperMes  :: Super Mesityl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: tBu       :: tert-Butyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: connected :: fragment of current selection</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: tm             :: Transition metals</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: Ad             :: Adamantyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: BF2            :: Difluoroboro substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CCH            :: Alkynyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CF3            :: Trifluoromethyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CH2Cl          :: Chloromethyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CH2F           :: Fluoromethyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CH2OH          :: Hydroxymethyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CHCH2          :: Vinyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CHCl2          :: Dichloromethyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CHF2           :: Difluoromethyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CHO            :: Formyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CN             :: Cyano substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: COCH3          :: Acetyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: COOCH3         :: Methylcarboxyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: Cy             :: Cyclohexyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: Et             :: Ethyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: iPr            :: iso-Propyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: Me             :: Methyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: Mes            :: Mesityl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: NH2            :: Amino substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: NHOH           :: Hydroxylamino substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: NO             :: Nitroso substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: NO2            :: Nitro substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: OCF3           :: Trifluoromethoxy substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: OH             :: Hydroxyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: OMe            :: Methoxy substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: Ph             :: Phenyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: SCH3           :: Methylthio substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: SH             :: Thio substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: SiF3           :: Trifluorosilyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: SiH3           :: Silyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: SuperMes       :: Super Mesityl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: tBu            :: tert-Butyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: connected      :: fragment of current selection</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: chiral-centers :: chiral centers</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: spiro-centers  :: chiral centers</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: bridgehead     :: chiral centers</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: linear :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: bent :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: planar :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: t-shaped :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: trigonal-planar :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: tetrahedral :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: sawhorse :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: seesaw :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: square-planar :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: trigonal-pyramidal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: trigonal-bipyramidal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: square-pyramidal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: pentagonal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: octahedral :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: hexagonal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: trigonal-prismatic :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: pentagonal-pyramidal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: capped-octahedral :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: capped-trigonal-prismatic :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: heptagonal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: hexagonal-pyramidal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: pentagonal-bipyramidal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: biaugmented-trigonal-prismatic :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: cubic :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: elongated-trigonal-bipyramidal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: hexagonal-bipyramidal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: heptagonal-pyramidal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: octagonal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: square-antiprismatic :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: trigonal-dodecahedral :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: capped-cube :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: capped-square-antiprismatic :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: enneagonal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: heptagonal-bipyramidal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: hula-hoop :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: triangular-cupola :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: tridiminished-icosahedral :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: muffin :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: octagonal-pyramidal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: tricapped-trigonal-prismatic :: VSEPR </ChimeraXClassifier>
+
 
                 <!--NOTE: this synopsis will not appear when `help <command>` is used-->
                 <ChimeraXClassifier>ChimeraX :: Command :: rmsdAlign           :: Structure Analysis :: Calculate RMSD between structures</ChimeraXClassifier>

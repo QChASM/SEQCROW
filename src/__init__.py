@@ -659,12 +659,60 @@ class _SEQCROW_API(BundleAPI):
             if len(sub) > 1 and any(not (c.isalnum() or c in "+-") for c in sub[1:]):
                 # print(sub, "contains non-alphanumeric character")
                 continue
-            add_selector(substituent_menu, sub, sub)
+            add_selector(substituent_menu, sub)
 
         # connected selector
         mw = session.ui.main_window
         structure_menu = add_submenu([], '&Structure')
         structure_menu.addAction(QAction("Connected", mw))
+        structure_menu.addAction(QAction("Chiral centers", mw))
+        structure_menu.addAction(QAction("Spiro centers", mw))
+        structure_menu.addAction(QAction("Bridgehead", mw))
+        
+        vsepr_menu = add_submenu(['Che&mistry'], 'Shape')
+        for vsepr in [
+            "linear",
+            "bent",
+            "planar",
+            "t-shaped",
+            "trigonal planar",
+            "tetrahedral",
+            "sawhorse",
+            "seesaw",
+            "square planar",
+            "trigonal pyramidal",
+            "trigonal bipyramidal",
+            "square pyramidal",
+            "pentagonal",
+            "octahedral",
+            "hexagonal",
+            "trigonal prismatic",
+            "pentagonal pyramidal",
+            "capped octahedral",
+            "capped trigonal prismatic",
+            "heptagonal",
+            "hexagonal pyramidal",
+            "pentagonal bipyramidal",
+            "biaugmented trigonal prismatic",
+            "cubic",
+            "elongated trigonal bipyramidal",
+            "hexagonal bipyramidal",
+            "heptagonal pyramidal",
+            "octagonal",
+            "square antiprismatic",
+            "trigonal dodecahedral",
+            "capped cube",
+            "capped square antiprismatic",
+            "enneagonal",
+            "heptagonal bipyramidal",
+            "hula-hoop",
+            "triangular cupola",
+            "tridiminished icosahedral",
+            "muffin",
+            "octagonal pyramidal",
+            "tricapped trigonal prismatic",
+        ]:
+            add_selector(vsepr_menu, vsepr, selector_text=vsepr.replace(" ", "-"))
 
     @staticmethod
     def register_tutorials(session):

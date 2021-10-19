@@ -1073,7 +1073,7 @@ class UVVisSpectrum(ToolInstance):
         uv_vis_trans_vel_item = model.item(3)
         ecd_item = model.item(4)
         ecd_vel_item = model.item(5)
-        if any(data.dipole_vel is None for data in mixed_spectra.data):
+        if any(data.oscillator_str_vel is None for data in mixed_spectra.data):
             uv_vis_vel_item.setFlags(uv_vis_vel_item.flags() & ~Qt.ItemIsEnabled)
             uv_vis_trans_vel_item.setFlags(uv_vis_trans_vel_item.flags() & ~Qt.ItemIsEnabled)
         else:
@@ -1101,7 +1101,7 @@ class UVVisSpectrum(ToolInstance):
                 self.plot_type.setCurrentIndex(0)
                 self.plot_type.blockSignals(False)
         if plot_type == "uv-vis-velocity" or plot_type == "transmittance-velocity":
-            if not all(data.dipole_vel is not None for data in mixed_spectra.data):
+            if not all(data.oscillator_str_vel is not None for data in mixed_spectra.data):
                 self.plot_type.blockSignals(True)
                 self.plot_type.setCurrentIndex(0)
                 self.plot_type.blockSignals(False)
@@ -1194,13 +1194,13 @@ class UVVisSpectrum(ToolInstance):
                 y_vals = (0, 1)
             
             if plot_type == "UV/vis":
-                y_rel = excit.dipole_str / item.dipole_str
+                y_rel = excit.oscillator_str / item.oscillator_str
             elif plot_type == "UV/vis (dipole velocity)":
-                y_rel = excit.dipole_vel / item.dipole_vel
+                y_rel = excit.oscillator_str_vel / item.oscillator_str_vel
             elif plot_type == "UV/vis transmittance":
-                y_rel = excit.dipole_str / item.dipole_str
+                y_rel = excit.oscillator_str / item.oscillator_str
             elif plot_type == "UV/vis transmittance (dipole velocity)":
-                y_rel = excit.dipole_vel / item.dipole_vel
+                y_rel = excit.oscillator_str_vel / item.oscillator_str_vel
             elif plot_type == "ECD":
                 y_rel = excit.rotatory_str_len / item.rotatory_str_len
             elif plot_type == "ECD (dipole velocity)":

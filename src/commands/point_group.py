@@ -6,6 +6,7 @@ from chimerax.core.commands import CmdDesc, FloatArg, BoolArg, IntArg
 
 from SEQCROW.residue_collection import ResidueCollection
 
+from AaronTools.atoms import Atom
 from AaronTools.symmetry import (
     PointGroup,
     ProperRotation,
@@ -22,9 +23,11 @@ pointGroup_description = CmdDesc(
     keyword=[
         ("printElements", BoolArg),
         ("displayElements", BoolArg),
+        ("residuesOnly", BoolArg),
         ("tolerance", FloatArg),
         ("axisTolerance", FloatArg),
         ("maxRotation", IntArg),
+        ("symmetryNumber", BoolArg),
     ],
     synopsis="print the point group of atomic structures to the log",
     url="https://github.com/QChASM/SEQCROW/wiki/Commands#pointGroup",
@@ -36,22 +39,45 @@ def pointGroup(
         selection,
         printElements=False,
         displayElements=True,
+        residuesOnly=False,
         tolerance=0.1,
         axisTolerance=0.5,
         maxRotation=6,
+        symmetryNumber=False,
 ):
 
+    out = []
     for model in selection:
-        rescol = ResidueCollection(model, refresh_ranks=False)
-        pg = PointGroup(
-            rescol,
-            tolerance=tolerance,
-            rotation_tolerance=np.deg2rad(axisTolerance),
-            max_rotation=maxRotation,
-            
-        )
+        if not residuesOnly:
+            rescol = ResidueCollection(model, refresh_ranks=False)
+            pg = PointGroup(
+                rescol,
+                tolerance=tolerance,
+                rotation_tolerance=np.deg2rad(axisTolerance),
+                max_rotation=maxRotation,
+            )
+        else:
+            atoms = []
+            groups = []
+            for residue in model.residues:
+                atoms.append(Atom(element="H", coords=residue.center))
+                groups.append(residue.name)
+            rescol = ResidueCollection(atoms, refresh_ranks=False)
+            pg = PointGroup(
+                rescol,
+                tolerance=tolerance,
+                rotation_tolerance=np.deg2rad(axisTolerance),
+                max_rotation=maxRotation,
+                groups=groups,
+            )
         session.logger.info("%s: %s" % (model.name, pg.name))
-        
+        out.append(pg.name)
+        if symmetryNumber:
+            session.logger.info(
+                "the rotational symmetry number for this point group is %i" % pg.symmetry_number
+            )
+            out[-1] = (pg.name, pg.symmetry_number)
+
         if printElements:
             for ele in sorted(pg.elements, reverse=True):
                 session.logger.info(repr(ele))
@@ -123,3 +149,5 @@ def pointGroup(
                     stream = BytesIO(bytes(mirror, "utf-8"))
                     bild_obj, status = read_bild(session, stream, repr(ele))
                     session.models.add(bild_obj, parent=model)
+    
+    return out

@@ -4,6 +4,7 @@ from chimerax.atomic import AtomicStructure, Atoms, selected_atoms, selected_bon
 from chimerax.core.commands import register_selector
 
 from AaronTools.atoms import BondOrder
+from AaronTools.finders import ChiralCenters, VSEPR, Bridgehead, SpiroCenters
 from AaronTools.substituent import Substituent
 from AaronTools.const import TMETAL
 from AaronTools.utils.prime_numbers import Primes
@@ -18,6 +19,7 @@ Primes()
 BondOrder()
 
 def register_selectors(logger, name):
+    logger.info(name)
     if name == "tm":
         register_selector("tm", tm_selector, logger, desc="transition metals")
 
@@ -37,6 +39,131 @@ def register_selectors(logger, name):
     elif name == "connected":
         register_selector("connected", all_connected_selector, logger, desc="fragment connected to selected atoms")
     
+    elif any(name == vsepr for vsepr in [
+        "t-shaped",
+        "trigonal-planar",
+        "tetrahedral",
+        "sawhorse",
+        "seesaw",
+        "square-planar",
+        "trigonal-pyramidal",
+        "trigonal-bipyramidal",
+        "square-pyramidal",
+        "pentagonal",
+        "octahedral",
+        "hexagonal",
+        "trigonal-prismatic",
+        "pentagonal-pyramidal",
+        "capped-octahedral",
+        "capped-trigonal-prismatic",
+        "heptagonal",
+        "hexagonal-pyramidal",
+        "pentagonal-bipyramidal",
+        "biaugmented-trigonal-prismatic",
+        "cubic",
+        "elongated-trigonal-bipyramidal",
+        "hexagonal-bipyramidal",
+        "heptagonal-pyramidal",
+        "octagonal",
+        "square-antiprismatic",
+        "trigonal-dodecahedral",
+        "capped-cube",
+        "capped-square-antiprismatic",
+        "enneagonal",
+        "heptagonal-bipyramidal",
+        "hula-hoop",
+        "triangular-cupola",
+        "tridiminished-icosahedral",
+        "muffin",
+        "octagonal-pyramidal",
+        "tricapped-trigonal-prismatic",
+    ]):
+        print("vsepr")
+        new_name = name
+        if name != "hula-hoop":
+            new_name = name.replace("-", " ")
+        register_selector(
+            name, 
+            lambda sess, models, results, vsepr_name=new_name: vsepr_selection(
+                sess,
+                vsepr_name,
+                models,
+                results
+            ),
+            logger,
+            desc="%s shape" % name
+        )
+    
+    elif any(name == vsepr for vsepr in [
+        "linear",
+        "bent",
+        "planar",
+    ]):
+        print("vsepr")
+        name_map = {
+            "linear": ["linear 1", "linear 2"],
+            "bent": [
+                "bent 2 planar",
+                "bent 2 tetrahedral",
+                "bent 3 tetrahedral",
+            ],
+            "planar": [
+                "trigonal planar",
+                "square planar",
+            ],
+        }
+        finders = name_map[name]
+        register_selector(
+            name, 
+            lambda sess, models, results, vsepr_name=finders: vsepr_selection(
+                sess,
+                vsepr_name,
+                models,
+                results
+            ),
+            logger,
+            desc="%s shape" % name
+        )
+
+    elif name == "bridgehead":
+        register_selector(
+            name, 
+            lambda sess, models, results, finder=Bridgehead(): finder_selection(
+                sess,
+                finder,
+                models,
+                results
+            ),
+            logger,
+            desc="%s atoms" % name.replace("-", " ")
+        )
+
+    elif name == "spiro-centers":
+        register_selector(
+            name, 
+            lambda sess, models, results, finder=SpiroCenters(): finder_selection(
+                sess,
+                finder,
+                models,
+                results
+            ),
+            logger,
+            desc="%s" % name.replace("-", " ")
+        )
+
+    elif name == "chiral-centers":
+        register_selector(
+            name, 
+            lambda sess, models, results, finder=ChiralCenters(): finder_selection(
+                sess,
+                finder,
+                models,
+                results
+            ),
+            logger,
+            desc="%s" % name.replace("-", " ")
+        )
+
 def tm_selector(session, models, results):
     """select transition metals using AaronTools' TMETAL dictionary"""
         
@@ -46,6 +173,42 @@ def tm_selector(session, models, results):
             for atom in model.atoms:
                 if atom.element.name in TMETAL:
                     atoms.append(atom)
+    
+    #need to add a Collection, not just a list of atoms
+    results.add_atoms(Atoms(atoms))
+
+def vsepr_selection(session, vsepr_name, models, results):
+    atoms = []
+    if isinstance(vsepr_name, str):
+        finders = VSEPR(vsepr_name)
+    else:
+        finders = [VSEPR(name) for name in vsepr_name]
+    
+    for model in models:
+        if isinstance(model, AtomicStructure):
+            rescol = ResidueCollection(model)
+            try:
+                rescol_atoms = rescol.find(finders)
+                atoms.extend([atom.chix_atom for atom in rescol_atoms])
+            except LookupError:
+                continue
+    
+    #need to add a Collection, not just a list of atoms
+    results.add_atoms(Atoms(atoms))
+
+def finder_selection(self, finder, models, results):
+    atoms = []
+    
+    for model in models:
+        if isinstance(model, AtomicStructure):
+            rescol = ResidueCollection(
+                model, refresh_ranks=False,
+            )
+            try:
+                rescol_atoms = rescol.find(finder)
+                atoms.extend([atom.chix_atom for atom in rescol_atoms])
+            except LookupError:
+                continue
     
     #need to add a Collection, not just a list of atoms
     results.add_atoms(Atoms(atoms))
