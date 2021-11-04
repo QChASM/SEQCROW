@@ -408,9 +408,7 @@
                 <ChimeraXClassifier>ChimeraX :: Selector :: capped-cube :: VSEPR </ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: capped-square-antiprismatic :: VSEPR </ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: enneagonal :: VSEPR </ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: heptagonal-bipyramidal :: VSEPR </ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: hula-hoop :: VSEPR </ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: triangular-cupola :: VSEPR </ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: tridiminished-icosahedral :: VSEPR </ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: muffin :: VSEPR </ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: octagonal-pyramidal :: VSEPR </ChimeraXClassifier>

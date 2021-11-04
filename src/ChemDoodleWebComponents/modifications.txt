@@ -1,10 +1,59 @@
 August 2021
-some portions of install/ChemDoodleWeb.js and install/uis/ChemDoodleWeb-uis.js
-have been commented out or deleted
-those files have also been modified for readability
-see those files for details about the changes
-the data, samples, and tests folders have also been deleted to reduce file size
+    some portions of install/ChemDoodleWeb.js and install/uis/ChemDoodleWeb-uis.js
+    have been commented out or deleted
+    those files have also been modified for readability
+    see those files for details about the changes
+    the data, samples, and tests folders have also been deleted to reduce file size
 
 
 October 8. 2021
-deleted src folder - source code that is used is in install
+    deleted src folder - source code that is used is in install
+
+November 4. 2021
+    changes to ChemDoodleWeb-uis shown below
+    removed the following templates to help reduce file size:
+     - all amino acids
+     - all cycloalkanes
+     - all platonic solids
+     - all ring conformers
+     - all stereocenters and geometries
+     - all vitamins
+     - all "other" things except prophyrin
+     - all cyclic terpenes
+     - "My Templates" option (can't seem to save templates)
+ 
+    removed the following SVG icons to reduce file size:
+     - SAVE
+     - TORSION
+     - QUERY
+     - ARROW_EQUILIBRIUM
+     - ARROW_RETROSYNTHETIC
+     - ARROW_RESONANCE
+     - ARROW_SYNTHETIC
+     - ATOM_REACTION_MAP
+     - CALCULATE
+     - COPY
+     - PASTE
+     - DISTANCE
+     - OPTIMIZE
+     - PERSPECTIVE
+     - PUSHER_BOND_FORMING
+     - PUSHER_DOUBLE
+     - PUSHER_SINGLE
+     - SEARCH
+     - SETTINGS
+     - BOND_QUADRUPLE
+     - BOND_QUINTUPLE
+     - BOND_SEXTUPLE
+     - MARQUEE
+     - LASSO
+     - LASSO_SHAPES
+     - TEXT
+     - ANGLE
+     - ANIMATION
+     - BRACKET_REPEAT_UNIT
+     - BRACKET_CHARGE
+
+    removed the following functions:
+     - SaveFileDialog
+     - ColorPicker
