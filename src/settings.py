@@ -23,10 +23,17 @@ class FreqOptions(EnumOption):
     values = ['do nothing', 'open normal modes tool']
     labels = ['do nothing', 'open normal modes tool']
 
+class QueueOptions(EnumOption):
+    values = ['None', 'Slurm', 'PBS', 'SGE', 'LSF']
+    labels = ['None', 'Slurm', 'PBS', 'SGE', 'LSF']
+
 # 'settings' module attribute will be set by manager initialization
 class _SEQCROWSettings(Settings):
     EXPLICIT_SAVE = {
-        'AARONLIB': Value(getenv('AARONLIB', path.join(path.expanduser('~'), "Aaron_libs")), StringArg),
+        'AARONLIB': Value(
+            getenv('AARONLIB', path.join(path.expanduser('~'), "Aaron_libs")),
+            StringArg
+        ),
         'ORCA_EXE': Value("orca.exe" if platform == "win32" else "orca", StringArg),
         'GAUSSIAN_EXE': Value("g09.exe" if platform == "win32" else "g09", StringArg),
         'PSI4_EXE': Value("psi4", StringArg),
@@ -50,6 +57,10 @@ class _SEQCROWSettings(Settings):
         ),
         'NON_SEQCROW_IO_PRESET': [],
         'MAX_FCHK_ARRAY': 10000000,
+        'QUEUE_TYPE': Value(
+            getenv('AARONLIB', 'None'),
+            EnumOf(QueueOptions.values),
+        ),
     }
 
 
@@ -165,6 +176,12 @@ from that file type
             "Scratch directory",
             InputFolderOption,
             "Directory for staging QM jobs"
+        ),
+
+        "QUEUE_TYPE" : (
+            "Cluster computing scheduling software",
+            QueueOptions,
+            "Cluster computing scheduling software"
         ),
         
         "JOB_FINISHED_NOTIFICATION" : (

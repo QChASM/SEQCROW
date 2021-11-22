@@ -69,6 +69,14 @@ class _SEQCROW_API(BundleAPI):
         #apply AARONLIB setting
         if seqcrow_settings.settings.AARONLIB is not None:
             os.environ['AARONLIB'] = seqcrow_settings.settings.AARONLIB
+            import AaronTools.const
+            AaronTools.const.AARONLIB = seqcrow_settings.settings.AARONLIB
+
+        # set queue type
+        if seqcrow_settings.settings.QUEUE_TYPE != "None":
+            os.environ['QUEUE_TYPE'] = seqcrow_settings.settings.QUEUE_TYPE
+            import AaronTools.job_control
+            AaronTools.job_control.QUEUE_TYPE = seqcrow_settings.settings.QUEUE_TYPE.upper()
 
         session.seqcrow_settings = seqcrow_settings
 
@@ -174,6 +182,31 @@ class _SEQCROW_API(BundleAPI):
             from SEQCROW.managers import QMInputManager
             session.seqcrow_qm_input_manager = QMInputManager(session, name)
             return session.seqcrow_qm_input_manager
+
+        elif name == "seqcrow_cluster_scheduling_software_manager":
+            from SEQCROW.managers import ClusterSchedulingSoftwareManager
+            session.seqcrow_cluster_scheduling_software_manager = ClusterSchedulingSoftwareManager(session, name)
+            return session.seqcrow_cluster_scheduling_software_manager
+
+        elif name == "Slurm":
+            from SEQCROW.managers import SlurmDefault
+            session.seqcrow_slurm_manager = SlurmDefault(session, name)
+            return session.seqcrow_slurm_manager
+
+        elif name == "SGE":
+            from SEQCROW.managers import SGEDefault
+            session.seqcrow_sge_manager = SGEDefault(session, name)
+            return session.seqcrow_sge_manager
+
+        elif name == "PBS":
+            from SEQCROW.managers import PBSDefault
+            session.seqcrow_pbs_manager =  PBSDefault(session, name)
+            return session.seqcrow_pbs_manager
+
+        elif name == "LSF":
+            from SEQCROW.managers import LSFDefault
+            session.seqcrow_lsf_manager = LSFDefault(session, name)
+            return session.seqcrow_lsf_manager
 
         else:
             raise RuntimeError("manager named '%s' is unknown to SEQCROW" % name)
@@ -549,6 +582,100 @@ class _SEQCROW_API(BundleAPI):
                 from SEQCROW.jobs import QChemJob
                 return QChemJob
 
+        elif mgr is session.seqcrow_cluster_scheduling_software_manager:
+            if name == "Slurm":
+                return session.seqcrow_slurm_manager
+            elif name == "SGE":
+                return session.seqcrow_sge_manager
+            elif name == "PBS":
+                return session.seqcrow_pbs_manager
+            elif name == "LSF":
+                return session.seqcrow_lsf_manager
+
+        elif mgr is session.seqcrow_slurm_manager:
+            if name == "Gaussian":
+                from .managers.cluster_template_manager import GaussianSlurmTemplate
+                return GaussianSlurmTemplate
+            
+            elif name == "ORCA":
+                from .managers.cluster_template_manager import ORCASlurmTemplate
+                return ORCASlurmTemplate
+            
+            elif name == "Psi4":
+                from .managers.cluster_template_manager import Psi4SlurmTemplate
+                return Psi4SlurmTemplate
+             
+            elif name == "Q-Chem":
+                from .managers.cluster_template_manager import QChemSlurmTemplate
+                return QChemSlurmTemplate
+            
+            elif name == "SQM":
+                from .managers.cluster_template_manager import SQMSlurmTemplate
+                return SQMSlurmTemplate
+ 
+        elif mgr is session.seqcrow_pbs_manager:
+            if name == "Gaussian":
+                from .managers.cluster_template_manager import GaussianPBSTemplate
+                return GaussianPBSTemplate
+            
+            elif name == "ORCA":
+                from .managers.cluster_template_manager import ORCAPBSTemplate
+                return ORCAPBSTemplate
+            
+            elif name == "Psi4":
+                from .managers.cluster_template_manager import Psi4PBSTemplate
+                return Psi4PBSTemplate
+             
+            elif name == "Q-Chem":
+                from .managers.cluster_template_manager import QChemPBSTemplate
+                return QChemPBSTemplate
+            
+            elif name == "SQM":
+                from .managers.cluster_template_manager import SQMPBSTemplate
+                return SQMPBSTemplate
+
+        elif mgr is session.seqcrow_sge_manager:
+            if name == "Gaussian":
+                from .managers.cluster_template_manager import GaussianSGETemplate
+                return GaussianSGETemplate
+            
+            elif name == "ORCA":
+                from .managers.cluster_template_manager import ORCASGETemplate
+                return ORCASGETemplate
+            
+            elif name == "Psi4":
+                from .managers.cluster_template_manager import Psi4SGETemplate
+                return Psi4SGETemplate
+             
+            elif name == "Q-Chem":
+                from .managers.cluster_template_manager import QChemSGETemplate
+                return QChemSGETemplate
+            
+            elif name == "SQM":
+                from .managers.cluster_template_manager import SQMSGETemplate
+                return SQMSGETemplate
+
+        elif mgr is session.seqcrow_lsf_manager:
+            if name == "Gaussian":
+                from .managers.cluster_template_manager import GaussianLSFTemplate
+                return GaussianLSFTemplate
+            
+            elif name == "ORCA":
+                from .managers.cluster_template_manager import ORCALSFTemplate
+                return ORCALSFTemplate
+            
+            elif name == "Psi4":
+                from .managers.cluster_template_manager import Psi4LSFTemplate
+                return Psi4LSFTemplate
+             
+            elif name == "Q-Chem":
+                from .managers.cluster_template_manager import QChemLSFTemplate
+                return QChemLSFTemplate
+            
+            elif name == "SQM":
+                from .managers.cluster_template_manager import SQMLSFTemplate
+                return SQMLSFTemplate
+ 
         elif mgr is session.test_manager:
             if name == "fuseRing_command":
                 from .tests.fuseRing_command import FuseRingCmdTest

@@ -9,9 +9,7 @@ from chimerax.core.commands import run
 
 from json import load, dump
 
-from SEQCROW.jobs import LocalJob
-from SEQCROW.managers import ADD_FILEREADER
-from SEQCROW.residue_collection import ResidueCollection
+from SEQCROW.jobs import LocalJob, LocalClusterJob
 
 JOB_FINISHED = "job finished"
 JOB_STARTED = "job started"
@@ -57,7 +55,11 @@ class JobManager(ProviderManager):
     def has_job_running(self):
         return any([job.isRunning() for job in self.local_jobs])
 
-    def add_provider(self, bundle_info, name):
+    @property
+    def has_local_job_running(self):
+        return any([job.isRunning() for job in self.local_jobs if not isinstance(job, LocalClusterJob)])
+
+    def add_provider(self, bundle_info, name, **kw):
         # if name in self.formats:
         #     self.session.logger.warning(
         #         "local job type %s from %s supplanted that from %s" % (
@@ -194,6 +196,11 @@ class JobManager(ProviderManager):
 
     def job_finished(self, trigger_name, job):
         """when a job is finished, open or update the structure as requested"""
+
+        from SEQCROW.managers import ADD_FILEREADER
+        from SEQCROW.residue_collection import ResidueCollection
+
+
         if self.session.seqcrow_settings.settings.JOB_FINISHED_NOTIFICATION == \
           'log and popup notifications' and self.session.ui.is_gui:
             #it's just an error message for now
@@ -354,7 +361,7 @@ class JobManager(ProviderManager):
                     self.triggers.activate_trigger(JOB_FINISHED, job)
                     return
         
-        if not self.has_job_running:
+        if not self.has_local_job_running:
             unstarted_local_jobs = []
             for job in self.local_jobs:
                 if not job.isFinished() and not job.killed:

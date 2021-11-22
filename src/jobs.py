@@ -1,22 +1,20 @@
 from sys import platform
 import os
 import subprocess
-from time import asctime, localtime
+from time import asctime, localtime, sleep
 
 from Qt.QtCore import QThread
-
-from AaronTools.geometry import Geometry
 
 
 class LocalJob(QThread):
     format_name = None
     info_type = None
-    """name of format for open command"""
+    """job for running computational chemistry software on local hardware"""
     def __init__(self, name, session, theory, geometry=None, auto_update=False, auto_open=False):
         """base class of local ORCA, Gaussian, and Psi4 jobs
         name        str - name of job
         session     chimerax session object
-        theory      SEQCROW.theory.SEQCROW_Theory or a dictionary with a saved job's settings
+        theory      AaronTools.theory.Theory or a dictionary with a saved job's settings
         """
         self.name = name
         self.session = session
@@ -70,17 +68,19 @@ class LocalJob(QThread):
                     fname = filename
                 outname = os.path.basename(fname)
                 name, ext = os.path.splitext(outname)
-                item = item.replace("{ name }", name)
+                item = item.replace("{{ name }}", name)
                 with open(fname, "w") as f:
                     f.write(item)
         else:
             outname = os.path.basename(filename)
             name, ext = os.path.splitext(outname)
-            contents = contents.replace("{ name }", name)
+            contents = contents.replace("{{ name }}", name)
             with open(filename, "w") as f:
                 f.write(contents)
     
     def get_json(self):
+        from AaronTools.geometry import Geometry
+
         d = {
             "theory": self.theory,
             "geometry": Geometry(self.theory.geometry),
@@ -373,3 +373,133 @@ class QChemJob(LocalJob):
         d = super().get_json()
         d["format"] = "Q-Chem"
         return d
+
+
+class LocalClusterJob(LocalJob):
+    format_name = None
+    """
+    job for submitting computational chemistry jobs to a queueing
+    system (e.g. Slurm, PBS, etc.) that is running on local hardware
+    """
+    def __init__(
+        self,
+        name,
+        session,
+        theory,
+        file_type,
+        cluster_type,
+        geometry=None,
+        auto_update=False,
+        auto_open=False,
+        template=None,
+        walltime=2,
+        processors=4,
+        memory=8,
+        template_kwargs=None,
+    ):
+        """
+        base class of local ORCA, Gaussian, and Psi4 cluster jobs
+        name        str - name of job
+        session     chimerax session object
+        theory      AaronTools.theory.Theory or a dictionary with a saved job's settings
+        """
+        self.name = name
+        self.session = session
+        self.theory = theory
+        if geometry:
+            self.theory.geometry = geometry
+        self.auto_update = auto_update
+        self.auto_open = auto_open
+        self.killed = False
+        self.error = False
+        self.output_name = None
+        self.scratch_dir = None
+        self.process = None
+        self.start_time = None
+        self.submitted = False
+        self.template = template
+        self.walltime = walltime
+        self.processors = processors
+        self.memory = memory
+        self.info_type = file_type
+        self.cluster_type = cluster_type
+        self.template_kwargs = dict()
+        if template_kwargs:
+            self.template_kwargs = template_kwargs
+        
+        super().__init__(name, session, theory)
+
+    def __repr__(self):
+        return "local cluster %s job \"%s\"" % (
+            self.info_type, self.name
+        )
+    
+    def run(self):
+        self.start_time = asctime(localtime())
+
+        self.scratch_dir = os.path.join(
+            os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR),
+            "%s_%s" % (self.name, self.start_time.replace(':', '.').replace(" ", "_")),
+        )
+
+        if " " in self.scratch_dir:
+            self.session.logger.warning(
+                "spaces in the full path to SEQCROW's scratch directory"
+                "may cause issues with submitting jobs to clusters"
+            )
+
+        if not os.path.exists(self.scratch_dir):
+            os.makedirs(self.scratch_dir)
+
+        infile = self.name.replace(" ", "_") + "." + self.cluster_type.expected_input_ext
+        outfile = self.name.replace(" ", "_") + "." + self.cluster_type.expected_output_ext
+        infile_path = os.path.join(self.scratch_dir, infile)
+        output_name = os.path.join(self.scratch_dir, outfile)
+
+        print(infile_path)
+        
+        self.write_file(infile_path)
+        self.cluster_type.submit_job(
+            infile_path,
+            self.walltime,
+            self.processors,
+            self.memory,
+            template=self.template,
+            template_kwargs=self.template_kwargs,
+        )
+
+        return 
+    
+    def kill(self):
+        self.session.logger.warning("killing %s..." % self)
+
+        if self.process is not None:
+            self.session.logger.warning(
+                "stopping cluster jobs is not implemented"
+            )
+        
+        self.killed = True
+       
+        #use exit b/c terminate can cause chimera to freeze
+        super().exit(1)
+    
+    def get_json(self):
+        from AaronTools.geometry import Geometry
+
+        d = {
+            "theory": self.theory,
+            "geometry": Geometry(self.theory.geometry),
+        }
+
+        d['output'] = self.output_name
+        d['scratch'] = self.scratch_dir
+
+        d['server'] = 'cluster'
+        d['start_time'] = self.start_time
+        d['name'] = self.name
+        d['depend'] = None
+        d['auto_update'] = False
+        d['auto_open'] = self.auto_open or self.auto_update
+
+        return d
+

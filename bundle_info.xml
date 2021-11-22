@@ -70,6 +70,7 @@
                 <Dependency name="scipy"/>
                 <Dependency name="Send2Trash"/>
                 <Dependency name="psutil"/>
+                <Dependency name="jinja2"/>
                 <!-- wait for numpy to fix fortran stuff in python 3.8
                 I've tried installing this with just gfortran on windows, but no luck
                 <Dependency name="stripy"/>
@@ -92,6 +93,11 @@
                 <Manager name="filereader_manager" uiOnly="false"/>
                 <Manager name="seqcrow_job_manager" uiOnly="false"/>
                 <Manager name="seqcrow_qm_input_manager" uiOnly="true"/>
+                <Manager name="seqcrow_cluster_scheduling_software_manager" uiOnly="true"/>
+                <Manager name="Slurm" uiOnly="true"/>
+                <!--<Manager name="SGE" uiOnly="true"/>-->
+                <Manager name="PBS" uiOnly="true"/>
+                <!--<Manager name="LSF" uiOnly="true"/>-->
             </Managers>
             
             <Providers manager="data formats">
@@ -226,6 +232,45 @@
                 <Provider name="lookDown_command"/>
                 <Provider name="cone_angle"/>
                 <Provider name="substituent_sterimol"/>
+            </Providers>
+  
+            <Providers manager="seqcrow_cluster_scheduling_software_manager">
+                <Provider name="Slurm"/>
+                <Provider name="SGE"/>
+                <Provider name="PBS"/>
+                <Provider name="LSF"/>
+            </Providers>
+  
+            <Providers manager="Slurm">
+                <Provider name="Gaussian"/>
+                <Provider name="ORCA"/>
+                <Provider name="Psi4"/>
+                <Provider name="Q-Chem"/>
+                <Provider name="SQM"/>
+            </Providers>
+    
+            <Providers manager="SGE">
+                <Provider name="Gaussian"/>
+                <Provider name="ORCA"/>
+                <Provider name="Psi4"/>
+                <Provider name="Q-Chem"/>
+                <Provider name="SQM"/>
+            </Providers>
+      
+            <Providers manager="PBS">
+                <Provider name="Gaussian"/>
+                <Provider name="ORCA"/>
+                <Provider name="Psi4"/>
+                <Provider name="Q-Chem"/>
+                <Provider name="SQM"/>
+            </Providers>
+        
+            <Providers manager="LSF">
+                <Provider name="Gaussian"/>
+                <Provider name="ORCA"/>
+                <Provider name="Psi4"/>
+                <Provider name="Q-Chem"/>
+                <Provider name="SQM"/>
             </Providers>
   
             <!--

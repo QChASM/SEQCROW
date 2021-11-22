@@ -1,6 +1,8 @@
 import os.path
 import re
 
+from jinja2 import Template
+
 from chimerax.atomic import selected_atoms, selected_bonds, selected_pseudobonds, get_triggers
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
@@ -13,8 +15,8 @@ from json import dumps, loads, dump, load
 
 from configparser import ConfigParser
 
-from Qt.QtCore import Qt, QRegularExpression, Signal
-from Qt.QtGui import QKeySequence, QFontDatabase, QIcon
+from Qt.QtCore import Qt, QRegularExpression, Signal, QTime
+from Qt.QtGui import QKeySequence, QFontDatabase, QIcon, QPixmap
 from Qt.QtWidgets import (
     QCheckBox,
     QLabel,
@@ -48,6 +50,7 @@ from Qt.QtWidgets import (
     QStyle,
 )
 
+from SEQCROW.jobs import LocalClusterJob
 from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.utils import iter2str
 from SEQCROW.widgets.periodic_table import PeriodicTable, ElementButton
@@ -62,6 +65,121 @@ from AaronTools.utils.utils import combine_dicts
 from AaronTools.json_extension import ATDecoder, ATEncoder
 
 # import cProfile
+
+# pencil icon
+edit_pencil = QPixmap([
+    "48 48 3  1",
+    "I c None",
+    "B c #000000",
+    "c c #555555",
+    "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIcccccccIIIII",
+    "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIcBBBBBBBccIII",
+    "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIcBBBBBBBBBBcII",
+    "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIcBBBBBBBBBBBBBcI",
+    "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIcBBBBBBBBBBBBBcI",
+    "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIcBBBBBBBBBBBBBBc",
+    "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIcBBBBBBBBBBBBBc",
+    "IIIIIIIIIIIIIIIIIIIIIIIIIIIccIIIIIcBBBBBBBBBBBBc",
+    "IIIIIIIIIIIIIIIIIIIIIIIIIIcBBcIIIIIcBBBBBBBBBBBc",
+    "IIIIIIIIIIIIIIIIIIIIIIIIIcBBBBcIIIIIcBBBBBBBBBBc",
+    "IIIIIIIIIIIIIIIIIIIIIIIIcBBBBBBcIIIIIcBBBBBBBBBc",
+    "IIIIIIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIcBBBBBBBcI",
+    "IIIIIIIIIIIIIIIIIIIIIIcBBBBBBBBBBcIIIIIcBBBBBcII",
+    "IIIIIIIIIIIIIIIIIIIIIcBBBBBBBBBBBBcIIIIIcBBBcIII",
+    "IIIIIIIIIIIIIIIIIIIIcBBBBBBBBBBBBBBcIIIIIcccIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBBBBBBBBBcIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIcBBBBBBBBBBBBBBBBBBcIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIcBBBBBBBBBBBBBBBBBBBBcIIIIIIIII",
+    "IIIIIIIIIIIIIIIIcBBBBBBBBBBBBBBBBBBBBBBcIIIIIIII",
+    "IIIIIIIIIIIIIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIII",
+    "IIIIIIIIIIIIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIII",
+    "IIIIIIIIIIIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIII",
+    "IIIIIIIIIIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIII",
+    "IIIIIIIIIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIII",
+    "IIIIIIIIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIII",
+    "IIIIIIIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIIII",
+    "IIIIIIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIIIII",
+    "IIIIIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIIIIII",
+    "IIIIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIIIIIII",
+    "IIIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIIIIIIII",
+    "IIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIIIIIIIIII",
+    "IIIBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIIIIIIIIIII",
+    "IIIBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIIIIIIIIIIII",
+    "IIIcBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIIIIIIIIIIIII",
+    "IIIIcBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIIIIIIIIIIIIII",
+    "IIIIIcBBBBBBBBBBBBBBBBcIIIIIIIIIIIIIIIIIIIIIIIII",
+    "IIIIIIcBBBBBBBBBBBBBBcIIIIIIIIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIcBBBBBBBBBBBBcIIIIIIIIIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIcBBBBBBBBBBcIIIIIIIIIIIIIIIIIIIIIIIIIIII",
+    "IccIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIIIIIIIIIIIII",
+    "IBBcIIIIIIcBBBBBBcIIIIIIIIIIIIIIIIIIIIIIIIIIIIII",
+    "IBBBcIIIIIIcBBBBcIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII",
+    "IBBBBcIIIIIIcBBcIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII",
+    "cBBBBBcIIIIIIccIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII",
+    "cBBBBBBcIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII",
+    "cBBBBBccIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII",
+    "ccccccIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII",
+])
+pencil_icon = QIcon(edit_pencil)
+
+
+plus_symbol = QPixmap([
+    "48 48 3  1",
+    "I c None",
+    "B c #3cde30",
+    "c c #3a3a3a",
+    "IIIIIIIIIIIIIIIIIIIIIccccccIIIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIIcBBBBBBcIIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIccccccccccccccccccBBBBBBBBcccccccccccccccccccI",
+    "IcBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBcI",
+    "cBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBc",
+    "cBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBc",
+    "cBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBc",
+    "cBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBc",
+    "cBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBc",
+    "cBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBc",
+    "IcBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBcI",
+    "IIccccccccccccccccccBBBBBBBBcccccccccccccccccccI",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIIcBBBBBBcIIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIIIccccccIIIIIIIIIIIIIIIIIIIII",
+])
+plus_icon = QIcon(plus_symbol)
+
 
 class UserRoleSortableTableWidget(QTableWidgetItem):
     def __lt__(self, other):
@@ -108,6 +226,12 @@ class _InputGeneratorSettings(Settings):
         'last_options': Value(dumps(dict()), StringArg),
         'previous_options': Value(dumps(dict()), StringArg),
         'last_program': Value("Gaussian", StringArg),
+        'queue_kwargs': Value(dumps({"queue": ["general", "batch", "all.q"]}), StringArg),
+        'last_queue_kwargs': Value(dumps(dict()), StringArg),
+        'templates': Value(dumps(dict()), StringArg),
+        'last_template': Value(dumps(dict()), StringArg),
+        'last_walltime': 4,
+        'last_submit_memory': 4,
     }
 
     AUTO_SAVE = {
@@ -151,9 +275,11 @@ class BuildQM(ToolInstance):
         self.warning_window = None
         self.preset_window = None
         self.job_local_prep = None
+        self.job_cluster_prep = None
         self.remove_preset_window = None
         self.export_preset_window = None
         self.program = None
+        self.templates = loads(self.settings.templates)
 
         self._build_ui()
 
@@ -312,21 +438,27 @@ class BuildQM(ToolInstance):
         self.presets_menu.addAction(self.export_preset)
 
         run = menu.addMenu("&Run")
-        locally = QAction("&Locally", self.tool_window.ui_area)
+        locally = QAction("&On this computer...", self.tool_window.ui_area)
         #remotely = QAction("R&emotely - coming eventually", self.tool_window.ui_area)
         locally.triggered.connect(self.show_local_job_prep)
         run.addAction(locally)
+        #run.addAction(remotely)
+
+        clusterly = QAction("&Submit to local cluster...", self.tool_window.ui_area)
+        #remotely = QAction("R&emotely - coming eventually", self.tool_window.ui_area)
+        clusterly.triggered.connect(self.show_cluster_job_prep)
+        run.addAction(clusterly)
         #run.addAction(remotely)
 
         menu.setNativeMenuBar(False)
 
         self._menu = menu
         layout.setMenuBar(menu)
-        menu.setVisible(True)
 
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(None)
+        menu.setVisible(True)
 
     def migrate_settings_from_v2(self):
         """
@@ -1011,7 +1143,22 @@ class BuildQM(ToolInstance):
     def show_local_job_prep(self):
         """open run local job child window"""
         if self.job_local_prep is None:
-            self.job_local_prep = self.tool_window.create_child_window("Launch Job", window_class=PrepLocalJob)
+            self.job_local_prep = self.tool_window.create_child_window(
+                "Launch Job", window_class=PrepLocalJob
+            )
+
+    def show_cluster_job_prep(self):
+        """open run cluster job child window"""
+        if self.session.seqcrow_settings.settings.QUEUE_TYPE == "None":
+            self.session.logger.error(
+                "you must set your scheduling software before submitting a job to a local cluster\n"
+                "this can be found under the \"SEQCROW Jobs\" section of ChimeraX's settings"
+            )
+            return
+        if self.job_cluster_prep is None:
+            self.job_cluster_prep = self.tool_window.create_child_window(
+                "Submit Job", window_class=PrepClusterJob
+            )
 
     def run_local_job(self, *args, name="local_job", auto_update=False, auto_open=False):
         """run job"""
@@ -1062,6 +1209,90 @@ class BuildQM(ToolInstance):
 
         self.update_preview()
 
+    def run_cluster_job(
+        self,
+        memory,
+        template_name,
+        walltime,
+        name="cluster_job",
+        auto_update=False,
+        auto_open=False,
+        template_kwargs=None,
+    ):
+        """run job"""
+        self.update_theory(update_settings=True)
+
+        # need to convert constraints to atoms so they can be encoded by the 
+        # job manager
+        for job in self.theory.job_type:
+            if isinstance(job, OptimizationJob):
+                if job.constraints:
+                    for key in job.constraints:
+                        if key == "atoms":
+                            if not job.constraints["atoms"]:
+                                continue
+                            job.constraints["atoms"] = [
+                                "%i" % (self.theory.geometry.atoms.index(atom) + 1)
+                                for atom in self.theory.geometry.find(job.constraints["atoms"])
+                            ]
+                        else:
+                            for i, con in enumerate(job.constraints[key]):
+                                job.constraints[key][i] = [
+                                    "%i" % (self.theory.geometry.atoms.index(atom) + 1)
+                                    for atom in self.theory.geometry.find(con)
+                                ]
+
+        self.settings.last_program = self.file_type.currentText()
+
+        program = self.file_type.currentText()
+        queue_type = self.session.seqcrow_settings.settings.QUEUE_TYPE
+        cluster_type = self.session.seqcrow_cluster_scheduling_software_manager.get_queue_manager(queue_type).get_template(program)()
+        template = self.templates[queue_type][program][template_name]
+        if program in self.session.seqcrow_job_manager.formats:
+            job = LocalClusterJob(
+                name,
+                self.session,
+                self.theory,
+                program,
+                cluster_type,
+                auto_update=auto_update,
+                auto_open=auto_open,
+                template=Template(template),
+                walltime=walltime,
+                processors=self.job_widget.getNProc(),
+                memory=memory,
+                template_kwargs=template_kwargs,
+            )
+    
+            self.session.logger.status("adding %s to queue" % name)
+    
+            self.session.seqcrow_job_manager.add_job(job)
+        else:
+            raise NotImplementedError("no provider for running local %s jobs" % program)
+
+        self.update_preview()
+
+    def new_template(self, *args, start_from=None):
+        default_text = ""
+        title = "New template"
+        queue_type = self.session.seqcrow_settings.settings.QUEUE_TYPE
+        if queue_type in self.session.seqcrow_cluster_scheduling_software_manager.queues:
+            default_templates = self.session.seqcrow_cluster_scheduling_software_manager.get_queue_manager(queue_type)
+            program = self.file_type.currentText()
+            if program in default_templates.templates:
+                default_text = default_templates.get_template(program).template
+        
+        if start_from is not None:
+            default_text = self.templates[queue_type][program][start_from]
+            title = "Edit %s" % start_from
+        
+        self.tool_window.create_child_window(
+            title,
+            window_class=NewTemplate,
+            default_text=default_text,
+            default_name=start_from
+        )
+
     def copy_input(self):
         """copies input file to the clipboard"""
         output, warnings = self.get_file_contents(update_settings=True)
@@ -1078,9 +1309,9 @@ class BuildQM(ToolInstance):
             self.session.logger.warning(warning)
 
         for line in output.splitlines():
-            if "{ name }" in line:
+            if "{{ name }}" in line:
                 self.session.logger.warning(
-                    "{ name } was used in the input file, but this feature is not available when copying the file to the clipboard because the file name is unknown"
+                    "{{ name }} was used in the input file, but this feature is not available when copying the file to the clipboard because the file name is unknown"
                 )
 
         app = QApplication.instance()
@@ -1113,13 +1344,13 @@ class BuildQM(ToolInstance):
                     fname = filename
                 outname = os.path.basename(fname)
                 name, ext = os.path.splitext(outname)
-                item = item.replace("{ name }", name)
+                item = item.replace("{{ name }}", name)
                 with open(fname, "w") as f:
                     f.write(item)
         else:
             outname = os.path.basename(filename)
             name, ext = os.path.splitext(outname)
-            contents = contents.replace("{ name }", name)
+            contents = contents.replace("{{ name }}", name)
             with open(filename, "w") as f:
                 f.write(contents)
 
@@ -1295,7 +1526,7 @@ class JobTypeOption(QWidget):
         file_browse_layout.setContentsMargins(*new_margins)
         self.chk_file_path = QLineEdit()
         self.chk_file_path.setPlaceholderText(
-            "{ name } will be replaced if file is saved"
+            "{{ name }} will be replaced if file is saved"
         )
         self.chk_file_path.textChanged.connect(self.something_changed)
         self.chk_browse_button = QPushButton("browse...")
@@ -5733,6 +5964,280 @@ class PrepLocalJob(ChildToolWindow):
         super().cleanup()
 
 
+class PrepClusterJob(ChildToolWindow):
+    """window for running a local cluster job"""
+    def __init__(self, tool_instance, title, **kwargs):
+        super().__init__(tool_instance, title, statusbar=False, **kwargs)
+
+        self._build_ui()
+
+        self.shrink_to_fit()
+        self.set_template_list()
+    
+    def _build_ui(self):
+        layout = QFormLayout()
+
+        tabs = QTabWidget()
+        layout.addRow(tabs)
+
+        basic_options = QWidget()
+        basic_layout = QFormLayout(basic_options)
+        tabs.addTab(basic_options, "standard options")
+
+        more_options = QWidget()
+        more_layout = QFormLayout(more_options)
+        tabs.addTab(more_options, "additional options")
+
+        template_options = QGroupBox("execution instructions")
+        template_layout = QHBoxLayout(template_options)
+        basic_layout.addRow(template_options)
+
+        template_layout.addWidget(QLabel("template:"), 0, Qt.AlignRight)
+
+        self.template = QComboBox()
+        self.tool_instance.file_type.currentTextChanged.connect(self.set_template_list)
+        template_layout.addWidget(self.template, 1)
+
+        edit = QPushButton(template_options)
+        edit.setIcon(pencil_icon)
+        edit.setToolTip("edit selected template")
+        edit.clicked.connect(self.show_editor)
+        template_layout.addWidget(edit, 0)
+        
+        new_template = QPushButton(template_options)
+        new_template.setIcon(plus_icon)
+        new_template.setToolTip("create a new template")
+        new_template.clicked.connect(self.tool_instance.new_template)
+        template_layout.addWidget(new_template, 0)
+        
+        delete_template = QPushButton(template_options)
+        delete_template.setIcon(QIcon(tabs.style().standardIcon(QStyle.SP_TrashIcon)))
+        delete_template.setToolTip("delete selected template")
+        delete_template.clicked.connect(self.delete_template)
+        template_layout.addWidget(delete_template, 0)
+
+        resource_options = QGroupBox("requested resources")
+        resource_layout = QFormLayout(resource_options)
+        basic_layout.addRow(resource_options)
+        
+        self.memory = QSpinBox()
+        self.memory.setRange(1, 512)
+        self.memory.setSuffix(" GB")
+        self.memory.setToolTip(
+            "memory requested from the cluster resources\n\n"
+            "the amount requested for the software package is typically\n"
+            "just for the major memory uses (e.g. overlap integrals),"
+            "so the actual amount memory the software requires could\n"
+            "be a bit more"
+        )
+        self.memory.setSingleStep(1)
+        
+        def set_min_mem(min_mem):
+            if min_mem <= 0:
+                min_mem = 1
+            self.memory.setMinimum(min_mem)
+        
+        self.tool_instance.job_widget.mem.valueChanged.connect(
+            set_min_mem,
+        )
+        set_min_mem(self.tool_instance.job_widget.mem.value())
+        
+        resource_layout.addRow("memory:", self.memory)
+
+        # try QTimeEdit
+        # that might require some changes to SubmitProcess
+        self.walltime = QSpinBox()
+        self.walltime.setSuffix(" h")
+        self.walltime.setRange(1, 720)
+        self.walltime.setToolTip("wall time limit for the job")
+        resource_layout.addRow("time limit:", self.walltime)
+        
+
+        kwarg_options = QGroupBox("other variables")
+        kwarg_layout = QFormLayout(kwarg_options)
+        more_layout.addRow(kwarg_options)
+
+        previous_options = loads(self.tool_instance.settings.queue_kwargs)
+        last_options = loads(self.tool_instance.settings.last_queue_kwargs)
+        print("init last", last_options)
+        print("init prev", previous_options)
+        submitproc_kwargs = TwoLayerKeyWordOption(
+            "variables",
+            last_options,
+            previous_options,
+            "double click to replace {{ %s }} with %s",
+            one_opt_per_kw=True,
+            parent=None,
+            allow_dup=False,
+            banned_settings=[
+                "name",
+                "walltime",
+                "processors",
+                "memory",
+                "exec_memory",
+                "wait",
+            ],
+        )
+        submitproc_kwargs.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        kwarg_options.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        kwarg_layout.addRow(submitproc_kwargs)
+        self.submitproc_kwargs = submitproc_kwargs
+
+        self.auto_update = QComboBox()
+        self.auto_update.addItems(['do nothing', 'open structure', 'change model'])
+        ndx = self.auto_update.findText(self.tool_instance.settings.on_finished)
+        self.auto_update.setCurrentIndex(ndx)
+        basic_layout.addRow("when finished:", self.auto_update)
+
+        self.job_name = QLineEdit()
+        self.job_name.returnPressed.connect(self.run_job)
+        basic_layout.addRow("job name:", self.job_name)
+
+        run = QPushButton("submit job")
+        run.clicked.connect(self.run_job)
+        basic_layout.addRow(run)
+
+        self.status = QStatusBar()
+        self.status.setSizeGripEnabled(False)
+        layout.addRow(self.status)
+
+        self.ui_area.setLayout(layout)
+        self.manage(None)
+
+    def delete_template(self):
+        name = self.template.currentText()
+        program = self.tool_instance.file_type.currentText()
+        queue_type = self.session.seqcrow_settings.settings.QUEUE_TYPE
+        
+        are_you_sure = QMessageBox.question(
+            None,
+            "Delete preset?",
+            "Are you sure you want to delete the %s template '%s' for %s?" % (
+                queue_type, name, program
+            ),
+            defaultButton=QMessageBox.No,
+        )
+        if are_you_sure != QMessageBox.Yes:
+            return
+        self.tool_instance.templates[queue_type][program].pop(name)
+        self.tool_instance.settings.templates = dumps(self.tool_instance.templates)
+        self.tool_instance.settings.save()
+        self.set_template_list()
+
+    def set_template_list(self):
+        self.template.clear()
+        new_templates = []
+        queue_type = self.session.seqcrow_settings.settings.QUEUE_TYPE
+        program = self.tool_instance.file_type.currentText()
+        
+        try:
+            new_templates = self.tool_instance.templates[queue_type][program].keys()
+        except KeyError:
+            pass
+        
+        self.template.addItems(new_templates)
+        
+        try:
+            last_template = loads(self.tool_instance.settings.last_template)[
+                queue_type
+            ][
+                program
+            ]
+            ndx = self.template.findText(last_template, Qt.MatchExactly)
+            if ndx >= 0:
+                self.template.setCurrentIndex(ndx)
+        except KeyError:
+            pass
+
+    def show_editor(self, *args):
+        current_template = self.template.currentText()
+        if not current_template:
+            self.session.logger.warning("no template selected, creating a new template instead")
+            self.tool_instance.new_template()
+            return
+        self.tool_instance.new_template(start_from=current_template)
+
+    def run_job(self):
+        template_name = self.template.currentText()
+        if not template_name:
+            self.session.logger.error("no template selected")
+            return
+    
+        job_name = self.job_name.text().strip()
+
+        kwargs = dict()
+        for key in self.submitproc_kwargs.last_dict.keys():
+            if self.submitproc_kwargs.last_dict[key]:
+                kwargs[key] = self.submitproc_kwargs.last_dict[key][0]
+        
+        kwargs["exec_memory"] = str(self.tool_instance.job_widget.getMem())
+
+        if not job_name.replace('-', '').replace('_','').isalnum():
+            self.session.logger.error("invalid job name: '%s'\nmust be alphanumeric" % job_name)
+            return
+
+        auto_update = self.auto_update.currentText() == 'change model'
+        auto_open = self.auto_update.currentText() == 'open structure'
+        self.tool_instance.settings.on_finished = self.auto_update.currentText()
+
+        self.tool_instance.run_cluster_job(
+            self.memory.value(),
+            template_name,
+            self.walltime.value(),
+            name=job_name,
+            auto_update=auto_update,
+            auto_open=auto_open,
+            template_kwargs=kwargs,
+        )
+        
+        for kw in self.submitproc_kwargs.last_dict:
+            if kw not in self.submitproc_kwargs.previous_dict:
+                self.submitproc_kwargs.previous_dict[kw] = [x for x in self.submitproc_kwargs.last_dict[kw]]
+                self.submitproc_kwargs.add_item_to_previous_kw_table(kw)
+
+                if self.submitproc_kwargs.selected_kw == kw:
+                    known_opts = []
+                    for opt in self.submitproc_kwargs.previous_dict[kw]:
+                        if opt not in known_opts:
+                            self.submitproc_kwargs.add_item_to_previous_opt_table(opt)
+                            known_opts.append(opt)
+
+            else:
+                for opt in self.submitproc_kwargs.last_dict[kw]:
+                    if opt not in self.submitproc_kwargs.previous_dict[kw]:
+                        self.submitproc_kwargs.previous_dict[kw].append(opt)
+
+                        if self.submitproc_kwargs.selected_kw == kw:
+                            self.submitproc_kwargs.add_item_to_previous_opt_table(opt)
+
+        print("last dict", self.submitproc_kwargs.last_dict)
+        print("prev dict", self.submitproc_kwargs.previous_dict)
+
+        self.tool_instance.settings.last_queue_kwargs = dumps(
+            self.submitproc_kwargs.last_dict
+        )
+        self.tool_instance.settings.queue_kwargs = dumps(
+            self.submitproc_kwargs.previous_dict
+        )
+
+        queue_type = self.session.seqcrow_settings.settings.QUEUE_TYPE
+        program = self.tool_instance.file_type.currentText()
+        last_template = loads(self.tool_instance.settings.last_template)
+        if queue_type not in last_template:
+            last_template[queue_type] = dict()
+        last_template[queue_type][program] = template_name
+        self.tool_instance.settings.last_template = dumps(last_template)
+
+        self.tool_instance.settings.save()
+
+        self.status.showMessage("queued \"%s\"; see the log for any details" % job_name)
+
+    def cleanup(self):
+        self.tool_instance.job_cluster_prep = None
+
+        super().cleanup()
+
+
 class ExportPreset(ChildToolWindow):
     """window for saving presets to a file"""
     def __init__(self, tool_instance, title, **kwargs):
@@ -5938,3 +6443,87 @@ class ExportPreset(ChildToolWindow):
         self.tool_instance.export_preset_window = None
 
         super().cleanup()
+
+
+class NewTemplate(ChildToolWindow):
+    """window showing new template"""
+    def __init__(
+        self,
+        tool_instance,
+        title,
+        default_text="",
+        default_name=None,
+        **kwargs
+    ):
+        super().__init__(tool_instance, title, statusbar=False, **kwargs)
+
+        self._build_ui()
+        self.contents.setText(default_text)
+        if default_name:
+            self.new_name.setText(default_name)
+        self.default_name = default_name
+        self.queue_type = self.session.seqcrow_settings.settings.QUEUE_TYPE
+        self.program = self.tool_instance.file_type.currentText()
+
+    def _build_ui(self):
+        layout = QFormLayout()
+
+        self.contents = QTextEdit()
+        font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
+        self.contents.setFont(font)
+        layout.addRow(self.contents)
+        
+        self.new_name = QLineEdit()
+        layout.addRow("name:", self.new_name)
+        
+        save_template = QPushButton("save template")
+        save_template.clicked.connect(self.save_template)
+        layout.addRow(save_template)
+
+        self.ui_area.setLayout(layout)
+
+        self.manage(None)
+    
+    def save_template(self):
+        name = self.new_name.text()
+        if not name:
+            self.session.logger.error(
+                "enter a name for this template"
+            )
+            return
+        
+        program = self.program
+        cur_program = self.tool_instance.file_type.currentText()
+        if cur_program != self.program:
+            which_program = QMessageBox.question(
+                None,
+                "Select program",
+                "this was initially a %s template\nwould you like to save it as a %s template?" % (
+                    self.program, cur_program
+                ),
+                defaultButton=QMessageBox.No,
+            )
+            if which_program == QMessageBox.Yes:
+                program = cur_program
+        
+        if self.queue_type not in self.tool_instance.templates:
+            self.tool_instance.templates[self.queue_type] = dict()
+        
+        if program not in self.tool_instance.templates[self.queue_type]:
+            self.tool_instance.templates[self.queue_type][program] = dict()
+        
+        self.tool_instance.templates[self.queue_type][program][name] = self.contents.toPlainText()
+        self.tool_instance.settings.templates = dumps(
+            self.tool_instance.templates
+        )
+        self.tool_instance.settings.save()
+        
+        if self.tool_instance.job_cluster_prep:
+            self.tool_instance.job_cluster_prep.set_template_list()
+            ndx = self.tool_instance.job_cluster_prep.template.findText(
+                name, Qt.MatchExactly
+            )
+            if ndx >= 0:
+                self.tool_instance.job_cluster_prep.template.setCurrentIndex(ndx)
+        
+        self.destroy()
