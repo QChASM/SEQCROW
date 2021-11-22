@@ -95,9 +95,9 @@
                 <Manager name="seqcrow_qm_input_manager" uiOnly="true"/>
                 <Manager name="seqcrow_cluster_scheduling_software_manager" uiOnly="true"/>
                 <Manager name="Slurm" uiOnly="true"/>
-                <!--<Manager name="SGE" uiOnly="true"/>-->
+                <Manager name="SGE" uiOnly="true"/>
                 <Manager name="PBS" uiOnly="true"/>
-                <!--<Manager name="LSF" uiOnly="true"/>-->
+                <Manager name="LSF" uiOnly="true"/>
             </Managers>
             
             <Providers manager="data formats">
