@@ -23,7 +23,6 @@ pointGroup_description = CmdDesc(
     keyword=[
         ("printElements", BoolArg),
         ("displayElements", BoolArg),
-        ("residuesOnly", BoolArg),
         ("tolerance", FloatArg),
         ("axisTolerance", FloatArg),
         ("maxRotation", IntArg),
@@ -39,7 +38,6 @@ def pointGroup(
         selection,
         printElements=False,
         displayElements=True,
-        residuesOnly=False,
         tolerance=0.1,
         axisTolerance=0.5,
         maxRotation=6,
@@ -48,28 +46,14 @@ def pointGroup(
 
     out = []
     for model in selection:
-        if not residuesOnly:
-            rescol = ResidueCollection(model, refresh_ranks=False)
-            pg = PointGroup(
-                rescol,
-                tolerance=tolerance,
-                rotation_tolerance=np.deg2rad(axisTolerance),
-                max_rotation=maxRotation,
-            )
-        else:
-            atoms = []
-            groups = []
-            for residue in model.residues:
-                atoms.append(Atom(element="H", coords=residue.center))
-                groups.append(residue.name)
-            rescol = ResidueCollection(atoms, refresh_ranks=False)
-            pg = PointGroup(
-                rescol,
-                tolerance=tolerance,
-                rotation_tolerance=np.deg2rad(axisTolerance),
-                max_rotation=maxRotation,
-                groups=groups,
-            )
+        rescol = ResidueCollection(model, refresh_ranks=False)
+        pg = PointGroup(
+            rescol,
+            tolerance=tolerance,
+            rotation_tolerance=np.deg2rad(axisTolerance),
+            max_rotation=maxRotation,
+        )
+
         session.logger.info("%s: %s" % (model.name, pg.name))
         out.append(pg.name)
         if symmetryNumber:
@@ -86,7 +70,8 @@ def pointGroup(
             for ele in sorted(pg.elements, reverse=True):
                 if isinstance(ele, InversionCenter):
                     inv = ".note %s\n" % repr(ele)
-                    inv += ".sphere   %.5f  %.5f  %.5f  0.1\n" % tuple(pg.center)
+                    inv += ".color plum\n"
+                    inv += ".sphere   %.5f  %.5f  %.5f  0.3\n" % tuple(pg.center)
                     
                     stream = BytesIO(bytes(inv, "utf-8"))
                     bild_obj, status = read_bild(session, stream, repr(ele))
@@ -130,8 +115,15 @@ def pointGroup(
     
                 elif isinstance(ele, MirrorPlane):
                     mirror = ".note %s\n" % repr(ele)
-                    mirror += ".color purple\n"
-                    mirror += ".transparency 25\n"
+                    if ele.label is None:
+                        mirror += ".color purple\n"
+                    elif ele.label == "h":
+                        mirror += ".color black\n"
+                    elif ele.label == "v":
+                        mirror += ".color chocolate\n"
+                    elif ele.label == "d":
+                        mirror += ".color teal\n"
+                    mirror += ".transparency 40\n"
                     z = ele.axis
                     x = perp_vector(z)
                     y = np.cross(x, z)
