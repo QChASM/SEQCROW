@@ -12,7 +12,7 @@ from Qt.QtWidgets import QGridLayout, QTextBrowser, QPushButton, QTreeWidget, QT
 from send2trash import send2trash
 
 from SEQCROW.managers.job_manager import JOB_QUEUED, JOB_STARTED, JOB_FINISHED
-from SEQCROW.jobs import LocalJob
+from SEQCROW.jobs import LocalJob, LocalClusterJob
 
 from AaronTools.fileIO import read_types
 
@@ -131,6 +131,7 @@ class JobQueue(ToolInstance):
             item.setText(self.NAME_COL, name)
             
             if isinstance(job, LocalJob):
+                # print(job.name)
                 if job.killed:
                     item.setText(self.STATUS_COL, "killed")
 
@@ -232,6 +233,8 @@ class JobQueue(ToolInstance):
                     self.tree.setItemWidget(item, self.KILL_COL, kill_widget)
                 
                 item.setText(self.SERVER_COL, "local")
+                if isinstance(job, LocalClusterJob):
+                    item.setText(self.SERVER_COL, "cluster")
 
                 if job.scratch_dir and os.path.exists(job.scratch_dir):
                     browse_widget = QWidget()

@@ -86,7 +86,7 @@ class ClusterSubmitTemplate:
             memory,
             template=template,
         )
-        proc.submit(**template_kwargs, wait=False)
+        proc.submit(**template_kwargs, wait=30)
 
 
 class ProgramSubmitTemplate:
@@ -124,7 +124,7 @@ class GaussianSlurmTemplate(ClusterSubmitTemplate, GaussianSubmit):
 #SBATCH --partition {{ queue }}
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task={{ processors }}
-#SBATCH --time={{ walltime }}:00
+#SBATCH --time={{ walltime }}:00:00
 #SBATCH --mem={{ memory }}gb
 
 # a variable in double curly brackets will be replaced with
@@ -141,7 +141,7 @@ class GaussianSlurmTemplate(ClusterSubmitTemplate, GaussianSubmit):
 module purge
 
 module load gaussian
-export GAUSS_SCRDIR=/scratch/$USER/$PBS_JOBID
+export GAUSS_SCRDIR=/scratch/$USER/$SLURM_JOB_ID
 SCRATCH=$GAUSS_SCRDIR
 mkdir -p $SCRATCH
 cd $SCRATCH
@@ -162,7 +162,7 @@ class ORCASlurmTemplate(ClusterSubmitTemplate, ORCASubmit):
 #SBATCH --partition {{ queue }}
 #SBATCH --ntasks={{ processors }}
 #SBATCH --cpus-per-task=1
-#SBATCH --time={{ walltime }}:00
+#SBATCH --time={{ walltime }}:00:00
 #SBATCH --mem={{ memory }}gb
 
 # a variable in double curly brackets will be replaced with
@@ -196,7 +196,7 @@ class Psi4SlurmTemplate(ClusterSubmitTemplate, Psi4Submit):
 #SBATCH --partition {{ queue }}
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task={{ processors }}
-#SBATCH --time={{ walltime }}:00
+#SBATCH --time={{ walltime }}:00:00
 #SBATCH --mem={{ memory }}gb
 
 # a variable in double curly brackets will be replaced with
@@ -214,6 +214,7 @@ module purge
 
 module load psi4
 SCRATCH=/scratch/$USER/$SLURM_JOB_ID
+export PSI_SCRATCH=$SCRATCH
 mkdir -p $SCRATCH
 cd $SCRATCH
 cp $SLURM_SUBMIT_DIR/{{ name }}.in .
@@ -232,7 +233,7 @@ class QChemSlurmTemplate(ClusterSubmitTemplate, QChemSubmit):
 #SBATCH --partition {{ queue }}
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task={{ processors }}
-#SBATCH --time={{ walltime }}:00
+#SBATCH --time={{ walltime }}:00:00
 #SBATCH --mem={{ memory }}gb
 
 # a variable in double curly brackets will be replaced with
@@ -265,7 +266,7 @@ class SQMSlurmTemplate(ClusterSubmitTemplate, SQMSubmit):
 #SBATCH --partition {{ queue }}
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
-#SBATCH --time={{ walltime }}:00
+#SBATCH --time={{ walltime }}:00:00
 #SBATCH --mem={{ memory }}gb
 
 # a variable in double curly brackets will be replaced with
@@ -285,7 +286,7 @@ module load AmberTools
 SCRATCH=/scratch/$USER/$SLURM_JOB_ID
 mkdir -p $SCRATCH
 cd $SCRATCH
-cp $SLURM_SUBMIT_DIR/{{ name }}.inp .
+cp $SLURM_SUBMIT_DIR/{{ name }}.mdin .
 sqm -i {{ name }}.mdin -o $SLURM_SUBMIT_DIR/{{ name }}.sqmout
 cd $SLURM_SUBMIT_DIR
 rm -rf $SCRATCH
@@ -386,6 +387,7 @@ module purge
 
 module load psi4
 SCRATCH=/scratch/$USER/$PBS_JOBID
+export PSI_SCRATCH=$SCRATCH
 mkdir -p $SCRATCH
 cd $SCRATCH
 cp $PBS_O_WORKDIR/{{ name }}.in .
@@ -455,7 +457,7 @@ module load AmberTools
 SCRATCH=/scratch/$USER/$PBS_JOBID
 mkdir -p $SCRATCH
 cd $SCRATCH
-cp $PBS_O_WORKDIR/{{ name }}.in .
+cp $PBS_O_WORKDIR/{{ name }}.mdin .
 sqm -i {{ name }}.mdin -o $PBS_O_WORKDIR/{{ name }}.sqmout
 cd $PBS_O_WORKDIR
 rm -rf $SCRATCH
@@ -554,7 +556,8 @@ class Psi4SGETemplate(ClusterSubmitTemplate, Psi4Submit):
 module purge
 
 module load psi4
-SCRATCH=/scratch/$USER/$PBS_JOBID
+SCRATCH=/scratch/$USER/$JOB_ID
+export PSI_SCRATCH=$SCRATCH
 mkdir -p $SCRATCH
 cd $SCRATCH
 cp $SGE_O_WORKDIR/{{ name }}.in .
@@ -624,7 +627,7 @@ module load AmberTools
 SCRATCH=/scratch/$USER/$JOB_ID
 mkdir -p $SCRATCH
 cd $SCRATCH
-cp $SGE_O_WORKDIR/{{ name }}.in .
+cp $SGE_O_WORKDIR/{{ name }}.mdin .
 sqm -i {{ name }}.mdin -o $SGE_O_WORKDIR/{{ name }}.sqmout
 cd $SGE_O_WORKDIR
 rm -rf $SCRATCH
@@ -724,6 +727,7 @@ module purge
 
 module load psi4
 SCRATCH=/scratch/$USER/$LSB_JOBID
+export PSI_SCRATCH=$SCRATCH
 mkdir -p $SCRATCH
 cd $SCRATCH
 cp $LS_SUBCWD/{{ name }}.in .
@@ -793,7 +797,7 @@ module load AmberTools
 SCRATCH=/scratch/$USER/$LSB_JOBID
 mkdir -p $SCRATCH
 cd $SCRATCH
-cp $LS_SUBCWD/{{ name }}.in .
+cp $LS_SUBCWD/{{ name }}.mdin .
 sqm -i {{ name }}.mdin -o $LS_SUBCWD/{{ name }}.sqmout
 cd $LS_SUBCWD
 rm -rf $SCRATCH

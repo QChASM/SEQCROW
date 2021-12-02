@@ -349,8 +349,6 @@ class QChemJob(LocalJob):
             infile,
         ]
 
-        print(args)
-
         log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
         log.write("executing:\n%s\n\n" % " ".join(args))
 
@@ -387,7 +385,7 @@ class LocalClusterJob(LocalJob):
         session,
         theory,
         file_type,
-        cluster_type,
+        cluster_type=None,
         geometry=None,
         auto_update=False,
         auto_open=False,
@@ -403,6 +401,8 @@ class LocalClusterJob(LocalJob):
         session     chimerax session object
         theory      AaronTools.theory.Theory or a dictionary with a saved job's settings
         """
+        super().__init__(name, session, theory)
+
         self.name = name
         self.session = session
         self.theory = theory
@@ -427,13 +427,11 @@ class LocalClusterJob(LocalJob):
         if template_kwargs:
             self.template_kwargs = template_kwargs
         
-        super().__init__(name, session, theory)
-
     def __repr__(self):
         return "local cluster %s job \"%s\"" % (
             self.info_type, self.name
         )
-    
+   
     def run(self):
         self.start_time = asctime(localtime())
 
@@ -454,10 +452,8 @@ class LocalClusterJob(LocalJob):
         infile = self.name.replace(" ", "_") + "." + self.cluster_type.expected_input_ext
         outfile = self.name.replace(" ", "_") + "." + self.cluster_type.expected_output_ext
         infile_path = os.path.join(self.scratch_dir, infile)
-        output_name = os.path.join(self.scratch_dir, outfile)
+        self.output_name = os.path.join(self.scratch_dir, outfile)
 
-        print(infile_path)
-        
         self.write_file(infile_path)
         self.cluster_type.submit_job(
             infile_path,
@@ -495,6 +491,7 @@ class LocalClusterJob(LocalJob):
         d['scratch'] = self.scratch_dir
 
         d['server'] = 'cluster'
+        d['file_type'] = self.info_type
         d['start_time'] = self.start_time
         d['name'] = self.name
         d['depend'] = None

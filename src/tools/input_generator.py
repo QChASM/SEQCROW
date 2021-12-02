@@ -6059,8 +6059,6 @@ class PrepClusterJob(ChildToolWindow):
 
         previous_options = loads(self.tool_instance.settings.queue_kwargs)
         last_options = loads(self.tool_instance.settings.last_queue_kwargs)
-        print("init last", last_options)
-        print("init prev", previous_options)
         submitproc_kwargs = TwoLayerKeyWordOption(
             "variables",
             last_options,
@@ -6209,9 +6207,6 @@ class PrepClusterJob(ChildToolWindow):
 
                         if self.submitproc_kwargs.selected_kw == kw:
                             self.submitproc_kwargs.add_item_to_previous_opt_table(opt)
-
-        print("last dict", self.submitproc_kwargs.last_dict)
-        print("prev dict", self.submitproc_kwargs.previous_dict)
 
         self.tool_instance.settings.last_queue_kwargs = dumps(
             self.submitproc_kwargs.last_dict

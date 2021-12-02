@@ -88,56 +88,74 @@ class JobManager(ProviderManager):
                                     name,
                                     self
                                 )
-                                local_job = job_cls(
+                                args = (
                                     job['name'],
                                     self.session,
                                     job['theory'],
-                                    geometry=job['geometry'],
-                                    auto_update=job['auto_update'],
-                                    auto_open=job['auto_open'],
                                 )
-                                
-                                if section == "check":
-                                    if 'output' in job and job['output'] and os.path.exists(job['output']):
-                                        fr = FileReader(job['output'], just_geom=False)
-                                        if 'finished' in fr.other and fr.other['finished']:
-                                            local_job.isFinished = lambda *args, **kwargs: True
-                                        else:
-                                            local_job.isRunning = lambda *args, **kwargs: True
-                                            self.unknown_status_jobs.append(local_job)
-    
-                                elif section == "finished":
-                                    #shh it's finished
-                                    local_job.isFinished = lambda *args, **kwargs: True
-                                    local_job.output_name = job['output']
-                                    local_job.scratch_dir = job['scratch']
-                                
-                                elif section == "error":
-                                    #shh it's finished
-                                    local_job.isFinished = lambda *args, **kwargs: True
-                                    local_job.error = True
-                                    local_job.output_name = job['output']
-                                    local_job.scratch_dir = job['scratch']
-                                
-                                elif section == "killed":
-                                    local_job.isFinished = lambda *args, **kwargs: True
-                                    local_job.killed = True
-                                    local_job.output_name = job['output']
-                                    local_job.scratch_dir = job['scratch']
-    
-                                local_job.output_name = job['output']
-                                local_job.scratch_dir = job['scratch']
-                                
-                                self.local_jobs.append(local_job)
-                                # self.session.logger.info("added %s (%s job) from previous session" % (job['name'], job['format']))
                                 break
-                        else:
-                            self.session.logger.warning(
-                                "local job provider for %s jobs is no longer installed," % job["format"] +
-                                "job named '%s' will be removed from the queue" % job["name"]
-                            )
+                            else:
+                                self.session.logger.warning(
+                                    "local job provider for %s jobs is no longer installed," % job["format"] +
+                                    "job named '%s' will be removed from the queue" % job["name"]
+                                )
+                    
+                    elif job['server'] == "cluster":
+                        args = (
+                            job['name'],
+                            self.session,
+                            job['theory'],
+                            job['file_type'],
+                        )
+                        job_cls = LocalClusterJob
+                    else:
+                        self.session.logger.warning("job with unknown server: %s" % job['server'])
+                        continue
+                                
+                    local_job = job_cls(
+                        *args,
+                        geometry=job['geometry'],
+                        auto_update=job['auto_update'],
+                        auto_open=job['auto_open'],
+                    )
+                                
+                    if section == "check":
+                        if 'output' in job and job['output'] and os.path.exists(job['output']):
+                            fr = FileReader(job['output'], just_geom=False)
+                            if 'finished' in fr.other and fr.other['finished']:
+                                local_job.isFinished = lambda *args, **kwargs: True
+                            else:
+                                local_job.isRunning = lambda *args, **kwargs: True
+                                self.unknown_status_jobs.append(local_job)
     
-                            self.local_jobs.append(local_job)
+                    elif section == "finished":
+                        #shh it's finished
+                        local_job.isFinished = lambda *args, **kwargs: True
+                        local_job.output_name = job['output']
+                        local_job.scratch_dir = job['scratch']
+                                
+                    elif section == "error":
+                       #shh it's finished
+                        local_job.isFinished = lambda *args, **kwargs: True
+                        local_job.isFinished = lambda *args, **kwargs: True
+                        local_job.error = True
+                        local_job.output_name = job['output']
+                        local_job.scratch_dir = job['scratch']
+                                
+                    elif section == "killed":
+                        local_job.isFinished = lambda *args, **kwargs: True
+                        local_job.isFinished = lambda *args, **kwargs: True
+                        local_job.killed = True
+                        local_job.output_name = job['output']
+                        local_job.scratch_dir = job['scratch']
+    
+                        local_job.output_name = job['output']
+                        local_job.scratch_dir = job['scratch']
+                                
+                        self.local_jobs.append(local_job)
+                        # self.session.logger.info("added %s (%s job) from previous session" % (job['name'], job['format']))
+                    
+                    self.local_jobs.append(local_job)
 
             self.paused = queue_dict['job_running']
 
@@ -287,6 +305,7 @@ class JobManager(ProviderManager):
 
 
         elif job.auto_open or job.auto_update:
+            # print(job.output_name, os.path.exists(job.output_name))
             if hasattr(job, "output_name") and job.output_name and os.path.exists(job.output_name):
                 if job.format_name:
                     if job.format_name in read_types:
@@ -297,8 +316,6 @@ class JobManager(ProviderManager):
                     run(job.session, "open \"%s\" coordsets true" % job.output_name)
             else:
                 self.session.logger.error("could not open output of %s" % repr(job))
-
-        pass
 
     def job_started(self, trigger_name, job):
         """prints 'job started' notification to log"""
@@ -365,6 +382,7 @@ class JobManager(ProviderManager):
             unstarted_local_jobs = []
             for job in self.local_jobs:
                 if not job.isFinished() and not job.killed:
+                    # print("unstarted job:", job)
                     unstarted_local_jobs.append(job)
                     
             if len(unstarted_local_jobs) > 0 and not self.paused:
