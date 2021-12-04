@@ -18,6 +18,7 @@ from Qt.QtWidgets import (
     QHeaderView,
 )
 
+from AaronTools.atoms import Atom
 from AaronTools.component import Component
 
 from SEQCROW.residue_collection import ResidueCollection
@@ -194,16 +195,34 @@ class CoordinationComplexVomit(ToolInstance):
         minimize = self.minimize.checkState() == Qt.Checked
         for i in range(0, self.ligand_table.rowCount() - 1):
             ligand_name = self.ligand_table.item(i, 0).text()
+            if ligand_name == "<click to choose>":
+                continue
             ligands.append(ligand_name)
             
             checkbox = self.ligand_table.cellWidget(i, 1).layout().itemAt(0).widget()
             c2 = checkbox.checkState() == Qt.Checked
             c2_symmetric.append(c2)
-        
+
+        denticity = 0
+        for lig in ligands:
+            comp = Component(lig)
+            denticity += len(comp.key_atoms)
+
+        vsepr = self.vsepr.currentText()
+        expected_denticity = len(Atom.get_shape(vsepr)) - 1
+        if expected_denticity != denticity:
+            self.session.logger.error(
+                "the sum of the denticity of you ligands is %i, but " % denticity +
+                "a %s coordination geometry has %i sites\n" % (vsepr, expected_denticity) +
+                "add or remove ligands so that the total ligand denticity is %i, " % expected_denticity +
+                "or choose a different coordination geometry"
+            )
+            return
+
         rescols, formula = ResidueCollection.get_coordination_complexes(
             self.element.text(),
             ligands,
-            self.vsepr.currentText(),
+            vsepr,
             c2_symmetric=c2_symmetric,
             minimize=minimize,
             session=self.session,
