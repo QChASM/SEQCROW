@@ -6032,15 +6032,10 @@ class PrepClusterJob(ChildToolWindow):
         )
         self.memory.setSingleStep(1)
         
-        def set_min_mem(min_mem):
-            if min_mem <= 0:
-                min_mem = 1
-            self.memory.setMinimum(min_mem)
-        
         self.tool_instance.job_widget.mem.valueChanged.connect(
-            set_min_mem,
+            self.set_min_mem,
         )
-        set_min_mem(self.tool_instance.job_widget.mem.value())
+        self.set_min_mem(self.tool_instance.job_widget.mem.value())
         
         resource_layout.addRow("memory:", self.memory)
 
@@ -6227,9 +6222,23 @@ class PrepClusterJob(ChildToolWindow):
 
         self.status.showMessage("queued \"%s\"; see the log for any details" % job_name)
 
+    def set_min_mem(self, value):
+        if value <= 0:
+            value = 1
+        if not self.tool_instance.job_widget.mem.isEnabled():
+            value = 1
+        self.memory.setMinimum(value)
+
     def cleanup(self):
         self.tool_instance.job_cluster_prep = None
-
+        self.tool_instance.file_type.currentTextChanged.disconnect(
+            self.set_template_list
+        )
+        
+        self.tool_instance.job_widget.mem.valueChanged.connect(
+            self.set_min_mem,
+        )
+        
         super().cleanup()
 
 
