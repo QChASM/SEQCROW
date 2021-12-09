@@ -6026,7 +6026,7 @@ class PrepClusterJob(ChildToolWindow):
         self.memory.setToolTip(
             "memory requested from the cluster resources\n\n"
             "the amount requested for the software package is typically\n"
-            "just for the major memory uses (e.g. overlap integrals),"
+            "just for the major memory uses (e.g. overlap integrals), "
             "so the actual amount memory the software requires could\n"
             "be a bit more"
         )
@@ -6035,7 +6035,10 @@ class PrepClusterJob(ChildToolWindow):
         self.tool_instance.job_widget.mem.valueChanged.connect(
             self.set_min_mem,
         )
-        self.set_min_mem(self.tool_instance.job_widget.mem.value())
+        self.tool_instance.file_type.currentTextChanged.connect(
+            self.set_min_mem,
+        )
+        self.set_min_mem()
         
         resource_layout.addRow("memory:", self.memory)
 
@@ -6222,7 +6225,8 @@ class PrepClusterJob(ChildToolWindow):
 
         self.status.showMessage("queued \"%s\"; see the log for any details" % job_name)
 
-    def set_min_mem(self, value):
+    def set_min_mem(self, *args):
+        value = self.tool_instance.job_widget.mem.value()
         if value <= 0:
             value = 1
         if not self.tool_instance.job_widget.mem.isEnabled():
@@ -6234,8 +6238,10 @@ class PrepClusterJob(ChildToolWindow):
         self.tool_instance.file_type.currentTextChanged.disconnect(
             self.set_template_list
         )
-        
-        self.tool_instance.job_widget.mem.valueChanged.connect(
+        self.tool_instance.file_type.currentTextChanged.disconnect(
+            self.set_min_mem,
+        )
+        self.tool_instance.job_widget.mem.valueChanged.disconnect(
             self.set_min_mem,
         )
         
