@@ -2080,10 +2080,11 @@ class JobTypeOption(QWidget):
                 constraints = self.getConstraints()
                 new_constraints = {}
                 if "atoms" in constraints:
+                    new_constraints["atoms"] = []
                     for atom in constraints["atoms"]:
-                        new_constraints["atoms"] = []
                         if atom.deleted:
                             continue
+                        print("tool", AtomSpec(atom.atomspec))
                         new_constraints["atoms"].append(AtomSpec(atom.atomspec))
 
                     for key in ["bonds", "angles", "torsions"]:

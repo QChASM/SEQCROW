@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+
+    <head>
+        <meta charset="UTF-8">
+        <title>QM Input Builder</title>
+        <meta http-equiv="Content-Type" content="text/html">
+        <link rel="icon" href="../images/SEQCROW.png" type="image/png">
+        <link rel="stylesheet" href="../style.css">
+    </head>
+    
+    <div class="head">
+        <object data="../ribbon.html" class="head"></object>
+    </div>
+    
+    <body>
+		<h1>Overview</h1>
+		This tool can be used to build an input file for Gaussian, ORCA, Psi4, SQM, and Q-Chem.
+		The input file can be exported to a file or to the user's clipboard, or run the job using one of the external software packages through SEQCROW.
+		SQM is included with ChimeraX &ge; 1.2, so it does not need to be installed separately.
+		There are options for geometry optimizations and frequency calculations. 
+		Some options are disabled if the program cannot perform them or if the input file builder cannot construct an input file for those settings.
+		Users can choose from a short list of methods and basis sets, or enter their own. 
+		Many other settings can be entered manually.
+		Methods, basis sets, and other options that are defined by the user are stored for use later.
+		
+		<h1>Job Options</h1>
+		
+		<h2>Execution</h2>
+		<br>
+		<img src="https://raw.githubusercontent.com/QChASM/ChimAARON/images_for_wiki/tools/QMInputBuilder/jobSettings.png"/>
+		<br>
+		<p>
+		The user can control the number or CPU cores and memory for the job.
+		Note that some programs, like Gaussian and ORCA, do not limit the job to the specified memory, just the memory used by some of the more memory-intensive parts of the job (<i>e.g.</i> electron repulsion integrals or storing wavefunction info).
+		For SQM, these options are disabled as they cannot be modified.
+		</p>
+		<p>
+		For Gaussian, the user can also request to use a checkpoint file.
+		This can be used to either restart a job or save a job's progress.
+		ORCA uses can request a Hessian or wavefunction information to be read.
+		</p>
+		<h2>Geometry Optimization</h2>
+		<p>
+		For geometry optimization jobs, you can select a transition state structure optimization or a constrained optimization. 
+		</p>
+		<p>
+		For constrained optimizations, atoms and bonds can be selected on the molecule are added to the list of constraints. Two bonds or three atoms can be selected to constrain an angle. Three bonds or four atoms can be selected to constrain a torsion.
+		</p>
+		<p>
+		For SQM, TS optimizations and constrained optimizations are unavailable. 
+		</p>
+		<br>
+		<img src="https://github.com/QChASM/SEQCROW/blob/images_for_wiki/tools/QMInputBuilder/optimizationSettings.png?raw=true"/>
+		<br>
+		<h2>Frequencies</h2>
+		<p>
+		The user can select a temperature.
+		This is used by the QM program to compute whatever thermochemistry it prints.
+		Raman intensities can be requested for Gaussian and ORCA.
+		For Gaussian, high-precision modes can be requested.
+		This results in Gaussian printing 5 decimal places on normal modes as opposed to the default of 3. 
+		</p>
+		
+		<p>
+		Frequency calculations are unavailable for SQM.
+		</p>
+		
+		<h2>Solvent</h2>
+		Implicit solvent models, as well as solvent keywords, that are available in the selected QM package are listed. 
+		
+		<h1>Method</h1>
+		<p>
+		For each QM program, several methods are listed.
+		Most of these options are popular DFT functionals.
+		For Gaussian and ORCA, two semi-empirical methods are also listed.
+		For Psi4, two coupled cluster theory options are listed.
+		SQM only has semi-empirical methods.
+		You can also specify a method keyword by selecting 'other' on the drop down menu.
+		When you export or run an input file with a user-defined keyword, that keyword will be saved.
+		Double-clicking an item on the table of previously-used methods will set the current method to that. 
+		</p>
+		<p>
+		An empirical dispersion correction can be selected, though this typically only applies to DFT calculations.
+		Dispersion corrections can be important for non-covalent interactions, such as a system with two separate molecules. 
+		</p>
+		<p>
+		The integration grid can also be selected.
+		Most DFT methods require integrating a function to calculate the exchange-correlation contribution to the total energy.
+		Numerical integration methods introduce error into the calculation, but are often necessitated by the complex form of the exchange-correlation calculation.
+		Integration errors do not have a significant impact on the electronic energy of the system, but can shift the free energies by several kcal/mol, primarily due to errors in low-frequency vibrational modes.
+		These errors can compound when calculating free energy differences (<i>e.g.</i> to calculate a reaction barrier height). The error can be reduced by selecting a finer grid or mitigated by using quasi-RRHO<sup>[https://github.com/QChASM/SEQCROW/wiki/Build-QM-Input-Tool/#citations 1]</sup> or quasi-harmonic<sup>[https://github.com/QChASM/SEQCROW/wiki/Build-QM-Input-Tool/#citations 2]</sup> free energies instead of RRHO free energy.
+		More details and examples can be found <a href="https://chemrxiv.org/articles/preprint/Popular_Integration_Grids_Can_Result_in_Large_Errors_in_DFT-Computed_Free_Energies/8864204">here</a>.
+		</p>
+		<p>
+		For Psi4, SEQCROW allows you to manually define monomers in SAPT calculations. 
+		</p>
+		<br>
+		<img src="https://raw.githubusercontent.com/QChASM/ChimAARON/images_for_wiki/tools/QMInputBuilder/functionalOptions.png"/>
+		<br>
+		<h1>Basis Sets</h1> 
+		<p>
+		A few basis sets are enumerated for each software package (except for SQM as basis sets are integral to its semi-empirical methods).
+		Different basis sets can be used for different elements, however it is not possible to select multiple basis sets for one element.
+		The user will also be prompted if an element is not included in any basis set.
+		Diffuse basis sets (<i>e.g.</i> <b>aug</b>-cc-pVDZ, 6-311<b>+</b>G(2d,p) or def2-SVP<b>D</b>) are recommended for anions, zwitterions, systems with highly localized electron density, systems that are strained (<i>e.g.</i> 3-membered rings), conjugated systems, or systems with significant non-covalent interactions. 
+		</p>
+		<p>
+		For ORCA, Psi4, and Q-Chem, it is possible to specify auxiliary basis sets.
+		If the basis set is built-in, this will specify the auxiliary version (<i>e.g.</i> specifying cc-pVTZ as an auxiliary "C" basis set for ORCA will result in cc-pVTZ/C being used in the input file).
+		As with methods, other basis set keywords may be specified. 
+		</p>
+		<p>
+		For Gaussian, ORCA, and Q-Chem, an effective core potential (ECP) may be specified separately (for Psi4, the ECP ought to be included in the basis set definition). ECP's are basis sets with fewer basis functions for core electrons.
+		They are often employed for heavier elements (row 5+) to reduce the computational cost associated with the number of orbitals on these atoms.
+		The time-saving benefit should be weighed against the accuracy cost that comes with reducing the number of basis functions.
+		The alternative is to use an all-electron basis set with or without including a relativistic correction. Consult you software's manual to see what relativistic corrections are available.
+		Several recommendations from <a href="https://sites.google.com/site/orcainputlibrary/effective-core-potentials">the ORCA team</a> are:
+		<ul>
+			<li>Do not use an ECP for elements in the first 4 rows of the periodic table. Instead, use an all-electron basis set (<i>e.g.</i> dev2-[X]VP or cc-pV[n]Z).</li>
+			<li>An ECP might not speed up your calculation very much if there is only one heavy metal.</li> 
+			<li>A relativistic correction method might run into numerical issues during geometry optimization. An ECP might be sufficient for optimizing the geometry.</li> 
+			<li>Some ECP's should be accompanied by a particular all-electron basis set on lighter elements(<i>e.g.</i> def2-[X]VP and SDD/ECP[<i>n</i>][X][Y]).</li>
+		</ul>
+		</p>
+		<br>
+		<img src="https://raw.githubusercontent.com/QChASM/ChimAARON/images_for_wiki/tools/QMInputBuilder/basisOptions.png"/>
+		<br>
+		<h1>Additional Options</h1>
+		Most other options must be specified by the user. Like user-specified methods and basis sets, these options are saved for use later. 
+		
+		<h2>Gaussian</h2>
+		Link 0 commands and route keywords and options can be specified. Link 0 commands should not include the '%' (<i>e.g.</i> use "save" instead of "%save"). Also, comment lines and lines at the end of the file (<i>i.e.</i> for NBOREAD) can be added. 
+		<br>
+		<img src="https://raw.githubusercontent.com/QChASM/ChimAARON/images_for_wiki/tools/QMInputBuilder/gaussianOptions.png"/>
+		<br>
+		<h2>ORCA</h2>
+		Route and blocks, along with block options, can be specified. The '%' should not be included in block names (<i>e.g.</i> use "basis" instead of "%basis"). Comment lines can also be added. 
+		<br>
+		<img src="https://raw.githubusercontent.com/QChASM/ChimAARON/images_for_wiki/tools/QMInputBuilder/orcaOptions.png"/>
+		<br>
+		<h2>Psi4</h2>
+		Global settings can be specified.
+		<p>
+		Additional lines can be inserted before the molecule and after the job.
+		For lines after the molecule, <code>$METHOD</code> will be replaced with the keyword for the method.
+		As an example, 
+		<br>
+		<code>
+		nrg, wfn = energy('$METHOD', return_wfn=True)
+		</code>
+		</p>
+		can be added to compute the single point energy of the structure.
+		<p>
+		Comment lines can also be added at the top of the file.
+		Hashtags are automatically added to the start of comment lines. 
+		</p>
+		<br>
+		<img src="https://raw.githubusercontent.com/QChASM/ChimAARON/images_for_wiki/tools/QMInputBuilder/psi4Options.png"/>
+		<br>
+		<h2>SQM</h2>
+		Variables can be added to the <i>&amp;qmmm</i> namelist.
+		See The the "SQM" section in the Amber manual for a full list of available options.
+		<br>>
+		<img src="https://raw.githubusercontent.com/QChASM/ChimAARON/images_for_wiki/tools/QMInputBuilder/sqmOptions.png"/>
+		</br>
+		<h2>Q-Chem</h2>
+		Settings can be added to the <code>REM</code> section.
+		Extra sections can also be added.
+		
+		<h1>Preview Input File</h1>
+		Clicking the 'View' menu option and selecting 'Preview' will open a dialog showing a preview of the file contents. This allows you to check that all intended options are present before exporting the file or running the job. The preview updates automatically when any setting is changed, with exceptions for user-defined keywords. To force the preview to update, click the refresh button in the bottom corner of the preview. 
+		
+		<h1>Presets</h1> 
+		Once options have been set, you can save the settings to a preset. Certain options may be excluded from the saved preset, such as the job type. You may also choose the elements in a basis set, so that the preset can be applied to structures with <i>e.g.</i> different functional groups. 
+		<br>
+		<img src="https://raw.githubusercontent.com/QChASM/ChimAARON/images_for_wiki/tools/QMInputBuilder/savePresets.png"/>
+		<br>
+		Applying a preset will set the current options to whatever was saved in that preset. To apply a preset, click the 'Presets' menu option, select the file type, and then click the preset name. 
+		
+		Presets can be exported to a file. This file may be shared with another SEQCROW user, who can import the presets. 
+		
+		<h1>Running Jobs</h1>
+		<p>
+		The input file is given to one of the external software packages to run a calculation.
+		The executable corresponding to the selected file format should be specified in the 'SEQCROW Jobs' section of the ChimeraX settings.
+		For SQM, SEQCROW will use the executable that comes with ChimeraX.
+		Only one job can be running at a time.
+		Jobs can be monitored using the <a href="https://github.com/QChASM/SEQCROW/wiki/Job-Queue-Tool">'Job Queue' tool</a>.
+		</p>
+		<p>
+		Q-Chem jobs cannot currently be run locally through SEQCROW.
+		</p>
+		<h1>Citations</h1>
+		<ol>
+			<li><a href="https://doi.org/10.1002/chem.201200497">Grimme's quasi-RRHO free energy</a></li>
+			<li><a href="https://doi.org/10.1021/jp205508z">Truhlar's quasi-harmonic free energy</a></li>
+		</ol>
+    </body>
+</html>

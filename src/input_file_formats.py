@@ -985,7 +985,7 @@ class Psi4FileInfo(QMInputFileInfo):
             'no_com': [],
         },
         PSI4_AFTER_JOB: [
-            "fchk_writer = psi4.core.FCHKWriter(wfn)\nfchk_writer.write('output.fchk')",
+            "fchk(wfn, '{{ name }}.fchk')",
             "cubeprop(wfn)",
         ],
     }
