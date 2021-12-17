@@ -94,11 +94,11 @@ class JobManager(ProviderManager):
                                     job['theory'],
                                 )
                                 break
-                            else:
-                                self.session.logger.warning(
-                                    "local job provider for %s jobs is no longer installed," % job["format"] +
-                                    "job named '%s' will be removed from the queue" % job["name"]
-                                )
+                        else:
+                            self.session.logger.warning(
+                                "local job provider for %s jobs is no longer installed," % job["format"] +
+                                "job named '%s' will be removed from the queue" % job["name"]
+                            )
                     
                     elif job['server'] == "cluster":
                         args = (
@@ -135,7 +135,7 @@ class JobManager(ProviderManager):
                         local_job.scratch_dir = job['scratch']
                                 
                     elif section == "error":
-                       #shh it's finished
+                        #shh it's finished
                         local_job.isFinished = lambda *args, **kwargs: True
                         local_job.isFinished = lambda *args, **kwargs: True
                         local_job.error = True
@@ -151,11 +151,9 @@ class JobManager(ProviderManager):
     
                         local_job.output_name = job['output']
                         local_job.scratch_dir = job['scratch']
-                                
-                        self.local_jobs.append(local_job)
-                        # self.session.logger.info("added %s (%s job) from previous session" % (job['name'], job['format']))
-                    
+
                     self.local_jobs.append(local_job)
+                    # self.session.logger.info("added %s (%s job) from previous session" % (job['name'], job['format']))
 
             self.paused = queue_dict['job_running']
 
