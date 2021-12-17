@@ -280,7 +280,7 @@ class DrawBondMouseMode(MouseMode):
                 x1, x2 = self.session.main_view.clip_plane_points(x, y)
                 v = x2 - x1
                 v /= np.linalg.norm(v)
-                p = np.dot(self._atom1.scene_coord - x1, v)
+                p = np.dot(self._atom1.coord - self._atom1.scene_coord - x1, v)
                 pt = x1 + p * v + (self._atom1.coord - self._atom1.scene_coord)
                 if self._markerset.num_atoms > 1:
                     self._markerset.atoms[1].delete()

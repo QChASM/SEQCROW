@@ -1,0 +1,66 @@
+<html>
+
+    <head>
+        <meta charset="UTF-8">
+        <title>Gaussian Input Files</title>
+        <meta http-equiv="Content-Type" content="text/html">
+        <link rel="icon" href="../images/SEQCROW.png" type="image/png">
+        <link rel="stylesheet" href="../style.css">
+    </head>
+    
+    <div class="head">
+        <object data="../ribbon.html" class="head"></object>
+    </div>
+	
+	<body>
+	
+	<h1>Anatomy of a Gaussian Input File</h1>
+	<p>
+	You can find the full specification of Gaussian input files in the Gaussian manual, either <a href="https://gaussian.com/input/">online</a> or your physical copy.
+	The input builder splits this into sections:
+	<ul>
+		<li>Link 0 commands - control job resources and caching data</li>
+		<li>Route - method, basis set, job type, and other options</li>
+		<li>Comments (title) - may or may not be present; intended to be a description of the computation</li>
+		<li>Molecule - charge, multiplicity, atoms and their coordinates</li>
+		<li>Miscellaneous input - some job types may require more input than what is in the route, particularly when Gaussian interfaces with other programs (e.g. NBO) - these appear at the end of the file</li>
+	</ul>
+	<p>
+	Note that if you are editing Gaussian input files manually, the placement of blank lines can matter.
+	See the Gaussian manual for details.
+	</p>
+	<p>
+	General options for link 0 commands, the route, comments, and miscellaneous input can be modified on the "additional options" page.
+	More commonly-used options have a dedicated widget or page on the tool window (e.g. basis sets).
+	</p>
+	<pre style="background-color: #e3e3e3; font-family: monospace"><span class="highlight">%NProcShared=4
+%Mem=6GB<span class="tooltip">link 0 commands</span></span><span class="highlight">#n B3LYP/def2SVP pop=(NBORead,NBO7)<span class="tooltip">route</span></span>	<span class="highlight">P2.out<span class="tooltip">title</span></span>	<span class="highlight">0 1
+H     -0.75974    -1.81400    -1.82699
+C     -0.63749    -1.75158    -0.72517
+C      0.76349    -1.20464    -0.28975
+C      0.48943    -0.95662     1.18701
+C     -0.80299    -0.57256     1.30946
+C     -1.41858    -0.55598    -0.08338
+H     -0.88343    -2.72820    -0.25831
+C      0.73281     0.17533    -0.99438
+H      1.64099    -1.83120    -0.52425
+H      1.25093    -1.07274     1.95364
+H     -1.35848    -0.29474     2.20123
+C     -0.77430     0.62287    -0.85334
+H     -2.52047    -0.59806    -0.12769
+H     -1.25565     0.72441    -1.85434
+H      1.02568     0.05880    -2.06610
+C      1.50934     1.27271    -0.34059
+C      0.70982     2.25539     0.11122
+H      2.59802     1.22785    -0.28132
+H      1.01697     3.17631     0.60977
+C     -0.74459     1.96816    -0.12364
+H     -1.29736     1.91764     0.84832
+H     -1.21126     2.77284    -0.74543<span class="tooltip">molecule specification</span></span>
+<span class="highlight">$nbo plot nrt BNDIDX $end<span class="tooltip">misc. options</span></span>
+	
+	</pre>
+	</p>
+	
+	</body>
+</html>

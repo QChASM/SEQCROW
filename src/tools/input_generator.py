@@ -260,7 +260,7 @@ class BuildQM(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False
 
-    help = "https://github.com/QChASM/SEQCROW/wiki/Build-QM-Input-Tool"
+    help = "help:seqcrow/tools/input_builder.html"
 
     def __init__(self, session, name):
         super().__init__(session, name)
@@ -969,7 +969,10 @@ class BuildQM(ToolInstance):
     def struc_mod_update_preview(self, *args, **kwargs):
         """whenever a setting is changed, this should be called to update the preview"""
         if self.changed:
-            self.job_widget.check_constraints()
+            if not self.job_widget.structure.deleted:
+                self.job_widget.setStructure(self.job_widget.structure)
+            else:
+                self.job_widget.check_constraints()
             self.update_preview()
             self.changed = False
 
@@ -1987,32 +1990,28 @@ class JobTypeOption(QWidget):
     def setStructure(self, structure):
         """changes the structure and clears contraints"""
         self.structure = structure
-        self.constrained_atoms = []
-        self.constrained_bonds = []
-        self.constrained_angles = []
-        self.constrained_torsions = []
 
         for i in range(self.constrained_atom_table.rowCount() - 1, -1, -1):
             atom = self.constrained_atoms[i]
-            if atom.deleted:
+            if atom.deleted or atom not in structure:
                 self.constrain_atoms.pop(i)
                 self.constrained_atom_table.removeRow(i)
 
         for i in range(self.constrained_bond_table.rowCount() - 1, -1, -1):
             bond = self.constrained_bonds[i]
-            if any(atom.deleted for atom in bond):
+            if any(atom.deleted or atom not in structure.atoms for atom in bond):
                 self.constrained_bonds.pop(i)
                 self.constrained_bond_table.removeRow(i)
 
         for i in range(self.constrained_angle_table.rowCount() - 1, -1, -1):
-            angle = self.constrained_bonds[i]
-            if any(atom.deleted for atom in angle):
+            angle = self.constrained_angles[i]
+            if any(atom.deleted or atom not in structure.atoms for atom in angle):
                 self.constrained_angles.pop(i)
                 self.constrained_angle_table.removeRow(i)
 
         for i in range(self.constrained_torsion_table.rowCount() - 1, -1, -1):
-            torsion = self.constrained_bonds[i]
-            if any(atom.deleted for atom in torsion):
+            torsion = self.constrained_torsions[i]
+            if any(atom.deleted or atom not in structure.atoms for atom in torsion):
                 self.constrained_torsions.pop(i)
                 self.constrained_torsion_table.removeRow(i)
 
@@ -2020,7 +2019,6 @@ class JobTypeOption(QWidget):
 
     def check_constraints(self):
         for i in range(self.constrained_atom_table.rowCount(), -1, -1):
-            
             self.constrained_atom_table.removeRow(i)
 
         for i in range(self.constrained_bond_table.rowCount(), -1, -1):
@@ -6103,6 +6101,8 @@ class PrepClusterJob(ChildToolWindow):
 
     def delete_template(self):
         name = self.template.currentText()
+        if not name:
+            return
         program = self.tool_instance.file_type.currentText()
         queue_type = self.session.seqcrow_settings.settings.QUEUE_TYPE
         

@@ -196,7 +196,7 @@ class JobManager(ProviderManager):
                     job_running = True
                     # print("check")
 
-            elif job.isFinished():
+            elif job.isFinished() and job.killed:
                 d['killed'].append(job.get_json())
                 # print("killed")
 
