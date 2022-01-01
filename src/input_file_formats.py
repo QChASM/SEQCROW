@@ -16,6 +16,10 @@ class QMInputFileInfo:
     # name of program
     name = ""
     
+    # whether or not this file type will work with raven
+    # aka the TSS Finder tool
+    allow_raven = False
+    
     # preset settings for this software
     # dict with keys:
     #    theory - Theory instance
@@ -86,6 +90,10 @@ class QMInputFileInfo:
     # special methods:
     # SAPT - will show a layer widget for selecting SAPT type and defining monomers
     methods = []
+    
+    # methods available for Raven
+    # will use methods if there aren't any
+    raven_methods = None
     
     # availale empirical dispersion
     # if there are no dispersion methods, the widget will be disabled
@@ -622,6 +630,8 @@ class QChemKeywordOptions(KeywordOptions):
 class GaussianFileInfo(QMInputFileInfo):
     name = "Gaussian"
 
+    allow_raven = True
+
     initial_options = {
         GAUSSIAN_ROUTE: {
             'opt': ['NoEigenTest', 'Tight', 'VeryTight'],
@@ -755,7 +765,9 @@ class GaussianFileInfo(QMInputFileInfo):
 
 class ORCAFileInfo(QMInputFileInfo):
     name = "ORCA"
-    
+
+    allow_raven = True
+  
     initial_presets = {
         "quick optimize":{
             "theory": Theory(
@@ -941,6 +953,8 @@ class ORCAFileInfo(QMInputFileInfo):
 class Psi4FileInfo(QMInputFileInfo):
     name = "Psi4"
     
+    allow_raven = True
+
     save_file_filter = "Psi4 input files (*.in)"
     basis_file_filter = "Basis Set Files (*.gbs)"
     initial_presets = {
@@ -990,6 +1004,17 @@ class Psi4FileInfo(QMInputFileInfo):
         ],
     }
     
+    raven_methods = [
+        "B3LYP",
+        "M06",
+        "M06-L",
+        "M06-2X",
+        "ωB97X-D",
+        "B3PW91",
+        "B97-D",
+        "BP86",
+        "PBE0",
+    ]    
     methods = [
         "B3LYP",
         "M06",
@@ -1111,6 +1136,8 @@ class SQMFileInfo(QMInputFileInfo):
 
 class QChemFileInfo(QMInputFileInfo):
     name = "Q-Chem"
+    
+    allow_raven = True
     
     single_job_type = True
     

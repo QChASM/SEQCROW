@@ -9,7 +9,7 @@ from chimerax.core.commands import run
 
 from json import load, dump
 
-from SEQCROW.jobs import LocalJob, LocalClusterJob
+from SEQCROW.jobs import LocalJob, LocalClusterJob, ParallelRavenJob
 
 JOB_FINISHED = "job finished"
 JOB_STARTED = "job started"
@@ -88,11 +88,19 @@ class JobManager(ProviderManager):
                                     name,
                                     self
                                 )
-                                args = (
+                                args = [
                                     job['name'],
                                     self.session,
                                     job['theory'],
-                                )
+                                ]
+                                kwargs = dict()
+                                if name == "Raven":
+                                    args.extend([
+                                        job["reactant"],
+                                        job["product"],
+                                        job["file_type"],
+                                    ])
+                                    kwargs = job["raven_kwargs"]
                                 break
                         else:
                             self.session.logger.warning(
@@ -101,22 +109,33 @@ class JobManager(ProviderManager):
                             )
                     
                     elif job['server'] == "cluster":
-                        args = (
+                        args = [
                             job['name'],
                             self.session,
                             job['theory'],
                             job['file_type'],
-                        )
-                        job_cls = LocalClusterJob
+                        ]
+                        if job["format"] == "Raven":
+                            job_cls = ParallelRavenJob
+                            args.extend([
+                                job["reactant"],
+                                job["product"],
+                                job["file_type"],
+                            ])
+                            kwargs = job["raven_kwargs"]
+                        else:
+                            job_cls = LocalClusterJob
+                            kwargs = {"geometry": job['geometry']}
+                    
                     else:
                         self.session.logger.warning("job with unknown server: %s" % job['server'])
                         continue
-                                
+                    
                     local_job = job_cls(
                         *args,
-                        geometry=job['geometry'],
                         auto_update=job['auto_update'],
                         auto_open=job['auto_open'],
+                        **kwargs
                     )
                                 
                     if section == "check":

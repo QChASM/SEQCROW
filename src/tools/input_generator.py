@@ -752,12 +752,13 @@ class BuildQM(ToolInstance):
 
         self.settings.presets = dumps(self.presets, cls=ATEncoder)
 
-        sep = self.presets_menu.addSeparator()
-        self.presets_menu.addAction(sep)
-        self.presets_menu.addAction(self.new_preset)
-        self.presets_menu.addAction(self.remove_preset)
-        self.presets_menu.addAction(self.import_preset)
-        self.presets_menu.addAction(self.export_preset)
+        if hasattr(self, "new_preset"):
+            sep = self.presets_menu.addSeparator()
+            self.presets_menu.addAction(sep)
+            self.presets_menu.addAction(self.new_preset)
+            self.presets_menu.addAction(self.remove_preset)
+            self.presets_menu.addAction(self.import_preset)
+            self.presets_menu.addAction(self.export_preset)
 
     def show_new_preset(self):
         """open 'save preset' child tool"""
@@ -1134,7 +1135,8 @@ class BuildQM(ToolInstance):
         if mdl is not None:
             elements = set(mdl.atoms.elements.names)
             self.basis_widget.setElements(elements)
-            self.job_widget.check_deleted_atoms()
+            if hasattr(self.job_widget, "check_deleted_atoms"):
+                self.job_widget.check_deleted_atoms()
             self.method_widget.sapt_layers.check_deleted_atoms()
 
     def get_basis_set(self, update_settings=False):
@@ -1448,7 +1450,7 @@ class JobTypeOption(QWidget):
         job_type_layout.addRow("charge:", self.charge)
 
         self.multiplicity = QSpinBox()
-        self.multiplicity.setRange(1, 3)
+        self.multiplicity.setRange(1, 10)
         self.multiplicity.setSingleStep(1)
         self.multiplicity.setValue(self.settings.previous_mult)
         self.multiplicity.setToolTip(
@@ -2812,11 +2814,19 @@ class MethodOption(QWidget):
 
     methodChanged = Signal()
 
-    def __init__(self, settings, session, init_form, parent=None):
+    def __init__(
+        self,
+        settings,
+        session,
+        init_form,
+        use_raven=False,
+        parent=None,
+    ):
         super().__init__(parent)
 
         self.settings = settings
         self.form = init_form
+        self.use_raven = use_raven
 
         layout = QGridLayout(self)
         margins = layout.contentsMargins()
@@ -3030,7 +3040,10 @@ class MethodOption(QWidget):
         self.dispersion.clear()
         self.grid.clear()
         self.form = file_info
-        self.method_option.addItems(file_info.methods)
+        if self.use_raven and file_info.raven_methods:
+            self.method_option.addItems(file_info.raven_methods)
+        else:
+            self.method_option.addItems(file_info.methods)
         self.method_option.addItem("other")
 
         self.dispersion.addItem("None")
@@ -3457,7 +3470,7 @@ class BasisOption(QWidget):
             self.aux_type.addItems(file_info.aux_options)
 
         self.setAux(aux)
-        self.setBasis(basis.name)
+        self.setBasis(basis.name, basis_path=basis.user_defined)
 
         self.blockSignals(False)
 

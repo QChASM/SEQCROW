@@ -342,6 +342,10 @@ class _SEQCROW_API(BundleAPI):
             from .tools import MolBuilder
             return MolBuilder(session, ti.name)
 
+        elif ti.name == "TSS Finder":
+            from .tools import BuildRaven
+            return BuildRaven(session, ti.name)
+
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)
 
@@ -581,6 +585,12 @@ class _SEQCROW_API(BundleAPI):
             elif name == "Q-Chem":
                 from SEQCROW.jobs import QChemJob
                 return QChemJob
+            elif name == "Raven":
+                from SEQCROW.jobs import SerialRavenJob
+                return SerialRavenJob
+            elif name == "ParallelRaven":
+                from SEQCROW.jobs import ParallelRavenJob
+                return ParallelRavenJob
 
         elif mgr is session.seqcrow_cluster_scheduling_software_manager:
             if name == "Slurm":

@@ -720,7 +720,7 @@ class Thermochem(ToolInstance):
             qharm_dg = co.calc_G_corr(v0=v0, temperature=T, method="QHARM")
             
             items = [(
-                "𝛿ZPE =",
+                "δZPE =",
                 dZPE,
                 None,
                 "lowest energy the molecule can have\n"
@@ -731,7 +731,7 @@ class Thermochem(ToolInstance):
             if fr.other["frequency"].anharm_data:
                 dZPE_anh = co.calc_zpe(anharmonic=True)
                 items.append((
-                    "𝛿ZPE<sub>anh</sub> =",
+                    "δZPE<sub>anh</sub> =",
                     dZPE_anh,
                     None,
                     "lowest energy the molecule can have\n"
@@ -741,28 +741,28 @@ class Thermochem(ToolInstance):
             
             items.extend([
                 (
-                    "𝛿H<sub>RRHO</sub> =",
+                    "δH<sub>RRHO</sub> =",
                     dH,
                     None,
                     "enthalpy of formation",
                 ), (
-                    "𝛿G<sub>RRHO</sub> =",
+                    "δG<sub>RRHO</sub> =",
                     rrho_dg,
                     None,
                     "energy after taking into account the average\n"
                     "population of vibrational, rotational, and translational\n"
                     "degrees of freedom",
                 ), (
-                    "𝛿G<sub>Quasi-RRHO</sub> =",
+                    "δG<sub>Quasi-RRHO</sub> =",
                     qrrho_dg,
                     "Grimme's Quasi-RRHO",
                     "vibrational entropy of each real mode is damped and complemented\n"
-                    "with rotational entropy, with the damping function being stronger for\n"
+                    "with free rotor entropy, with the damping function being stronger for\n"
                     "frequencies < 𝜔\u2080\n"
                     "can mitigate error from inaccuracies in the harmonic oscillator\n"
                     "approximation for low-frequency vibrations",
                 ), (
-                    "𝛿G<sub>Quasi-Harmonic</sub> =",
+                    "δG<sub>Quasi-Harmonic</sub> =",
                     qharm_dg,
                     "Truhlar's Quasi-Harmonic",
                     "real vibrational frequencies below 𝜔\u2080 are treated as 𝜔\u2080\n"

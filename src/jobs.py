@@ -426,7 +426,7 @@ class LocalClusterJob(LocalJob):
         self.template_kwargs = dict()
         if template_kwargs:
             self.template_kwargs = template_kwargs
-        
+
     def __repr__(self):
         return "local cluster %s job \"%s\"" % (
             self.info_type, self.name
@@ -500,3 +500,232 @@ class LocalClusterJob(LocalJob):
 
         return d
 
+
+class SerialRavenJob(LocalJob):
+    info_type = "Raven"
+    format_name = "xyz"
+    
+    def __init__(
+        self,
+        name,
+        session,
+        theory,
+        reactant,
+        product,
+        file_type,
+        auto_update=False,
+        auto_open=False,
+        **raven_kwargs,
+    ):
+        super().__init__(
+            name, session, theory,
+            auto_open=auto_open, auto_update=auto_update
+        )
+        self.reactant = reactant
+        self.product = product
+        self.file_type = file_type
+        self.raven_kwargs = raven_kwargs
+    
+    def __repr__(self):
+        return "serial %s job using %s \"%s\"" % (
+            self.info_type, self.file_type, self.name
+        )
+    
+    def run(self):
+        from Raven.job_runner import SerialJobRunner
+        from Raven.driver import run_raven
+        from chimerax.core.commands import run
+        from SEQCROW.residue_collection import ResidueCollection
+        
+        self.start_time = asctime(localtime())
+        
+        self.scratch_dir = os.path.join(
+            os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
+            "%s %s" % (self.name, self.start_time.replace(':', '.')), \
+        )
+        
+        if not os.path.exists(self.scratch_dir):
+            os.makedirs(self.scratch_dir)
+
+        if self.file_type.lower() == "gaussian":
+            qm_executable = os.path.abspath(
+                self.session.seqcrow_settings.settings.GAUSSIAN_EXE
+            )
+            if not os.path.exists(qm_executable):
+                qm_executable = self.session.seqcrow_settings.settings.GAUSSIAN_EXE
+
+        if self.file_type.lower() == "orca":
+            qm_executable = os.path.abspath(
+                self.session.seqcrow_settings.settings.ORCA_EXE
+            )
+            if not os.path.exists(qm_executable):
+                qm_executable = self.session.seqcrow_settings.settings.ORCA_EXE
+
+        if self.file_type.lower() == "psi4":
+            qm_executable = os.path.abspath(
+                self.session.seqcrow_settings.settings.PSI4_EXE
+            )
+            if not os.path.exists(qm_executable):
+                qm_executable = self.session.seqcrow_settings.settings.PSI4_EXE
+
+        if self.file_type.lower() == "q-chem":
+            qm_executable = os.path.abspath(
+                self.session.seqcrow_settings.settings.QCHEM_EXE
+            )
+            if not os.path.exists(qm_executable):
+                qm_executable = self.session.seqcrow_settings.settings.QCHEM_EXE
+        
+        self.output_name = os.path.join(
+            self.scratch_dir, "path.xyz"
+        )
+
+        job_runner = SerialJobRunner(
+            self.file_type,
+            qm_executable,
+        )
+        
+        stationary_points = run_raven(
+            self.reactant,
+            self.product,
+            job_runner,
+            self.theory,
+            cwd=self.scratch_dir,
+            **self.raven_kwargs,
+        )
+        
+        if self.auto_open:
+            mdls = []
+            for geom in stationary_points:
+                rescol = ResidueCollection(geom, name=geom.name)
+                mdl = rescol.get_chimera(self.session)
+                mdls.append(mdl)
+            self.session.models.add(mdls)
+
+    def get_json(self):
+        d = super().get_json()
+        d.pop("geometry")
+        d["format"] = "Raven"
+        d["reactant"] = self.reactant
+        d["product"] = self.product
+        d["file_type"] = self.file_type
+        d["raven_kwargs"] = self.raven_kwargs
+        return d
+
+
+class ParallelRavenJob(LocalClusterJob):
+    format_name = None
+    """
+    job for submitting computational chemistry jobs to a queueing
+    system (e.g. Slurm, PBS, etc.) that is running on local hardware
+    """
+    def __init__(
+        self,
+        name,
+        session,
+        theory,
+        reactant,
+        product,
+        file_type,
+        cluster_type,
+        auto_update=False,
+        auto_open=False,
+        template=None,
+        walltime=2,
+        processors=4,
+        memory=8,
+        template_kwargs=None,
+        **raven_kwargs,
+    ):
+        """
+        base class of local ORCA, Gaussian, and Psi4 cluster jobs
+        name        str - name of job
+        session     chimerax session object
+        theory      AaronTools.theory.Theory or a dictionary with a saved job's settings
+        """
+        super().__init__(
+            name,
+            session,
+            theory,
+            file_type,
+            cluster_type=cluster_type,
+            auto_update=auto_update,
+            auto_open=auto_open,
+            template=template,
+            walltime=walltime,
+            processors=processors,
+            memory=memory,
+            template_kwargs=template_kwargs,
+        )
+
+        self.reactant = reactant
+        self.product = product
+        self.raven_kwargs = raven_kwargs
+
+    def __repr__(self):
+        return "local cluster %s job \"%s\"" % (
+            self.info_type, self.name
+        )
+    
+    def run(self):
+        from Raven.job_runner import ParallelClusterJobRunner
+        from Raven.driver import run_raven
+        from chimerax.core.commands import run
+        from SEQCROW.residue_collection import ResidueCollection
+        
+        self.start_time = asctime(localtime())
+        
+        self.scratch_dir = os.path.join(
+            os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
+            "%s %s" % (self.name, self.start_time.replace(':', '.')), \
+        )
+        
+        if not os.path.exists(self.scratch_dir):
+            os.makedirs(self.scratch_dir)
+
+        exec_memory = self.memory
+        if not exec_memory:
+            exec_memory = self.theory.memory
+        if not exec_memory:
+            raise ValueError("memory must be non-zero for cluster jobs")
+
+        walltime = self.walltime
+        
+        job_runner = ParallelClusterJobRunner(
+            self.info_type,
+            memory=exec_memory,
+            walltime=self.walltime,
+            template=self.template,
+            wait=90,
+        )
+
+        self.output_name = os.path.join(
+            self.scratch_dir, "path.xyz"
+        )
+        
+        stationary_points = run_raven(
+            self.reactant,
+            self.product,
+            job_runner,
+            self.theory,
+            cwd=self.scratch_dir,
+            **self.raven_kwargs,
+        )
+        
+        if self.auto_open:
+            mdls = []
+            for geom in stationary_points:
+                rescol = ResidueCollection(geom, name=geom.name)
+                mdl = rescol.get_chimera(self.session)
+                mdls.append(mdl)
+            self.session.models.add(mdls)
+
+    def get_json(self):
+        d = super().get_json()
+        d.pop("geometry")
+        d["format"] = "Raven"
+        d["reactant"] = self.reactant
+        d["product"] = self.product
+        d["raven_kwargs"] = self.raven_kwargs
+        return d
+
+    
