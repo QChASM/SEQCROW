@@ -672,11 +672,11 @@ class ParallelRavenJob(LocalClusterJob):
         from chimerax.core.commands import run
         from SEQCROW.residue_collection import ResidueCollection
         
-        self.start_time = asctime(localtime())
+        self.start_time = asctime(localtime()).replace(" ", "_")
         
         self.scratch_dir = os.path.join(
             os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
-            "%s %s" % (self.name, self.start_time.replace(':', '.')), \
+            "%s_%s" % (self.name, self.start_time.replace(':', '.')), \
         )
         
         if not os.path.exists(self.scratch_dir):
@@ -696,6 +696,7 @@ class ParallelRavenJob(LocalClusterJob):
             walltime=self.walltime,
             template=self.template,
             wait=90,
+            **self.template_kwargs,
         )
 
         self.output_name = os.path.join(

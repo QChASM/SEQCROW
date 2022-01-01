@@ -115,7 +115,7 @@ class JobManager(ProviderManager):
                             job['theory'],
                             job['file_type'],
                         ]
-                        if job["format"] == "Raven":
+                        if "format" in job and job["format"] == "Raven":
                             job_cls = ParallelRavenJob
                             args.extend([
                                 job["reactant"],
