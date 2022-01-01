@@ -174,7 +174,7 @@ class Thermochem(ToolInstance):
         self.v0_edit.valueChanged.connect(self.set_thermo)
         self.v0_edit.setMinimum(0)
         self.v0_edit.setToolTip("frequency parameter for quasi treatments of entropy")
-        thermo_layout.addRow("𝜔<sub>0</sub> =", self.v0_edit)
+        thermo_layout.addRow("ω<sub>0</sub> =", self.v0_edit)
 
         self.thermo_table = QTableWidget()
         self.thermo_table.setColumnCount(3)
@@ -249,7 +249,7 @@ class Thermochem(ToolInstance):
         self.relative_v0.setMinimum(0)
         self.relative_v0.setToolTip("frequency parameter for quasi treatments of entropy")
         self.relative_v0.valueChanged.connect(self.calc_relative_thermo)
-        relative_layout.addWidget(QLabel("𝜔<sub>0</sub> ="), 2, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
+        relative_layout.addWidget(QLabel("ω<sub>0</sub> ="), 2, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
         
         relative_layout.addWidget(self.relative_v0, 2, 1, 1, 5, Qt.AlignLeft | Qt.AlignVCenter)
 

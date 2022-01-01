@@ -162,7 +162,7 @@ class IRSpectrum(ToolInstance):
         self.w0.setSingleStep(5)
         self.w0.setValue(self.settings.w0)
         self.w0.setSuffix(" cm\u207b\u00b9")
-        component_layout.addWidget(QLabel("𝜔<sub>0</sub> ="), 1, 4, 1, 1, Qt.AlignRight | Qt.AlignHCenter)
+        component_layout.addWidget(QLabel("ω<sub>0</sub> ="), 1, 4, 1, 1, Qt.AlignRight | Qt.AlignHCenter)
         component_layout.addWidget(self.w0, 1, 5, 1, 1, Qt.AlignLeft | Qt.AlignHCenter)
 
         self.weight_method = QComboBox()
