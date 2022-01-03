@@ -925,6 +925,12 @@ class GSMWidget(QWidget):
 
         return charge
 
+    def setCharge(self, charge):
+        self.charge.setValue(charge)
+    
+    def setMultiplicity(self, mult):
+        self.multiplicity.setValue(mult)
+
     def getMultiplicity(self, update_settings=True):
         """returns multiplicity"""
         mult = self.multiplicity.value()
