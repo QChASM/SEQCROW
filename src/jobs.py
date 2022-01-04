@@ -6,6 +6,10 @@ from time import asctime, localtime, sleep
 from Qt.QtCore import QThread
 
 
+class SEQCROWSigKill(Exception):
+    pass
+
+
 class LocalJob(QThread):
     format_name = None
     info_type = None
@@ -584,14 +588,22 @@ class SerialRavenJob(LocalJob):
             qm_executable,
         )
         
-        stationary_points = run_raven(
-            self.reactant,
-            self.product,
-            job_runner,
-            self.theory,
-            cwd=self.scratch_dir,
-            **self.raven_kwargs,
-        )
+        def seqcrow_killed(obj=self):
+            if self.killed:
+                raise SEQCROWSigKill("kill")
+        
+        try:
+            stationary_points = run_raven(
+                self.reactant,
+                self.product,
+                job_runner,
+                self.theory,
+                cwd=self.scratch_dir,
+                callback=seqcrow_killed,
+                **self.raven_kwargs,
+            )
+        except SEQCROWSigKill:
+            return
         
         if self.auto_open:
             mdls = []
@@ -600,7 +612,20 @@ class SerialRavenJob(LocalJob):
                 mdl = rescol.get_chimera(self.session)
                 mdls.append(mdl)
             self.session.models.add(mdls)
+    
+    def kill(self):
+        self.session.logger.warning("killing %s..." % self)
 
+        if self.process is not None:
+            self.session.logger.warning(
+                "stopping cluster jobs is not implemented"
+            )
+        
+        self.killed = True
+       
+        #use exit b/c terminate can cause chimera to freeze
+        super().exit(1)
+    
     def get_json(self):
         d = super().get_json()
         d.pop("geometry")
@@ -703,14 +728,22 @@ class ParallelRavenJob(LocalClusterJob):
             self.scratch_dir, "path.xyz"
         )
         
-        stationary_points = run_raven(
-            self.reactant,
-            self.product,
-            job_runner,
-            self.theory,
-            cwd=self.scratch_dir,
-            **self.raven_kwargs,
-        )
+        def seqcrow_killed(obj=self):
+            if self.killed:
+                raise SEQCROWSigKill("kill")
+        
+        try:
+            stationary_points = run_raven(
+                self.reactant,
+                self.product,
+                job_runner,
+                self.theory,
+                cwd=self.scratch_dir,
+                callback=seqcrow_killed,
+                **self.raven_kwargs,
+            )
+        except SEQCROWSigKill:
+            return
         
         if self.auto_open:
             mdls = []
@@ -719,7 +752,20 @@ class ParallelRavenJob(LocalClusterJob):
                 mdl = rescol.get_chimera(self.session)
                 mdls.append(mdl)
             self.session.models.add(mdls)
+    
+    def kill(self):
+        self.session.logger.warning("killing %s..." % self)
 
+        if self.process is not None:
+            self.session.logger.warning(
+                "stopping cluster jobs is not implemented; no new jobs will start, but running jobs will finish"
+            )
+        
+        self.killed = True
+       
+        #use exit b/c terminate can cause chimera to freeze
+        super().exit(1)
+    
     def get_json(self):
         d = super().get_json()
         d.pop("geometry")
