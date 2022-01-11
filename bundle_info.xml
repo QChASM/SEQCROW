@@ -99,6 +99,7 @@
                 <Manager name="SGE" uiOnly="true"/>
                 <Manager name="PBS" uiOnly="true"/>
                 <Manager name="LSF" uiOnly="true"/>
+				<Manager name="tss_finder_manager" uiOnly="true"/>
             </Managers>
             
             <Providers manager="data formats">
@@ -211,9 +212,12 @@
                 <Provider name="SQM"/>
                 <Provider name="Raven"/>
                 <Provider name="ParallelRaven"/>
+                <Provider name="Gaussian STQN"/>
+                <Provider name="ORCA NEB"/>
                 <!--
                 I have not gotten this to work
                 maybe something in ChimeraX's environment conflicts with Q-Chem
+                <Provider name="Q-Chem FSM"/>
                 <Provider name="Q-Chem"/>
                 -->
             </Providers>
@@ -342,6 +346,13 @@
                 />
             </Providers>
             
+			<Providers manager="tss_finder_manager">
+				<Provider name="GPR growing string method"/>
+				<Provider name="synchornous transit-guided quasi-Newton"/>
+				<Provider name="nudged elastic band"/>
+				<Provider name="freezing string method"/>
+			</Providers>
+			
             <Classifiers>
                 <PythonClassifier>Development Status :: 4 - Beta</PythonClassifier>
                 <PythonClassifier>License :: OSI Approved :: GNU General Public License v3 (GPLv3)</PythonClassifier>

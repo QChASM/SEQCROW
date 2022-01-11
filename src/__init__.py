@@ -208,6 +208,11 @@ class _SEQCROW_API(BundleAPI):
             session.seqcrow_lsf_manager = LSFDefault(session, name)
             return session.seqcrow_lsf_manager
 
+        elif name == "tss_finder_manager":
+            from SEQCROW.managers import TSSFinderManager
+            session.tss_finder_manager = TSSFinderManager(session, name)
+            return session.tss_finder_manager
+
         else:
             raise RuntimeError("manager named '%s' is unknown to SEQCROW" % name)
 
@@ -591,6 +596,15 @@ class _SEQCROW_API(BundleAPI):
             elif name == "ParallelRaven":
                 from SEQCROW.jobs import ParallelRavenJob
                 return ParallelRavenJob
+            elif name == "Gaussian STQN":
+                from SEQCROW.jobs import GaussianSTQNJob
+                return GaussianSTQNJob
+            elif name == "ORCA NEB":
+                from SEQCROW.jobs import ORCANEBJob
+                return ORCANEBJob
+            elif name == "Q-Chem FSM":
+                from SEQCROW.jobs import QChemFSMJob
+                return QChemFSMJob
 
         elif mgr is session.seqcrow_cluster_scheduling_software_manager:
             if name == "Slurm":
@@ -685,6 +699,20 @@ class _SEQCROW_API(BundleAPI):
             elif name == "SQM":
                 from .managers.cluster_template_manager import SQMLSFTemplate
                 return SQMLSFTemplate
+
+        elif mgr is session.tss_finder_manager:
+            if name == "GPR growing string method":
+                from .tss_finder_methods import GPRGSM
+                return GPRGSM()
+            elif name == "synchornous transit-guided quasi-Newton":
+                from .tss_finder_methods import STQN
+                return STQN()
+            elif name == "nudged elastic band":
+                from .tss_finder_methods import NEB
+                return NEB()
+            elif name == "freezing string method":
+                from .tss_finder_methods import FSM
+                return FSM()
  
         elif mgr is session.test_manager:
             if name == "fuseRing_command":

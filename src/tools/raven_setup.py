@@ -1,6 +1,7 @@
-from jinja2 import Template
+import inspect
 
-from json import loads
+from jinja2 import Template
+from json import loads, dumps
 
 from chimerax.atomic import get_triggers
 from chimerax.core.tools import ToolInstance
@@ -88,14 +89,7 @@ def ele_order(name):
 
 class _RavenSettings(Settings):
     AUTO_SAVE = {
-        "grow_max_disp_tol": 2e-2,
-        "grow_rms_disp_tol": 1.34e-2,
-        "done_max_disp_tol": 2e-2,
-        "done_rms_disp_tol": 1.34e-2,
-        "nodes": 11,
-        "kernel": "RBF",
-        "stddev_cutoff": 1.5e-2,
-        "length_param": 10,
+        "stored_defaults": "{}",
     }
 
 
@@ -162,6 +156,7 @@ class BuildRaven(BuildQM, ToolInstance):
         #change from one software widget to another when the dropdown menu changes
         #TODO: add a presets tab to save/load presets to aaronrc
         #      so it can easily be used in other tools (like one that makes AARON input files)
+        
         if any(x == self.settings.last_program for x in self.session.seqcrow_qm_input_manager.formats.keys()):
             init_form = self.session.seqcrow_qm_input_manager.get_info(self.settings.last_program)
         else:
@@ -174,14 +169,28 @@ class BuildRaven(BuildQM, ToolInstance):
         basics_form = QWidget()
         form_layout = QFormLayout(basics_form)
 
+        self.tss_algorithm = QComboBox()
+        self.tss_algorithm.addItems(
+            self.session.tss_finder_manager.formats.keys()
+        )
+        
+        form_layout.addRow("algorithm:", self.tss_algorithm)
+        
+
+        tss_info = self.session.tss_finder_manager.get_info(
+            self.tss_algorithm.currentText()
+        )
+
         self.file_type = QComboBox()
-        for item in self.session.seqcrow_qm_input_manager.formats:
+        for item in tss_info.available_for:
             info = self.session.seqcrow_qm_input_manager.get_info(
                 item
             )
-            if not info.allow_raven:
-                continue
             self.file_type.addItem(item)
+
+        self.tss_algorithm.currentTextChanged.connect(
+            self.change_tss_algorithm
+        )
 
         ndx = self.file_type.findText(init_form.name, Qt.MatchExactly)
         if ndx >= 0:
@@ -198,8 +207,12 @@ class BuildRaven(BuildQM, ToolInstance):
 
         layout.addWidget(basics_form, 0, 0)
 
-        self.job_widget = GSMWidget(
-            self.raven_settings, self.settings, self.session, init_form
+        self.job_widget = TSSWidget(
+            self.raven_settings,
+            self.settings,
+            self.session,
+            init_form,
+            tss_info,
         )
 
         #method stuff
@@ -210,10 +223,6 @@ class BuildRaven(BuildQM, ToolInstance):
         self.basis_widget = BasisWidget(self.settings, init_form=init_form)
         self.basis_widget.basisChanged.connect(self.update_preview)
 
-        #solvent
-        self.solvent_widget = SolventWidget(self.settings, init_form=init_form)
-        self.solvent_widget.solventChanged.connect(self.update_preview)
-
         #other keywords
         self.other_keywords_widget = KeywordWidget(self.session, self.settings, init_form=init_form)
         self.other_keywords_widget.additionalOptionsChanged.connect(self.update_preview)
@@ -222,7 +231,6 @@ class BuildRaven(BuildQM, ToolInstance):
         tabs.addTab(self.job_widget, "TS search options")
         tabs.addTab(self.method_widget, "method")
         tabs.addTab(self.basis_widget, "basis functions")
-        tabs.addTab(self.solvent_widget, "implicit solvent")
         tabs.addTab(self.other_keywords_widget, "additional options")
 
         self.reactant_selector.currentIndexChanged.connect(self.change_reactant)
@@ -292,6 +300,24 @@ class BuildRaven(BuildQM, ToolInstance):
         self.tool_window.manage(None)
         menu.setVisible(True)
 
+    def change_tss_algorithm(self, text):
+        self.file_type.blockSignals(True)
+        cur_file_type = self.file_type.currentText()
+        self.file_type.clear()
+
+        tss_info = self.session.tss_finder_manager.get_info(
+            self.tss_algorithm.currentText()
+        )
+
+        self.file_type.addItems(tss_info.available_for)
+        ndx = self.file_type.findText(cur_file_type, Qt.MatchExactly)
+        if ndx >= 0:
+            self.file_type.setCurrentIndex(ndx)
+
+        self.job_widget.set_tss_method(tss_info)
+        self.file_type.blockSignals(False)
+        self.change_file_type()
+
     def change_file_type(self, *args):
         """change the file type
         args are ignored, only the contents of self.file_type matters"""
@@ -300,7 +326,6 @@ class BuildRaven(BuildQM, ToolInstance):
         self.file_type.blockSignals(True)
         self.method_widget.blockSignals(True)
         self.basis_widget.blockSignals(True)
-        self.solvent_widget.blockSignals(True)
         self.job_widget.blockSignals(True)
         self.other_keywords_widget.blockSignals(True)
 
@@ -314,12 +339,10 @@ class BuildRaven(BuildQM, ToolInstance):
             self.tabs.setTabEnabled(2, True)
             self.basis_widget.setOptions(file_info)
         self.job_widget.setOptions(file_info)
-        self.solvent_widget.setOptions(file_info)
         self.other_keywords_widget.setOptions(file_info)
 
         self.file_type.blockSignals(False)
         self.method_widget.blockSignals(False)
-        self.solvent_widget.blockSignals(False)
         self.basis_widget.blockSignals(False)
         self.job_widget.blockSignals(False)
         self.other_keywords_widget.blockSignals(False)
@@ -405,6 +428,43 @@ class BuildRaven(BuildQM, ToolInstance):
             elements = set(reactant.atoms.elements.names)
             self.basis_widget.setElements(elements)
             self.method_widget.sapt_layers.check_deleted_atoms()
+    
+    def get_file_contents(self, update_settings=False):
+        self.update_theory(update_settings=update_settings)
+
+        tss_algorithm = self.tss_algorithm.currentText()
+        tss_info = self.session.tss_finder_manager.get_info(tss_algorithm)
+        program = self.file_type.currentText()
+        
+        reactant = ResidueCollection(
+            self.reactant_selector.currentData(),
+            bonds_matter=False
+        )
+
+        product = ResidueCollection(
+            self.product_selector.currentData(),
+            bonds_matter=False
+        )
+
+        if tss_info.get_file_contents:
+            if callable(tss_info.get_file_contents):
+                contents, warnings = tss_info.get_file_contents(
+                    reactant,
+                    product,
+                    self.theory,
+                )
+            
+            else:
+                contents, warnings = tss_info.get_file_contents[program](
+                    reactant,
+                    product,
+                    self.theory,
+                )
+        
+        else:
+            contents, warnings = self.session.seqcrow_qm_input_manager.get_info(program).get_file_contents(self.theory)
+        
+        return contents, warnings
 
     def update_preview(self):
         model = self.product_selector.currentData()
@@ -455,7 +515,7 @@ class BuildRaven(BuildQM, ToolInstance):
             
 
         if "use_solvent" in preset and preset["use_solvent"]:
-            self.solvent_widget.setSolvent(theory.solvent)
+            self.job_widget.setSolvent(theory.solvent)
 
         if "use_method" in preset and preset["use_method"]:
             self.method_widget.setMethod(theory.method)
@@ -536,7 +596,7 @@ class BuildRaven(BuildQM, ToolInstance):
         nproc = self.job_widget.getNProc(update_settings)
         mem = self.job_widget.getMem(update_settings)
 
-        solvent = self.solvent_widget.getSolvent(update_settings)
+        solvent = self.job_widget.getSolvent(update_settings)
         
         kw_dict = self.job_widget.getKWDict(update_settings=update_settings)
         other_kw_dict = self.other_keywords_widget.getKWDict(update_settings=update_settings)
@@ -554,11 +614,42 @@ class BuildRaven(BuildQM, ToolInstance):
             grid=grid,
             processors=nproc,
             memory=mem,
-            job_type="force",
             solvent=solvent,
             geometry=rescol,
             **combined_dict
         )
+
+        tss_info = self.session.tss_finder_manager.get_info(
+            self.tss_algorithm.currentText()
+        )
+        
+        fixup_func = None
+        if tss_info.fixup_theory:
+            if callable(tss_info.fixup_theory):
+                fixup_func = tss_info.fixup_theory
+            else:
+                fixup_func = tss_info.fixup_theory[program]
+
+        kwargs = dict()
+        defaults = loads(self.raven_settings.stored_defaults)
+        for option, widget in self.job_widget.options.items():
+            defaults[option] = widget.value
+        self.raven_settings.stored_defaults = dumps(defaults)
+            
+        if fixup_func:
+            sig = inspect.signature(fixup_func)
+            
+            for param in sig.parameters.values():
+                if param.name not in self.job_widget.options:
+                    continue
+                value = self.job_widget.options[param.name].get_value()
+                kwargs[param.name] = value
+            
+            self.theory = fixup_func(
+                self.theory,
+                restart_file=self.job_widget.restart.text(),
+                **kwargs,
+            )
 
     def close(self):
         """deregister trigger handlers"""
@@ -605,27 +696,14 @@ class BuildRaven(BuildQM, ToolInstance):
 
         self.settings.last_program = self.file_type.currentText()
 
-        raven_kwargs = dict()
-        raven_kwargs["n_nodes"] = self.job_widget.n_nodes.value()
-        self.raven_settings.nodes = raven_kwargs["n_nodes"]
-        raven_kwargs["kernel"] = self.job_widget.kernel.currentData(Qt.UserRole)
-        self.raven_settings.kernel = raven_kwargs["kernel"]
-        raven_kwargs["grow_rms_disp_tol"] = self.job_widget.grow_rms_disp_tol.value()
-        self.raven_settings.grow_rms_disp_tol = raven_kwargs["grow_rms_disp_tol"]
-        raven_kwargs["grow_max_disp_tol"] = self.job_widget.grow_max_disp_tol.value()
-        self.raven_settings.grow_max_disp_tol = raven_kwargs["grow_max_disp_tol"]
-        raven_kwargs["done_rms_disp_tol"] = self.job_widget.done_rms_disp_tol.value()
-        self.raven_settings.done_rms_disp_tol = raven_kwargs["done_rms_disp_tol"]
-        raven_kwargs["done_max_disp_tol"] = self.job_widget.done_max_disp_tol.value()
-        self.raven_settings.done_max_disp_tol = raven_kwargs["done_max_disp_tol"]
-        raven_kwargs["length_param"] = self.job_widget.length_param.value()
-        self.raven_settings.length_param = raven_kwargs["length_param"]
-        raven_kwargs["stddev_cutoff"] = self.job_widget.stddev_cutoff.value()
-        self.raven_settings.stddev_cutoff = raven_kwargs["stddev_cutoff"]
+        restart = self.job_widget.restart.text()
+        if restart:
+            raven_kwargs["restart"] = restart
 
         self.raven_settings.save()
 
         program = self.file_type.currentText()
+        tss_info = self.tss_algorithm.currentText()
         queue_type = self.session.seqcrow_settings.settings.QUEUE_TYPE
         cluster_type = self.session.seqcrow_cluster_scheduling_software_manager.get_queue_manager(queue_type).get_template(program)()
         template = self.templates[queue_type][program][template_name]
@@ -633,13 +711,28 @@ class BuildRaven(BuildQM, ToolInstance):
         reactant = ResidueCollection(self.reactant_selector.currentData())
         product = ResidueCollection(self.product_selector.currentData())
 
-        program = self.file_type.currentText()
         if program in self.session.seqcrow_job_manager.formats:
-            job_cls = self.session.seqcrow_job_manager.formats["ParallelRaven"].run_provider(
-                self.session,
-                "ParallelRaven",
-                self.session.seqcrow_job_manager,
-            )
+            job_cls = self.session.tss_finder_manager.formats[tss_info].cluster_job_cls["program"]
+
+            kwargs = dict()
+            defaults = loads(self.raven_settings.stored_defaults)
+            for option, widget in self.job_widget.options.items():
+                defaults[option] = widget.value
+            self.raven_settings.stored_defaults = dumps(defaults)
+                
+            sig = inspect.signature(job_cls.__init__)
+            kwargs = dict()
+            defaults = loads(self.raven_settings.stored_defaults)
+            for option, widget in self.job_widget.options.items():
+                defaults[option] = widget.value
+                if any(
+                    param.name == option or
+                    param.kind == param.VAR_KEYWORD
+                    for param in sig.parameters.values()
+                ):
+                    kwargs[option] = defaults[option]
+            self.raven_settings.stored_defaults = dumps(defaults)
+
             job = job_cls(
                 name,
                 self.session,
@@ -677,23 +770,9 @@ class BuildRaven(BuildQM, ToolInstance):
 
         self.settings.last_program = self.file_type.currentText()
 
-        raven_kwargs = dict()
-        raven_kwargs["n_nodes"] = self.job_widget.n_nodes.value()
-        self.raven_settings.nodes = raven_kwargs["n_nodes"]
-        raven_kwargs["kernel"] = self.job_widget.kernel.currentData(Qt.UserRole)
-        self.raven_settings.kernel = raven_kwargs["kernel"]
-        raven_kwargs["grow_rms_disp_tol"] = self.job_widget.grow_rms_disp_tol.value()
-        self.raven_settings.grow_rms_disp_tol = raven_kwargs["grow_rms_disp_tol"]
-        raven_kwargs["grow_max_disp_tol"] = self.job_widget.grow_max_disp_tol.value()
-        self.raven_settings.grow_max_disp_tol = raven_kwargs["grow_max_disp_tol"]
-        raven_kwargs["done_rms_disp_tol"] = self.job_widget.done_rms_disp_tol.value()
-        self.raven_settings.done_rms_disp_tol = raven_kwargs["done_rms_disp_tol"]
-        raven_kwargs["done_max_disp_tol"] = self.job_widget.done_max_disp_tol.value()
-        self.raven_settings.done_max_disp_tol = raven_kwargs["done_max_disp_tol"]
-        raven_kwargs["length_param"] = self.job_widget.length_param.value()
-        self.raven_settings.length_param = raven_kwargs["length_param"]
-        raven_kwargs["stddev_cutoff"] = self.job_widget.stddev_cutoff.value()
-        self.raven_settings.stddev_cutoff = raven_kwargs["stddev_cutoff"]
+        restart = self.job_widget.restart.text()
+        if restart:
+            raven_kwargs["restart"] = restart
 
         self.raven_settings.save()
 
@@ -701,12 +780,26 @@ class BuildRaven(BuildQM, ToolInstance):
         product = ResidueCollection(self.product_selector.currentData())
 
         program = self.file_type.currentText()
+        tss_info = self.tss_algorithm.currentText()
+
         if program in self.session.seqcrow_job_manager.formats:
-            job_cls = self.session.seqcrow_job_manager.formats["Raven"].run_provider(
-                self.session,
-                "Raven",
-                self.session.seqcrow_job_manager,
-            )
+            job_cls = self.session.tss_finder_manager.get_info(tss_info).local_job_cls[program]
+        
+            sig = inspect.signature(job_cls.__init__)
+            kwargs = dict()
+            defaults = loads(self.raven_settings.stored_defaults)
+            for option, widget in self.job_widget.options.items():
+                defaults[option] = widget.value
+                if any(
+                    param.name == option or
+                    param.kind == param.VAR_KEYWORD
+                    for param in sig.parameters.values()
+                ):
+                    kwargs[option] = defaults[option]
+            self.raven_settings.stored_defaults = dumps(defaults)
+
+            print(kwargs)
+            
             job = job_cls(
                 name,
                 self.session,
@@ -714,9 +807,10 @@ class BuildRaven(BuildQM, ToolInstance):
                 reactant,
                 product,
                 program,
+                tss_info,
                 auto_update=auto_update,
                 auto_open=auto_open,
-                **raven_kwargs,
+                **kwargs,
             )
     
             self.session.logger.status("adding %s to queue" % name)
@@ -728,7 +822,7 @@ class BuildRaven(BuildQM, ToolInstance):
         self.update_preview()
 
 
-class GSMWidget(QWidget):
+class TSSWidget(QWidget):
     jobTypeChanged = Signal()
 
     def __init__(
@@ -737,6 +831,7 @@ class GSMWidget(QWidget):
         job_settings,
         session,
         init_form,
+        init_tss_method,
         parent=None,
     ):
         super().__init__(parent)
@@ -746,8 +841,8 @@ class GSMWidget(QWidget):
         self.form = init_form
         
         self.layout = QGridLayout(self)
-        tabs = QTabWidget()
-        self.layout.addWidget(tabs, 0, 0)
+        self.tabs = QTabWidget()
+        self.layout.addWidget(self.tabs, 0, 0)
         
         job_form = QWidget()
         job_type_layout = QFormLayout(job_form)
@@ -791,122 +886,199 @@ class GSMWidget(QWidget):
         self.mem.setValue(self.job_settings.last_mem)
         self.mem.valueChanged.connect(self.something_changed)
         job_type_layout.addRow("memory:", self.mem)
-
-        tabs.addTab(job_form, "job details")
-
-
-        string_options_widget = QWidget()
-        string_options_layout = QFormLayout(string_options_widget)
         
-        self.n_nodes = QSpinBox()
-        self.n_nodes.setMaximum(101)
-        self.n_nodes.setMinimum(6)
-        self.n_nodes.setValue(self.settings.nodes)
-        string_options_layout.addRow("number of nodes:", self.n_nodes)
-        
-        self.grow_max_disp_tol = QDoubleSpinBox()
-        self.grow_max_disp_tol.setDecimals(4)
-        self.grow_max_disp_tol.setMinimum(1e-4)
-        self.grow_max_disp_tol.setMaximum(5e-2)
-        self.grow_max_disp_tol.setSingleStep(1e-3)
-        self.grow_max_disp_tol.setValue(self.settings.grow_max_disp_tol)
-        self.grow_max_disp_tol.setToolTip(
-            """maximum displacement tolerance for determining
-        whether or not to add a node to the string"""
-        )
-        string_options_layout.addRow(
-            "grow max. displacement tolerance:", self.grow_max_disp_tol,
-        )
-
-        self.grow_rms_disp_tol = QDoubleSpinBox()
-        self.grow_rms_disp_tol.setDecimals(4)
-        self.grow_rms_disp_tol.setMinimum(1e-4)
-        self.grow_rms_disp_tol.setMaximum(5e-2)
-        self.grow_rms_disp_tol.setSingleStep(1e-3)
-        self.grow_rms_disp_tol.setValue(self.settings.grow_rms_disp_tol)
-        self.grow_rms_disp_tol.setToolTip(
-            """root mean squared displacement tolerance for
-        determining whether or not to add a node to the string"""
-        )
-        string_options_layout.addRow(
-            "grow RMS displacement tolerance:", self.grow_rms_disp_tol,
-        )
-
-        self.done_max_disp_tol = QDoubleSpinBox()
-        self.done_max_disp_tol.setDecimals(4)
-        self.done_max_disp_tol.setMinimum(1e-4)
-        self.done_max_disp_tol.setMaximum(5e-2)
-        self.done_max_disp_tol.setSingleStep(1e-3)
-        self.done_max_disp_tol.setValue(self.settings.done_max_disp_tol)
-        self.done_max_disp_tol.setToolTip(
-            """maximum displacement tolerance for determining
-        whether or not to finish optimizing the reaction path"""
-        )
-        string_options_layout.addRow(
-            "done max. displacement tolerance:", self.done_max_disp_tol,
-        )
-
-        self.done_rms_disp_tol = QDoubleSpinBox()
-        self.done_rms_disp_tol.setDecimals(4)
-        self.done_rms_disp_tol.setMinimum(1e-4)
-        self.done_rms_disp_tol.setMaximum(5e-2)
-        self.done_rms_disp_tol.setSingleStep(1e-3)
-        self.done_rms_disp_tol.setValue(self.settings.done_rms_disp_tol)
-        self.done_rms_disp_tol.setToolTip(
-            """root mean squared displacement tolerance for determining
-        whether or not to finish optimizing the reaction path"""
-        )
-        string_options_layout.addRow(
-            "done RMS displacement tolerance:", self.done_rms_disp_tol,
+        self.restart = QLineEdit()
+        self.browse = QPushButton("browse...")
+        self.browse.clicked.connect(self.browse_restart)
+        restart_widget = QWidget()
+        restart_layout = QHBoxLayout(restart_widget)
+        restart_layout.setContentsMargins(0, 0, 4, 0)
+        restart_layout.insertWidget(0, self.restart, 1)
+        restart_layout.insertWidget(1, self.browse, 0)
+        job_type_layout.addRow(
+            "restart file:", restart_widget,
         )
         
-        tabs.addTab(string_options_widget, "growing string options")
+        self.tabs.addTab(job_form, "job details")
+
+        algorithm_widget = QWidget()
+        self.algorithm_layout = QFormLayout(algorithm_widget)
+
+        self.tabs.addTab(algorithm_widget, "algorithm options")
+        self.options = dict()
+        self.set_tss_method(init_tss_method)
+
+
+        solvent_widget = QWidget()
+        solvent_layout = QFormLayout(solvent_widget)
+        
+        self.solvent_option = QComboBox()
+        self.solvent_option.currentTextChanged.connect(self.change_solvent_model)
+        solvent_layout.addRow("implicit solvent model:", self.solvent_option)
+
+        self.solvent_name_label = QLabel("solvent:")
+        self.solvent_name = QLineEdit()
+        self.solvent_name.setText(self.job_settings.previous_solvent_name)
+        self.solvent_name.textChanged.connect(self.filter_solvents)
+        self.solvent_name.setClearButtonEnabled(True)
+        solvent_layout.addRow(self.solvent_name_label, self.solvent_name)
+
+        self.solvent_names = QListWidget()
+        self.solvent_names.setSelectionMode(self.solvent_names.SingleSelection)
+        self.solvent_names.itemSelectionChanged.connect(self.change_selected_solvent)
+        self.solvent_names.itemDoubleClicked.connect(self.change_selected_solvent)
+
+        solvent_layout.addRow(self.solvent_names)
+        
+        self.tabs.addTab(solvent_widget, "implicit solvent")
+
+        self.setOptions(self.form)
     
-    
-        gpr_options_widget = QWidget()
-        gpr_options_layout = QFormLayout(gpr_options_widget)
-        
-        self.kernel = QComboBox()
-        self.kernel.addItems([
-            "radial basis function",
-            "Matérn (ν=3/2)",
-            "Matérn (ν=5/2)",
-        ])
-        self.kernel.setItemData(0, "RBF")
-        self.kernel.setItemData(1, "Matern1.5")
-        self.kernel.setItemData(2, "Matern2.5")
-        ndx = self.kernel.findData(self.settings.kernel)
-        if ndx >= 0:
-            self.kernel.setCurrentIndex(ndx)
-        gpr_options_layout.addRow("kernel:", self.kernel)
-        
-        self.length_param = QDoubleSpinBox()
-        self.length_param.setMaximum(100)
-        self.length_param.setMinimum(1)
-        self.length_param.setSingleStep(0.5)
-        self.length_param.setValue(self.settings.length_param)
-        gpr_options_layout.addRow(
-            "similarity falloff parameter:", self.length_param
+    def browse_restart(self):
+        filename, _ = QFileDialog.getOpenFileName(
+            filter=self.tss_info.restart_filter
         )
-        
-        self.stddev_cutoff = QDoubleSpinBox()
-        self.stddev_cutoff.setMaximum(1)
-        self.stddev_cutoff.setMinimum(0)
-        self.stddev_cutoff.setDecimals(3)
-        self.stddev_cutoff.setSingleStep(1e-3)
-        self.stddev_cutoff.setValue(self.settings.stddev_cutoff)
-        gpr_options_layout.addRow(
-            "prediction certainty threshold:", self.stddev_cutoff
-        )
-        
-        tabs.addTab(gpr_options_widget, "GPR options")
-    
+
+        if filename:
+            self.restart.setText(filename)
+
     def setStructure(self, mdl):
         self.structure = mdl
     
     def setOptions(self, file_info):
-        pass
+        self.form = file_info
+        self.solvent_option.clear()
+        self.solvent_names.clear()
+        self.solvent_option.addItems(["None"])
+        
+        if file_info.solvent_models is not None:
+            self.solvent_option.addItems(file_info.solvent_models)
+        if file_info.solvents:
+            ndx = self.solvent_option.findText(self.job_settings.previous_solvent_model)
+            if ndx >= 0:
+                self.solvent_option.setCurrentIndex(ndx)
+            if isinstance(file_info.solvents, dict) and self.solvent_option.currentText() in file_info.solvents:
+                self.solvent_names.addItems(file_info.solvents[self.solvent_option.currentText()])
+            else:
+                self.solvent_names.addItems(file_info.solvents)
+            self.solvent_name.setText(self.job_settings.previous_solvent_name)
+
+        self.solvent_names.sortItems()
     
+    def set_tss_method(self, tss_info):
+        self.tss_info = tss_info
+        self.restart.setEnabled(bool(tss_info.restart_filter))
+        self.browse.setEnabled(bool(tss_info.restart_filter))
+    
+        self.options = dict()
+        for i in range(0, self.algorithm_layout.rowCount()):
+            self.algorithm_layout.removeRow(0)
+        
+        defaults = loads(self.settings.stored_defaults)
+        
+        for name, option in tss_info.options.items():
+            cls = option[0]
+            kwargs = option[1]
+            if "callback" not in kwargs:
+                kwargs["callback"] = None
+            if "default" not in kwargs:
+                kwargs["default"] = None
+            obj = cls(name, **kwargs)
+            default_value = defaults.get(name, None)
+            if default_value and (
+                not hasattr(obj, "values") or
+                default_value in obj.values
+            ):
+                obj.set_value(default_value)
+            self.algorithm_layout.addRow(
+                "%s:" % name.replace("_", " "),
+                obj.widget
+            )
+            self.options[name] = obj
+
+    def change_selected_solvent(self):
+        """when a solvent is selected in the list, the solvent is set to that"""
+        item = self.solvent_names.selectedItems()
+        if len(item) == 1:
+            name = item[0].text()
+            self.solvent_name.setText(name)
+
+        self.jobTypeChanged.emit()
+
+    def filter_solvents(self, text):
+        """case-insensitive regex to filter solvent list based on what the user
+        has typed for a solvent name"""
+        if text:
+            #the user doesn't need capturing groups
+            text = text.replace('(', '\(')
+            text = text.replace(')', '\)')
+            m = QRegularExpression(text)
+            if m.isValid():
+                m.setPatternOptions(QRegularExpression.CaseInsensitiveOption)
+
+                m.optimize()
+                filter = lambda row_num: m.match(self.solvent_names.item(row_num).text()).hasMatch()
+            else:
+                return
+
+        else:
+            filter = lambda row: True
+
+        for i in range(0, self.solvent_names.count()):
+            self.solvent_names.setRowHidden(i, not filter(i))
+
+    def change_solvent_model(self):
+        """hide solvent options when solvent model changes to 'None'"""
+        if self.solvent_option.currentText() != "None":
+            self.solvent_name_label.setVisible(True)
+            self.solvent_name.setVisible(True)
+            self.solvent_names.setVisible(True)
+        else:
+            self.solvent_name_label.setVisible(False)
+            self.solvent_name.setVisible(False)
+            self.solvent_names.setVisible(False)
+
+        if isinstance(self.form.solvents, dict) and self.solvent_option.currentText() in self.form.solvents:
+            self.solvent_names.clear()
+            self.solvent_names.addItems(self.form.solvents[self.solvent_option.currentText()])
+            self.solvent_names.sortItems()
+            self.filter_solvents(self.solvent_name.text())
+
+        self.jobTypeChanged.emit()
+
+    def setSolventModel(self, value):
+        """sets solvent model if model is available"""
+        ndx = self.solvent_option.findText(value, Qt.MatchExactly)
+        if ndx >= 0:
+            self.solvent_option.setCurrentIndex(ndx)
+    
+    def getSolvent(self, update_settings):
+        """returns ImplicitSolvent for the current solvent settings"""
+        model = self.solvent_option.currentText()
+        if model == "None":
+            if update_settings:
+                self.job_settings.previous_solvent_model = "None"
+            return None
+
+        solvent = self.solvent_name.text()
+
+        if update_settings:
+            self.job_settings.previous_solvent_model = model
+            self.job_settings.previous_solvent_name = solvent
+
+        return ImplicitSolvent(model, solvent)
+
+    def setSolvent(self, solvent):
+        """sets solvent to match the given ImplicitSolvent"""
+        if isinstance(solvent, ImplicitSolvent):
+            ndx = self.solvent_option.findText(solvent.solvent_model)
+            if ndx >= 0:
+                self.solvent_option.setCurrentIndex(ndx)
+    
+            self.solvent_name.setText(solvent.solvent)
+        else:
+            self.solvent_option.setCurrentIndex(0)
+
     def something_changed(self, *args, **kw):
         """called whenever a setting has changed to notify the main tool"""
         self.jobTypeChanged.emit()
@@ -974,136 +1146,3 @@ class GSMWidget(QWidget):
             False,
         )
 
-
-class SolventWidget(QWidget):
-    solventChanged = Signal()
-
-    def __init__(self, settings, init_form, parent=None):
-        super().__init__(parent)
-        self.settings = settings
-        self.form = init_form
-        
-        self.layout = QFormLayout(self)
-        
-        self.solvent_option = QComboBox()
-        self.solvent_option.currentTextChanged.connect(self.change_solvent_model)
-        self.layout.addRow("implicit solvent model:", self.solvent_option)
-
-        self.solvent_name_label = QLabel("solvent:")
-        self.solvent_name = QLineEdit()
-        self.solvent_name.setText(self.settings.previous_solvent_name)
-        self.solvent_name.textChanged.connect(self.filter_solvents)
-        self.solvent_name.setClearButtonEnabled(True)
-        self.layout.addRow(self.solvent_name_label, self.solvent_name)
-
-        self.solvent_names = QListWidget()
-        self.solvent_names.setSelectionMode(self.solvent_names.SingleSelection)
-        self.solvent_names.itemSelectionChanged.connect(self.change_selected_solvent)
-        self.solvent_names.itemDoubleClicked.connect(self.change_selected_solvent)
-
-        self.layout.addRow(self.solvent_names)
-
-        self.setOptions(self.form)
-
-    def setOptions(self, file_info):
-        self.form = file_info
-        self.solvent_option.clear()
-        self.solvent_names.clear()
-        self.solvent_option.addItems(["None"])
-        
-        if file_info.solvent_models is not None:
-            self.solvent_option.addItems(file_info.solvent_models)
-        if file_info.solvents:
-            ndx = self.solvent_option.findText(self.settings.previous_solvent_model)
-            if ndx >= 0:
-                self.solvent_option.setCurrentIndex(ndx)
-            if isinstance(file_info.solvents, dict) and self.solvent_option.currentText() in file_info.solvents:
-                self.solvent_names.addItems(file_info.solvents[self.solvent_option.currentText()])
-            else:
-                self.solvent_names.addItems(file_info.solvents)
-            self.solvent_name.setText(self.settings.previous_solvent_name)
-
-        self.solvent_names.sortItems()
-
-    def change_selected_solvent(self):
-        """when a solvent is selected in the list, the solvent is set to that"""
-        item = self.solvent_names.selectedItems()
-        if len(item) == 1:
-            name = item[0].text()
-            self.solvent_name.setText(name)
-
-        self.solventChanged.emit()
-
-    def filter_solvents(self, text):
-        """case-insensitive regex to filter solvent list based on what the user
-        has typed for a solvent name"""
-        if text:
-            #the user doesn't need capturing groups
-            text = text.replace('(', '\(')
-            text = text.replace(')', '\)')
-            m = QRegularExpression(text)
-            if m.isValid():
-                m.setPatternOptions(QRegularExpression.CaseInsensitiveOption)
-
-                m.optimize()
-                filter = lambda row_num: m.match(self.solvent_names.item(row_num).text()).hasMatch()
-            else:
-                return
-
-        else:
-            filter = lambda row: True
-
-        for i in range(0, self.solvent_names.count()):
-            self.solvent_names.setRowHidden(i, not filter(i))
-
-    def change_solvent_model(self):
-        """hide solvent options when solvent model changes to 'None'"""
-        if self.solvent_option.currentText() != "None":
-            self.solvent_name_label.setVisible(True)
-            self.solvent_name.setVisible(True)
-            self.solvent_names.setVisible(True)
-        else:
-            self.solvent_name_label.setVisible(False)
-            self.solvent_name.setVisible(False)
-            self.solvent_names.setVisible(False)
-
-        if isinstance(self.form.solvents, dict) and self.solvent_option.currentText() in self.form.solvents:
-            self.solvent_names.clear()
-            self.solvent_names.addItems(self.form.solvents[self.solvent_option.currentText()])
-            self.solvent_names.sortItems()
-            self.filter_solvents(self.solvent_name.text())
-
-        self.solventChanged.emit()
-
-    def setSolventModel(self, value):
-        """sets solvent model if model is available"""
-        ndx = self.solvent_option.findText(value, Qt.MatchExactly)
-        if ndx >= 0:
-            self.solvent_option.setCurrentIndex(ndx)
-    
-    def getSolvent(self, update_settings):
-        """returns ImplicitSolvent for the current solvent settings"""
-        model = self.solvent_option.currentText()
-        if model == "None":
-            if update_settings:
-                self.settings.previous_solvent_model = "None"
-            return None
-
-        solvent = self.solvent_name.text()
-
-        if update_settings:
-            self.settings.previous_solvent_model = model
-            self.settings.previous_solvent_name = solvent
-
-        return ImplicitSolvent(model, solvent)
-
-    def setSolvent(self, solvent):
-        """sets solvent to match the given ImplicitSolvent"""
-        if isinstance(solvent, ImplicitSolvent):
-            ndx = self.solvent_option.findText(solvent.solvent_model)
-            if ndx >= 0:
-                self.solvent_option.setCurrentIndex(ndx)
-    
-            self.solvent_name.setText(solvent.solvent)
-        else:
-            self.solvent_option.setCurrentIndex(0)

@@ -9,7 +9,7 @@ from chimerax.core.commands import run
 
 from json import load, dump
 
-from SEQCROW.jobs import LocalJob, LocalClusterJob, ParallelRavenJob
+from SEQCROW.jobs import LocalJob, LocalClusterJob, ParallelRavenJob, TSSJob
 
 JOB_FINISHED = "job finished"
 JOB_STARTED = "job started"
@@ -99,8 +99,15 @@ class JobManager(ProviderManager):
                                         job["reactant"],
                                         job["product"],
                                         job["file_type"],
+                                        "GPRGSM",
                                     ])
                                     kwargs = job["raven_kwargs"]
+                                if issubclass(job_cls, TSSJob):
+                                    args.extend([
+                                        job["reactant"],
+                                        job["product"],
+                                        job["file_type"],
+                                    ])
                                 break
                         else:
                             self.session.logger.warning(
@@ -121,6 +128,7 @@ class JobManager(ProviderManager):
                                 job["reactant"],
                                 job["product"],
                                 job["file_type"],
+                                "GPRGSM",
                             ])
                             kwargs = job["raven_kwargs"]
                         else:
@@ -137,7 +145,7 @@ class JobManager(ProviderManager):
                         auto_open=job['auto_open'],
                         **kwargs
                     )
-                                
+
                     if section == "check":
                         if 'output' in job and job['output'] and os.path.exists(job['output']):
                             fr = FileReader(job['output'], just_geom=False)
@@ -247,92 +255,42 @@ class JobManager(ProviderManager):
 
         if isinstance(job, LocalJob):
             self._thread = None
-            if not hasattr(job, "output_name") or \
-               not job.output_name or \
-               not os.path.exists(job.output_name):
+            if (
+                not hasattr(job, "output_name") or
+                not job.output_name or (
+                    isinstance(job.output_name, str) and
+                    not os.path.exists(job.output_name)
+                ) or (
+                    hasattr(job.output_name, "__iter__") and
+                    all(os.path.exists(f) for f in job.output_name)
+                )
+            ):
                 job.error = True
             
             else:
                 try:
-                    fr = FileReader(job.output_name, just_geom=False)
-                    if 'finished' not in fr.other or not fr.other['finished']:
-                        job.error = True
+                    if isinstance(job.output_name, str):
+                        fr = FileReader(job.output_name, just_geom=False)
+                        if 'finished' not in fr.other or not fr.other['finished']:
+                            job.error = True
+                    else:
+                        for f in job.output_name:
+                            fr = FileReader(f, just_geom=False)
+                            if 'finished' not in fr.other or not fr.other['finished']:
+                                job.error = True
                 except NotImplementedError:
                     pass
         
         self.triggers.activate_trigger(JOB_QUEUED, trigger_name)
 
         if job.auto_update and (
-                job.theory.geometry.chix_atomicstructure is not None and
-                not job.theory.geometry.chix_atomicstructure.deleted
+            job.theory.geometry.chix_atomicstructure is not None and
+            not job.theory.geometry.chix_atomicstructure.deleted
         ):
-            if os.path.exists(job.output_name):
-                finfo = job.output_name
-                try:
-                    finfo = (job.output_name, job.format_name, None)
-
-                    fr = FileReader(finfo, get_all=True, just_geom=False)
-                    if len(fr.atoms) > 0:
-                        job.session.filereader_manager.triggers.activate_trigger(
-                            ADD_FILEREADER, 
-                            ([job.theory.geometry.chix_atomicstructure], [fr])
-                        )
-        
-                        rescol = ResidueCollection(fr)
-                        rescol.update_chix(job.theory.geometry.chix_atomicstructure)
-
-                    if fr.all_geom is not None and len(fr.all_geom) > 1:
-                        coordsets = rescol.all_geom_coordsets(fr)
-        
-                        job.theory.geometry.chix_atomicstructure.remove_coordsets()
-                        job.theory.geometry.chix_atomicstructure.add_coordsets(coordsets)
-        
-                        for i, coordset in enumerate(coordsets):
-                            job.theory.geometry.chix_atomicstructure.active_coordset_id = i + 1
-                            
-                            for atom, coord in zip(job.theory.geometry.chix_atomicstructure.atoms, coordset):
-                                atom.coord = coord
-        
-                        job.theory.geometry.chix_atomicstructure.active_coordset_id = job.theory.geometry.chix_atomicstructure.num_coordsets
-
-                except Exception:
-                    if job.__class__.update_structure is not LocalJob.update_structure:
-                        job.update_structure(job.theory.geometry.chix_atomicstructure)
-                    
-                    else:
-                        self.session.logger.warning(
-                            "can only update the structure of AaronTools file formats"
-                        )
-                        if (
-                                hasattr(job, "output_name") and
-                                job.output_name and os.path.exists(job.output_name)
-                        ):
-                            if job.format_name:
-                                run(
-                                    job.session,
-                                    "open \"%s\" format %s" % (
-                                        job.output_name,
-                                        job.format_name
-                                    )
-                                )
-                            else:
-                                run(job.session, "open \"%s\"" % job.output_name)
-                        else:
-                            self.session.logger.error("could not open output of %s" % repr(job))
-
+            job.update_structure(job.theory.geometry.chix_atomicstructure)
 
         elif job.auto_open or job.auto_update:
-            # print(job.output_name, os.path.exists(job.output_name))
-            if hasattr(job, "output_name") and job.output_name and os.path.exists(job.output_name):
-                if job.format_name:
-                    if job.format_name in read_types:
-                        run(job.session, "open \"%s\" coordsets true format %s" % (job.output_name, job.format_name))
-                    else:
-                        run(job.session, "open \"%s\" format %s" % (job.output_name, job.format_name))
-                else:
-                    run(job.session, "open \"%s\" coordsets true" % job.output_name)
-            else:
-                self.session.logger.error("could not open output of %s" % repr(job))
+            job.open_structure()
 
     def job_started(self, trigger_name, job):
         """prints 'job started' notification to log"""

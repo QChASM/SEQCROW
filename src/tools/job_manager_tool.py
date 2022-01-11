@@ -34,7 +34,9 @@ class JobQueue(ToolInstance):
         
         self.display_name = "Job Queue"
         
-        self.tool_window = MainToolWindow(self)        
+        self.tool_window = MainToolWindow(self) 
+
+        self.job_list = []
 
         if not self.session.seqcrow_job_manager.initialized:
             self.session.seqcrow_job_manager.init_queue()
@@ -114,53 +116,151 @@ class JobQueue(ToolInstance):
 
         self.tool_window.manage(None)
 
-    def fill_tree(self, trigger_name=None, trigger_job=None):        
+    def fill_tree(self, trigger_name=None, trigger_job=None):
+        self.job_list = []
         item_stack = [self.tree.invisibleRootItem()]
         
         self.tree.clear()
 
         jobs = self.session.seqcrow_job_manager.jobs
 
-        for job in jobs:
-            name = job.name
-            parent = item_stack[0]
-            item = QTreeWidgetItem(parent)
-            item_stack.append(item)
-            
-            item.setData(self.NAME_COL, Qt.DisplayRole, job)
-            item.setText(self.NAME_COL, name)
-            
-            if isinstance(job, LocalJob):
-                # print(job.name)
-                if job.killed:
-                    item.setText(self.STATUS_COL, "killed")
+        statuses = [
+            "check",
+            "running",
+            "queued",
+            "error",
+            "finished",
+            "killed",
+        ]
 
-                    del_job_widget = QWidget()
-                    del_job_layout = QGridLayout(del_job_widget)
-                    del_job = QPushButton()
-                    del_job.clicked.connect(lambda *args, job=job: self.remove_job(job))
-                    del_job.setIcon(QIcon(del_job_widget.style().standardIcon(QStyle.SP_DialogDiscardButton)))
-                    del_job.setFlat(True)
-                    del_job_layout.addWidget(del_job, 0, 0, 1, 1, Qt.AlignHCenter)
-                    del_job_layout.setColumnStretch(0, 1)
-                    del_job_layout.setContentsMargins(0, 0, 0, 0)
-                    self.tree.setItemWidget(item, self.DEL_COL, del_job_widget)
+        for status in statuses:
+            for job in jobs:
+                if status == "check" and job not in self.session.seqcrow_job_manager.unknown_status_jobs:
+                    continue
+                
+                if status == "running" and not (
+                    job.isRunning() and job not in self.session.seqcrow_job_manager.unknown_status_jobs
+                ):
+                    continue
+                
+                if status == "queued" and any([
+                    job.isRunning(),
+                    job.isFinished(),
+                    job.killed,
+                    job in self.session.seqcrow_job_manager.unknown_status_jobs
+                ]):
+                    continue
+                
+                if status == "error" and not (job.isFinished() and job.error):
+                    continue
+                
+                if status == "finished" and not (
+                    job.isFinished() and not job.error and not job.killed
+                ):
+                    continue
+                
+                if status == "killed" and not job.killed:
+                    continue
 
-                elif job.isRunning():
-                    if job in self.session.seqcrow_job_manager.unknown_status_jobs:
-                        unk_widget = QWidget()
-                        unk_layout = QGridLayout(unk_widget)
-                        unk = QPushButton()
-                        unk.setIcon(QIcon(unk_widget.style().standardIcon(QStyle.SP_MessageBoxQuestion)))
-                        unk.setFlat(True)
-                        unk.clicked.connect(lambda *args, job=job: self.show_ask_if_running(job))
-                        unk_layout.addWidget(unk, 0, 0, 1, 1, Qt.AlignHCenter)
-                        unk_layout.setColumnStretch(0, 1)
-                        unk_layout.setContentsMargins(0, 0, 0, 0)
-                        self.tree.setItemWidget(item, self.STATUS_COL, unk_widget)
-                    
+                self.job_list.append(job)
+
+                name = job.name
+                parent = item_stack[0]
+                item = QTreeWidgetItem(parent)
+                item_stack.append(item)
+                
+                item.setData(self.NAME_COL, Qt.DisplayRole, job)
+                item.setText(self.NAME_COL, name)
+                
+                if isinstance(job, LocalJob):
+                    # print(job.name)
+                    if job.killed:
+                        item.setText(self.STATUS_COL, "killed")
+    
+                        del_job_widget = QWidget()
+                        del_job_layout = QGridLayout(del_job_widget)
+                        del_job = QPushButton()
+                        del_job.clicked.connect(lambda *args, job=job: self.remove_job(job))
+                        del_job.setIcon(QIcon(del_job_widget.style().standardIcon(QStyle.SP_DialogDiscardButton)))
+                        del_job.setFlat(True)
+                        del_job_layout.addWidget(del_job, 0, 0, 1, 1, Qt.AlignHCenter)
+                        del_job_layout.setColumnStretch(0, 1)
+                        del_job_layout.setContentsMargins(0, 0, 0, 0)
+                        self.tree.setItemWidget(item, self.DEL_COL, del_job_widget)
+    
+                    elif job.isRunning():
+                        if job in self.session.seqcrow_job_manager.unknown_status_jobs:
+                            unk_widget = QWidget()
+                            unk_layout = QGridLayout(unk_widget)
+                            unk = QPushButton()
+                            unk.setIcon(QIcon(unk_widget.style().standardIcon(QStyle.SP_MessageBoxQuestion)))
+                            unk.setFlat(True)
+                            unk.clicked.connect(lambda *args, job=job: self.show_ask_if_running(job))
+                            unk_layout.addWidget(unk, 0, 0, 1, 1, Qt.AlignHCenter)
+                            unk_layout.setColumnStretch(0, 1)
+                            unk_layout.setContentsMargins(0, 0, 0, 0)
+                            self.tree.setItemWidget(item, self.STATUS_COL, unk_widget)
+                        
+                        else:
+                            item.setText(self.STATUS_COL, "running")
+                        
+                            kill_widget = QWidget()
+                            kill_layout = QGridLayout(kill_widget)
+                            kill = QPushButton()
+                            kill.setIcon(QIcon(kill_widget.style().standardIcon(QStyle.SP_DialogCancelButton)))
+                            kill.setFlat(True)
+                            kill.clicked.connect(lambda *args, job=job: job.kill())
+                            kill.clicked.connect(lambda *args, session=self.session: session.seqcrow_job_manager.triggers.activate_trigger(JOB_QUEUED, "resume"))
+                            kill_layout.addWidget(kill, 0, 0, 1, 1, Qt.AlignLeft)
+                            kill_layout.setColumnStretch(0, 0)
+                            kill_layout.setContentsMargins(0, 0, 0, 0)
+                            self.tree.setItemWidget(item, self.KILL_COL, kill_widget)
+    
+                    elif job.isFinished():
+                        if not job.error:
+                            item.setText(self.STATUS_COL, "finished")
+                        else:
+                            error_widget = QWidget()
+                            error_layout = QGridLayout(error_widget)
+                            error = QPushButton()
+                            error.setIcon(QIcon(error_widget.style().standardIcon(QStyle.SP_MessageBoxWarning)))
+                            error.setFlat(True)
+                            error.setToolTip("job did not finish without errors or output file cannot be found")
+                            error_layout.addWidget(error, 0, 0, 1, 1, Qt.AlignHCenter)
+                            error_layout.setColumnStretch(0, 1)
+                            error_layout.setContentsMargins(0, 0, 0, 0)
+                            self.tree.setItemWidget(item, self.STATUS_COL, error_widget)
+                        
+                        del_job_widget = QWidget()
+                        del_job_layout = QGridLayout(del_job_widget)
+                        del_job = QPushButton()
+                        del_job.clicked.connect(lambda *args, job=job: self.remove_job(job))
+                        del_job.setIcon(QIcon(del_job_widget.style().standardIcon(QStyle.SP_DialogDiscardButton)))
+                        del_job.setFlat(True)
+                        del_job_layout.addWidget(del_job, 0, 0, 1, 1, Qt.AlignHCenter)
+                        del_job_layout.setColumnStretch(0, 1)
+                        del_job_layout.setContentsMargins(0, 0, 0, 0)
+                        self.tree.setItemWidget(item, self.DEL_COL, del_job_widget)
+    
                     else:
-                        item.setText(self.STATUS_COL, "running")
+                        item.setText(self.STATUS_COL, "queued")
+        
+                        priority_widget = QWidget()
+                        priority_layout = QGridLayout(priority_widget)
+                        inc_priority = QPushButton()
+                        inc_priority.setIcon(QIcon(priority_widget.style().standardIcon(QStyle.SP_ArrowUp)))
+                        inc_priority.setFlat(True)
+                        inc_priority.clicked.connect(lambda *args, job=job: self.session.seqcrow_job_manager.increase_priotity(job))
+                        priority_layout.addWidget(inc_priority, 0, 0, 1, 1, Qt.AlignRight)
+                        dec_priority = QPushButton()
+                        dec_priority.setIcon(QIcon(priority_widget.style().standardIcon(QStyle.SP_ArrowDown)))
+                        dec_priority.setFlat(True)
+                        dec_priority.clicked.connect(lambda *args, job=job: self.session.seqcrow_job_manager.decrease_priotity(job))
+                        priority_layout.addWidget(dec_priority, 0, 1, 1, 1, Qt.AlignLeft)
+                        priority_layout.setColumnStretch(0, 1)
+                        priority_layout.setColumnStretch(1, 1)
+                        priority_layout.setContentsMargins(0, 0, 0, 0)
+                        self.tree.setItemWidget(item, self.CHANGE_PRIORITY, priority_widget)
                     
                         kill_widget = QWidget()
                         kill_layout = QGridLayout(kill_widget)
@@ -173,82 +273,24 @@ class JobQueue(ToolInstance):
                         kill_layout.setColumnStretch(0, 0)
                         kill_layout.setContentsMargins(0, 0, 0, 0)
                         self.tree.setItemWidget(item, self.KILL_COL, kill_widget)
-
-                elif job.isFinished():
-                    if not job.error:
-                        item.setText(self.STATUS_COL, "finished")
-                    else:
-                        error_widget = QWidget()
-                        error_layout = QGridLayout(error_widget)
-                        error = QPushButton()
-                        error.setIcon(QIcon(error_widget.style().standardIcon(QStyle.SP_MessageBoxWarning)))
-                        error.setFlat(True)
-                        error.setToolTip("job did not finish without errors or output file cannot be found")
-                        error_layout.addWidget(error, 0, 0, 1, 1, Qt.AlignHCenter)
-                        error_layout.setColumnStretch(0, 1)
-                        error_layout.setContentsMargins(0, 0, 0, 0)
-                        self.tree.setItemWidget(item, self.STATUS_COL, error_widget)
                     
-                    del_job_widget = QWidget()
-                    del_job_layout = QGridLayout(del_job_widget)
-                    del_job = QPushButton()
-                    del_job.clicked.connect(lambda *args, job=job: self.remove_job(job))
-                    del_job.setIcon(QIcon(del_job_widget.style().standardIcon(QStyle.SP_DialogDiscardButton)))
-                    del_job.setFlat(True)
-                    del_job_layout.addWidget(del_job, 0, 0, 1, 1, Qt.AlignHCenter)
-                    del_job_layout.setColumnStretch(0, 1)
-                    del_job_layout.setContentsMargins(0, 0, 0, 0)
-                    self.tree.setItemWidget(item, self.DEL_COL, del_job_widget)
-
-                else:
-                    item.setText(self.STATUS_COL, "queued")
+                    item.setText(self.SERVER_COL, "local")
+                    if isinstance(job, LocalClusterJob):
+                        item.setText(self.SERVER_COL, "cluster")
     
-                    priority_widget = QWidget()
-                    priority_layout = QGridLayout(priority_widget)
-                    inc_priority = QPushButton()
-                    inc_priority.setIcon(QIcon(priority_widget.style().standardIcon(QStyle.SP_ArrowUp)))
-                    inc_priority.setFlat(True)
-                    inc_priority.clicked.connect(lambda *args, job=job: self.session.seqcrow_job_manager.increase_priotity(job))
-                    priority_layout.addWidget(inc_priority, 0, 0, 1, 1, Qt.AlignRight)
-                    dec_priority = QPushButton()
-                    dec_priority.setIcon(QIcon(priority_widget.style().standardIcon(QStyle.SP_ArrowDown)))
-                    dec_priority.setFlat(True)
-                    dec_priority.clicked.connect(lambda *args, job=job: self.session.seqcrow_job_manager.decrease_priotity(job))
-                    priority_layout.addWidget(dec_priority, 0, 1, 1, 1, Qt.AlignLeft)
-                    priority_layout.setColumnStretch(0, 1)
-                    priority_layout.setColumnStretch(1, 1)
-                    priority_layout.setContentsMargins(0, 0, 0, 0)
-                    self.tree.setItemWidget(item, self.CHANGE_PRIORITY, priority_widget)
-                
-                    kill_widget = QWidget()
-                    kill_layout = QGridLayout(kill_widget)
-                    kill = QPushButton()
-                    kill.setIcon(QIcon(kill_widget.style().standardIcon(QStyle.SP_DialogCancelButton)))
-                    kill.setFlat(True)
-                    kill.clicked.connect(lambda *args, job=job: job.kill())
-                    kill.clicked.connect(lambda *args, session=self.session: session.seqcrow_job_manager.triggers.activate_trigger(JOB_QUEUED, "resume"))
-                    kill_layout.addWidget(kill, 0, 0, 1, 1, Qt.AlignLeft)
-                    kill_layout.setColumnStretch(0, 0)
-                    kill_layout.setContentsMargins(0, 0, 0, 0)
-                    self.tree.setItemWidget(item, self.KILL_COL, kill_widget)
-                
-                item.setText(self.SERVER_COL, "local")
-                if isinstance(job, LocalClusterJob):
-                    item.setText(self.SERVER_COL, "cluster")
-
-                if job.scratch_dir and os.path.exists(job.scratch_dir):
-                    browse_widget = QWidget()
-                    browse_layout = QGridLayout(browse_widget)
-                    browse = QPushButton()
-                    browse.clicked.connect(lambda *args, job=job: self.browse_local(job))
-                    browse.setIcon(QIcon(browse_widget.style().standardIcon(QStyle.SP_DirOpenIcon)))
-                    browse.setFlat(True)
-                    browse_layout.addWidget(browse, 0, 0, 1, 1, Qt.AlignLeft)
-                    browse_layout.setColumnStretch(0, 1)
-                    browse_layout.setContentsMargins(0, 0, 0, 0)
-                    self.tree.setItemWidget(item, self.BROWSE_COL, browse_widget)
-
-            self.tree.expandItem(item)
+                    if job.scratch_dir and os.path.exists(job.scratch_dir):
+                        browse_widget = QWidget()
+                        browse_layout = QGridLayout(browse_widget)
+                        browse = QPushButton()
+                        browse.clicked.connect(lambda *args, job=job: self.browse_local(job))
+                        browse.setIcon(QIcon(browse_widget.style().standardIcon(QStyle.SP_DirOpenIcon)))
+                        browse.setFlat(True)
+                        browse_layout.addWidget(browse, 0, 0, 1, 1, Qt.AlignLeft)
+                        browse_layout.setColumnStretch(0, 1)
+                        browse_layout.setContentsMargins(0, 0, 0, 0)
+                        self.tree.setItemWidget(item, self.BROWSE_COL, browse_widget)
+    
+                self.tree.expandItem(item)
     
         self.tree.resizeColumnToContents(self.STATUS_COL)
         self.tree.resizeColumnToContents(self.SERVER_COL)
@@ -269,11 +311,8 @@ class JobQueue(ToolInstance):
         jobs = self.session.seqcrow_job_manager.jobs
         ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
         for ndx in ndxs:
-            job = jobs[ndx]
-            if hasattr(job, "output_name") and job.output_name and job.format_name in read_types:
-                run(job.session, "open \"%s\" coordsets true" % job.output_name, log=False)
-            elif hasattr(job, "output_name") and job.output_name:
-                run(job.session, "open \"%s\"" % job.output_name, log=False)
+            job = self.job_list[ndx]
+            job.open_structure()
 
     def open_log(self):
         jobs = self.session.seqcrow_job_manager.jobs
@@ -289,7 +328,14 @@ class JobQueue(ToolInstance):
         for ndx in ndxs:
             job = jobs[ndx]
             if hasattr(job, "output_name"):
-                self.tool_window.create_child_window("%s log" % job.name, window_class=JobOutput, file=job.output_name)        
+                file = job.output_name
+                if hasattr(file, "__iter__") and not isinstance(file, str):
+                    file = job.output_name[0]
+                self.tool_window.create_child_window(
+                    "%s log" % job.name,
+                    window_class=JobOutput,
+                    file=file
+                )
 
     def kill_running(self):
         jobs = self.session.seqcrow_job_manager.jobs

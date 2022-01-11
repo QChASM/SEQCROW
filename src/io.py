@@ -60,20 +60,20 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
     if coordsets:
         from chimerax.std_commands.coordset_gui import CoordinateSetSlider
         from SEQCROW.tools import EnergyPlot
-        
+                
+        slider = CoordinateSetSlider(session, structure)
+
+        if fr.all_geom:
+            structure.active_coordset_id = structure.num_coordsets
+            if coordsets:
+                slider.set_slider(structure.num_coordsets)
+
         if "energy" in fr.other:
             nrg_plot = EnergyPlot(session, structure, fr)
             if not nrg_plot.opened:
                 warn("energy plot could not be opened\n" + \
                      "there might be a mismatch between energy entries and structure entries in %s" % file_name)
                 nrg_plot.delete()
-            else:
-                slider = CoordinateSetSlider(session, structure)
-
-                if fr.all_geom:
-                    structure.active_coordset_id = structure.num_coordsets
-                    if coordsets:
-                        slider.set_slider(structure.num_coordsets)
 
     if format_name == "Gaussian input file":
         a_or_an = "a"

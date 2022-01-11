@@ -1245,7 +1245,6 @@ class QChemFileInfo(QMInputFileInfo):
     
     def get_file_contents(self, theory):
         """creates Q-Chem input file using AaronTools"""
-        fmt = "{:<3s} {: 9.5f} {: 9.5f} {: 9.5f}\n"
         header, header_warnings = theory.make_header(
             style="qchem", return_warnings=True,
         )

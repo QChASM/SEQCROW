@@ -3,7 +3,15 @@ import os
 import subprocess
 from time import asctime, localtime, sleep
 
+from AaronTools.fileIO import FileReader
+from AaronTools.theory import OptimizationJob
+
+from chimerax.core.commands import run
+
 from Qt.QtCore import QThread
+
+from SEQCROW.residue_collection import ResidueCollection
+from SEQCROW.managers import ADD_FILEREADER
 
 
 class SEQCROWSigKill(Exception):
@@ -14,7 +22,15 @@ class LocalJob(QThread):
     format_name = None
     info_type = None
     """job for running computational chemistry software on local hardware"""
-    def __init__(self, name, session, theory, geometry=None, auto_update=False, auto_open=False):
+    def __init__(
+        self,
+        name,
+        session,
+        theory,
+        geometry=None,
+        auto_update=False,
+        auto_open=False,
+    ):
         """base class of local ORCA, Gaussian, and Psi4 jobs
         name        str - name of job
         session     chimerax session object
@@ -109,11 +125,32 @@ class LocalJob(QThread):
         required for "update structure" option to work when launching
         a job if the output file is not parsable by AaronTools
         """
-        raise NotImplementedError(
-            "no update_structure method for %s" % (
-                self.__class__.name
+        if isinstance(self.output_name, str):
+            fr = FileReader(self.output_name, just_geom=False, all_geom=True)
+            rescol = ResidueCollection(fr)
+            residue_collection.update_chix(structure)
+            self.session.filereader_manager.triggers.activate_trigger(
+                ADD_FILEREADER, ([structure], [fr])
             )
-        )
+        elif hasattr(self.output_name, "__iter__"):
+            for file in self.output_name:
+                fr = FileReader(self.output_name, just_geom=False, all_geom=True)
+                rescol = ResidueCollection(fr)
+                residue_collection.update_chix(structure)
+                self.session.filereader_manager.triggers.activate_trigger(
+                    ADD_FILEREADER, ([structure], [fr])
+                )
+
+    def open_structure(self):
+        if isinstance(self.output_name, str):
+            args = ["open", "\"%s\"" % self.output_name, "format", self.format_name]
+            if any(isinstance(job, OptimizationJob) for job in self.theory.job_type):
+                args.extend(["coordsets", "true"])
+            run(self.session, " ".join(args))
+        
+        elif hasattr(self.output_name, "__iter__"):
+            for file in self.output_name:
+                run(self.session, "open \"%s\"" % file)
 
 
 class ORCAJob(LocalJob):
@@ -259,6 +296,15 @@ class Psi4Job(LocalJob):
             self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
         else:
             self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log)
+
+        possible_fchk_name = os.path.join(
+            self.scratch_dir, self.name + ".fchk"
+        )
+        if os.path.exists(possible_fchk_name):
+            self.output_name = [
+                self.output_name,
+                possible_fchk_name
+            ]
 
         self.process.communicate()
         self.process = None
@@ -517,9 +563,10 @@ class SerialRavenJob(LocalJob):
         reactant,
         product,
         file_type,
+        tss_algorithm,
         auto_update=False,
         auto_open=False,
-        **raven_kwargs,
+        **raven_kwargs
     ):
         super().__init__(
             name, session, theory,
@@ -529,6 +576,7 @@ class SerialRavenJob(LocalJob):
         self.product = product
         self.file_type = file_type
         self.raven_kwargs = raven_kwargs
+        self.to_kill = False
     
     def __repr__(self):
         return "serial %s job using %s \"%s\"" % (
@@ -589,7 +637,7 @@ class SerialRavenJob(LocalJob):
         )
         
         def seqcrow_killed(obj=self):
-            if self.killed:
+            if self.to_kill:
                 raise SEQCROWSigKill("kill")
         
         try:
@@ -603,25 +651,22 @@ class SerialRavenJob(LocalJob):
                 **self.raven_kwargs,
             )
         except SEQCROWSigKill:
+            self.killed = True
             return
         
-        if self.auto_open:
-            mdls = []
-            for geom in stationary_points:
-                rescol = ResidueCollection(geom, name=geom.name)
-                mdl = rescol.get_chimera(self.session)
-                mdls.append(mdl)
-            self.session.models.add(mdls)
+        self.output_name = []
+        for f in os.listdir(self.scratch_dir):
+            if f.endswith("xyz"):
+                self.output_name.append(os.path.join(self.scratch_dir, f))
     
     def kill(self):
         self.session.logger.warning("killing %s..." % self)
 
-        if self.process is not None:
-            self.session.logger.warning(
-                "stopping cluster jobs is not implemented"
-            )
+        self.session.logger.warning(
+            "the current iteration will finish"
+        )
         
-        self.killed = True
+        self.to_kill = True
        
         #use exit b/c terminate can cause chimera to freeze
         super().exit(1)
@@ -638,7 +683,7 @@ class SerialRavenJob(LocalJob):
 
 
 class ParallelRavenJob(LocalClusterJob):
-    format_name = None
+    format_name = "xyz"
     """
     job for submitting computational chemistry jobs to a queueing
     system (e.g. Slurm, PBS, etc.) that is running on local hardware
@@ -651,6 +696,7 @@ class ParallelRavenJob(LocalClusterJob):
         reactant,
         product,
         file_type,
+        tss_algorithm,
         cluster_type,
         auto_update=False,
         auto_open=False,
@@ -685,6 +731,7 @@ class ParallelRavenJob(LocalClusterJob):
         self.reactant = reactant
         self.product = product
         self.raven_kwargs = raven_kwargs
+        self.to_kill = False
 
     def __repr__(self):
         return "local cluster %s job \"%s\"" % (
@@ -729,7 +776,7 @@ class ParallelRavenJob(LocalClusterJob):
         )
         
         def seqcrow_killed(obj=self):
-            if self.killed:
+            if self.to_kill:
                 raise SEQCROWSigKill("kill")
         
         try:
@@ -743,25 +790,22 @@ class ParallelRavenJob(LocalClusterJob):
                 **self.raven_kwargs,
             )
         except SEQCROWSigKill:
+            self.killed = True
             return
-        
-        if self.auto_open:
-            mdls = []
-            for geom in stationary_points:
-                rescol = ResidueCollection(geom, name=geom.name)
-                mdl = rescol.get_chimera(self.session)
-                mdls.append(mdl)
-            self.session.models.add(mdls)
+
+        self.output_name = []
+        for f in os.listdir(self.scratch_dir):
+            if f.endswith("xyz"):
+                self.output_name.append(os.path.join(self.scratch_dir, f))
     
     def kill(self):
         self.session.logger.warning("killing %s..." % self)
 
-        if self.process is not None:
-            self.session.logger.warning(
-                "stopping cluster jobs is not implemented; no new jobs will start, but running jobs will finish"
-            )
+        self.session.logger.warning(
+            "stopping cluster jobs is not implemented; no new jobs will start, but running jobs will finish"
+        )
         
-        self.killed = True
+        self.to_kill = True
        
         #use exit b/c terminate can cause chimera to freeze
         super().exit(1)
@@ -775,4 +819,223 @@ class ParallelRavenJob(LocalClusterJob):
         d["raven_kwargs"] = self.raven_kwargs
         return d
 
+
+class TSSJob(LocalJob):    
+    def __init__(
+        self,
+        name,
+        session,
+        theory,
+        reactant,
+        product,
+        file_type,
+        tss_algorithm,
+        auto_update=False,
+        auto_open=False,
+    ):
+        super().__init__(
+            name, session, theory,
+            auto_open=auto_open, auto_update=auto_update
+        )
+        self.reactant = reactant
+        self.product = product
+        self.file_type = file_type
+        self.tss_algorithm = tss_algorithm
+
+    def write_file(self, filename):
+        input_info = self.session.tss_finder_manager.get_info(
+            self.tss_algorithm
+        )
+        if input_info.get_file_contents:
+            if callable(input_info.get_file_contents):
+                contents, warnings = input_info.get_file_contents(
+                    self.reactant, self.product, self.theory,
+                )
+            else:
+                contents, warnings = input_info.get_file_contents[
+                    self.file_type
+                ](self.reactant, self.product, self.theory)
+
+        else:
+            file_info = self.session.seqcrow_qm_input_manager.get_info(
+                self.file_type
+            )
+        contents, warnings = file_info.get_file_contents(self.theory)
+
+        if isinstance(contents, dict):
+            for key, item in contents.items():
+                if "%" in key:
+                    fname = key % filename
+                else:
+                    fname = filename
+                outname = os.path.basename(fname)
+                name, ext = os.path.splitext(outname)
+                item = item.replace("{{ name }}", name)
+                with open(fname, "w") as f:
+                    f.write(item)
+        else:
+            outname = os.path.basename(filename)
+            name, ext = os.path.splitext(outname)
+            contents = contents.replace("{{ name }}", name)
+            with open(filename, "w") as f:
+                f.write(contents)
     
+    def get_json(self):
+        d = super().get_json()
+        d.pop("geometry")
+        d["reactant"] = self.reactant
+        d["product"] = self.product
+        d["file_type"] = self.file_type
+        return d
+
+
+class GaussianSTQNJob(TSSJob):
+    def run(self):
+        self.scratch_dir = os.path.join(
+            os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
+            "%s %s" % (self.name, self.start_time.replace(':', '.')), \
+        )
+        
+        if not os.path.exists(self.scratch_dir):
+            os.makedirs(self.scratch_dir)
+
+        if platform == "win32":
+            infile = self.name + '.gjf'
+        else:
+            infile = self.name + '.com'
+
+        infile_path = os.path.join(self.scratch_dir, infile)
+        self.write_file(infile_path)
+
+        executable = os.path.abspath(self.session.seqcrow_settings.settings.GAUSSIAN_EXE)
+        if not os.path.exists(executable):
+            executable = self.session.seqcrow_settings.settings.GAUSSIAN_EXE
+            
+        self.output_name = os.path.join(self.scratch_dir, self.name + '.log')
+        
+        args = [executable, infile, self.output_name]
+        
+        log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
+        log.write("executing:\n%s\n\n" % " ".join(args))
+
+        if platform == "win32":
+            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+        else:
+            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log)
+
+        self.process.communicate()
+        self.process = None
+
+        return 
+    
+    def get_json(self):
+        d = super().get_json()
+        d["format"] = "Gaussian STQN"
+        return d
+
+
+class ORCANEBJob(TSSJob):
+    def run(self):
+        self.start_time = asctime(localtime())
+
+        self.scratch_dir = os.path.join(
+            os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR),
+            "%s %s" % (self.name, self.start_time.replace(':', '.')),
+        )
+
+        if not os.path.exists(self.scratch_dir):
+            os.makedirs(self.scratch_dir)
+
+        self.theory.geometry = self.reactant
+        self.product.write(
+            outfile=os.path.join(self.scratch_dir, "product.xyz"),
+        )
+        infile = self.name + '.inp'
+        infile = infile.replace(' ', '_')
+        infile_path = os.path.join(self.scratch_dir, infile)
+        self.write_file(infile_path)
+        executable = os.path.abspath(self.session.seqcrow_settings.settings.ORCA_EXE)
+        if not os.path.exists(executable):
+            executable = self.session.seqcrow_settings.settings.ORCA_EXE
+
+        self.output_name = os.path.join(self.scratch_dir, self.name.replace(' ', '_') + '.out')
+        outfile = open(self.output_name, 'w')
+
+        args = [executable, infile]
+
+        log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
+        log.write("executing:\n%s\n\n" % " ".join(args))
+
+        log.close()
+        log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'a')
+
+        if " " in infile:
+            raise RuntimeError("ORCA input files cannot contain spaces")
+
+        if platform == "win32":
+            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+        else:        
+            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log)
+
+        self.process.communicate()
+        self.process = None
+
+        return 
+    
+    def get_json(self):
+        d = super().get_json()
+        d["format"] = "ORCA NEB"
+        return d
+
+
+class QChemFSMJob(TSSJob):
+    def run(self):
+        self.start_time = asctime(localtime())
+
+        self.scratch_dir = os.path.join(
+            os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
+            "%s %s" % (self.name, self.start_time.replace(':', '.')), \
+        )
+
+        if not os.path.exists(self.scratch_dir):
+            os.makedirs(self.scratch_dir)
+
+        infile = self.name.replace(" ", "_") + '.inp'
+        infile_path = os.path.join(self.scratch_dir, infile)
+        self.write_file(infile_path)
+
+        executable = os.path.abspath(self.session.seqcrow_settings.settings.QCHEM_EXE)
+        if not os.path.exists(executable):
+            executable = self.session.seqcrow_settings.settings.QCHEM_EXE
+
+        self.output_name = os.path.join(self.scratch_dir, self.name.replace(" ", "_") + '.out')
+        outfile = open(self.output_name, 'w')
+
+        args = [
+            executable,
+            "-nt %i" % self.theory.processors,
+            infile,
+        ]
+
+        log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
+        log.write("executing:\n%s\n\n" % " ".join(args))
+
+        if platform == "win32":
+            self.process = subprocess.Popen(
+                args, cwd=self.scratch_dir, stdout=outfile, stderr=log,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+        else:
+            self.process = subprocess.Popen(
+                args, cwd=self.scratch_dir, stdout=outfile, stderr=log
+            )
+
+        self.process.communicate()
+        self.process = None
+
+        return 
+
+    def get_json(self):
+        d = super().get_json()
+        d["format"] = "Q-Chem FSM"
+        return d
