@@ -697,8 +697,6 @@ class BuildRaven(BuildQM, ToolInstance):
         self.settings.last_program = self.file_type.currentText()
 
         restart = self.job_widget.restart.text()
-        if restart:
-            raven_kwargs["restart"] = restart
 
         self.raven_settings.save()
 
@@ -732,6 +730,13 @@ class BuildRaven(BuildQM, ToolInstance):
                 ):
                     kwargs[option] = defaults[option]
             self.raven_settings.stored_defaults = dumps(defaults)
+        
+            if restart and any(
+                param.name == "restart" or 
+                param.kind == param.VAR_KEYWORD
+                for param in sig.parameters.values()
+            ):
+                kwargs["restart"] = restart
 
             job = job_cls(
                 name,
@@ -771,8 +776,6 @@ class BuildRaven(BuildQM, ToolInstance):
         self.settings.last_program = self.file_type.currentText()
 
         restart = self.job_widget.restart.text()
-        if restart:
-            raven_kwargs["restart"] = restart
 
         self.raven_settings.save()
 
@@ -797,6 +800,13 @@ class BuildRaven(BuildQM, ToolInstance):
                 ):
                     kwargs[option] = defaults[option]
             self.raven_settings.stored_defaults = dumps(defaults)
+        
+            if restart and any(
+                param.name == "restart" or 
+                param.kind == param.VAR_KEYWORD
+                for param in sig.parameters.values()
+            ):
+                kwargs["restart"] = restart
 
             print(kwargs)
             
