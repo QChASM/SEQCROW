@@ -151,7 +151,9 @@ class JobQueue(ToolInstance):
                 ]):
                     continue
                 
-                if status == "error" and not (job.isFinished() and job.error):
+                if status == "error" and not (
+                    job.isFinished() and job.error and not job.killed
+                ):
                     continue
                 
                 if status == "finished" and not (
@@ -161,6 +163,8 @@ class JobQueue(ToolInstance):
                 
                 if status == "killed" and not job.killed:
                     continue
+
+                # print(job, status)
 
                 self.job_list.append(job)
 
@@ -175,6 +179,7 @@ class JobQueue(ToolInstance):
                 if isinstance(job, LocalJob):
                     # print(job.name)
                     if job.killed:
+                        # print("killed")
                         item.setText(self.STATUS_COL, "killed")
     
                         del_job_widget = QWidget()
@@ -190,6 +195,7 @@ class JobQueue(ToolInstance):
     
                     elif job.isRunning():
                         if job in self.session.seqcrow_job_manager.unknown_status_jobs:
+                            # print("?")
                             unk_widget = QWidget()
                             unk_layout = QGridLayout(unk_widget)
                             unk = QPushButton()
@@ -202,6 +208,7 @@ class JobQueue(ToolInstance):
                             self.tree.setItemWidget(item, self.STATUS_COL, unk_widget)
                         
                         else:
+                            # print("running")
                             item.setText(self.STATUS_COL, "running")
                         
                             kill_widget = QWidget()
@@ -218,8 +225,10 @@ class JobQueue(ToolInstance):
     
                     elif job.isFinished():
                         if not job.error:
+                            # print("finished")
                             item.setText(self.STATUS_COL, "finished")
                         else:
+                            # print("error")
                             error_widget = QWidget()
                             error_layout = QGridLayout(error_widget)
                             error = QPushButton()
@@ -243,6 +252,7 @@ class JobQueue(ToolInstance):
                         self.tree.setItemWidget(item, self.DEL_COL, del_job_widget)
     
                     else:
+                        # print("queued")
                         item.setText(self.STATUS_COL, "queued")
         
                         priority_widget = QWidget()
@@ -308,25 +318,22 @@ class JobQueue(ToolInstance):
         self.session.seqcrow_job_manager.triggers.activate_trigger(JOB_QUEUED, "resume")
 
     def open_jobs(self):
-        jobs = self.session.seqcrow_job_manager.jobs
         ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
         for ndx in ndxs:
             job = self.job_list[ndx]
             job.open_structure()
 
     def open_log(self):
-        jobs = self.session.seqcrow_job_manager.jobs
         ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
         for ndx in ndxs:
-            job = jobs[ndx]
+            job = self.job_list[ndx]
             if hasattr(job, "scratch_dir") and os.path.exists(job.scratch_dir):
                 self.tool_window.create_child_window("%s log" % job.name, window_class=JobLog, scr_dir=job.scratch_dir)        
 
     def open_output(self):
-        jobs = self.session.seqcrow_job_manager.jobs
         ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
         for ndx in ndxs:
-            job = jobs[ndx]
+            job = self.job_list[ndx]
             if hasattr(job, "output_name"):
                 file = job.output_name
                 if hasattr(file, "__iter__") and not isinstance(file, str):
@@ -338,10 +345,9 @@ class JobQueue(ToolInstance):
                 )
 
     def kill_running(self):
-        jobs = self.session.seqcrow_job_manager.jobs
         ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
         for ndx in ndxs:
-            job = jobs[ndx]
+            job = self.job_list[ndx]
             if not job.isFinished():
                 job.kill()
                 job.wait()
@@ -357,8 +363,9 @@ class JobQueue(ToolInstance):
 
     def remove_job(self, job):
         if isinstance(job, LocalJob):
-            self.tree.takeTopLevelItem(self.session.seqcrow_job_manager.jobs.index(job))
+            self.tree.takeTopLevelItem(self.job_list.index(job))
             self.session.seqcrow_job_manager.remove_local_job(job)
+            self.job_list.remove(job)
             if hasattr(job, "scratch_dir") and os.path.exists(job.scratch_dir):
                 yes = QMessageBox.question(
                     self.tool_window.ui_area,
@@ -373,13 +380,15 @@ class JobQueue(ToolInstance):
 
     def show_ask_if_running(self, job):
         if isinstance(job, LocalJob):
-            yes = QMessageBox.question(self.tool_window.ui_area, \
-                                       "Job status unknown", \
-                                       "%s was running the last time ChimeraX was closed.\n" % (str(job)) + \
-                                       "If the job is still running, it might compete with other jobs for you computer's resources, " + \
-                                       "which could cause any running job to error out.\n\n" + \
-                                       "Has this job finished running?", \
-                                       QMessageBox.Yes | QMessageBox.No)
+            yes = QMessageBox.question(
+                self.tool_window.ui_area, \
+                "Job status unknown", \
+                "%s was running the last time ChimeraX was closed.\n" % (str(job)) + \
+                "If the job is still running, it might compete with other jobs for you computer's resources, " + \
+                "which could cause any running job to error out.\n\n" + \
+                "Has this job finished running?", \
+                QMessageBox.Yes | QMessageBox.No
+            )
             
             if yes == QMessageBox.Yes:
                 self.session.seqcrow_job_manager.unknown_status_jobs.remove(job)

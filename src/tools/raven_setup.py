@@ -151,6 +151,11 @@ class BuildRaven(BuildQM, ToolInstance):
             "changes done", self.struc_mod_update_preview
         )
 
+        # this tool is big by default
+        # unless the user has saved its position, make it small
+        if name not in self.session.ui.settings.tool_positions['windows']:
+            self.tool_window.shrink_to_fit()
+
     def _build_ui(self):
         #build an interface with a dropdown menu to select software package
         #change from one software widget to another when the dropdown menu changes
@@ -993,7 +998,9 @@ class TSSWidget(QWidget):
                 kwargs["callback"] = None
             if "default" not in kwargs:
                 kwargs["default"] = None
-            obj = cls(name, **kwargs)
+            if "name" not in kwargs:
+                kwargs["name"] = name
+            obj = cls(**kwargs)
             default_value = defaults.get(name, None)
             if default_value and (
                 not hasattr(obj, "values") or
@@ -1001,7 +1008,7 @@ class TSSWidget(QWidget):
             ):
                 obj.set_value(default_value)
             self.algorithm_layout.addRow(
-                "%s:" % name.replace("_", " "),
+                "%s:" % kwargs["name"].replace("_", " "),
                 obj.widget
             )
             self.options[name] = obj

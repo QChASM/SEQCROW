@@ -4,6 +4,7 @@ from AaronTools.utils.utils import combine_dicts
 
 from chimerax.ui.options import FloatOption, Option, IntOption
 
+from Qt.QtCore import Qt
 from Qt.QtWidgets import QComboBox
 
 from SEQCROW.jobs import (
@@ -46,6 +47,25 @@ class EnumOption(Option):
         raise NotImplementedError
 
 
+class SymbolicEnumOption(EnumOption):
+    def _make_widget(self, *, values=None, labels=None):
+        self.widget = QComboBox()
+        if labels and values:
+            self.values = values
+            self.labels = labels
+            self.widget.addItems(labels)
+            for i, value in enumerate(labels):
+                self.widget.setItemData(i, value)
+        return self.widget
+    
+    def get_value(self):
+        return self.widget.currentData(Qt.UserRole)
+    
+    def set_value(self, value):
+        ndx = self.widget.findText(value, Qt.UserRole)
+        self.widget.setCurrentIndex(ndx)
+    
+
 class TSSFinder:
     # list of software packages that this can work with
     available_for = []
@@ -53,6 +73,10 @@ class TSSFinder:
     restart_filter = None
     
     get_file_contents = None
+    
+    cluster_job_cls = None
+    
+    local_job_cls = None
     
     options = dict()
     
@@ -159,6 +183,16 @@ def fixup_orca_neb_theory(
     
     return theory
 
+def get_orca_neb_file_contents(
+    reactant, product, theory
+):
+    theory.geometry = reactant
+    orca_inp, warnings = reactant.write(
+        theory=theory, outfile=False, style="orca", return_warnings=True,
+    )
+    xyz = product.write(style="xyz", outfile=False)
+    return {"inp": orca_inp, "xyz": xyz}, warnings
+
 def fixup_qchem_fsm_theory(
     theory,
     restart_file=None,
@@ -219,9 +253,7 @@ class STQN(TSSFinder):
     we don't take guesses (yet?), so no opt=QST3
     """
     available_for = ["Gaussian"]
-    
-    special_contents = True
-    
+        
     local_job_cls = {
         "Gaussian": GaussianSTQNJob,
     }
@@ -271,16 +303,16 @@ class NEB(TSSFinder):
     local_job_cls = {
         "ORCA": ORCANEBJob,
     }
-    
-    cluster_job_cls = {
-        "ORCA": LocalClusterJob,
-    }
-    
+
     fixup_theory = {
         "ORCA": fixup_orca_neb_theory
     }
 
     restart_filter = "XYZ pathway files (*.xyz)"
+    
+    get_file_contents = {
+        "ORCA": get_orca_neb_file_contents,
+    }
 
 
 class FSM(TSSFinder):
@@ -358,7 +390,7 @@ class GPRGSM(TSSFinder):
                 "min": 0.1,
                 "max": 10.,
                 "step": 0.25,
-                "default": 2,
+                "default": 1.5,
             }
         ),
         "uncertainty_cutoff": (
@@ -366,8 +398,28 @@ class GPRGSM(TSSFinder):
                 "min": 0.0,
                 "max": 0.5,
                 "step": 0.05,
-                "decimals": 3,
-                "default": 0.1,
+                "decimal_places": 3,
+                "default": 0.15,
+            }
+        ),
+        "done_rms_disp_tol": (
+            FloatOption, {
+                "min": 5e-3,
+                "max": 1.34e-2,
+                "decimal_places": 4,
+                "step": 1e-3,
+                "default": 8e-2,
+                "name": "final RMS disp. tol.",
+            }
+        ),
+        "done_max_disp_tol": (
+            FloatOption, {
+                "min": 5e-3,
+                "max": 2e-2,
+                "decimal_places": 4,
+                "step": 1e-3,
+                "default": 1e-2,
+                "name": "final max. disp. tol.",
             }
         ),
     }

@@ -81,13 +81,10 @@ class LocalJob(QThread):
         input_info = self.session.seqcrow_qm_input_manager.get_info(self.info_type)
         contents, warnings = input_info.get_file_contents(self.theory)
         if isinstance(contents, dict):
+            name, ext = os.path.splitext(outname)
             for key, item in contents.items():
-                if "%" in key:
-                    fname = key % filename
-                else:
-                    fname = filename
+                fname = name + ".%s" % key
                 outname = os.path.basename(fname)
-                name, ext = os.path.splitext(outname)
                 item = item.replace("{{ name }}", name)
                 with open(fname, "w") as f:
                     f.write(item)
@@ -144,7 +141,9 @@ class LocalJob(QThread):
     def open_structure(self):
         if isinstance(self.output_name, str):
             args = ["open", "\"%s\"" % self.output_name, "format", self.format_name]
-            if any(isinstance(job, OptimizationJob) for job in self.theory.job_type):
+            if self.theory.job_type and any(
+                isinstance(job, OptimizationJob) for job in self.theory.job_type
+            ):
                 args.extend(["coordsets", "true"])
             run(self.session, " ".join(args))
         
@@ -863,13 +862,10 @@ class TSSJob(LocalJob):
         contents, warnings = file_info.get_file_contents(self.theory)
 
         if isinstance(contents, dict):
+            name, ext = os.path.splitext(outname)
             for key, item in contents.items():
-                if "%" in key:
-                    fname = key % filename
-                else:
-                    fname = filename
+                fname = name + ".%s" % key
                 outname = os.path.basename(fname)
-                name, ext = os.path.splitext(outname)
                 item = item.replace("{{ name }}", name)
                 with open(fname, "w") as f:
                     f.write(item)
@@ -1039,3 +1035,77 @@ class QChemFSMJob(TSSJob):
         d = super().get_json()
         d["format"] = "Q-Chem FSM"
         return d
+
+
+class ClusterTSSJob(TSSJob):
+    def __init__(
+        self,
+        name,
+        session,
+        theory,
+        reactant,
+        product,
+        file_type,
+        tss_algorithm,
+        auto_update=False,
+        auto_open=False,
+        cluster_type=None,
+        template=None,
+        walltime=2,
+        processors=4,
+        memory=8,
+        template_kwargs=None,
+    ):
+        super().__init__(
+            name, session, theory,
+            auto_open=auto_open, auto_update=auto_update
+        )
+        self.reactant = reactant
+        self.product = product
+        self.file_type = file_type
+        self.tss_algorithm = tss_algorithm
+        self.name = name
+        self.session = session
+        self.theory = theory
+        
+        self.killed = False
+        self.error = False
+        self.output_name = None
+        self.scratch_dir = None
+        self.process = None
+        self.start_time = None
+        self.submitted = False
+        self.template = template
+        self.walltime = walltime
+        self.processors = processors
+        self.memory = memory
+        self.info_type = file_type
+        self.cluster_type = cluster_type
+        self.template_kwargs = dict()
+        if template_kwargs:
+            self.template_kwargs = template_kwargs
+   
+    def get_json(self):
+        d = super().get_json()
+        d.pop("geometry")
+        d["reactant"] = self.reactant
+        d["product"] = self.product
+        d["file_type"] = self.file_type
+
+        d = {
+            "theory": self.theory,
+        }
+
+        d['output'] = self.output_name
+        d['scratch'] = self.scratch_dir
+
+        d['server'] = 'cluster'
+        d['file_type'] = self.info_type
+        d['start_time'] = self.start_time
+        d['name'] = self.name
+        d['depend'] = None
+        d['auto_update'] = False
+        d['auto_open'] = self.auto_open or self.auto_update
+        
+        return d
+    

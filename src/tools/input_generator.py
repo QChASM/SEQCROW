@@ -1328,8 +1328,10 @@ class BuildQM(ToolInstance):
         self.session.logger.status("copied to clipboard")
 
     def save_input(self):
-        """save input to a file
-        a file dialog will open asking for a file location"""
+        """
+        save input to a file
+        a file dialog will open asking for a file location
+        """
 
         program = self.file_type.currentText()
         info = self.session.seqcrow_qm_input_manager.get_info(program)
@@ -1342,13 +1344,10 @@ class BuildQM(ToolInstance):
         contents, warnings = self.get_file_contents(update_settings=True)
 
         if isinstance(contents, dict):
+            name, ext = os.path.splitext(outname)
             for key, item in contents.items():
-                if "%" in key:
-                    fname = key % filename
-                else:
-                    fname = filename
+                fname = name + ".%s" % key
                 outname = os.path.basename(fname)
-                name, ext = os.path.splitext(outname)
                 item = item.replace("{{ name }}", name)
                 with open(fname, "w") as f:
                     f.write(item)
@@ -5588,9 +5587,9 @@ class InputPreview(ChildToolWindow):
         if isinstance(text, dict):
             s = ""
             for key, item in text.items():
-                s += "<<- %s\n" % key
+                s += "<<<- %s ->>>\n" % key
                 s += item
-                s += "%s\n\n\n" % key
+                s += "\n"
             text = s
         self.preview.setText(text)
         if len(warnings_list) > 0:
