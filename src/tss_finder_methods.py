@@ -376,6 +376,7 @@ class GPRGSM(TSSFinder):
             IntOption, {
                 "min": 5,
                 "max": 25,
+                "default": 11,
             }
         ),
         "kernel": (
@@ -408,7 +409,7 @@ class GPRGSM(TSSFinder):
                 "max": 1.34e-2,
                 "decimal_places": 4,
                 "step": 1e-3,
-                "default": 8e-2,
+                "default": 8e-3,
                 "name": "final RMS disp. tol.",
             }
         ),

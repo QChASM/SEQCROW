@@ -434,7 +434,7 @@ class LocalClusterJob(LocalJob):
         session,
         theory,
         file_type,
-        cluster_type=None,
+        queue_type=None,
         geometry=None,
         auto_update=False,
         auto_open=False,
@@ -471,7 +471,11 @@ class LocalClusterJob(LocalJob):
         self.processors = processors
         self.memory = memory
         self.info_type = file_type
-        self.cluster_type = cluster_type
+        self.queue_type = queue_type
+        self.cluster_type = session.seqcrow_cluster_scheduling_software_manager.get_queue_manager(
+            queue_type
+        ).get_template(file_type)()
+        self.format_name = self.cluster_type.expected_output_ext
         self.template_kwargs = dict()
         if template_kwargs:
             self.template_kwargs = template_kwargs
@@ -543,6 +547,8 @@ class LocalClusterJob(LocalJob):
         d['file_type'] = self.info_type
         d['start_time'] = self.start_time
         d['name'] = self.name
+        d['template'] = self.template
+        d['queue_type'] = self.queue_type
         d['depend'] = None
         d['auto_update'] = False
         d['auto_open'] = self.auto_open or self.auto_update
@@ -696,7 +702,7 @@ class ParallelRavenJob(LocalClusterJob):
         product,
         file_type,
         tss_algorithm,
-        cluster_type,
+        queue_type,
         auto_update=False,
         auto_open=False,
         template=None,
@@ -717,7 +723,7 @@ class ParallelRavenJob(LocalClusterJob):
             session,
             theory,
             file_type,
-            cluster_type=cluster_type,
+            queue_type=queue_type,
             auto_update=auto_update,
             auto_open=auto_open,
             template=template,
@@ -1049,7 +1055,7 @@ class ClusterTSSJob(TSSJob):
         tss_algorithm,
         auto_update=False,
         auto_open=False,
-        cluster_type=None,
+        queue_type=None,
         template=None,
         walltime=2,
         processors=4,
@@ -1080,8 +1086,12 @@ class ClusterTSSJob(TSSJob):
         self.processors = processors
         self.memory = memory
         self.info_type = file_type
-        self.cluster_type = cluster_type
+        self.queue_type = queue_type
+        self.cluster_type = session.seqcrow_cluster_scheduling_software_manager.get_queue_manager(
+            queue_type
+        ).get_template(file_type)()
         self.template_kwargs = dict()
+        self.format_name = self.cluster_type.expected_output_ext
         if template_kwargs:
             self.template_kwargs = template_kwargs
    
@@ -1100,8 +1110,13 @@ class ClusterTSSJob(TSSJob):
         d['scratch'] = self.scratch_dir
 
         d['server'] = 'cluster'
+        d['template'] = self.template
+        d['queue_type'] = self.queue_type
         d['file_type'] = self.info_type
         d['start_time'] = self.start_time
+        d['processors'] = self.processors
+        d['memory'] = self.memory
+        d['walltime'] = self.walltime
         d['name'] = self.name
         d['depend'] = None
         d['auto_update'] = False

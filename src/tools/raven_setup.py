@@ -715,7 +715,7 @@ class BuildRaven(BuildQM, ToolInstance):
         product = ResidueCollection(self.product_selector.currentData())
 
         if program in self.session.seqcrow_job_manager.formats:
-            job_cls = self.session.tss_finder_manager.formats[tss_info].cluster_job_cls["program"]
+            job_cls = self.session.tss_finder_manager.get_info(tss_info).cluster_job_cls[program]
 
             kwargs = dict()
             defaults = loads(self.raven_settings.stored_defaults)
@@ -750,14 +750,15 @@ class BuildRaven(BuildQM, ToolInstance):
                 reactant,
                 product,
                 program,
-                cluster_type,
-                template=Template(template),
+                tss_info,
+                queue_type,
+                template=template,
                 template_kwargs=template_kwargs,
                 processors=self.job_widget.getNProc(),
                 memory=memory,
                 auto_update=auto_update,
                 auto_open=auto_open,
-                **raven_kwargs,
+                **kwargs
             )
     
             self.session.logger.status("adding %s to queue" % name)

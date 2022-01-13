@@ -133,8 +133,16 @@ class JobManager(ProviderManager):
                             kwargs = job["raven_kwargs"]
                         else:
                             job_cls = LocalClusterJob
-                            kwargs = {"geometry": job['geometry']}
-                    
+                            kwargs = {
+                                "geometry": job['geometry'],
+                            }
+                   
+                        kwargs["queue_type"] = job["queue_type"]
+                        kwargs["template"] = job["template"]
+                        kwargs["processors"] = job["processors"]
+                        kwargs["walltime"] = job["walltime"]
+                        kwargs["memory"] = job["memory"]
+
                     else:
                         self.session.logger.warning("job with unknown server: %s" % job['server'])
                         continue
@@ -345,13 +353,16 @@ class JobManager(ProviderManager):
         """check to see if a waiting job can run"""
         for job in self.unknown_status_jobs:
             if isinstance(job, LocalJob):
-                fr = FileReader(job.output_name, just_geom=False)
-                if 'finished' in fr.other and fr.other['finished']:
-                    job.isFinished = lambda *args, **kwargs: True
-                    job.isRunning = lambda *args, **kwargs: False
-                    self.unknown_status_jobs.remove(job)
-                    self.triggers.activate_trigger(JOB_FINISHED, job)
-                    return
+                try:
+                    fr = FileReader(job.output_name, just_geom=False)
+                    if 'finished' in fr.other and fr.other['finished']:
+                        job.isFinished = lambda *args, **kwargs: True
+                        job.isRunning = lambda *args, **kwargs: False
+                        self.unknown_status_jobs.remove(job)
+                        self.triggers.activate_trigger(JOB_FINISHED, job)
+                except NotImplementedError:
+                    self.session.logger.warning("cannot determine status of job %s" % job)
+                    continue
         
         if not self.has_local_job_running:
             unstarted_local_jobs = []
