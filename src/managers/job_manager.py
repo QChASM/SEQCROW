@@ -127,7 +127,6 @@ class JobManager(ProviderManager):
                             args.extend([
                                 job["reactant"],
                                 job["product"],
-                                job["file_type"],
                                 "GPRGSM",
                             ])
                             kwargs = job["raven_kwargs"]
@@ -138,10 +137,15 @@ class JobManager(ProviderManager):
                             }
                    
                         kwargs["queue_type"] = job["queue_type"]
+                        kwargs["template_kwargs"] = job["template_kwargs"]
                         kwargs["template"] = job["template"]
                         kwargs["processors"] = job["processors"]
                         kwargs["walltime"] = job["walltime"]
                         kwargs["memory"] = job["memory"]
+
+                        print(job_cls)
+                        print(args)
+                        print(kwargs)
 
                     else:
                         self.session.logger.warning("job with unknown server: %s" % job['server'])
