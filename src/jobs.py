@@ -544,6 +544,9 @@ class LocalClusterJob(LocalJob):
         d['scratch'] = self.scratch_dir
 
         d['server'] = 'cluster'
+        d['memory'] = self.memory
+        d['processors'] = self.processors
+        d['walltime'] = self.walltime
         d['file_type'] = self.info_type
         d['start_time'] = self.start_time
         d['name'] = self.name
@@ -552,6 +555,7 @@ class LocalClusterJob(LocalJob):
         d['depend'] = None
         d['auto_update'] = False
         d['auto_open'] = self.auto_open or self.auto_update
+        d['template_kwargs'] = self.template_kwargs
 
         return d
 

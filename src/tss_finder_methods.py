@@ -391,7 +391,27 @@ class GPRGSM(TSSFinder):
                 "min": 0.1,
                 "max": 10.,
                 "step": 0.25,
-                "default": 1.5,
+                "default": 1.,
+            }
+        ),
+        "grow_rms_disp_tol": (
+            FloatOption, {
+                "min": 5e-3,
+                "max": 1.34e-2,
+                "decimal_places": 4,
+                "step": 1e-3,
+                "default": 8e-3,
+                "name": "grow RMS disp. tol.",
+            }
+        ),
+        "grow_max_disp_tol": (
+            FloatOption, {
+                "min": 5e-3,
+                "max": 2e-2,
+                "decimal_places": 4,
+                "step": 1e-3,
+                "default": 1e-2,
+                "name": "grow max. disp. tol.",
             }
         ),
         "uncertainty_cutoff": (
@@ -405,11 +425,11 @@ class GPRGSM(TSSFinder):
         ),
         "done_rms_disp_tol": (
             FloatOption, {
-                "min": 5e-3,
+                "min": 2e-3,
                 "max": 1.34e-2,
                 "decimal_places": 4,
                 "step": 1e-3,
-                "default": 8e-3,
+                "default": 6e-3,
                 "name": "final RMS disp. tol.",
             }
         ),
@@ -419,7 +439,7 @@ class GPRGSM(TSSFinder):
                 "max": 2e-2,
                 "decimal_places": 4,
                 "step": 1e-3,
-                "default": 1e-2,
+                "default": 8e-3,
                 "name": "final max. disp. tol.",
             }
         ),
