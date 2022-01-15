@@ -274,7 +274,7 @@ class JobManager(ProviderManager):
                     not os.path.exists(job.output_name)
                 ) or (
                     hasattr(job.output_name, "__iter__") and
-                    all(os.path.exists(f) for f in job.output_name)
+                    not all(os.path.exists(f) for f in job.output_name)
                 )
             ):
                 job.error = True
@@ -288,7 +288,7 @@ class JobManager(ProviderManager):
                     else:
                         for f in job.output_name:
                             fr = FileReader(f, just_geom=False)
-                            if 'finished' not in fr.other or not fr.other['finished']:
+                            if 'finished' in fr.other and not fr.other['finished']:
                                 job.error = True
                 except NotImplementedError:
                     pass
