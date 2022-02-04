@@ -215,7 +215,7 @@ def fixup_qchem_fsm_theory(
     theory.kwargs = combine_dicts(
         {
             "rem": {
-                "JOBTYPE": "FSM",
+                "JOB_TYPE": "FSM",
                 "FSM_NMODE": str(nodes),
                 "FSM_NGRAD": str(optimization_steps),
                 "FSM_MODE": interpolation,

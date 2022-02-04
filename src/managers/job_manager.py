@@ -273,6 +273,7 @@ class JobManager(ProviderManager):
                     isinstance(job.output_name, str) and
                     not os.path.exists(job.output_name)
                 ) or (
+                    not isinstance(job.output_name, str) and
                     hasattr(job.output_name, "__iter__") and
                     not all(os.path.exists(f) for f in job.output_name)
                 )

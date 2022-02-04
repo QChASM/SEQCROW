@@ -645,6 +645,10 @@ class SerialRavenJob(LocalJob):
             qm_executable,
         )
         
+        def log_func(s, outfile=os.path.join(self.scratch_dir, "seqcrow_log.txt")):
+            with open(outfile, "a") as f:
+                f.write(s + "\n")
+        
         def seqcrow_killed(obj=self):
             if self.to_kill:
                 raise SEQCROWSigKill("kill")
@@ -657,6 +661,7 @@ class SerialRavenJob(LocalJob):
                 self.theory,
                 cwd=self.scratch_dir,
                 callback=seqcrow_killed,
+                log_func=log_func,
                 **self.raven_kwargs,
             )
         except SEQCROWSigKill:
@@ -671,11 +676,14 @@ class SerialRavenJob(LocalJob):
     def kill(self):
         self.session.logger.warning("killing %s..." % self)
 
-        self.session.logger.warning(
-            "the current iteration will finish"
-        )
-        
-        self.to_kill = True
+        if self.isRunning():
+            self.session.logger.warning(
+                "the current iteration will finish"
+            )
+            
+            self.to_kill = True
+        else:
+            self.killed = True
        
         #use exit b/c terminate can cause chimera to freeze
         super().exit(1)
@@ -784,6 +792,10 @@ class ParallelRavenJob(LocalClusterJob):
             self.scratch_dir, "path.xyz"
         )
         
+        def log_func(s, outfile=os.path.join(self.scratch_dir, "seqcrow_log.txt")):
+            with open(outfile, "a") as f:
+                f.write(s + "\n")
+        
         def seqcrow_killed(obj=self):
             if self.to_kill:
                 raise SEQCROWSigKill("kill")
@@ -796,6 +808,7 @@ class ParallelRavenJob(LocalClusterJob):
                 self.theory,
                 cwd=self.scratch_dir,
                 callback=seqcrow_killed,
+                log_func=log_func,
                 **self.raven_kwargs,
             )
         except SEQCROWSigKill:
@@ -810,11 +823,14 @@ class ParallelRavenJob(LocalClusterJob):
     def kill(self):
         self.session.logger.warning("killing %s..." % self)
 
-        self.session.logger.warning(
-            "stopping cluster jobs is not implemented; no new jobs will start, but running jobs will finish"
-        )
-        
-        self.to_kill = True
+        if self.isRunning():
+            self.session.logger.warning(
+                "stopping cluster jobs is not implemented; no new jobs will start, but running jobs will finish"
+            )
+            
+            self.to_kill = True
+        else:
+            self.killed = True
        
         #use exit b/c terminate can cause chimera to freeze
         super().exit(1)
