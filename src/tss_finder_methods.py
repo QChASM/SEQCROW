@@ -54,7 +54,7 @@ class SymbolicEnumOption(EnumOption):
             self.values = values
             self.labels = labels
             self.widget.addItems(labels)
-            for i, value in enumerate(labels):
+            for i, value in enumerate(values):
                 self.widget.setItemData(i, value)
         return self.widget
     
@@ -62,7 +62,9 @@ class SymbolicEnumOption(EnumOption):
         return self.widget.currentData(Qt.UserRole)
     
     def set_value(self, value):
-        ndx = self.widget.findText(value, Qt.UserRole)
+        ndx = self.widget.findText(value, Qt.MatchExactly)
+        if ndx < 0:
+            ndx = self.widget.findData(value, Qt.UserRole, Qt.MatchExactly)
         self.widget.setCurrentIndex(ndx)
     
 
@@ -380,27 +382,32 @@ class GPRGSM(TSSFinder):
             }
         ),
         "kernel": (
-            EnumOption, {
+            SymbolicEnumOption, {
                 "values": [
                     "RBF",
-                ]
+                    "matern52",
+                ],
+                "labels": [
+                    "radial basis function",
+                    "Matérn ν=5/2",
+                ],
             }
         ),
         "similarity_falloff": (
             FloatOption, {
                 "min": 0.1,
-                "max": 10.,
+                "max": 20.,
                 "step": 0.25,
-                "default": 1.,
+                "default": 10.,
             }
         ),
-        "uncertainty_cutoff": (
+        "variance_threshold": (
             FloatOption, {
                 "min": 0.0,
                 "max": 0.5,
                 "step": 0.05,
-                "decimal_places": 3,
-                "default": 0.15,
+                "decimal_places": 5,
+                "default": 0.001,
             }
         ),
         "grow_rms_disp_tol": (
@@ -409,7 +416,7 @@ class GPRGSM(TSSFinder):
                 "max": 2e-2,
                 "decimal_places": 4,
                 "step": 5e-4,
-                "default": 1.5e-3,
+                "default": 2.5e-3,
                 "name": "grow RMS disp. tol.",
             }
         ),
@@ -419,7 +426,7 @@ class GPRGSM(TSSFinder):
                 "max": 2e-2,
                 "decimal_places": 4,
                 "step": 5e-4,
-                "default": 1.5e-3,
+                "default": 2.5e-3,
                 "name": "grow max. disp. tol.",
             }
         ),
@@ -429,7 +436,7 @@ class GPRGSM(TSSFinder):
                 "max": 2e-2,
                 "decimal_places": 4,
                 "step": 5e-4,
-                "default": 1.5e-3,
+                "default": 2.5e-3,
                 "name": "final RMS disp. tol.",
             }
         ),
@@ -439,7 +446,7 @@ class GPRGSM(TSSFinder):
                 "max": 2e-2,
                 "decimal_places": 4,
                 "step": 5e-4,
-                "default": 1.5e-3,
+                "default": 2.5e-3,
                 "name": "final max. disp. tol.",
             }
         ),
