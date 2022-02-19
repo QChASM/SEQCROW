@@ -1,13 +1,13 @@
+from chimerax.core.commands import run
+
+
 def apply_seqcrow_bse_lighting(session):
     view = session.main_view
     # view.set_background_color([1., 1., 1., 0])
-    view.silhouette.enabled = True
     
     lighting_profile = view.lighting
     
     lighting_profile.key_light_intensity = 1.
-    lighting_profile.depth_cue = True
-    lighting_profile.shadows = False
     lighting_profile.multishadow = 0
     lighting_profile.fill_light_intensity = 0.5
     lighting_profile.ambient_light_intensity = 0.4
@@ -16,8 +16,9 @@ def apply_seqcrow_bse_lighting(session):
     lighting_profile.ambient_light_color = [1., 1., 1., 0]
     lighting_profile.depth_cue_color = [1., 1., 1.]
     
-    view.update_lighting = True
-    view.redraw_needed = True
+    run(session, "graphics silhouettes true", log=False)
+    run(session, "lighting depthCue true", log=False)
+    run(session, "lighting shadows false", log=False)
 
 def seqcrow_bse(session, models=None, atoms=None):
     """non-H atoms are displayed with B&S
@@ -28,8 +29,7 @@ def seqcrow_bse(session, models=None, atoms=None):
     from chimerax.atomic import AtomicStructure, Atom
     from chimerax.atomic.colors import element_color
 
-    if models is None or atoms is None:
-        apply_seqcrow_bse_lighting(session)
+    apply_seqcrow_bse_lighting(session)
 
     if models is None:
         if atoms is None:
@@ -82,8 +82,7 @@ def seqcrow_vdw(session, models=None, atoms=None):
     from chimerax.atomic import AtomicStructure, Atom
     from chimerax.atomic.colors import element_color
     
-    if models is None or atoms is None:
-        apply_seqcrow_bse_lighting(session)
+    apply_seqcrow_bse_lighting(session)
 
     if models is None:
         if atoms is None:
@@ -123,13 +122,10 @@ def seqcrow_vdw(session, models=None, atoms=None):
 def apply_seqcrow_s_lighting(session):
     view = session.main_view
     # view.set_background_color([1., 1., 1., 0])
-    view.silhouette.enabled = True
 
     lighting_profile = view.lighting
     
     lighting_profile.key_light_intensity = 1.
-    lighting_profile.depth_cue = True
-    lighting_profile.shadows = True
     lighting_profile.multishadow = 64
     lighting_profile.multishadow_map_size = 1024
     lighting_profile.multishadow_depth_bias = 0.01
@@ -139,10 +135,11 @@ def apply_seqcrow_s_lighting(session):
     lighting_profile.fill_light_color = [1., 1., 1., 0]
     lighting_profile.ambient_light_color = [1., 1., 1., 0]
     lighting_profile.depth_cue_color = [1., 1., 1.]
+   
+    run(session, "graphics silhouettes true", log=False)
+    run(session, "lighting depthCue true", log=False)
+    run(session, "lighting shadows true", log=False)
 
-    view.update_lighting = True
-    view.redraw_needed = True
-    
 def seqcrow_s(session, models=None, atoms=None):
     """atoms are represented with sticks
     atoms colored by Jmol colors"""
@@ -152,8 +149,7 @@ def seqcrow_s(session, models=None, atoms=None):
     from chimerax.atomic.colors import element_color
     from SEQCROW.selectors import get_fragment
 
-    if models is None or atoms is None:
-        apply_seqcrow_s_lighting(session)
+    apply_seqcrow_s_lighting(session)
 
     if models is None:
         if atoms is None:
@@ -251,7 +247,6 @@ def seqcrow_s(session, models=None, atoms=None):
                                 ):
                                     display = True
                                     break
- 
                 
                 atom.display = display
 

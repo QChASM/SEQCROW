@@ -1,7 +1,5 @@
 from os import cpu_count
 
-from psutil import virtual_memory
-
 from chimerax.core.commands import run
 from chimerax.core.commands.cli import TupleOf, FloatArg
 from chimerax.core.configfile import Value
@@ -35,6 +33,7 @@ from Qt.QtWidgets import (
 )
 
 from AaronTools.fileIO import Orbitals
+from AaronTools.utils.utils import available_memory
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.widgets import FilereaderComboBox
@@ -590,12 +589,12 @@ class OrbitalViewer(ToolInstance):
             n_atoms=len(fr.atoms),
             n_jobs=threads,
         )
-        if mem * 1e9 > (0.9 * virtual_memory().free):
+        if mem * 1e9 > (0.9 * available_memory()):
             are_you_sure = QMessageBox.warning(
                 self.mo_table,
                 "Memory Limit Warning",
                 "Estimated peak memory usage (%.1fGB) is above or close to\n" % mem +
-                "the available memory (%.1fGB).\n" % (virtual_memory().free * 1e-9) +
+                "the available memory (%.1fGB).\n" % (available_memory * 1e-9) +
                 "Exceeding available memory might affect the stability of your\n"
                 "computer. You may attempt to continue, but it is recommended\n" +
                 "that you lower your resolution, decrease padding, or use\n" +
@@ -725,12 +724,12 @@ class OrbitalViewer(ToolInstance):
             n_atoms=len(fr.atoms),
             n_jobs=threads,
         )
-        if mem * 1e9 > (0.9 * virtual_memory().free):
+        if mem * 1e9 > (0.9 * available_memory()):
             are_you_sure = QMessageBox.warning(
                 self.mo_table,
                 "Memory Limit Warning",
                 "Estimated peak memory usage (%.1fGB) is above or close to\n" % mem +
-                "the available memory (%.1fGB).\n" % (virtual_memory().free * 1e-9) +
+                "the available memory (%.1fGB).\n" % (available_memory() * 1e-9) +
                 "Exceeding available memory might affect the stability of your\n"
                 "computer. You may attempt to continue, but it is recommended\n" +
                 "that you lower your resolution, decrease padding, or use\n" +
@@ -865,12 +864,12 @@ class OrbitalViewer(ToolInstance):
             n_atoms=len(fr.atoms),
             n_jobs=threads,
         )
-        if mem * 1e9 > (0.9 * virtual_memory().free):
+        if mem * 1e9 > (0.9 * available_memory()):
             are_you_sure = QMessageBox.warning(
                 self.mo_table,
                 "Memory Limit Warning",
                 "Estimated peak memory usage (%.1fGB) is above or close to\n" % mem +
-                "the available memory (%.1fGB).\n" % (virtual_memory().free * 1e-9) +
+                "the available memory (%.1fGB).\n" % (available_memory() * 1e-9) +
                 "Exceeding available memory might affect the stability of your\n"
                 "computer. You may attempt to continue, but it is recommended\n" +
                 "that you lower your resolution, decrease padding, or use\n" +
@@ -1005,12 +1004,12 @@ class OrbitalViewer(ToolInstance):
             n_atoms=len(fr.atoms),
             n_jobs=threads,
         )
-        if mem * 1e9 > (0.9 * virtual_memory().free):
+        if mem * 1e9 > (0.9 * available_memory()):
             are_you_sure = QMessageBox.warning(
                 self.mo_table,
                 "Memory Limit Warning",
                 "Estimated peak memory usage (%.1fGB) is above or close to\n" % mem +
-                "the available memory (%.1fGB).\n" % (virtual_memory().free * 1e-9) +
+                "the available memory (%.1fGB).\n" % (available_memory() * 1e-9) +
                 "Exceeding available memory might affect the stability of your\n"
                 "computer. You may attempt to continue, but it is recommended\n" +
                 "that you lower your resolution, decrease padding, or use\n" +
@@ -1153,12 +1152,12 @@ class OrbitalViewer(ToolInstance):
             n_atoms=len(fr.atoms),
             n_jobs=threads,
         )
-        if mem * 1e9 > (0.9 * virtual_memory().free):
+        if mem * 1e9 > (0.9 * available_memory()):
             are_you_sure = QMessageBox.warning(
                 self.mo_table,
                 "Memory Limit Warning",
                 "Estimated peak memory usage (%.1fGB) is above or close to\n" % mem +
-                "the available memory (%.1fGB).\n" % (virtual_memory().free * 1e-9) +
+                "the available memory (%.1fGB).\n" % (available_memory() * 1e-9) +
                 "Exceeding available memory might affect the stability of your\n"
                 "computer. You may attempt to continue, but it is recommended\n" +
                 "that you lower your resolution, decrease padding, or use\n" +

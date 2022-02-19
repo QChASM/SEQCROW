@@ -769,7 +769,7 @@ class UVVisSpectrum(ToolInstance):
                 transmittance="transmittance" in plot_type,
                 peak_type=peak_type,
                 fwhm=fwhm,
-                normalize=False,
+                normalize=True,
                 show_functions=show_functions,
                 change_x_unit_func=change_x_unit_func,
             )
@@ -1141,6 +1141,7 @@ class UVVisSpectrum(ToolInstance):
             scalar_scale=shift,
             units=x_units,
             show_functions=show_components,
+            normalize=True,
         )
 
         self.canvas.draw()

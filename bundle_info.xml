@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="1.4a1">
+            version="1.4a2">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -529,6 +529,7 @@
 		<DataFile>LICENSE</DataFile>
     </DataFiles>
 	
+
     <DataFiles>
         <DataDir>docs</DataDir>
         <DataDir>icons</DataDir>
