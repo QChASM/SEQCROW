@@ -27,10 +27,10 @@ This is a plug-in for ChimeraX.
 The Chimera version of SEQCROW (ChimAARON) can be found on the [Chimera branch](https://github.com/QChASM/ChimAARON/tree/Chimera).
 
 ### ChimeraX Stable
-you are here
+For the version on the toolshed, check out the [master branch](https://github.com/QChASM/ChimAARON/tree/master)
 
 ### ChimeraX Daily
-For the latest features and bugs, check out the [dev branch](https://github.com/QChASM/ChimAARON/tree/dev)
+you are here
 
 ## Citation
 If you use SEQCROW, please cite the following:
