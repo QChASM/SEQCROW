@@ -813,6 +813,8 @@ class BuildRaven(BuildQM, ToolInstance):
                 for param in sig.parameters.values()
             ):
                 kwargs["restart"] = restart
+            else:
+                kwargs["restart"] = None
 
             print(kwargs)
             

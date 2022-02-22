@@ -395,59 +395,39 @@ class GPRGSM(TSSFinder):
         ),
         "similarity_falloff": (
             FloatOption, {
-                "min": 0.1,
+                "min": 1,
                 "max": 20.,
-                "step": 0.25,
-                "default": 10.,
+                "step": 0.5,
+                "default": 7.5,
             }
         ),
         "variance_threshold": (
             FloatOption, {
                 "min": 0.0,
                 "max": 0.5,
-                "step": 0.05,
+                "step": 0.0005,
                 "decimal_places": 5,
                 "default": 0.001,
             }
         ),
-        "grow_rms_disp_tol": (
+        "rms_force_tol": (
             FloatOption, {
                 "min": 1e-3,
                 "max": 2e-2,
                 "decimal_places": 4,
                 "step": 5e-4,
                 "default": 2.5e-3,
-                "name": "grow RMS disp. tol.",
+                "name": "RMS force tol.",
             }
         ),
-        "grow_max_disp_tol": (
+        "max_force_tol": (
             FloatOption, {
                 "min": 1e-3,
                 "max": 2e-2,
                 "decimal_places": 4,
                 "step": 5e-4,
                 "default": 2.5e-3,
-                "name": "grow max. disp. tol.",
-            }
-        ),
-        "done_rms_disp_tol": (
-            FloatOption, {
-                "min": 1e-3,
-                "max": 2e-2,
-                "decimal_places": 4,
-                "step": 5e-4,
-                "default": 2.5e-3,
-                "name": "final RMS disp. tol.",
-            }
-        ),
-        "done_max_disp_tol": (
-            FloatOption, {
-                "min": 1e-3,
-                "max": 2e-2,
-                "decimal_places": 4,
-                "step": 5e-4,
-                "default": 2.5e-3,
-                "name": "final max. disp. tol.",
+                "name": "max. force tol.",
             }
         ),
     }

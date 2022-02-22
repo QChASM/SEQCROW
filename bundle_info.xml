@@ -71,7 +71,6 @@
                 <Dependency name="Send2Trash"/>
                 <Dependency name="psutil"/>
                 <Dependency name="jinja2"/>
-                <Dependency name="scikit-learn"/>
                 <!-- wait for numpy to fix fortran stuff in python 3.8
                 I've tried installing this with just gfortran on windows, but no luck
                 <Dependency name="stripy"/>
@@ -369,31 +368,31 @@
                 ChimeraX's devel build
                 ChimeraXClassifier>ChimeraX :: Bundle :: General,Input/Output,Structure Editing,External Program :: 1,1 :: SEQCROW :: ChimAARON,SEQCRO,SEQCROW :: true</ChimeraXClassifier
                 -->
-                <ChimeraXClassifier>ChimeraX :: Tool :: Build QM Input                 :: AaronTools         :: Create Gaussian, ORCA, or Psi4 input file</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Structure Modification         :: AaronTools         :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Change Substituents            :: Structure Editing  :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Swap Transition Metal Ligands  :: Structure Editing  :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Fuse Ring                      :: Structure Editing  :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Browse AaronTools Libraries    :: AaronTools         :: Browse the AaronTools ligand, substituent, and ring libraries</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Process QM Thermochemistry     :: AaronTools         :: Compute the free energy of a molecule with frequency data</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Managed Models                 :: SEQCROW            :: see models managed by SEQCROW</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Add to Personal Library        :: AaronTools         :: Add to your personal ligand, substituent, and ring libraries</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Visualize Normal Modes         :: AaronTools         :: Visualize normal modes from a frequency output file as displacement vectors or as an animation</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Job Queue                      :: SEQCROW            :: View status of jobs</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Substituent Sterimol           :: Structure Analysis :: Calculate L, and B1-B5 Sterimol parameters for a substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Bond Editor                    :: Structure Editing  :: Draw or erase bonds</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Change Element                 :: Structure Editing  :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Rotate Atoms                   :: Structure Editing  :: Rotate all or part of a molecular structure</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Buried Volume                  :: Structure Analysis :: Calculate percent buried volume</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: File Info                      :: AaronTools         :: Miscellaneous file data</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Cone Angle                     :: Structure Analysis :: Calculate ligand cone angles</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Coordination Complex Generator :: Structure Editing  :: Create coordination complexes with mono- or bidentate ligands</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Orbital Viewer                 :: AaronTools         :: View molecular orbitals</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Ligand Sterimol                :: Structure Analysis :: Calculate Sterimol parameters for ligands on organo- or organometallic catalysts</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: IR Spectrum                    :: AaronTools         :: plot simulated IR spectra</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: UV/Vis Spectrum                :: AaronTools         :: plot simulated UV/vis spectra</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: 2D Builder                     :: Structure Editing  :: molecule using ChemDoodle Web Components</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: TSS Finder                     :: SEQCROW            :: locate transition state structures using the growing string method</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Build QM Input                 :: AaronTools           :: Create Gaussian, ORCA, or Psi4 input file</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Structure Modification         :: AaronTools           :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Change Substituents            :: Structure Editing    :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Swap Transition Metal Ligands  :: Structure Editing    :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Fuse Ring                      :: Structure Editing    :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Browse AaronTools Libraries    :: AaronTools           :: Browse the AaronTools ligand, substituent, and ring libraries</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Process QM Thermochemistry     :: AaronTools           :: Compute the free energy of a molecule with frequency data</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Managed Models                 :: SEQCROW              :: see models managed by SEQCROW</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Add to Personal Library        :: AaronTools           :: Add to your personal ligand, substituent, and ring libraries</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Visualize Normal Modes         :: AaronTools           :: Visualize normal modes from a frequency output file as displacement vectors or as an animation</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Job Queue                      :: SEQCROW              :: View status of jobs</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Substituent Sterimol           :: Structure Analysis   :: Calculate L, and B1-B5 Sterimol parameters for a substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Bond Editor                    :: Structure Editing    :: Draw or erase bonds</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Change Element                 :: Structure Editing    :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Rotate Atoms                   :: Structure Editing    :: Rotate all or part of a molecular structure</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Buried Volume                  :: Structure Analysis   :: Calculate percent buried volume</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: File Info                      :: AaronTools           :: Miscellaneous file data</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Cone Angle                     :: Structure Analysis   :: Calculate ligand cone angles</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Coordination Complex Generator :: Structure Editing    :: Create coordination complexes with mono- or bidentate ligands</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Orbital Viewer                 :: AaronTools           :: View molecular orbitals</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Ligand Sterimol                :: Structure Analysis   :: Calculate Sterimol parameters for ligands on organo- or organometallic catalysts</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: IR Spectrum                    :: AaronTools           :: plot simulated IR spectra</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: UV/Vis Spectrum                :: AaronTools           :: plot simulated UV/vis spectra</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: 2D Builder                     :: Structure Editing    :: molecule using ChemDoodle Web Components</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Transition State Structures    :: Structure Prediction :: locate transition state structures using the growing string method</ChimeraXClassifier>
                 <!--<ChimeraXClassifier>ChimeraX :: Tool :: AaronJr Input Builder          :: AaronJr            :: Create input files for AaronJr</ChimeraXClassifier>-->
                 <!--ChimeraXClassifier>ChimeraX :: Tool :: AARON Input Builder :: AARON :: Build AARON input file</ChimeraXClassifier-->
                 

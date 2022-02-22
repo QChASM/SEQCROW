@@ -1,9 +1,12 @@
 from os import cpu_count
 
+from chimerax.atomic import Atoms
 from chimerax.core.commands import run
 from chimerax.core.commands.cli import TupleOf, FloatArg
 from chimerax.core.configfile import Value
+from chimerax.core.objects import Objects
 from chimerax.core.tools import ToolInstance
+from chimerax.label.label3d import label
 from chimerax.map.volume import Volume, RenderingOptions
 from chimerax.map_data.griddata import GridData
 from chimerax.core.settings import Settings
@@ -30,6 +33,7 @@ from Qt.QtWidgets import (
     QTabWidget,
     QGroupBox,
     QLabel,
+    QComboBox,
 )
 
 from AaronTools.fileIO import Orbitals
@@ -91,6 +95,9 @@ class _OrbitalSettings(Settings):
         "fd_iso_val": 0.01,
         "fukui_delta": 0.1,
         "fa_low_mem": False,
+        "n_radial": "20",
+        "n_angular": "194",
+        "vdw_radii": "UMN",
     }
 
 
@@ -161,7 +168,7 @@ class OrbitalViewer(ToolInstance):
         options_layout = QFormLayout(options_tab)
 
         self.padding = QDoubleSpinBox()
-        self.padding.setRange(1., 10.)
+        self.padding.setRange(0.25, 10.)
         self.padding.setDecimals(2)
         self.padding.setValue(self.settings.padding)
         self.padding.setSingleStep(0.25)
@@ -258,11 +265,21 @@ class OrbitalViewer(ToolInstance):
         fukui_layout = QFormLayout(fukui_group)
         other_surface_layout.addRow(fukui_group)
         
+        
+        self.fukui_type = QComboBox()
+        self.fukui_type.addItems(["volume", "condensed"])
+        self.fukui_type.currentTextChanged.connect(self.show_fukui_options)
+        fukui_layout.addRow("display type:", self.fukui_type)
+
+        self.fukui_volume_widget = QWidget()
+        fukui_volume_layout = QFormLayout(self.fukui_volume_widget)
+        fukui_volume_layout.setContentsMargins(0, 0, 0, 0)
+
 
         fukui_color_options = QWidget()
         color_layout = QHBoxLayout(fukui_color_options)
         color_layout.setContentsMargins(5, 0, 5, 0)
-        
+
         f_plus = QLabel("")
         f_plus.setText("<a href=\"test\" style=\"text-decoration: none;\"><i>f</i><sub>w</sub><sup>-</sup>:</a>")
         f_plus.setTextFormat(Qt.RichText)
@@ -294,14 +311,52 @@ class OrbitalViewer(ToolInstance):
         # widget for alignment
         color_layout.insertWidget(4, QWidget(), 1, Qt.AlignLeft)
         
-        fukui_layout.addRow("colors:", fukui_color_options)
+        fukui_volume_layout.addRow("colors:", fukui_color_options)
 
         self.fd_iso_value = QDoubleSpinBox()
         self.fd_iso_value.setDecimals(4)
         self.fd_iso_value.setRange(1e-4, 5)
         self.fd_iso_value.setSingleStep(1e-3)
         self.fd_iso_value.setValue(self.settings.fd_iso_val)
-        fukui_layout.addRow("isosurface:", self.fd_iso_value)
+        fukui_volume_layout.addRow("isosurface:", self.fd_iso_value)
+
+        
+        self.fukui_condensed_widget = QWidget()
+        fukui_condensed_layout = QFormLayout(self.fukui_condensed_widget)
+        fukui_condensed_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.vdw_radii = QComboBox()
+        self.vdw_radii.addItems(["UMN", "Bondi"])
+        ndx = self.vdw_radii.findText(self.settings.vdw_radii, Qt.MatchExactly)
+        if ndx >= 0:
+            self.vdw_radii.setCurrentIndex(ndx)
+        fukui_condensed_layout.addRow("radii:", self.vdw_radii)
+        
+        
+        n_radial = [20, 32, 64, 75, 99, 127]
+        n_angular = [110, 194, 302, 590, 974, 1454, 2030, 2702, 5810]
+        
+        self.radial = QComboBox()
+        self.angular = QComboBox()
+        for widget, data in zip([self.radial, self.angular], [n_radial, n_angular]):
+            for i, n in enumerate(data):
+                widget.addItem(str(n))
+                widget.setItemData(i, n)
+        ndx = self.radial.findText(self.settings.n_radial, Qt.MatchExactly)
+        if ndx >= 0:
+            self.radial.setCurrentIndex(ndx)
+        ndx = self.angular.findText(self.settings.n_angular, Qt.MatchExactly)
+        if ndx >= 0:
+            self.angular.setCurrentIndex(ndx)
+
+        fukui_condensed_layout.addRow("radial points:", self.radial)
+        fukui_condensed_layout.addRow("angular points:", self.angular)
+
+        
+        fukui_layout.addRow(self.fukui_volume_widget)
+        fukui_layout.addRow(self.fukui_condensed_widget)
+        self.fukui_condensed_widget.setVisible(False)
+        
 
         self.fukui_delta = QDoubleSpinBox()
         self.fukui_delta.setDecimals(2)
@@ -334,6 +389,14 @@ class OrbitalViewer(ToolInstance):
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(None)
+
+    def show_fukui_options(self, text):
+        if text == "volume":
+            self.fukui_volume_widget.setVisible(True)
+            self.fukui_condensed_widget.setVisible(False)
+        else:
+            self.fukui_volume_widget.setVisible(False)
+            self.fukui_condensed_widget.setVisible(True)
 
     def fill_orbits(self, ndx):
         self.mo_table.setRowCount(0)
@@ -786,7 +849,7 @@ class OrbitalViewer(ToolInstance):
             return
         model = self.session.filereader_manager.get_model(fr)
         orbits = fr.other["orbitals"]
-
+ 
         padding = self.padding.value()
         self.settings.padding = padding
         spacing = self.spacing.value()
@@ -804,7 +867,35 @@ class OrbitalViewer(ToolInstance):
         if delta != self.settings.fukui_delta:
             keep_open = False
         self.settings.fukui_delta = delta
-        
+
+        if self.fukui_type.currentText() == "condensed":
+            self.settings.n_radial = self.radial.currentText()
+            self.settings.n_angular = self.angular.currentText()
+            self.settings.vdw_radii = self.vdw_radii.currentText()
+            
+            rescol = ResidueCollection(model)
+            values = orbits.condensed_fukui_donor_values(
+                rescol,
+                n_jobs=threads,
+                apoints=self.angular.currentData(),
+                rpoints=self.radial.currentData(),
+                radii=self.vdw_radii.currentText(),
+                delta=delta,
+                low_mem=low_mem_mode,
+            )
+            for val, atom in zip(values, model.atoms):
+                l = "%6.3f" % val
+                label(
+                    self.session,
+                    objects=Objects(atoms=Atoms([atom])),
+                    object_type="atoms",
+                    text=l,
+                    offset=(-0.11*len(l),-0.2,-0.2),
+                    height=0.4,
+                    on_top=True,
+                )
+            return
+
         cube = self.get_coords()
         if cube is False:
             return
@@ -944,7 +1035,35 @@ class OrbitalViewer(ToolInstance):
         if delta != self.settings.fukui_delta:
             keep_open = False
         self.settings.fukui_delta = delta
-        
+
+        if self.fukui_type.currentText() == "condensed":
+            self.settings.n_radial = self.radial.currentText()
+            self.settings.n_angular = self.angular.currentText()
+            self.settings.vdw_radii = self.vdw_radii.currentText()
+
+            rescol = ResidueCollection(model)
+            values = orbits.condensed_fukui_acceptor_values(
+                rescol,
+                n_jobs=threads,
+                apoints=self.angular.currentData(),
+                rpoints=self.radial.currentData(),
+                radii=self.vdw_radii.currentText(),
+                delta=delta,
+                low_mem=low_mem_mode,
+            )
+            for val, atom in zip(values, model.atoms):
+                l = "%6.3f" % val
+                label(
+                    self.session,
+                    objects=Objects(atoms=Atoms([atom])),
+                    object_type="atoms",
+                    text=l,
+                    offset=(-0.11*len(l),-0.2,-0.2),
+                    height=0.4,
+                    on_top=True,
+                )
+            return
+
         cube = self.get_coords()
         if cube is False:
             return
@@ -1086,7 +1205,35 @@ class OrbitalViewer(ToolInstance):
         if delta != self.settings.fukui_delta:
             keep_open = False
         self.settings.fukui_delta = delta
-        
+
+        if self.fukui_type.currentText() == "condensed":
+            self.settings.n_radial = self.radial.currentText()
+            self.settings.n_angular = self.angular.currentText()
+            self.settings.vdw_radii = self.vdw_radii.currentText()
+
+            rescol = ResidueCollection(model)
+            values = orbits.condensed_fukui_dual_values(
+                rescol,
+                n_jobs=threads,
+                apoints=self.angular.currentData(),
+                rpoints=self.radial.currentData(),
+                radii=self.vdw_radii.currentText(),
+                delta=delta,
+                low_mem=low_mem_mode,
+            )
+            for val, atom in zip(values, model.atoms):
+                l = "%6.3f" % val
+                label(
+                    self.session,
+                    objects=Objects(atoms=Atoms([atom])),
+                    object_type="atoms",
+                    text=l,
+                    offset=(-0.11*len(l),-0.2,-0.2),
+                    height=0.4,
+                    on_top=True,
+                )
+            return
+
         cube = self.get_coords()
         if cube is False:
             return

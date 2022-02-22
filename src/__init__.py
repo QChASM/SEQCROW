@@ -347,7 +347,7 @@ class _SEQCROW_API(BundleAPI):
             from .tools import MolBuilder
             return MolBuilder(session, ti.name)
 
-        elif ti.name == "TSS Finder":
+        elif ti.name == "Transition State Structures":
             from .tools import BuildRaven
             return BuildRaven(session, ti.name)
 

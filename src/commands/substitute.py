@@ -137,7 +137,7 @@ def substitute(
     for ndx, subname in enumerate(substituents):
         subname = subname.strip()
         sub = Substituent(subname)
-        
+
         # when minimizing, we only want to deal with residues that are close to the substituent
         # determine the size of the new substituent to limit this
         if minimize:
@@ -182,7 +182,7 @@ def substitute(
                         # call substitute on the ResidueCollection b/c we need to see
                         # the other residues if minimize=True
                         rescol.substitute(
-                            sub.copy(),
+                            sub.copy(copy_atoms=True),
                             AtomSpec(target.atomspec),
                             attached_to=end,
                             minimize=minimize,

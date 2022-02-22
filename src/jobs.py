@@ -594,7 +594,7 @@ class SerialRavenJob(LocalJob):
     
     def run(self):
         from Raven.job_runner import SerialJobRunner
-        from Raven.driver import run_raven
+        from Raven.driver import RavenDriver
         from chimerax.core.commands import run
         from SEQCROW.residue_collection import ResidueCollection
         
@@ -654,16 +654,25 @@ class SerialRavenJob(LocalJob):
                 raise SEQCROWSigKill("kill")
         
         try:
-            stationary_points = run_raven(
+            driver = RavenDriver(
                 self.reactant,
                 self.product,
-                job_runner,
                 self.theory,
                 cwd=self.scratch_dir,
-                callback=seqcrow_killed,
+                nodes=self.raven_kwargs["nodes"],
+                restart=self.raven_kwargs["restart"],
+                kernel=self.raven_kwargs["kernel"],
+                similarity_falloff=self.raven_kwargs["similarity_falloff"],
                 log_func=log_func,
-                **self.raven_kwargs,
             )
+            driver.optimize_string(
+                self.raven_kwargs["rms_force_tol"],
+                self.raven_kwargs["max_force_tol"],
+                job_runner,
+                variance_threshold=self.raven_kwargs["variance_threshold"],
+                callback=seqcrow_killed,
+            )
+            driver.print_stationary_points()
         except SEQCROWSigKill:
             self.killed = True
             return
@@ -801,16 +810,25 @@ class ParallelRavenJob(LocalClusterJob):
                 raise SEQCROWSigKill("kill")
         
         try:
-            stationary_points = run_raven(
+            driver = RavenDriver(
                 self.reactant,
                 self.product,
-                job_runner,
                 self.theory,
                 cwd=self.scratch_dir,
-                callback=seqcrow_killed,
+                nodes=self.raven_kwargs["nodes"],
+                restart=self.raven_kwargs["restart"],
+                kernel=self.raven_kwargs["kernel"],
+                similarity_falloff=self.raven_kwargs["similarity_falloff"],
                 log_func=log_func,
-                **self.raven_kwargs,
             )
+            driver.optimize_string(
+                self.raven_kwargs["rms_force_tol"],
+                self.raven_kwargs["max_force_tol"],
+                job_runner,
+                variance_threshold=self.raven_kwargs["variance_threshold"],
+                callback=seqcrow_killed,
+            )
+            driver.print_stationary_points()
         except SEQCROWSigKill:
             self.killed = True
             return
