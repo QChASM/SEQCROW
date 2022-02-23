@@ -383,7 +383,7 @@ class BuildQM(ToolInstance):
         self.copy = copy
 
         save = QAction("&Save Input", self.tool_window.ui_area)
-        save.triggered.connect(self.save_input)
+        save.triggered.connect(self.open_save_dialog)
         #this shortcut interferes with main window's save shortcut
         #I've tried different shortcut contexts to no avail
         #thanks Qt...
@@ -1327,10 +1327,9 @@ class BuildQM(ToolInstance):
 
         self.session.logger.status("copied to clipboard")
 
-    def save_input(self):
+    def open_save_dialog(self):
         """
-        save input to a file
-        a file dialog will open asking for a file location
+        open a dialog to select the save file location
         """
 
         program = self.file_type.currentText()
@@ -1340,14 +1339,27 @@ class BuildQM(ToolInstance):
 
         if not filename:
             return
+        
+        self.save_file(filename)
 
+    def save_file(self, filename):
+        """
+        save the input file contents to filename
+        """
         contents, warnings = self.get_file_contents(update_settings=True)
 
         if isinstance(contents, dict):
+            dirname, outname = os.path.split(filename)
             name, ext = os.path.splitext(outname)
             for key, item in contents.items():
-                fname = name + ".%s" % key
-                outname = os.path.basename(fname)
+                if "." in key:
+                    fname = os.path.join(
+                        dirname, key
+                    )
+                else:
+                    fname = os.path.join(
+                        dirname, name + ".%s" % key
+                    )
                 item = item.replace("{{ name }}", name)
                 with open(fname, "w") as f:
                     f.write(item)
@@ -1995,7 +2007,7 @@ class JobTypeOption(QWidget):
         for i in range(self.constrained_atom_table.rowCount() - 1, -1, -1):
             atom = self.constrained_atoms[i]
             if atom.deleted or atom not in structure:
-                self.constrain_atoms.pop(i)
+                self.constrained_atoms.pop(i)
                 self.constrained_atom_table.removeRow(i)
 
         for i in range(self.constrained_bond_table.rowCount() - 1, -1, -1):

@@ -95,12 +95,6 @@ class JobManager(ProviderManager):
                                 ]
                                 kwargs = dict()
                                 if name == "Raven":
-                                    args.extend([
-                                        job["reactant"],
-                                        job["product"],
-                                        job["file_type"],
-                                        "GPRGSM",
-                                    ])
                                     kwargs = job["raven_kwargs"]
                                 if issubclass(job_cls, TSSJob):
                                     args.extend([
@@ -124,12 +118,18 @@ class JobManager(ProviderManager):
                         ]
                         if "format" in job and job["format"] == "Raven":
                             job_cls = ParallelRavenJob
-                            args.extend([
+                            kwargs = job["raven_kwargs"]
+                        elif "tss_algorithm" in job:
+                            job_cls = ClusterTSSJob
+                            args = [
+                                job["name"],
+                                self.session,
+                                job["theory"],
                                 job["reactant"],
                                 job["product"],
-                                "GPRGSM",
-                            ])
-                            kwargs = job["raven_kwargs"]
+                                job["file_type"],
+                                job["tss_algorithm"],
+                            ]
                         else:
                             job_cls = LocalClusterJob
                             kwargs = {
@@ -143,14 +143,14 @@ class JobManager(ProviderManager):
                         kwargs["walltime"] = job["walltime"]
                         kwargs["memory"] = job["memory"]
 
-                        print(job_cls)
-                        print(args)
-                        print(kwargs)
-
                     else:
                         self.session.logger.warning("job with unknown server: %s" % job['server'])
                         continue
-                    
+
+                    print(job_cls)
+                    print(args)
+                    print(kwargs)
+
                     local_job = job_cls(
                         *args,
                         auto_update=job['auto_update'],

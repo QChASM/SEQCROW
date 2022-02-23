@@ -8,14 +8,12 @@ from AaronTools.theory import OptimizationJob
 
 from chimerax.core.commands import run
 
+from jinja2 import Template
+
 from Qt.QtCore import QThread
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.managers import ADD_FILEREADER
-
-
-class SEQCROWSigKill(Exception):
-    pass
 
 
 class LocalJob(QThread):
@@ -81,9 +79,14 @@ class LocalJob(QThread):
         input_info = self.session.seqcrow_qm_input_manager.get_info(self.info_type)
         contents, warnings = input_info.get_file_contents(self.theory)
         if isinstance(contents, dict):
-            name, ext = os.path.splitext(outname)
+            name, ext = os.path.splitext(filename)
             for key, item in contents.items():
-                fname = name + ".%s" % key
+                if "." in key:
+                    fname = os.path.join(
+                        os.path.dirname(filename), key
+                    )
+                else:
+                    fname = name + ".%s" % key
                 outname = os.path.basename(fname)
                 item = item.replace("{{ name }}", name)
                 with open(fname, "w") as f:
@@ -560,10 +563,77 @@ class LocalClusterJob(LocalJob):
         return d
 
 
-class SerialRavenJob(LocalJob):
-    info_type = "Raven"
-    format_name = "xyz"
+
+class TSSJob(LocalJob):    
+    def __init__(
+        self,
+        name,
+        session,
+        theory,
+        reactant,
+        product,
+        file_type,
+        auto_update=False,
+        auto_open=False,
+    ):
+        super().__init__(
+            name, session, theory,
+            auto_open=auto_open, auto_update=auto_update
+        )
+        self.reactant = reactant
+        self.product = product
+        self.file_type = file_type
+
+    def write_file(self, filename, **kwargs):
+        input_info = self.session.tss_finder_manager.get_info(
+            self.tss_algorithm
+        )
+        if input_info.get_file_contents:
+            if callable(input_info.get_file_contents):
+                contents, warnings = input_info.get_file_contents(
+                    self.reactant, self.product, self.theory, **kwargs
+                )
+            else:
+                contents, warnings = input_info.get_file_contents[
+                    self.file_type
+                ](self.reactant, self.product, self.theory, **kwargs)
+
+        else:
+            file_info = self.session.seqcrow_qm_input_manager.get_info(
+                self.file_type
+            )
+            contents, warnings = file_info.get_file_contents(self.theory)
+
+        if isinstance(contents, dict):
+            name, ext = os.path.splitext(filename)
+            for key, item in contents.items():
+                if "." in key:
+                    fname = os.path.join(
+                        os.path.dirname(filename), key
+                    )
+                else:
+                    fname = name + ".%s" % key
+                outname = os.path.basename(fname)
+                item = item.replace("{{ name }}", name)
+                with open(fname, "w") as f:
+                    f.write(item)
+        else:
+            outname = os.path.basename(filename)
+            name, ext = os.path.splitext(outname)
+            contents = contents.replace("{{ name }}", name)
+            with open(filename, "w") as f:
+                f.write(contents)
     
+    def get_json(self):
+        d = super().get_json()
+        d.pop("geometry")
+        d["reactant"] = self.reactant
+        d["product"] = self.product
+        d["file_type"] = self.file_type
+        return d
+
+
+class ClusterTSSJob(LocalClusterJob):
     def __init__(
         self,
         name,
@@ -575,28 +645,154 @@ class SerialRavenJob(LocalJob):
         tss_algorithm,
         auto_update=False,
         auto_open=False,
-        **raven_kwargs
+        queue_type=None,
+        template=None,
+        walltime=2,
+        processors=4,
+        memory=8,
+        template_kwargs=None,
     ):
         super().__init__(
-            name, session, theory,
-            auto_open=auto_open, auto_update=auto_update
+            name, session, theory, file_type,
+            queue_type=queue_type, template=template, walltime=walltime,
+            processors=processors, memory=memory, template_kwargs=template_kwargs,
+            auto_open=auto_open, auto_update=auto_update,
         )
         self.reactant = reactant
         self.product = product
         self.file_type = file_type
+        self.tss_algorithm = tss_algorithm
+        self.name = name
+        self.session = session
+        self.theory = theory
+        
+        self.killed = False
+        self.error = False
+        self.output_name = None
+        self.scratch_dir = None
+        self.process = None
+        self.start_time = None
+        self.submitted = False
+        self.template = template
+        self.walltime = walltime
+        self.processors = processors
+        self.memory = memory
+        self.info_type = file_type
+        self.queue_type = queue_type
+        self.cluster_type = session.seqcrow_cluster_scheduling_software_manager.get_queue_manager(
+            queue_type
+        ).get_template(file_type)()
+        self.template_kwargs = dict()
+        self.format_name = self.cluster_type.expected_output_ext
+        if template_kwargs:
+            self.template_kwargs = template_kwargs
+
+    def write_file(self, filename, **kwargs):
+        input_info = self.session.tss_finder_manager.get_info(
+            self.tss_algorithm
+        )
+        if input_info.get_file_contents:
+            if callable(input_info.get_file_contents):
+                contents, warnings = input_info.get_file_contents(
+                    self.reactant, self.product, self.theory, **kwargs
+                )
+            else:
+                contents, warnings = input_info.get_file_contents[
+                    self.file_type
+                ](self.reactant, self.product, self.theory, **kwargs)
+
+        else:
+            file_info = self.session.seqcrow_qm_input_manager.get_info(
+                self.file_type
+            )
+            contents, warnings = file_info.get_file_contents(self.theory)
+
+        if isinstance(contents, dict):
+            name, ext = os.path.splitext(filename)
+            for key, item in contents.items():
+                if "." in key:
+                    fname = os.path.join(
+                        os.path.dirname(filename), key
+                    )
+                else:
+                    fname = name + ".%s" % key
+                outname = os.path.basename(fname)
+                item = item.replace("{{ name }}", name)
+                with open(fname, "w") as f:
+                    f.write(item)
+        else:
+            outname = os.path.basename(filename)
+            name, ext = os.path.splitext(outname)
+            contents = contents.replace("{{ name }}", name)
+            with open(filename, "w") as f:
+                f.write(contents)
+
+    def get_json(self):
+        d = super().get_json()
+        d.pop("geometry")
+        d["reactant"] = self.reactant
+        d["product"] = self.product
+        d["file_type"] = self.file_type
+        d['tss_algorithm'] = self.tss_algorithm
+
+        d['output'] = self.output_name
+        d['scratch'] = self.scratch_dir
+
+        d['server'] = 'cluster'
+        d['template'] = self.template
+        d['queue_type'] = self.queue_type
+        d['file_type'] = self.info_type
+        d['start_time'] = self.start_time
+        d['processors'] = self.processors
+        d['memory'] = self.memory
+        d['walltime'] = self.walltime
+        d['name'] = self.name
+        d['depend'] = None
+        d['auto_update'] = False
+        d['auto_open'] = self.auto_open or self.auto_update
+        
+        return d
+
+
+class SerialRavenJob(TSSJob):
+    format_name = "xyz"
+    info_type = "Raven"
+    tss_algorithm = "GPR growing string method"
+    
+    def __init__(
+        self,
+        name,
+        session,
+        theory,
+        reactant,
+        product,
+        file_type,
+        auto_update=False,
+        auto_open=False,
+        **raven_kwargs
+    ):
+        super().__init__(
+            name, session, theory, reactant, product, file_type,
+            auto_open=auto_open, auto_update=auto_update
+        )
         self.raven_kwargs = raven_kwargs
         self.to_kill = False
     
     def __repr__(self):
-        return "serial %s job using %s \"%s\"" % (
-            self.info_type, self.file_type, self.name
+        return "serial Raven job using %s \"%s\"" % (
+            self.file_type, self.name
         )
     
     def run(self):
-        from Raven.job_runner import SerialJobRunner
-        from Raven.driver import RavenDriver
+        from sys import executable as python_exe
+        
+        import Raven
+        
         from chimerax.core.commands import run
         from SEQCROW.residue_collection import ResidueCollection
+        
+        raven_path = os.path.dirname(Raven.__file__)
+        raven_exe = os.path.join(raven_path, "bin", "raven.py")
         
         self.start_time = asctime(localtime())
         
@@ -636,84 +832,52 @@ class SerialRavenJob(LocalJob):
             if not os.path.exists(qm_executable):
                 qm_executable = self.session.seqcrow_settings.settings.QCHEM_EXE
         
+        self.write_file(
+            os.path.join(self.scratch_dir, "%s.ini" % self.name),
+            **self.raven_kwargs
+        )
+        
         self.output_name = os.path.join(
             self.scratch_dir, "path.xyz"
         )
+        
+        args = [
+            python_exe, "-m",
+            "Raven", "serial", "executable", qm_executable, "%s.ini" % self.name,
+        ]
+        if self.raven_kwargs["restart"]:
+            args.extend(["restart", self.raven_kwargs["restart"]])
+        
+        log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
+        log.write("executing:\n%s\n\n" % " ".join(args))
+        log.flush()
 
-        job_runner = SerialJobRunner(
-            self.file_type,
-            qm_executable,
-        )
-        
-        def log_func(s, outfile=os.path.join(self.scratch_dir, "seqcrow_log.txt")):
-            with open(outfile, "a") as f:
-                f.write(s + "\n")
-        
-        def seqcrow_killed(obj=self):
-            if self.to_kill:
-                raise SEQCROWSigKill("kill")
-        
-        try:
-            driver = RavenDriver(
-                self.reactant,
-                self.product,
-                self.theory,
-                cwd=self.scratch_dir,
-                nodes=self.raven_kwargs["nodes"],
-                restart=self.raven_kwargs["restart"],
-                kernel=self.raven_kwargs["kernel"],
-                similarity_falloff=self.raven_kwargs["similarity_falloff"],
-                log_func=log_func,
-            )
-            driver.optimize_string(
-                self.raven_kwargs["rms_force_tol"],
-                self.raven_kwargs["max_force_tol"],
-                job_runner,
-                variance_threshold=self.raven_kwargs["variance_threshold"],
-                callback=seqcrow_killed,
-            )
-            driver.print_stationary_points()
-        except SEQCROWSigKill:
-            self.killed = True
-            return
-        
+        if platform == "win32":
+            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+        else:
+            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log)
+
+        self.process.communicate()
+        self.process = None
+
         self.output_name = []
         for f in os.listdir(self.scratch_dir):
+            if not any(f.startswith(s) for s in ["ts", "min"]):
+                continue
             if f.endswith("xyz"):
                 self.output_name.append(os.path.join(self.scratch_dir, f))
     
-    def kill(self):
-        self.session.logger.warning("killing %s..." % self)
-
-        if self.isRunning():
-            self.session.logger.warning(
-                "the current iteration will finish"
-            )
-            
-            self.to_kill = True
-        else:
-            self.killed = True
-       
-        #use exit b/c terminate can cause chimera to freeze
-        super().exit(1)
-    
     def get_json(self):
         d = super().get_json()
-        d.pop("geometry")
         d["format"] = "Raven"
-        d["reactant"] = self.reactant
-        d["product"] = self.product
         d["file_type"] = self.file_type
         d["raven_kwargs"] = self.raven_kwargs
         return d
 
 
-class ParallelRavenJob(LocalClusterJob):
+class ParallelRavenJob(ClusterTSSJob):
     format_name = "xyz"
-    """
-    job for submitting computational chemistry jobs to a queueing
-    system (e.g. Slurm, PBS, etc.) that is running on local hardware
-    """
+
     def __init__(
         self,
         name,
@@ -765,76 +929,73 @@ class ParallelRavenJob(LocalClusterJob):
         )
     
     def run(self):
-        from Raven.job_runner import ParallelClusterJobRunner
-        from Raven.driver import run_raven
+        from sys import executable as python_exe
+        
+        import Raven
+        
         from chimerax.core.commands import run
         from SEQCROW.residue_collection import ResidueCollection
         
-        self.start_time = asctime(localtime()).replace(" ", "_")
+        raven_path = os.path.dirname(Raven.__file__)
+        raven_exe = os.path.join(raven_path, "bin", "raven.py")
         
+        self.start_time = asctime(localtime())
+
         self.scratch_dir = os.path.join(
-            os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
-            "%s_%s" % (self.name, self.start_time.replace(':', '.')), \
+            os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR),
+            "%s_%s" % (self.name, self.start_time.replace(':', '.').replace(" ", "_")),
         )
         
         if not os.path.exists(self.scratch_dir):
             os.makedirs(self.scratch_dir)
 
-        exec_memory = self.memory
-        if not exec_memory:
-            exec_memory = self.theory.memory
-        if not exec_memory:
-            raise ValueError("memory must be non-zero for cluster jobs")
+        extra_kwargs = {
+            "Job": {
+                "queue_type": self.queue_type,
+                "wall": self.walltime,
+                "memory": self.memory,
+            }
+        }
 
-        walltime = self.walltime
-        
-        job_runner = ParallelClusterJobRunner(
-            self.info_type,
-            memory=exec_memory,
-            walltime=self.walltime,
-            template=self.template,
-            wait=90,
-            **self.template_kwargs,
+        self.write_file(
+            os.path.join(self.scratch_dir, "%s.ini" % self.name),
+            **extra_kwargs, **self.raven_kwargs
         )
+
+        job_file = os.path.join(self.scratch_dir, "%s.job" % self.name)
+        with open(job_file, "w") as f:
+            if not isinstance(self.template, Template):
+                self.template = Template(self.template)
+            tm = self.template.render(**self.template_kwargs)
+            f.write(tm)
 
         self.output_name = os.path.join(
             self.scratch_dir, "path.xyz"
         )
         
-        def log_func(s, outfile=os.path.join(self.scratch_dir, "seqcrow_log.txt")):
-            with open(outfile, "a") as f:
-                f.write(s + "\n")
+        args = [
+            python_exe, "-m",
+            "Raven", "parallel", "%s.ini" % self.name, "template", job_file,
+        ]
+        if self.raven_kwargs["restart"]:
+            args.extend(["restart", self.raven_kwargs["restart"]])
         
-        def seqcrow_killed(obj=self):
-            if self.to_kill:
-                raise SEQCROWSigKill("kill")
-        
-        try:
-            driver = RavenDriver(
-                self.reactant,
-                self.product,
-                self.theory,
-                cwd=self.scratch_dir,
-                nodes=self.raven_kwargs["nodes"],
-                restart=self.raven_kwargs["restart"],
-                kernel=self.raven_kwargs["kernel"],
-                similarity_falloff=self.raven_kwargs["similarity_falloff"],
-                log_func=log_func,
-            )
-            driver.optimize_string(
-                self.raven_kwargs["rms_force_tol"],
-                self.raven_kwargs["max_force_tol"],
-                job_runner,
-                variance_threshold=self.raven_kwargs["variance_threshold"],
-                callback=seqcrow_killed,
-            )
-            driver.print_stationary_points()
-        except SEQCROWSigKill:
-            self.killed = True
-            return
+        log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
+        log.write("executing:\n%s\n\n" % " ".join(args))
+        log.flush()
+
+        if platform == "win32":
+            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+        else:
+            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log)
+
+        self.process.communicate()
+        self.process = None
 
         self.output_name = []
         for f in os.listdir(self.scratch_dir):
+            if not any(f.startswith(s) for s in ["ts", "min"]):
+                continue
             if f.endswith("xyz"):
                 self.output_name.append(os.path.join(self.scratch_dir, f))
     
@@ -863,73 +1024,9 @@ class ParallelRavenJob(LocalClusterJob):
         return d
 
 
-class TSSJob(LocalJob):    
-    def __init__(
-        self,
-        name,
-        session,
-        theory,
-        reactant,
-        product,
-        file_type,
-        tss_algorithm,
-        auto_update=False,
-        auto_open=False,
-    ):
-        super().__init__(
-            name, session, theory,
-            auto_open=auto_open, auto_update=auto_update
-        )
-        self.reactant = reactant
-        self.product = product
-        self.file_type = file_type
-        self.tss_algorithm = tss_algorithm
-
-    def write_file(self, filename):
-        input_info = self.session.tss_finder_manager.get_info(
-            self.tss_algorithm
-        )
-        if input_info.get_file_contents:
-            if callable(input_info.get_file_contents):
-                contents, warnings = input_info.get_file_contents(
-                    self.reactant, self.product, self.theory,
-                )
-            else:
-                contents, warnings = input_info.get_file_contents[
-                    self.file_type
-                ](self.reactant, self.product, self.theory)
-
-        else:
-            file_info = self.session.seqcrow_qm_input_manager.get_info(
-                self.file_type
-            )
-        contents, warnings = file_info.get_file_contents(self.theory)
-
-        if isinstance(contents, dict):
-            name, ext = os.path.splitext(outname)
-            for key, item in contents.items():
-                fname = name + ".%s" % key
-                outname = os.path.basename(fname)
-                item = item.replace("{{ name }}", name)
-                with open(fname, "w") as f:
-                    f.write(item)
-        else:
-            outname = os.path.basename(filename)
-            name, ext = os.path.splitext(outname)
-            contents = contents.replace("{{ name }}", name)
-            with open(filename, "w") as f:
-                f.write(contents)
-    
-    def get_json(self):
-        d = super().get_json()
-        d.pop("geometry")
-        d["reactant"] = self.reactant
-        d["product"] = self.product
-        d["file_type"] = self.file_type
-        return d
-
-
 class GaussianSTQNJob(TSSJob):
+    tss_algorithm = "synchornous transit-guided quasi-Newton"
+    
     def run(self):
         self.scratch_dir = os.path.join(
             os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
@@ -975,6 +1072,8 @@ class GaussianSTQNJob(TSSJob):
 
 
 class ORCANEBJob(TSSJob):
+    tss_algorithm = "nudged elastic band"
+
     def run(self):
         self.start_time = asctime(localtime())
 
@@ -1029,6 +1128,8 @@ class ORCANEBJob(TSSJob):
 
 
 class QChemFSMJob(TSSJob):
+    tss_algorithm = "freezing string method"
+    
     def run(self):
         self.start_time = asctime(localtime())
 
@@ -1080,85 +1181,3 @@ class QChemFSMJob(TSSJob):
         d["format"] = "Q-Chem FSM"
         return d
 
-
-class ClusterTSSJob(TSSJob):
-    def __init__(
-        self,
-        name,
-        session,
-        theory,
-        reactant,
-        product,
-        file_type,
-        tss_algorithm,
-        auto_update=False,
-        auto_open=False,
-        queue_type=None,
-        template=None,
-        walltime=2,
-        processors=4,
-        memory=8,
-        template_kwargs=None,
-    ):
-        super().__init__(
-            name, session, theory,
-            auto_open=auto_open, auto_update=auto_update
-        )
-        self.reactant = reactant
-        self.product = product
-        self.file_type = file_type
-        self.tss_algorithm = tss_algorithm
-        self.name = name
-        self.session = session
-        self.theory = theory
-        
-        self.killed = False
-        self.error = False
-        self.output_name = None
-        self.scratch_dir = None
-        self.process = None
-        self.start_time = None
-        self.submitted = False
-        self.template = template
-        self.walltime = walltime
-        self.processors = processors
-        self.memory = memory
-        self.info_type = file_type
-        self.queue_type = queue_type
-        self.cluster_type = session.seqcrow_cluster_scheduling_software_manager.get_queue_manager(
-            queue_type
-        ).get_template(file_type)()
-        self.template_kwargs = dict()
-        self.format_name = self.cluster_type.expected_output_ext
-        if template_kwargs:
-            self.template_kwargs = template_kwargs
-   
-    def get_json(self):
-        d = super().get_json()
-        d.pop("geometry")
-        d["reactant"] = self.reactant
-        d["product"] = self.product
-        d["file_type"] = self.file_type
-
-        d = {
-            "theory": self.theory,
-        }
-
-        d['output'] = self.output_name
-        d['scratch'] = self.scratch_dir
-
-        d['server'] = 'cluster'
-        d['template'] = self.template
-        d['queue_type'] = self.queue_type
-        d['file_type'] = self.info_type
-        d['start_time'] = self.start_time
-        d['processors'] = self.processors
-        d['memory'] = self.memory
-        d['walltime'] = self.walltime
-        d['name'] = self.name
-        d['depend'] = None
-        d['auto_update'] = False
-        d['auto_open'] = self.auto_open or self.auto_update
-        
-        return d
-    

@@ -257,7 +257,7 @@ class BuildRaven(BuildQM, ToolInstance):
         self.copy = copy
 
         save = QAction("&Save Input", self.tool_window.ui_area)
-        save.triggered.connect(self.save_input)
+        save.triggered.connect(self.open_save_dialog)
         #this shortcut interferes with main window's save shortcut
         #I've tried different shortcut contexts to no avail
         #thanks Qt...
@@ -453,21 +453,49 @@ class BuildRaven(BuildQM, ToolInstance):
 
         if tss_info.get_file_contents:
             if callable(tss_info.get_file_contents):
+                kwargs = dict()
+                sig = inspect.signature(tss_info.get_file_contents)
+                defaults = loads(self.raven_settings.stored_defaults)
+                for option, widget in self.job_widget.options.items():
+                    defaults[option] = widget.value
+                    if any(
+                        param.name == option or
+                        param.kind == param.VAR_KEYWORD
+                        for param in sig.parameters.values()
+                    ):
+                        kwargs[option] = defaults[option]
+                
                 contents, warnings = tss_info.get_file_contents(
                     reactant,
                     product,
                     self.theory,
+                    **kwargs,
                 )
             
             else:
+                kwargs = dict()
+                sig = inspect.signature(tss_info.get_file_contents[program])
+                defaults = loads(self.raven_settings.stored_defaults)
+                for option, widget in self.job_widget.options.items():
+                    defaults[option] = widget.value
+                    if any(
+                        param.name == option or
+                        param.kind == param.VAR_KEYWORD
+                        for param in sig.parameters.values()
+                    ):
+                        kwargs[option] = defaults[option]
+                
                 contents, warnings = tss_info.get_file_contents[program](
                     reactant,
                     product,
                     self.theory,
+                    **kwargs,
                 )
         
         else:
-            contents, warnings = self.session.seqcrow_qm_input_manager.get_info(program).get_file_contents(self.theory)
+            contents, warnings = self.session.seqcrow_qm_input_manager.get_info(program).get_file_contents(
+                self.theory,
+            )
         
         return contents, warnings
 
@@ -685,7 +713,25 @@ class BuildRaven(BuildQM, ToolInstance):
         if self.changed:
             self.update_preview()
             self.changed = False
-    
+
+    def open_save_dialog(self):
+        """
+        open a dialog to select the save file location
+        """
+
+        program = self.file_type.currentText()
+        tss_algorithm = self.tss_algorithm.currentText()
+        info = self.session.tss_finder_manager.get_info(tss_algorithm)
+        if not info.save_file_filter:
+            info = self.session.seqcrow_qm_input_manager.get_info(program)
+        self.settings.last_program = program
+        filename, _ = QFileDialog.getSaveFileName(filter=info.save_file_filter)
+
+        if not filename:
+            return
+        
+        self.save_file(filename)
+
     def run_cluster_job(
         self,
         memory,
@@ -825,7 +871,6 @@ class BuildRaven(BuildQM, ToolInstance):
                 reactant,
                 product,
                 program,
-                tss_info,
                 auto_update=auto_update,
                 auto_open=auto_open,
                 **kwargs,

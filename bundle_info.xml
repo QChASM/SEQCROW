@@ -526,6 +526,7 @@
 
     <DataFiles package="Raven">
 		<DataFile>LICENSE</DataFile>
+        <DataDir>bin</DataDir>
     </DataFiles>
 	
 

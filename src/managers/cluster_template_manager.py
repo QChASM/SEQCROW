@@ -103,6 +103,7 @@ class ORCASubmit(ProgramSubmitTemplate):
     expected_input_ext = "inp"
     expected_output_ext = "out"
 
+
 class Psi4Submit(ProgramSubmitTemplate):
     expected_input_ext = "in"
     expected_output_ext = "out"

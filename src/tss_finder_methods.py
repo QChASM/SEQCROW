@@ -1,5 +1,7 @@
 # methods for the TSS finder tool
 
+from configparser import ConfigParser
+
 from AaronTools.utils.utils import combine_dicts
 
 from chimerax.ui.options import FloatOption, Option, IntOption
@@ -81,6 +83,8 @@ class TSSFinder:
     local_job_cls = None
     
     options = dict()
+    
+    save_file_filter = None
     
     @staticmethod
     def fixup_theory(theory, restart_file=None):
@@ -247,6 +251,108 @@ def get_qchem_fes_file_contents(reactant, product, theory):
     
     return out, warnings
 
+def get_raven_input(
+    reactant,
+    product,
+    theory,
+    exec_type=None,
+    rms_force_tol=None,
+    max_force_tol=None,
+    nodes=11,
+    similarity_falloff=5,
+    kernel="rbf",
+    variance_threshold=1e-3,
+    **kwargs,
+):
+    print("kwargs", kwargs)
+    config = ConfigParser()
+    config.add_section("Theory")
+    config.add_section("Job")
+    config.add_section("Raven")
+
+    for section in kwargs:
+        if not kwargs[section]:
+            continue
+        if not hasattr(kwargs[section], "__iter__"):
+            continue
+        if isinstance(kwargs[section], str):
+            continue
+        for option, value in kwargs[section].items():
+            config.set(section, option, str(value))
+    
+    if theory.processors:
+        config.set("Job", "procs", str(theory.processors))
+    if theory.memory:
+        config.set("Job", "exec_memory", str(theory.memory))
+    if exec_type:
+        config.set("Job", "exec_type", exec_type)
+
+    if theory.method:
+        config.set("Theory", "method", theory.method.name)
+    if not theory.method.is_semiempirical:
+        if theory.basis.basis:
+            theory.basis.refresh_elements(reactant)
+            basis_info = ""
+            for basis in theory.basis.basis:
+                basis_info += " ".join(basis.elements)
+                if basis.aux_type:
+                    basis_info += " aux %s" % basis.aux_type
+                basis_info += " %s" % basis.name
+                if basis.user_defined:
+                    basis_info += " %s" % basis.user_defined
+                basis_info += "\n       "
+            config.set("Theory", "basis", basis_info.strip())
+        
+        if theory.basis.ecp:
+            theory.basis.refresh_elements(reactant)
+            ecp_info = ""
+            for basis in theory.basis.ecp:
+                ecp_info += " ".join(basis.elements)
+                ecp_info += " %s" % basis.name
+                if basis.user_defined:
+                    ecp_info += " %s" % basis.user_defined
+                ecp_info += "\n      "
+            config.set("Theory", "ecp", ecp_info.strip())
+    if theory.solvent:
+        config.set("Theory", "solvent", theory.solvent.solvent)
+        config.set("Theory", "solvent_model", theory.solvent.solvent_model)
+    if theory.empirical_dispersion:
+        config.set("Theory", "empirical_dispersion", theory.empirical_dispersion.name)
+    if theory.grid:
+        config.set("Theory", "grid", theory.grid.name)
+    config.set("Theory", "charge", str(theory.charge))
+    config.set("Theory", "multiplicity", str(theory.multiplicity))
+
+    config.set("Raven", "reactant", "reactant.xyz")
+    config.set("Raven", "product", "product.xyz")
+    config.set("Raven", "rms_force_tol", "%.3e" % rms_force_tol)
+    config.set("Raven", "max_force_tol", "%.3e" % max_force_tol)
+    config.set("Raven", "similarity_falloff", "%.3f" % similarity_falloff)
+    config.set("Raven", "variance_threshold", "%.3e" % variance_threshold)
+    config.set("Raven", "kernel", kernel)
+    config.set("Raven", "nodes", str(nodes))
+
+    ini_file = ""
+    for section in config.sections():
+        ini_file += "[%s]\n" % section
+        for option in config.options(section):
+            value = config.get(section, option)
+            ini_file += "%s = %s\n" % (option, value)
+        
+        ini_file += "\n"
+    
+    out = {
+        "ini": ini_file,
+        "reactant.xyz": reactant.write(outfile=False),
+        "product.xyz": product.write(outfile=False),
+    }
+    
+    _, warnings = reactant.write(
+        theory=theory, outfile=False, style=exec_type, return_warnings=True
+    )
+    
+    return out, warnings
+
 
 class STQN(TSSFinder):
     """
@@ -371,6 +477,9 @@ class FSM(TSSFinder):
 
 
 class GPRGSM(TSSFinder):
+    
+    save_file_filter = "Raven input files (*.ini)"
+    
     available_for = ["Gaussian", "ORCA", "Psi4", "Q-Chem"]
     
     options = {
@@ -453,3 +562,17 @@ class GPRGSM(TSSFinder):
         theory.job_type = "force"
         return theory
     
+    get_file_contents = {
+        "Gaussian": lambda *args, exec_type="gaussian", **kwargs: get_raven_input(
+            *args, exec_type=exec_type, **kwargs
+        ),
+        "ORCA": lambda *args, exec_type="orca", **kwargs: get_raven_input(
+            *args, exec_type=exec_type, **kwargs
+        ),
+        "Psi4": lambda *args, exec_type="psi4", **kwargs: get_raven_input(
+            *args, exec_type=exec_type, **kwargs
+        ),
+        "Q-Chem": lambda *args, exec_type="qchem", **kwargs: get_raven_input(
+            *args, exec_type=exec_type, **kwargs
+        ),
+    }
