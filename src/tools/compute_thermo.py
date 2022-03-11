@@ -821,7 +821,7 @@ class Thermochem(ToolInstance):
 
             label = self.thermo_table.cellWidget(row, 0)
             tooltip = label.toolTip()
-            text = label.text().replace("𝛿", "")
+            text = label.text().replace("δ", "")
             sum_label = QLabel(text)
             if "href=" in text:
                 sum_label = QLabel()

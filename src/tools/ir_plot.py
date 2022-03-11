@@ -933,9 +933,8 @@ class IRSpectrum(ToolInstance):
                         return
                     
                     data_list = getattr(freq, data_attr)
-                    frequencies = np.array(
-                        [data.frequency for data in data_list if data.frequency > 0]
-                    )
+                    data_list = [data for data in data_list if data.frequency > 0]
+                    frequencies = np.array([data.frequency for data in data_list])
                     c1 = self.linear.value()
                     c2 = self.quadratic.value()
                     frequencies -= c1 * frequencies + c2 * frequencies ** 2

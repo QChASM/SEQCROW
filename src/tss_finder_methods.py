@@ -197,7 +197,7 @@ def get_orca_neb_file_contents(
         theory=theory, outfile=False, style="orca", return_warnings=True,
     )
     xyz = product.write(style="xyz", outfile=False)
-    return {"inp": orca_inp, "xyz": xyz}, warnings
+    return {"inp": orca_inp, "product.xyz": xyz}, warnings
 
 def fixup_qchem_fsm_theory(
     theory,
