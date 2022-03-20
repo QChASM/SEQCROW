@@ -361,7 +361,7 @@ class STQN(TSSFinder):
     we don't take guesses (yet?), so no opt=QST3
     """
     available_for = ["Gaussian"]
-        
+
     local_job_cls = {
         "Gaussian": GaussianSTQNJob,
     }

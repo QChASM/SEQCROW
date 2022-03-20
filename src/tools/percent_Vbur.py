@@ -245,31 +245,39 @@ class PercentVolumeBuried(ToolInstance):
         steric_layout.addRow("maximum value:", self.map_max)
 
         self.num_pts.setEnabled(self.settings.steric_map)
-        self.steric_map.stateChanged.connect(lambda state, widget=self.num_pts: widget.setEnabled(state == Qt.Checked))
+        self.steric_map.stateChanged.connect(
+            lambda state, widget=self.num_pts: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
+        )
         
         self.include_vbur.setEnabled(self.settings.steric_map)
-        self.steric_map.stateChanged.connect(lambda state, widget=self.include_vbur: widget.setEnabled(state == Qt.Checked))        
+        self.steric_map.stateChanged.connect(
+            lambda state, widget=self.include_vbur: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
+        )
 
         self.map_shape.setEnabled(self.settings.steric_map)
-        self.steric_map.stateChanged.connect(lambda state, widget=self.map_shape: widget.setEnabled(state == Qt.Checked))        
+        self.steric_map.stateChanged.connect(
+            lambda state, widget=self.map_shape: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
+        )
         
         self.auto_minmax.setEnabled(self.settings.steric_map)
-        self.steric_map.stateChanged.connect(lambda state, widget=self.auto_minmax: widget.setEnabled(state == Qt.Checked))        
+        self.steric_map.stateChanged.connect(
+            lambda state, widget=self.auto_minmax: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
+        )
         
         self.map_min.setEnabled(not self.settings.auto_minmax and self.settings.steric_map)
         self.steric_map.stateChanged.connect(
-            lambda state, widget=self.map_min, widget2=self.auto_minmax: widget.setEnabled(state == Qt.Checked and not widget2.isChecked())
+            lambda state, widget=self.map_min, widget2=self.auto_minmax: widget.setEnabled(Qt.CheckState(state) == Qt.Checked and not widget2.isChecked())
         )
         self.auto_minmax.stateChanged.connect(
-            lambda state, widget=self.map_min, widget2=self.steric_map: widget.setEnabled(not state == Qt.Checked and widget2.isChecked())
+            lambda state, widget=self.map_min, widget2=self.steric_map: widget.setEnabled(not Qt.CheckState(state) == Qt.Checked and widget2.isChecked())
         )
 
         self.map_max.setEnabled(not self.settings.auto_minmax and self.settings.steric_map)
         self.steric_map.stateChanged.connect(
-            lambda state, widget=self.map_max, widget2=self.auto_minmax: widget.setEnabled(state == Qt.Checked and not widget2.isChecked())
+            lambda state, widget=self.map_max, widget2=self.auto_minmax: widget.setEnabled(Qt.CheckState(state) == Qt.Checked and not widget2.isChecked())
         )
         self.auto_minmax.stateChanged.connect(
-            lambda state, widget=self.map_max, widget2=self.steric_map: widget.setEnabled(not state == Qt.Checked and widget2.isChecked())
+            lambda state, widget=self.map_max, widget2=self.steric_map: widget.setEnabled(not Qt.CheckState(state) == Qt.Checked and widget2.isChecked())
         )
 
 
@@ -350,7 +358,7 @@ class PercentVolumeBuried(ToolInstance):
 
         copy = QAction("&Copy CSV to clipboard", self.tool_window.ui_area)
         copy.triggered.connect(self.copy_csv)
-        shortcut = QKeySequence(Qt.CTRL + Qt.Key_C)
+        shortcut = QKeySequence(QKeySequence.Copy)
         copy.setShortcut(shortcut)
         export.addAction(copy)
         self.copy = copy
@@ -710,13 +718,14 @@ class StericMap(ChildToolWindow):
     
     def set_data(self, x, y, z, min_alt, max_alt, vbur, radius, include_vbur):
         fig, ax = plt.subplots()
+        cmap = copy.copy(plt.cm.get_cmap("jet"))
+        cmap.set_under('w')
         steric_map = ax.contourf(
             x, y, z,
             extend="min",
-            cmap=copy.copy(plt.cm.get_cmap("jet")),
+            cmap=cmap,
             levels=np.linspace(min_alt, max_alt, num=21)
         )
-        steric_map.cmap.set_under('w')
         ax.contour(
             x, y, z,
             extend="min",

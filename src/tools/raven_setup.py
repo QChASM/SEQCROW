@@ -815,12 +815,23 @@ class BuildRaven(BuildQM, ToolInstance):
 
         self.update_preview()
     
+    def get_local_job_type(self):
+        program = self.file_type.currentText()
+        tss_info = self.tss_algorithm.currentText()
+
+        if program in self.session.seqcrow_job_manager.formats:
+            job_cls = self.session.tss_finder_manager.get_info(tss_info).local_job_cls[program]
+        
+        else:
+            raise NotImplementedError("no provider for running local %s jobs" % program)
+        
+        return job_cls
+    
     def run_local_job(
         self,
         *args,
         name="local_job",
-        auto_update=False,
-        auto_open=False,
+        **job_kwargs,
     ):
         """run job"""
         self.update_theory(update_settings=True)
@@ -871,8 +882,7 @@ class BuildRaven(BuildQM, ToolInstance):
                 reactant,
                 product,
                 program,
-                auto_update=auto_update,
-                auto_open=auto_open,
+                **job_kwargs,
                 **kwargs,
             )
     

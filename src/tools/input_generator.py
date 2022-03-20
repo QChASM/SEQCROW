@@ -1165,7 +1165,20 @@ class BuildQM(ToolInstance):
                 "Submit Job", window_class=PrepClusterJob
             )
 
-    def run_local_job(self, *args, name="local_job", auto_update=False, auto_open=False):
+    def get_local_job_type(self):
+        program = self.file_type.currentText()
+        if program in self.session.seqcrow_job_manager.formats:
+            job_cls = self.session.seqcrow_job_manager.formats[program].run_provider(
+                self.session,
+                program,
+                self.session.seqcrow_job_manager,
+            )
+        else:
+            raise NotImplementedError("no provider for running local %s jobs" % program)
+        
+        return job_cls
+
+    def run_local_job(self, *args, name="local_job", **kwargs):
         """run job"""
         self.update_theory(update_settings=True)
 
@@ -1189,28 +1202,20 @@ class BuildQM(ToolInstance):
                                     for atom in self.theory.geometry.find(con)
                                 ]
 
-        self.settings.last_program = self.file_type.currentText()
-
         program = self.file_type.currentText()
-        if program in self.session.seqcrow_job_manager.formats:
-            job_cls = self.session.seqcrow_job_manager.formats[program].run_provider(
-                self.session,
-                program,
-                self.session.seqcrow_job_manager,
-            )
-            job = job_cls(
-                name,
-                self.session,
-                self.theory,
-                auto_update=auto_update,
-                auto_open=auto_open
-            )
+        self.settings.last_program = program
+
+        job_cls = self.get_local_job_type()
+        job = job_cls(
+            name,
+            self.session,
+            self.theory,
+            **kwargs,
+        )
     
-            self.session.logger.status("adding %s to queue" % name)
+        self.session.logger.status("adding %s to queue" % name)
     
-            self.session.seqcrow_job_manager.add_job(job)
-        else:
-            raise NotImplementedError("no provider for running local %s jobs" % program)
+        self.session.seqcrow_job_manager.add_job(job)
 
         self.update_preview()
 
@@ -1817,7 +1822,7 @@ class JobTypeOption(QWidget):
 
     def opt_checked(self, state):
         """when optimization is checked, switch the tab widget to show optimization settings"""
-        if state == Qt.Checked:
+        if Qt.CheckState(state) == Qt.Checked:
             self.job_type_opts.setCurrentIndex(1)
             if self.form.single_job_type:
                 self.do_freq.blockSignals(True)
@@ -1828,7 +1833,7 @@ class JobTypeOption(QWidget):
 
     def freq_checked(self, state):
         """when frequency is checked, switch the tab widget to show freq settings"""
-        if state == Qt.Checked:
+        if Qt.CheckState(state) == Qt.Checked:
             self.job_type_opts.setCurrentIndex(2)
             if self.form.single_job_type:
                 self.do_geom_opt.blockSignals(True)
@@ -1838,7 +1843,7 @@ class JobTypeOption(QWidget):
             self.job_type_opts.setCurrentIndex(0) 
 
     def chk_state_changed(self, state):
-        if state == Qt.Checked:
+        if Qt.CheckState(state) == Qt.Checked:
             self.chk_file_path.setEnabled(bool(self.form.read_checkpoint_filter))
             self.chk_browse_button.setEnabled(bool(self.form.read_checkpoint_filter))
         else:
@@ -1962,9 +1967,9 @@ class JobTypeOption(QWidget):
 
         self.jobTypeChanged.emit()
 
-    def show_contraints(self, value):
+    def show_contraints(self, state):
         """enable contraints table when doing contrainted optimization"""
-        self.constraints_widget.setEnabled(bool(value))
+        self.constraints_widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
         self.jobTypeChanged.emit()
 
     def getCharge(self, update_settings=True):
@@ -3276,7 +3281,7 @@ class CompactElementList(QTableWidget):
     def sizeHintForRow(self, row):
         if self.cellWidget(row, 0):
             return self.cellWidget(row, 0).maximumHeight()
-        return int(1.5 * self.fontMetrics().boundingRect("QQ").width())
+        return int(1.7 * self.fontMetrics().boundingRect("Qy").width())
 
 
 class BasisOption(QWidget):
@@ -3341,10 +3346,10 @@ class BasisOption(QWidget):
         #make element list roughly as wide as two characters + a scroll bar
         #this keeps the widget as narrow as possible so it doesn't take up the entire screen
         scroll_width = self.style().pixelMetric(QStyle.PM_ScrollBarExtent)
-        self.elements.setMinimumWidth(2 + scroll_width + int(1.5 * self.fontMetrics().boundingRect("QQ").width()))
-        self.elements.setMaximumWidth(2 + scroll_width + int(1.5 * self.fontMetrics().boundingRect("QQ").width()))
+        self.elements.setMinimumWidth(2 + scroll_width + int(1.7 * self.fontMetrics().boundingRect("Qy").width()))
+        self.elements.setMaximumWidth(2 + scroll_width + int(1.7 * self.fontMetrics().boundingRect("Qy").width()))
         #set the max. height too b/c I can't seem to get it to respect setRowStretch
-        self.elements.setMaximumHeight(int(6*self.fontMetrics().boundingRect("QQ").height()))
+        self.elements.setMaximumHeight(int(6*self.fontMetrics().boundingRect("Qy").height()))
         self.layout.addWidget(self.elements, 0, 2, 3, 1, Qt.AlignTop)
 
         self.custom_basis_kw = QLineEdit()
@@ -3519,7 +3524,7 @@ class BasisOption(QWidget):
     def show_gen_path(self, state):
         """show/hide the path to external basis file when the 'builtin' checkbox is toggled"""
         for option in self.gen_options:
-            option.setVisible(state == Qt.Unchecked)
+            option.setVisible(Qt.CheckState(state) == Qt.Unchecked)
 
     def basis_changed(self):
         """tracks changes to basis set dropdown menu
@@ -3836,9 +3841,9 @@ class BasisOption(QWidget):
     def setBasis(self, name=None, custom_kw=None, basis_path=False):
         """set options to match these options"""
         if name is not None:
-            ndx = self.basis_option.findData(name, Qt.MatchExactly)
+            ndx = self.basis_option.findText(name, Qt.MatchExactly)
             if ndx < 0 and name:
-                ndx = self.basis_option.findData("other", Qt.MatchExactly)
+                ndx = self.basis_option.findText("other", Qt.MatchExactly)
                 self.custom_basis_kw.setText(name)
 
             self.basis_option.setCurrentIndex(ndx)
@@ -3863,7 +3868,7 @@ class BasisOption(QWidget):
         if name is None:
             name = "no"
 
-        ndx = self.aux_type.findData(name, Qt.MatchExactly)
+        ndx = self.aux_type.findData(name, flags=Qt.MatchExactly)
         if ndx >= 0:
             self.aux_type.setCurrentIndex(ndx)
             return True
@@ -4535,7 +4540,7 @@ class OneLayerKeyWordOption(QWidget):
         if self.multiline:
             self.new_kw = QTextEdit()
             self.new_kw.setAcceptRichText(False)
-            self.new_kw.setMaximumHeight(int(6*self.fontMetrics().boundingRect("QQ").height()))
+            self.new_kw.setMaximumHeight(int(6*self.fontMetrics().boundingRect("Qy").height()))
         else:
             self.new_kw = QLineEdit()
             self.new_kw.setClearButtonEnabled(True)
@@ -5765,7 +5770,9 @@ class SavePreset(ChildToolWindow):
         self.basis_elements.refresh_basis()
         layout.addRow(self.basis_elements)
 
-        self.basis.stateChanged.connect(lambda state, widget=self.basis_elements: widget.setEnabled(state == Qt.Checked))
+        self.basis.stateChanged.connect(
+            lambda state, widget=self.basis_elements: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
+        )
 
         self.additional = QCheckBox()
         self.additional.setChecked(True)
@@ -5938,9 +5945,12 @@ class PrepLocalJob(ChildToolWindow):
         super().__init__(tool_instance, title, statusbar=False, **kwargs)
 
         self._build_ui()
+        self.change_job_options()
 
         self.form = self.tool_instance.file_type.currentText()
-        self.tool_instance.file_type.currentTextChanged.connect(lambda program, widget=self: widget.__setattr__("form", program))
+        self.tool_instance.file_type.currentTextChanged.connect(
+            self.change_job_options
+        )
 
     def _build_ui(self):
         layout = QFormLayout()
@@ -5950,6 +5960,11 @@ class PrepLocalJob(ChildToolWindow):
         ndx = self.auto_update.findText(self.tool_instance.settings.on_finished)
         self.auto_update.setCurrentIndex(ndx)
         layout.addRow("when finished:", self.auto_update)
+
+        self.options_widget = QGroupBox("")
+        self.options_layout = QFormLayout(self.options_widget)
+        layout.addRow(self.options_widget)
+        self.options = dict()
 
         self.job_name = QLineEdit()
         self.job_name.returnPressed.connect(self.run_job)
@@ -5977,9 +5992,44 @@ class PrepLocalJob(ChildToolWindow):
         auto_open = self.auto_update.currentText() == 'open structure'
         self.tool_instance.settings.on_finished = self.auto_update.currentText()
 
-        self.tool_instance.run_local_job(name=job_name, auto_update=auto_update, auto_open=auto_open)
+        kwargs = dict()
+        for option, widget in self.options.items():
+            kwargs[option] = widget.value
+
+        print(kwargs)
+
+        self.tool_instance.run_local_job(
+            name=job_name, auto_update=auto_update, auto_open=auto_open, **kwargs
+        )
 
         self.status.showMessage("queued \"%s\"; see the log for any details" % job_name)
+
+    def change_job_options(self):
+        for i in range(0, self.options_layout.rowCount()):
+            self.options_layout.removeRow(0)
+
+        job_type = self.tool_instance.get_local_job_type()
+        if not job_type.exec_options:
+            self.options_widget.setTitle("no options for %s jobs" % job_type.info_type)
+            return
+        
+        self.options_widget.setTitle("%s job options" % job_type.info_type)
+        
+        for name, option in job_type.exec_options.items():
+            cls = option[0]
+            kwargs = option[1]
+            if "callback" not in kwargs:
+                kwargs["callback"] = None
+            if "default" not in kwargs:
+                kwargs["default"] = None
+            if "name" not in kwargs:
+                kwargs["name"] = name
+            obj = cls(**kwargs)
+            self.options_layout.addRow(
+                "%s:" % kwargs["name"].replace("_", " "),
+                obj.widget
+            )
+            self.options[name] = obj
 
     def cleanup(self):
         self.tool_instance.job_local_prep = None

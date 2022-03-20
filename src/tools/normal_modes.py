@@ -425,7 +425,7 @@ class NormalModes(ToolInstance):
 
     def change_mw_option(self, state):
         """toggle bool associated with mass-weighting option"""
-        if state == Qt.Checked:
+        if Qt.CheckState(state) == Qt.Checked:
             self.vec_mw_bool = True
         else:
             self.vec_mw_bool = False

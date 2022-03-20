@@ -2,11 +2,14 @@ from sys import platform
 import os
 import subprocess
 from time import asctime, localtime, sleep
+from pathlib import Path
+from shutil import rmtree
 
 from AaronTools.fileIO import FileReader
 from AaronTools.theory import OptimizationJob
 
 from chimerax.core.commands import run
+from chimerax.ui.options import BooleanOption
 
 from jinja2 import Template
 
@@ -19,6 +22,12 @@ from SEQCROW.managers import ADD_FILEREADER
 class LocalJob(QThread):
     format_name = None
     info_type = None
+    exec_options = {
+        "delete_everything_but_output_file": (
+            BooleanOption, {"default": False},
+        ),
+    }
+    
     """job for running computational chemistry software on local hardware"""
     def __init__(
         self,
@@ -28,6 +37,7 @@ class LocalJob(QThread):
         geometry=None,
         auto_update=False,
         auto_open=False,
+        **job_options,
     ):
         """base class of local ORCA, Gaussian, and Psi4 jobs
         name        str - name of job
@@ -47,6 +57,7 @@ class LocalJob(QThread):
         self.scratch_dir = None
         self.process = None
         self.start_time = None
+        self.job_options = job_options
         
         super().__init__()
 
@@ -78,6 +89,7 @@ class LocalJob(QThread):
     def write_file(self, filename):
         input_info = self.session.seqcrow_qm_input_manager.get_info(self.info_type)
         contents, warnings = input_info.get_file_contents(self.theory)
+        self.input_files = []
         if isinstance(contents, dict):
             name, ext = os.path.splitext(filename)
             for key, item in contents.items():
@@ -89,12 +101,14 @@ class LocalJob(QThread):
                     fname = name + ".%s" % key
                 outname = os.path.basename(fname)
                 item = item.replace("{{ name }}", name)
+                self.input_files.append(fname)
                 with open(fname, "w") as f:
                     f.write(item)
         else:
             outname = os.path.basename(filename)
             name, ext = os.path.splitext(outname)
             contents = contents.replace("{{ name }}", name)
+            self.input_files.append(filename)
             with open(filename, "w") as f:
                 f.write(contents)
     
@@ -154,10 +168,36 @@ class LocalJob(QThread):
             for file in self.output_name:
                 run(self.session, "open \"%s\"" % file)
 
+    def remove_extra_files(self):
+        keep_files = [
+            os.path.join(self.scratch_dir, "seqcrow_log.txt"),
+            *self.input_files,
+        ]
+        if isinstance(self.output_name, str):
+            keep_files.append(self.output_name)
+        else:
+            keep_files.extend(self.output_name)
+        
+        for f in keep_files:
+            print(f)
+        
+        keep_paths = [Path(f) for f in keep_files]
+        
+        for f in os.listdir(self.scratch_dir):
+            fname = os.path.join(self.scratch_dir, f)
+            fpath = Path(fname)
+            if not any(fpath == path for path in keep_paths):
+                print("deleting", fname)
+                if fpath.is_file():
+                    os.remove(fname)
+                elif fpath.is_dir():
+                    rmtree(fname)
+
 
 class ORCAJob(LocalJob):
     format_name = "out"
     info_type = "ORCA"
+
     def __repr__(self):
         return "local ORCA job \"%s\"" % self.name
 
@@ -202,6 +242,9 @@ class ORCAJob(LocalJob):
         self.process.communicate()
         self.process = None
 
+        if self.job_options.get("delete_everything_but_output_file", False):
+            self.remove_extra_files()
+
         return 
 
     def get_json(self):
@@ -213,6 +256,15 @@ class ORCAJob(LocalJob):
 class GaussianJob(LocalJob):
     format_name = "log"
     info_type = "Gaussian"
+    exec_options = {
+        "convert_chk_files_to_fchk": (
+            BooleanOption, {"default": False},
+        ),
+        "delete_everything_but_output_file": (
+            BooleanOption, {"default": False},
+        ),
+    }
+    
     def __repr__(self):
         return "local Gaussian job \"%s\"" % self.name
 
@@ -254,6 +306,40 @@ class GaussianJob(LocalJob):
         self.process.communicate()
         self.process = None
 
+        if self.job_options.get("fchk_the_chk_file", False):
+            gau_exe_dir = os.path.dirname(executable)
+            formchk = os.path.join(gau_exe_dir, "formchk")
+            _, ext = os.path.splitext(executable)
+            formchk += ext
+            for f in os.listdir(self.scratch_dir):
+                _, ext = os.path.splitext(f)
+                if ext.lower() == ".chk":
+                    fchk_name = self.name + ".fchk"
+                    args = [formchk, f, fchk_name]
+                    if platform == "win32":
+                        self.process = subprocess.Popen(
+                            args,
+                            cwd=self.scratch_dir,
+                            stdout=log,
+                            stderr=log,
+                            creationflags=subprocess.CREATE_NO_WINDOW,
+                        )
+                    else:
+                        self.process = subprocess.Popen(
+                            args,
+                            cwd=self.scratch_dir,
+                            stdout=log,
+                            stderr=log,
+                        )
+                    if not isinstance(self.output_name, list):
+                        self.output_name = [self.output_name]
+                    self.output_name.append(
+                        os.path.join(self.scratch_dir, fchk_name)
+                    )
+
+        if self.job_options.get("delete_everything_but_output_file", False):
+            self.remove_extra_files()
+
         return 
 
     def get_json(self):
@@ -265,6 +351,7 @@ class GaussianJob(LocalJob):
 class Psi4Job(LocalJob):
     format_name = "dat"
     info_type = "Psi4"
+
     def __repr__(self):
         return "local Psi4 job \"%s\"" % self.name
 
@@ -310,6 +397,9 @@ class Psi4Job(LocalJob):
 
         self.process.communicate()
         self.process = None
+
+        if self.job_options.get("delete_everything_but_output_file", False):
+            self.remove_extra_files()
 
         return 
 
@@ -361,6 +451,9 @@ class SQMJob(LocalJob):
         self.process.communicate()
         self.process = None
 
+        if self.job_options.get("delete_everything_but_output_file", False):
+            self.remove_extra_files()
+
     def get_json(self):
         d = super().get_json()
         d["format"] = "SQM"
@@ -370,6 +463,7 @@ class SQMJob(LocalJob):
 class QChemJob(LocalJob):
     format_name = "out"
     info_type = "Q-Chem"
+
     def __repr__(self):
         return "local Q-Chem job \"%s\"" % self.name
 
@@ -416,6 +510,9 @@ class QChemJob(LocalJob):
 
         self.process.communicate()
         self.process = None
+
+        if self.job_options.get("delete_everything_but_output_file", False):
+            self.remove_extra_files()
 
         return 
 
@@ -563,7 +660,6 @@ class LocalClusterJob(LocalJob):
         return d
 
 
-
 class TSSJob(LocalJob):    
     def __init__(
         self,
@@ -588,6 +684,7 @@ class TSSJob(LocalJob):
         input_info = self.session.tss_finder_manager.get_info(
             self.tss_algorithm
         )
+        self.input_files = []
         if input_info.get_file_contents:
             if callable(input_info.get_file_contents):
                 contents, warnings = input_info.get_file_contents(
@@ -615,12 +712,14 @@ class TSSJob(LocalJob):
                     fname = name + ".%s" % key
                 outname = os.path.basename(fname)
                 item = item.replace("{{ name }}", name)
+                self.input_files.append(fname)
                 with open(fname, "w") as f:
                     f.write(item)
         else:
             outname = os.path.basename(filename)
             name, ext = os.path.splitext(outname)
             contents = contents.replace("{{ name }}", name)
+            self.input_files.append(filename)
             with open(filename, "w") as f:
                 f.write(contents)
     
@@ -691,6 +790,7 @@ class ClusterTSSJob(LocalClusterJob):
         input_info = self.session.tss_finder_manager.get_info(
             self.tss_algorithm
         )
+        self.input_files = []
         if input_info.get_file_contents:
             if callable(input_info.get_file_contents):
                 contents, warnings = input_info.get_file_contents(
@@ -718,12 +818,14 @@ class ClusterTSSJob(LocalClusterJob):
                     fname = name + ".%s" % key
                 outname = os.path.basename(fname)
                 item = item.replace("{{ name }}", name)
+                self.input_files.append(fname)
                 with open(fname, "w") as f:
                     f.write(item)
         else:
             outname = os.path.basename(filename)
             name, ext = os.path.splitext(outname)
             contents = contents.replace("{{ name }}", name)
+            self.input_files.append(filename)
             with open(filename, "w") as f:
                 f.write(contents)
 
@@ -776,6 +878,12 @@ class SerialRavenJob(TSSJob):
             auto_open=auto_open, auto_update=auto_update
         )
         self.raven_kwargs = raven_kwargs
+        self.job_options = dict()
+        for option in raven_kwargs:
+            if option in self.exec_options:
+                self.job_options[option] = self.raven_kwargs[option]
+        for option in self.job_options:
+            self.raven_kwargs.pop(option)
         self.to_kill = False
     
     def __repr__(self):
@@ -836,6 +944,7 @@ class SerialRavenJob(TSSJob):
             os.path.join(self.scratch_dir, "%s.ini" % self.name),
             **self.raven_kwargs
         )
+        self.input_files.append(os.path.join(self.scratch_dir, "raven.json"))
         
         self.output_name = os.path.join(
             self.scratch_dir, "path.xyz"
@@ -862,11 +971,14 @@ class SerialRavenJob(TSSJob):
 
         self.output_name = []
         for f in os.listdir(self.scratch_dir):
-            if not any(f.startswith(s) for s in ["ts", "min"]):
-                continue
+            # if not any(f.startswith(s) for s in ["ts", "min"]):
+            #     continue
             if f.endswith("xyz"):
                 self.output_name.append(os.path.join(self.scratch_dir, f))
-    
+
+        if self.job_options.get("delete_everything_but_output_file", False):
+            self.remove_extra_files()
+
     def get_json(self):
         d = super().get_json()
         d["format"] = "Raven"
@@ -994,8 +1106,8 @@ class ParallelRavenJob(ClusterTSSJob):
 
         self.output_name = []
         for f in os.listdir(self.scratch_dir):
-            if not any(f.startswith(s) for s in ["ts", "min"]):
-                continue
+            # if not any(f.startswith(s) for s in ["ts", "min"]):
+            #     continue
             if f.endswith("xyz"):
                 self.output_name.append(os.path.join(self.scratch_dir, f))
     
@@ -1063,6 +1175,9 @@ class GaussianSTQNJob(TSSJob):
         self.process.communicate()
         self.process = None
 
+        if self.job_options.get("delete_everything_but_output_file", False):
+            self.remove_extra_files()
+
         return 
     
     def get_json(self):
@@ -1119,6 +1234,9 @@ class ORCANEBJob(TSSJob):
         self.process.communicate()
         self.process = None
 
+        if self.job_options.get("delete_everything_but_output_file", False):
+            self.remove_extra_files()
+
         return 
     
     def get_json(self):
@@ -1173,6 +1291,9 @@ class QChemFSMJob(TSSJob):
 
         self.process.communicate()
         self.process = None
+
+        if self.job_options.get("delete_everything_but_output_file", False):
+            self.remove_extra_files()
 
         return 
 

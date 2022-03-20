@@ -126,7 +126,11 @@ class BondEditor(ToolInstance):
         self.bond_color = ColorButton(has_alpha_channel=True, max_size=(16, 16))
         self.bond_color.set_color(self.settings.bond_color)
         self.bond_color.setEnabled(self.bond_halfbond.checkState() != Qt.Checked)
-        self.bond_halfbond.stateChanged.connect(lambda state, widget=self.bond_color: self.bond_color.setEnabled(state != Qt.Checked))
+        self.bond_halfbond.stateChanged.connect(
+            lambda state, widget=self.bond_color: self.bond_color.setEnabled(
+                Qt.CheckState(state) != Qt.Checked
+            )
+        )
         bond_options.addRow("color:", self.bond_color)
         
         self.bond_radius = QDoubleSpinBox()

@@ -516,7 +516,9 @@ class _ElementPicker(ToolInstance):
         do_it.clicked.connect(self.set_selected)
         layout.addRow(do_it)
 
-        self.keep_open.stateChanged.connect(lambda state: do_it.setVisible(state != Qt.Checked))
+        self.keep_open.stateChanged.connect(
+            lambda state: do_it.setVisible(Qt.CheckState(state) != Qt.Checked)
+        )
         self.keep_open.stateChanged.connect(self.element_changed)
 
         self.tool_window.ui_area.setLayout(layout)
@@ -813,7 +815,9 @@ class _SubstituentSelector(ToolInstance):
         do_it.clicked.connect(self.set_sub)
         layout.addRow(do_it)
 
-        self.keep_open.stateChanged.connect(lambda state: do_it.setVisible(state != Qt.Checked))
+        self.keep_open.stateChanged.connect(
+            lambda state: do_it.setVisible(Qt.CheckState(state) != Qt.Checked)
+        )
         self.keep_open.stateChanged.connect(self.sub_changed)
 
         self.substituent_table.table.itemSelectionChanged.connect(self.sub_changed)

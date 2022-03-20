@@ -479,7 +479,7 @@ class IRSpectrum(ToolInstance):
         line_color.set_color(color_cycle[color_ndx - 1])
         line_color.setEnabled(False)
         show_line.stateChanged.connect(
-            lambda state, widget=line_color: widget.setEnabled(state == Qt.Checked)
+            lambda state, widget=line_color: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
         )
         line_widget_layout.insertWidget(2, line_color, 1, Qt.AlignLeft | Qt.AlignVCenter)
         
@@ -496,7 +496,7 @@ class IRSpectrum(ToolInstance):
         line_widget_layout2.insertWidget(1, line_style, 1, Qt.AlignLeft | Qt.AlignVCenter)
         line_widget2.setEnabled(False)
         show_line.stateChanged.connect(
-            lambda state, widget=line_widget2: widget.setEnabled(state == Qt.Checked)
+            lambda state, widget=line_widget2: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
         )
         
         style_group = QTreeWidgetItem(mol_group)
@@ -585,7 +585,7 @@ class IRSpectrum(ToolInstance):
         line_color.set_color(color_cycle[color_ndx])
         line_color.setEnabled(False)
         show_line.stateChanged.connect(
-            lambda state, widget=line_color: widget.setEnabled(state == Qt.Checked)
+            lambda state, widget=line_color: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
         )
         line_widget_layout.insertWidget(2, line_color, 0, Qt.AlignRight | Qt.AlignVCenter)
         
@@ -604,7 +604,7 @@ class IRSpectrum(ToolInstance):
         line_widget_layout2.insertWidget(1, line_style, 1, Qt.AlignLeft | Qt.AlignVCenter)
         line_widget2.setEnabled(False)
         show_line.stateChanged.connect(
-            lambda state, widget=line_widget2: widget.setEnabled(state == Qt.Checked)
+            lambda state, widget=line_widget2: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
         )
         trash_button.clicked.connect(
             lambda *args, child=conformer_item: conf_group_widget.removeChild(style_group)
