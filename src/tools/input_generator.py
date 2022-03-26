@@ -994,6 +994,11 @@ class BuildQM(ToolInstance):
                     self.preview_window.setPreview(contents, warnings)
                 if self.warning_window is not None:
                     self.warning_window.setWarnings(warnings)
+        else:
+            self.update_theory(update_settings=False)
+
+        if self.job_local_prep:
+            self.job_local_prep.eval_conditions()
 
         # profile.disable()
         # profile.print_stats()
@@ -5944,6 +5949,8 @@ class PrepLocalJob(ChildToolWindow):
     def __init__(self, tool_instance, title, **kwargs):
         super().__init__(tool_instance, title, statusbar=False, **kwargs)
 
+        self.conditions = []
+
         self._build_ui()
         self.change_job_options()
 
@@ -5994,6 +6001,9 @@ class PrepLocalJob(ChildToolWindow):
 
         kwargs = dict()
         for option, widget in self.options.items():
+            if not widget.enabled:
+                kwargs[option] = False
+                continue
             kwargs[option] = widget.value
 
         print(kwargs)
@@ -6007,6 +6017,7 @@ class PrepLocalJob(ChildToolWindow):
     def change_job_options(self):
         for i in range(0, self.options_layout.rowCount()):
             self.options_layout.removeRow(0)
+        self.conditions = []
 
         job_type = self.tool_instance.get_local_job_type()
         if not job_type.exec_options:
@@ -6030,6 +6041,18 @@ class PrepLocalJob(ChildToolWindow):
                 obj.widget
             )
             self.options[name] = obj
+            if len(option) > 2:
+                condition = option[2]
+                self.conditions.append((condition, obj))
+
+        self.eval_conditions()
+
+    def eval_conditions(self):
+        for condition, obj in self.conditions:
+            if not self.tool_instance.theory:
+                obj.enabled = False
+                continue
+            obj.enabled = condition(self.tool_instance.theory)
 
     def cleanup(self):
         self.tool_instance.job_local_prep = None

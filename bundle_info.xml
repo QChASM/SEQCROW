@@ -214,11 +214,11 @@
                 <Provider name="Gaussian STQN"/>
                 <Provider name="ORCA NEB"/>
                 <!--
-                I have not gotten this to work
+                I have not gotten Q-Chem jobs to work
                 maybe something in ChimeraX's environment conflicts with Q-Chem
+                -->
                 <Provider name="Q-Chem FSM"/>
                 <Provider name="Q-Chem"/>
-                -->
             </Providers>
             
             <Providers manager="seqcrow_qm_input_manager">

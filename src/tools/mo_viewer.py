@@ -261,7 +261,7 @@ class OrbitalViewer(ToolInstance):
         e_density_layout.addRow(show_e_density)
         
 
-        fukui_group = QGroupBox("Fukui Functions")
+        fukui_group = QGroupBox("Fukui functions")
         fukui_layout = QFormLayout(fukui_group)
         other_surface_layout.addRow(fukui_group)
         

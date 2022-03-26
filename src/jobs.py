@@ -19,7 +19,42 @@ from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.managers import ADD_FILEREADER
 
 
+def allow_chk2fchk(theory):
+    """determine whether we should allow the option to convert
+    .chk files to .fchk files"""
+    try:
+        return "chk" in theory.kwargs["link0"]
+    except KeyError:
+        return False
+
+
 class LocalJob(QThread):
+    """
+    base class for jobs running using local hardware and software
+    
+    attributes:
+    format_name - output file format
+    info_type - program running job
+    exec_options - dict() of options that are available when preparing to
+        run the job locally
+        keys are kwargs passed when creating the job instance, as well
+        as the labels for the options (underscores will be replaced with
+        spaces)
+        values are tuples:
+            - first is the option type (see chimerax.ui.options)
+            - second are kwargs used to instantiate the option
+            - third (option) is a function used to determine whether the
+                option is available
+                function takes a Theory instance as the only argument and
+                returns either True or False for whether the option should
+                be enabled
+                if no third option is given, the option is always available
+    
+    after the job has started/finished, the following attributes will be set:
+    scratch_dir - directory where the job was run
+    start_time - time and date the job started
+    output_name - output file(s) - can be a string if there is only one file
+    """
     format_name = None
     info_type = None
     exec_options = {
@@ -147,13 +182,26 @@ class LocalJob(QThread):
                 ADD_FILEREADER, ([structure], [fr])
             )
         elif hasattr(self.output_name, "__iter__"):
-            for file in self.output_name:
-                fr = FileReader(self.output_name, just_geom=False, all_geom=True)
-                rescol = ResidueCollection(fr)
-                residue_collection.update_chix(structure)
-                self.session.filereader_manager.triggers.activate_trigger(
-                    ADD_FILEREADER, ([structure], [fr])
-                )
+            if isinstance(self.output_name, dict):
+                for fmt, path in self.output_name.items():
+                    fr = FileReader(
+                        (self.output_name, fmt),
+                        just_geom=False,
+                        all_geom=True,
+                    )
+                    rescol = ResidueCollection(fr)
+                    residue_collection.update_chix(structure)
+                    self.session.filereader_manager.triggers.activate_trigger(
+                        ADD_FILEREADER, ([structure], [fr])
+                    )
+            else:
+                for file in self.output_name:
+                    fr = FileReader(self.output_name, just_geom=False, all_geom=True)
+                    rescol = ResidueCollection(fr)
+                    residue_collection.update_chix(structure)
+                    self.session.filereader_manager.triggers.activate_trigger(
+                        ADD_FILEREADER, ([structure], [fr])
+                    )
 
     def open_structure(self):
         if isinstance(self.output_name, str):
@@ -165,8 +213,23 @@ class LocalJob(QThread):
             run(self.session, " ".join(args))
         
         elif hasattr(self.output_name, "__iter__"):
-            for file in self.output_name:
-                run(self.session, "open \"%s\"" % file)
+            if isinstance(self.output_name, dict):
+                for fmt, path in self.output_name.items():
+                    args = [
+                        "open",
+                        "\"%s\"" % path,
+                        "format",
+                        fmt,
+                    ]
+                    if self.theory.job_type and any(
+                        isinstance(job, OptimizationJob) for job in self.theory.job_type
+                    ):
+                        args.extend(["coordsets", "true"])
+                    run(self.session, " ".join(args))
+        
+            else:
+                for file in self.output_name:
+                    run(self.session, "open \"%s\"" % file)
 
     def remove_extra_files(self):
         keep_files = [
@@ -258,7 +321,7 @@ class GaussianJob(LocalJob):
     info_type = "Gaussian"
     exec_options = {
         "convert_chk_files_to_fchk": (
-            BooleanOption, {"default": False},
+            BooleanOption, {"default": False}, allow_chk2fchk,
         ),
         "delete_everything_but_output_file": (
             BooleanOption, {"default": False},
