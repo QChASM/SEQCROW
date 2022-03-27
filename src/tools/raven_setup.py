@@ -1,5 +1,7 @@
 import inspect
 
+import numpy as np
+
 from jinja2 import Template
 from json import loads, dumps
 
@@ -48,6 +50,7 @@ from Qt.QtWidgets import (
     QTreeWidgetItem,
     QSizePolicy,
     QStyle,
+    QVBoxLayout,
 )
 
 
@@ -390,6 +393,7 @@ class BuildRaven(BuildQM, ToolInstance):
         reactant = self.reactant_selector.currentData()
         product = self.product_selector.currentData()
         if reactant is not None and product is not None:
+            self.job_widget.fill_atom_table(reactant, product)
             react_eles = dict()
             prod_eles = dict()
             if reactant.num_atoms != product.num_atoms:
@@ -441,15 +445,24 @@ class BuildRaven(BuildQM, ToolInstance):
         tss_info = self.session.tss_finder_manager.get_info(tss_algorithm)
         program = self.file_type.currentText()
         
+        reactant = self.reactant_selector.currentData()
+        product = self.product_selector.currentData()
+        if not reactant or not product:
+            return ""
+        
         reactant = ResidueCollection(
-            self.reactant_selector.currentData(),
+            reactant,
             bonds_matter=False
         )
+        reactant_ndx = self.job_widget.reactant_order()
+        reactant.atoms = [reactant.atoms[i] for i in reactant_ndx]
 
         product = ResidueCollection(
-            self.product_selector.currentData(),
+            product,
             bonds_matter=False
         )
+        product_ndx = self.job_widget.product_order()
+        product.atoms = [product.atoms[i] for i in product_ndx]
 
         if tss_info.get_file_contents:
             if callable(tss_info.get_file_contents):
@@ -758,7 +771,12 @@ class BuildRaven(BuildQM, ToolInstance):
         template = self.templates[queue_type][program][template_name]
  
         reactant = ResidueCollection(self.reactant_selector.currentData())
+        reactant_ndx = self.job_widget.reactant_order()
+        reactant.atoms = [reactant.atoms[i] for i in reactant_ndx]
+        
         product = ResidueCollection(self.product_selector.currentData())
+        product_ndx = self.job_widget.product_order()
+        product.atoms = [product.atoms[i] for i in product_ndx]
 
         if program in self.session.seqcrow_job_manager.formats:
             job_cls = self.session.tss_finder_manager.get_info(tss_info).cluster_job_cls[program]
@@ -843,7 +861,12 @@ class BuildRaven(BuildQM, ToolInstance):
         self.raven_settings.save()
 
         reactant = ResidueCollection(self.reactant_selector.currentData())
+        reactant_ndx = self.job_widget.reactant_order()
+        reactant.atoms = [reactant.atoms[i] for i in reactant_ndx]
+        
         product = ResidueCollection(self.product_selector.currentData())
+        product_ndx = self.job_widget.product_order()
+        product.atoms = [product.atoms[i] for i in product_ndx]
 
         program = self.file_type.currentText()
         tss_info = self.tss_algorithm.currentText()
@@ -912,6 +935,7 @@ class TSSWidget(QWidget):
         self.settings = settings
         self.job_settings = job_settings
         self.form = init_form
+        self.session = session
         
         self.layout = QGridLayout(self)
         self.tabs = QTabWidget()
@@ -1005,7 +1029,137 @@ class TSSWidget(QWidget):
         
         self.tabs.addTab(solvent_widget, "implicit solvent")
 
+        atom_order = QWidget()
+        atom_order_layout = QVBoxLayout(atom_order)
+
+        self.atom_order_table = QTableWidget()
+        self.atom_order_table.setColumnCount(2)
+        self.atom_order_table.setHorizontalHeaderLabels(["reactant", "product"])
+        self.atom_order_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.atom_order_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Interactive)
+        self.atom_order_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.atom_order_table.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
+        atom_order_layout.insertWidget(0, self.atom_order_table, 1)
+        
+        apply_consistent_order = QPushButton("use systematic ordering")
+        apply_consistent_order.clicked.connect(self.canonical_reorder)
+        atom_order_layout.insertWidget(1, apply_consistent_order, 0)
+
+        self.tabs.addTab(atom_order, "atom order")
+
         self.setOptions(self.form)
+
+    def fill_atom_table(self, reactant, product):
+        self.reactant = reactant
+        self.product = product
+        if not reactant or not product:
+            return
+        
+        if len(reactant.atoms) != len(product.atoms):
+            return
+        
+        reactant_order = [
+            self.atom_order_table.cellWidget(i, 0).currentText() for i in range(
+                0, self.atom_order_table.rowCount()
+            )
+        ]
+        product_order = [
+            self.atom_order_table.cellWidget(i, 1).currentText() for i in range(
+                0, self.atom_order_table.rowCount()
+            )
+        ]
+        self.atom_order_table.setRowCount(0)
+
+        r_atomspecs = [atom.atomspec for atom in reactant.atoms]
+        p_atomspecs = [atom.atomspec for atom in product.atoms]
+
+        for atom1, atom2 in zip(reactant.atoms, product.atoms):
+            row = self.atom_order_table.rowCount()
+            
+            self.atom_order_table.insertRow(row)
+            r_combobox = QComboBox()
+            r_combobox.addItems(r_atomspecs)
+            ndx = -1
+            if row < len(reactant_order):
+                ndx = r_combobox.findText(reactant_order[row])
+            if ndx < 0:
+                ndx = r_combobox.findText(atom1.atomspec)
+            r_combobox.setCurrentIndex(ndx)
+            self.atom_order_table.setCellWidget(row, 0, r_combobox)
+            
+            p_combobox = QComboBox()
+            p_combobox.addItems(p_atomspecs)
+            ndx = -1
+            if row < len(product_order):
+                ndx = p_combobox.findText(product_order[row])
+            if ndx < 0:
+                ndx = p_combobox.findText(atom2.atomspec)
+            p_combobox.setCurrentIndex(ndx)
+            self.atom_order_table.setCellWidget(row, 1, p_combobox)
+
+    def canonical_reorder(self):
+        if not self.reactant or not self.product:
+            self.session.logger.error("reactant or product not set")
+        
+        rescol = ResidueCollection(self.reactant)
+        reactant_invar = set([a.get_neighbor_id() for a in rescol.atoms])
+        ranks = rescol.canonical_rank(invariant=False)
+        for i, rank in enumerate(ranks):
+            combobox = self.atom_order_table.cellWidget(i, 0)
+            combobox.setCurrentIndex(rank)
+    
+        rescol = ResidueCollection(self.product)
+        product_invar = set([a.get_neighbor_id() for a in rescol.atoms])
+        ranks = rescol.canonical_rank(invariant=False)
+        for i, rank in enumerate(ranks):
+            combobox = self.atom_order_table.cellWidget(i, 1)
+            combobox.setCurrentIndex(rank)
+    
+        if reactant_invar != product_invar:
+            self.session.logger.warning(
+                "reactant and product do not have the same bonding pattern\n"
+                "systematic ordering may not be the same for both"
+            )
+    
+    def reactant_order(self):
+        order = np.zeros(self.atom_order_table.rowCount(), dtype=int)
+        for i in range(0, self.atom_order_table.rowCount()):
+            combobox = self.atom_order_table.cellWidget(i, 0)
+            order[i] = combobox.currentIndex()
+        
+        if len(order) != len(np.unique(order)):
+            for i in order:
+                ndx = np.where(order == i)
+                if len(ndx) > 1:
+                    atomspec = self.atom_order_table.cellWidget(ndx[0], 0).currentText()
+                    self.session.logger.warning(
+                            "reactant atom %s specified multiple times: %s" % (
+                                atomspec, ", ".join(["%s" % n for n in (ndx + 1)])
+                        )
+                    )
+            self.session.logger.error("some reactant atom has been specified multiple times")
+        
+        return order
+        
+    def product_order(self):
+        order = np.zeros(self.atom_order_table.rowCount(), dtype=int)
+        for i in range(0, self.atom_order_table.rowCount()):
+            combobox = self.atom_order_table.cellWidget(i, 1)
+            order[i] = combobox.currentIndex()
+        
+        if len(order) != len(np.unique(order)):
+            for i in order:
+                ndx = np.where(order == i)
+                if len(ndx) > 1:
+                    atomspec = self.atom_order_table.cellWidget(ndx[0], 1).currentText()
+                    self.session.logger.warning(
+                            "product atom %s specified multiple times: %s" % (
+                                atomspec, ", ".join(["%s" % n for n in (ndx + 1)])
+                        )
+                    )
+            self.session.logger.error("some product atom has been specified multiple times")
+        
+        return order
     
     def browse_restart(self):
         filename, _ = QFileDialog.getOpenFileName(

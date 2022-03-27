@@ -322,6 +322,20 @@ def get_raven_input(
         config.set("Theory", "grid", theory.grid.name)
     config.set("Theory", "charge", str(theory.charge))
     config.set("Theory", "multiplicity", str(theory.multiplicity))
+    for key, item in theory.kwargs.items():
+        if not item:
+            continue
+        fmt = "\n" + " " * (len(key) + 3)
+        if isinstance(item, list):
+            config.set("Theory", key, fmt.join(item))
+        elif isinstance(item, dict):
+            s = ""
+            for layer, options in item.items():
+                s += "%s " % layer
+                s += ", ".join(options)
+            s += fmt
+            config.set("Theory", key, s.strip())
+
 
     config.set("Raven", "reactant", "reactant.xyz")
     config.set("Raven", "product", "product.xyz")

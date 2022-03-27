@@ -398,6 +398,7 @@ class ResidueCollection(Geometry):
         
             #update bonding to match that of the chimerax molecule
             for atom in all_atoms:
+                atom.connected = set()
                 for atom2 in all_atoms:
                     if atom2.chix_atom not in atom.chix_atom.neighbors:
                         continue
