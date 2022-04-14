@@ -1036,7 +1036,7 @@ class TSSWidget(QWidget):
         self.atom_order_table.setColumnCount(2)
         self.atom_order_table.setHorizontalHeaderLabels(["reactant", "product"])
         self.atom_order_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.atom_order_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Interactive)
+        self.atom_order_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.atom_order_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.atom_order_table.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
         atom_order_layout.insertWidget(0, self.atom_order_table, 1)
@@ -1119,6 +1119,11 @@ class TSSWidget(QWidget):
             self.session.logger.warning(
                 "reactant and product do not have the same bonding pattern\n"
                 "systematic ordering may not be the same for both"
+            )
+            self.session.logger.warning(
+                "it is recommended that you add all bonds that are present in "
+                "the reactant or product to both structures (even if they are"
+                "unreasonable)"
             )
     
     def reactant_order(self):

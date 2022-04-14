@@ -264,7 +264,6 @@ def get_raven_input(
     variance_threshold=1e-3,
     **kwargs,
 ):
-    print("kwargs", kwargs)
     config = ConfigParser()
     config.add_section("Theory")
     config.add_section("Job")

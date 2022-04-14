@@ -21,10 +21,19 @@ class _SEQCROW_API(BundleAPI):
         from SEQCROW import settings as seqcrow_settings
         seqcrow_settings.settings = settings._SEQCROWSettings(session, "SEQCROW")
         if session.ui.is_gui:
-            from .presets import seqcrow_bse, seqcrow_s, seqcrow_vdw, indexLabel
+            from .presets import (
+                seqcrow_bse,
+                seqcrow_bse_cartoon,
+                seqcrow_s,
+                seqcrow_s_cartoon,
+                seqcrow_vdw,
+                indexLabel,
+            )
 
             session.presets.add_presets("SEQCROW", {"ball-stick-endcap":lambda p=seqcrow_bse: p(session)})
+            session.presets.add_presets("SEQCROW", {"ball-stick-endcap 2":lambda p=seqcrow_bse_cartoon: p(session)})
             session.presets.add_presets("SEQCROW", {"sticks":lambda p=seqcrow_s: p(session)})
+            session.presets.add_presets("SEQCROW", {"sticks 2":lambda p=seqcrow_s_cartoon: p(session)})
             session.presets.add_presets("SEQCROW", {"VDW":lambda p=seqcrow_vdw: p(session)})
             session.presets.add_presets("SEQCROW", {"index labels":lambda p=indexLabel: p(session)})
 
