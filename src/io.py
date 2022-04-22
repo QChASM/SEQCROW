@@ -1,4 +1,4 @@
-def open_aarontools(session, stream, file_name, format_name=None, coordsets=False):
+def open_aarontools(session, stream, file_name, format_name=None, coordsets=None):
     from AaronTools.fileIO import FileReader
     from SEQCROW.residue_collection import ResidueCollection
     from SEQCROW.managers import ADD_FILEREADER
@@ -55,11 +55,21 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
     #associate the AaronTools FileReader with each structure
     session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([structure], [fr]))
 
+
+    if fr.all_geom and "energy" in fr.other and (
+        coordsets is None or coordsets is True
+    ):
+        from SEQCROW.tools import EnergyPlot
+        nrg_plot = EnergyPlot(session, structure, fr)
+        if not nrg_plot.opened:
+            warn("energy plot could not be opened\n" + \
+                 "there might be a mismatch between energy entries and structure entries in %s" % file_name)
+            nrg_plot.delete()
+    
     coordsets = coordsets and fr.all_geom
 
     if coordsets:
         from chimerax.std_commands.coordset_gui import CoordinateSetSlider
-        from SEQCROW.tools import EnergyPlot
                 
         slider = CoordinateSetSlider(session, structure)
 
@@ -67,13 +77,6 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=Fals
             structure.active_coordset_id = structure.num_coordsets
             if coordsets:
                 slider.set_slider(structure.num_coordsets)
-
-        if "energy" in fr.other:
-            nrg_plot = EnergyPlot(session, structure, fr)
-            if not nrg_plot.opened:
-                warn("energy plot could not be opened\n" + \
-                     "there might be a mismatch between energy entries and structure entries in %s" % file_name)
-                nrg_plot.delete()
 
     if format_name == "Gaussian input file":
         a_or_an = "a"
