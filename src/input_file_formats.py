@@ -4,6 +4,13 @@ run local jobs using the input files
 """
 
 from AaronTools.theory import *
+from AaronTools.fileIO import FileWriter
+from AaronTools.theory.implicit_solvent import (
+    KNOWN_GAUSSIAN_SOLVENTS,
+    KNOWN_ORCA_SOLVENTS,
+    KNOWN_PSI4_SOLVENTS,
+    KNOWN_XTB_SOLVENTS,
+)
 
 from SEQCROW.tools.input_generator import (
     KeywordOptions,
@@ -76,14 +83,10 @@ class QMInputFileInfo:
     # whether or not high-precision vibrational mode dispacement vectors can be requested
     # basically Gaussian-only option
     hpmodes_available = False
-    
-    # availale solvent models
-    # if there are no solvent models, the widget will be disabled
-    solvent_models = None
-    
+
     # availale solvents
-    # if all solvents are availale for all solvent models, can simply be a list
-    # otherwise, should be a dict with the models as the keys
+    # dict with the models as the keys and the list of solvents available
+    # for that model as the values
     solvents = None
     
     # availale methods - should be list
@@ -627,10 +630,60 @@ class QChemKeywordOptions(KeywordOptions):
             )
 
 
+class XTBKeywordOptions(KeywordOptions):
+    items = {
+        'xcontrol': XTB_CONTROL_BLOCKS,
+        'command line': XTB_COMMAND_LINE,
+    }
+
+    previous_option_name = "previous_xtb_options"
+    last_option_name = "last_xtb_options"
+
+    @classmethod
+    def get_options_for(cls, name, last, previous):
+        if name == 'xcontrol':
+            if last is None:
+                last_dict = {}
+            else:
+                last_dict = last
+
+            if previous is None:
+                previous_dict = {}
+            else:
+                previous_dict = previous
+
+            return TwoLayerKeyWordOption(
+                'xcontrol',
+                last_dict,
+                previous_dict,
+                "double click to use $%s\n\t%s\n$end",
+                one_opt_per_kw=True,
+                allow_dup=False,
+            )
+            
+        if name == 'command line':
+            if last is None:
+                last_dict = {}
+            else:
+                last_dict = last
+
+            if previous is None:
+                previous_dict = {}
+            else:
+                previous_dict = previous
+
+            return TwoLayerKeyWordOption(
+                'command line',
+                last_dict,
+                previous_dict,
+                "double click to use --%s %s",
+                one_opt_per_kw=True,
+                allow_dup=False,
+            )
+
+
 class GaussianFileInfo(QMInputFileInfo):
     name = "Gaussian"
-
-    allow_raven = True
 
     initial_options = {
         GAUSSIAN_ROUTE: {
@@ -672,8 +725,7 @@ class GaussianFileInfo(QMInputFileInfo):
     read_checkpoint_filter = "Gaussian checkpoint files (*.chk)"
     raman_available = True
     hpmodes_available = True
-    solvent_models = ImplicitSolvent.KNOWN_GAUSSIAN_MODELS
-    solvents = ImplicitSolvent.KNOWN_GAUSSIAN_SOLVENTS
+    solvents = KNOWN_GAUSSIAN_SOLVENTS
     methods = [
         "B3LYP",
         "M06",
@@ -766,8 +818,6 @@ class GaussianFileInfo(QMInputFileInfo):
 class ORCAFileInfo(QMInputFileInfo):
     name = "ORCA"
 
-    allow_raven = True
-  
     initial_presets = {
         "quick optimize":{
             "theory": Theory(
@@ -806,11 +856,7 @@ class ORCAFileInfo(QMInputFileInfo):
     basis_file_filter = "Basis Set Files (*.basis)"
     read_checkpoint_filter = "ORCA orbital files (*.gbw);;ORCA Hessian files (*.hess)"
     raman_available = True
-    solvent_models = ["CPCM", "SMD"]
-    solvents = {
-        "CPCM": ImplicitSolvent.KNOWN_ORCA_CPCM_SOLVENTS,
-        "SMD": ImplicitSolvent.KNOWN_ORCA_SMD_SOLVENTS,
-    }
+    solvents = KNOWN_ORCA_SOLVENTS
     methods = [
         "B3LYP",
         "M06",
@@ -952,8 +998,6 @@ class ORCAFileInfo(QMInputFileInfo):
 
 class Psi4FileInfo(QMInputFileInfo):
     name = "Psi4"
-    
-    allow_raven = True
 
     save_file_filter = "Psi4 input files (*.in)"
     basis_file_filter = "Basis Set Files (*.gbs)"
@@ -1061,8 +1105,7 @@ class Psi4FileInfo(QMInputFileInfo):
         "aug-cc-pVTZ",
         "6-311+G**",
     ]
-    solvent_models = ImplicitSolvent.KNOWN_PSI4_MODELS
-    solvents = ImplicitSolvent.KNOWN_PSI4_SOLVENTS
+    solvents = KNOWN_PSI4_SOLVENTS
     aux_options = BasisSet.PSI4_AUX
     keyword_options = Psi4KeywordOptions
     
@@ -1136,9 +1179,7 @@ class SQMFileInfo(QMInputFileInfo):
 
 class QChemFileInfo(QMInputFileInfo):
     name = "Q-Chem"
-    
-    allow_raven = True
-    
+
     single_job_type = True
     
     initial_presets = {
@@ -1273,3 +1314,30 @@ class QChemFileInfo(QMInputFileInfo):
                 rem['DORAMAN'] = 'TRUE'
 
         return {QCHEM_REM: rem}
+
+
+class XTBFileInfo(QMInputFileInfo):
+    name = "xTB"
+    
+    initial_presets = {}
+    initial_options = {}
+    
+    save_file_filter = "xTB input file (*.xc)"
+    memory = False
+    solvents = KNOWN_XTB_SOLVENTS
+    basis_sets = None
+    keyword_options = XTBKeywordOptions
+    methods = [
+        "GFN-FF",
+        "GFN1-xTB",
+        "GFN2-xTB",
+    ]
+
+    single_job_type = True
+
+    def get_file_contents(self, theory):
+        contents, warnings = FileWriter.write_xtb(
+            theory.geometry, theory, outfile=False, return_warnings=True,
+        )
+        return contents, warnings
+    

@@ -256,8 +256,8 @@ def get_raven_input(
     product,
     theory,
     exec_type=None,
-    rms_force_tol=None,
-    max_force_tol=None,
+    rms_disp_tol=None,
+    max_disp_tol=None,
     nodes=11,
     similarity_falloff=5,
     kernel="rbf",
@@ -338,8 +338,8 @@ def get_raven_input(
 
     config.set("Raven", "reactant", "reactant.xyz")
     config.set("Raven", "product", "product.xyz")
-    config.set("Raven", "rms_force_tol", "%.3e" % rms_force_tol)
-    config.set("Raven", "max_force_tol", "%.3e" % max_force_tol)
+    config.set("Raven", "rms_force_tol", "%.3e" % rms_disp_tol)
+    config.set("Raven", "max_force_tol", "%.3e" % max_disp_tol)
     config.set("Raven", "similarity_falloff", "%.3f" % similarity_falloff)
     config.set("Raven", "variance_threshold", "%.3e" % variance_threshold)
     config.set("Raven", "kernel", kernel)
@@ -365,6 +365,46 @@ def get_raven_input(
     )
     
     return out, warnings
+
+def fixup_xtb_mdpf_theory(
+    theory,
+    nrun=1,
+    nopt=20,
+    anopt=15,
+    kpush=0.003,
+    kpull=-0.015,
+    alp=1.2,
+    restart_file=None,
+):
+    theory.kwargs = combine_dicts(
+        {
+            "xcontrol": {
+                "path": [
+                    "nrun=%i" % nrun,
+                    "nopt=%i" % nopt,
+                    "anopt=%i" % anopt,
+                    "kpush=%.3f" % kpush,
+                    "kpull=%.3f" % kpull,
+                    "alp=%.2f" % alp,
+                ]
+            }
+        },
+        theory.kwargs,
+    )
+    return theory
+
+def get_xtb_mdpf_file_contents(reactant, product, theory):
+    contents, warnings = reactant.write(
+        theory=theory,
+        outfile=False,
+        style="xtb",
+        return_warnings=True,
+        command_line={"path": ["product.xyz"]},
+    )
+    contents["product.xyz"] = product.write(outfile=False, style="xyz")
+    return contents, warnings
+
+
 
 
 class STQN(TSSFinder):
@@ -532,24 +572,24 @@ class GPRGSM(TSSFinder):
                 "default": 0.001,
             }
         ),
-        "rms_force_tol": (
+        "rms_disp_tol": (
             FloatOption, {
                 "min": 1e-3,
                 "max": 2e-2,
                 "decimal_places": 4,
                 "step": 5e-4,
                 "default": 2.5e-3,
-                "name": "RMS force tol.",
+                "name": "RMS disp. tol.",
             }
         ),
-        "max_force_tol": (
+        "max_disp_tol": (
             FloatOption, {
                 "min": 1e-3,
                 "max": 2e-2,
                 "decimal_places": 4,
                 "step": 5e-4,
                 "default": 2.5e-3,
-                "name": "max. force tol.",
+                "name": "max. disp. tol.",
             }
         ),
     }
@@ -588,4 +628,74 @@ class GPRGSM(TSSFinder):
         "Q-Chem": lambda *args, exec_type="qchem", **kwargs: get_raven_input(
             *args, exec_type=exec_type, **kwargs
         ),
+    }
+
+
+class MDPF(TSSFinder):
+    
+    save_file_filter = "xTB input files (*.xc)"
+    
+    available_for = ["xTB"]
+    
+    options = {
+        "nrun": (
+            IntOption, {
+                "min": 1,
+                "max": 25,
+                "default": 1,
+                "name": "pathfinder runs",
+            }
+        ),
+        "nopt": (
+            IntOption, {
+                "min": 1,
+                "max": 25,
+                "default": 20,
+                "name": "path points",
+            }
+        ),
+        "anopt": (
+            IntOption, {
+                "min": 1,
+                "max": 25,
+                "default": 20,
+                "name": "optimization cycles",
+            }
+        ),
+        "kpush": (
+            FloatOption, {
+                "min": -1,
+                "max": 1,
+                "step": 5e-3,
+                "default": 0.003,
+                "name": "reactant push factor",
+            }
+        ),
+        "kpull": (
+            FloatOption, {
+                "min": -1,
+                "max": 1,
+                "step": 5e-3,
+                "default": -0.015,
+                "name": "product pull factor",
+            }
+        ),
+        "alp": (
+            FloatOption, {
+                "min": 1e-2,
+                "max": 5,
+                "step": 5e-1,
+                "default": 1.2,
+                "name": "RMSD width",
+            }
+        ),
+
+    }
+    
+    fixup_theory = {
+        "xTB": fixup_xtb_mdpf_theory
+    }
+    
+    get_file_contents = {
+        "xTB": get_xtb_mdpf_file_contents,
     }

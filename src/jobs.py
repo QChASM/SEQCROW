@@ -6,6 +6,7 @@ from pathlib import Path
 from shutil import rmtree
 
 from AaronTools.fileIO import FileReader
+from AaronTools.geometry import Geometry
 from AaronTools.theory import OptimizationJob
 
 from chimerax.core.commands import run
@@ -82,8 +83,11 @@ class LocalJob(QThread):
         self.name = name
         self.session = session
         self.theory = theory
+        self.geometry = geometry
         if geometry:
             self.theory.geometry = geometry
+        else:
+            self.geometry = self.theory.geometry
         self.auto_update = auto_update
         self.auto_open = auto_open
         self.killed = False
@@ -152,7 +156,7 @@ class LocalJob(QThread):
 
         d = {
             "theory": self.theory,
-            "geometry": Geometry(self.theory.geometry),
+            "geometry": Geometry(self.geometry),
         }
 
         d['output'] = self.output_name
@@ -164,6 +168,7 @@ class LocalJob(QThread):
         d['depend'] = None
         d['auto_update'] = False
         d['auto_open'] = self.auto_open or self.auto_update
+        d['job_options'] = self.job_options
 
         return d
 
@@ -230,6 +235,36 @@ class LocalJob(QThread):
             else:
                 for file in self.output_name:
                     run(self.session, "open \"%s\"" % file)
+
+    def get_errors(self):
+        check_for_errors = []
+        if isinstance(self.output_name, str):
+            check_for_errors.append((self.output_name, self.format_name, None))
+
+        elif hasattr(self.output_name, "__iter__"):
+            if isinstance(self.output_name, dict):
+                for fmt, path in self.output_name.items():
+                    check_for_errors.append((path, fmt, None))
+
+            else:
+                for file in self.output_name:
+                    check_for_errors.append(file)
+        
+        error_codes = []
+        error_msgs = []
+        frs = []
+        for file in check_for_errors:
+            try:
+                fr = FileReader(file, just_geom=False)
+                frs.append(fr)
+                error = fr["error"]
+                error_msg = fr["error_msg"]
+                error_codes.append(error)
+                error_msgs.append(error_msg)
+            except (NotImplementedError, KeyError, FileNotFoundError):
+                continue
+        
+        return error_codes, error_msgs, frs
 
     def remove_extra_files(self):
         keep_files = [
@@ -585,6 +620,70 @@ class QChemJob(LocalJob):
         return d
 
 
+class XTBJob(LocalJob):
+    format_name = "xyz"
+    info_type = "XTB"
+
+    def __repr__(self):
+        return "local XTB job \"%s\"" % self.name
+
+    def run(self):
+        self.start_time = asctime(localtime())
+
+        self.scratch_dir = os.path.join(
+            os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR),
+            "%s %s" % (self.name, self.start_time.replace(':', '.')),
+        )
+
+        if not os.path.exists(self.scratch_dir):
+            os.makedirs(self.scratch_dir)
+
+        infile = self.name
+        infile = infile.replace(' ', '_')
+        infile_path = os.path.join(self.scratch_dir, infile)
+        self.write_file(infile_path)
+        executable = os.path.abspath(self.session.seqcrow_settings.settings.XTB_EXE)
+        if not os.path.exists(executable):
+            executable = self.session.seqcrow_settings.settings.XTB_EXE
+
+        args = self.theory.get_xtb_cmd(return_warnings=False, split_words=True)
+        args[0] = executable
+        
+        self.output_name = os.path.join(self.scratch_dir, self.name + '.out')
+        outfile = open(self.output_name, 'w')
+
+        log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
+        log.write("executing:\n%s\n\n" % " ".join(args))
+
+        log.close()
+        log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'a')
+
+        if platform == "win32":
+            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+        else:        
+            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log)
+
+        self.process.communicate()
+        self.process = None
+
+        self.output_name = dict()
+        for f in os.listdir(self.scratch_dir):
+            if f.endswith("xyz") and self.name not in f:
+                self.output_name["xyz"] = f
+            elif f == "g98.out":
+                self.output_name["log"] = f
+
+        if self.job_options.get("delete_everything_but_output_file", False):
+            self.remove_extra_files()
+
+        return 
+
+    def get_json(self):
+        d = super().get_json()
+        d["format"] = "XTB"
+        return d
+
+
 class LocalClusterJob(LocalJob):
     format_name = None
     """
@@ -732,8 +831,10 @@ class TSSJob(LocalJob):
         reactant,
         product,
         file_type,
+        algorithm_kwargs,
         auto_update=False,
         auto_open=False,
+        **job_options,
     ):
         super().__init__(
             name, session, theory,
@@ -742,6 +843,8 @@ class TSSJob(LocalJob):
         self.reactant = reactant
         self.product = product
         self.file_type = file_type
+        self.algorithm_kwargs = algorithm_kwargs
+        self.job_options = job_options
 
     def write_file(self, filename, **kwargs):
         input_info = self.session.tss_finder_manager.get_info(
@@ -789,9 +892,10 @@ class TSSJob(LocalJob):
     def get_json(self):
         d = super().get_json()
         d.pop("geometry")
-        d["reactant"] = self.reactant
-        d["product"] = self.product
+        d["reactant"] = Geometry(self.reactant)
+        d["product"] = Geometry(self.product)
         d["file_type"] = self.file_type
+        d["algorithm_kwargs"] = self.algorithm_kwargs
         return d
 
 
@@ -805,6 +909,7 @@ class ClusterTSSJob(LocalClusterJob):
         product,
         file_type,
         tss_algorithm,
+        algorithm_kwargs,
         auto_update=False,
         auto_open=False,
         queue_type=None,
@@ -827,6 +932,7 @@ class ClusterTSSJob(LocalClusterJob):
         self.name = name
         self.session = session
         self.theory = theory
+        self.algorithm_kwargs = algorithm_kwargs
         
         self.killed = False
         self.error = False
@@ -895,10 +1001,11 @@ class ClusterTSSJob(LocalClusterJob):
     def get_json(self):
         d = super().get_json()
         d.pop("geometry")
-        d["reactant"] = self.reactant
-        d["product"] = self.product
+        d["reactant"] = Geometry(self.reactant)
+        d["product"] = Geometry(self.product)
         d["file_type"] = self.file_type
         d['tss_algorithm'] = self.tss_algorithm
+        d['algorithm_kwargs'] = self.algorithm_kwargs
 
         d['output'] = self.output_name
         d['scratch'] = self.scratch_dir
@@ -923,31 +1030,6 @@ class SerialRavenJob(TSSJob):
     format_name = "xyz"
     info_type = "Raven"
     tss_algorithm = "GPR growing string method"
-    
-    def __init__(
-        self,
-        name,
-        session,
-        theory,
-        reactant,
-        product,
-        file_type,
-        auto_update=False,
-        auto_open=False,
-        **raven_kwargs
-    ):
-        super().__init__(
-            name, session, theory, reactant, product, file_type,
-            auto_open=auto_open, auto_update=auto_update
-        )
-        self.raven_kwargs = raven_kwargs
-        self.job_options = dict()
-        for option in raven_kwargs:
-            if option in self.exec_options:
-                self.job_options[option] = self.raven_kwargs[option]
-        for option in self.job_options:
-            self.raven_kwargs.pop(option)
-        self.to_kill = False
     
     def __repr__(self):
         return "serial Raven job using %s \"%s\"" % (
@@ -1005,7 +1087,7 @@ class SerialRavenJob(TSSJob):
         
         self.write_file(
             os.path.join(self.scratch_dir, "%s.ini" % self.name),
-            **self.raven_kwargs
+            **self.algorithm_kwargs
         )
         self.input_files.append(os.path.join(self.scratch_dir, "raven.json"))
         
@@ -1017,8 +1099,8 @@ class SerialRavenJob(TSSJob):
             python_exe, "-m",
             "Raven", "serial", "executable", qm_executable, "%s.ini" % self.name,
         ]
-        if self.raven_kwargs["restart"]:
-            args.extend(["restart", self.raven_kwargs["restart"]])
+        if self.algorithm_kwargs["restart"]:
+            args.extend(["restart", self.algorithm_kwargs["restart"]])
         
         log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
         log.write("executing:\n%s\n\n" % " ".join(args))
@@ -1046,57 +1128,11 @@ class SerialRavenJob(TSSJob):
         d = super().get_json()
         d["format"] = "Raven"
         d["file_type"] = self.file_type
-        d["raven_kwargs"] = self.raven_kwargs
         return d
 
 
 class ParallelRavenJob(ClusterTSSJob):
     format_name = "xyz"
-
-    def __init__(
-        self,
-        name,
-        session,
-        theory,
-        file_type,
-        reactant,
-        product,
-        tss_algorithm,
-        queue_type,
-        auto_update=False,
-        auto_open=False,
-        template=None,
-        walltime=2,
-        processors=4,
-        memory=8,
-        template_kwargs=None,
-        **raven_kwargs,
-    ):
-        """
-        base class of local ORCA, Gaussian, and Psi4 cluster jobs
-        name        str - name of job
-        session     chimerax session object
-        theory      AaronTools.theory.Theory or a dictionary with a saved job's settings
-        """
-        super().__init__(
-            name,
-            session,
-            theory,
-            file_type,
-            queue_type=queue_type,
-            auto_update=auto_update,
-            auto_open=auto_open,
-            template=template,
-            walltime=walltime,
-            processors=processors,
-            memory=memory,
-            template_kwargs=template_kwargs,
-        )
-
-        self.reactant = reactant
-        self.product = product
-        self.raven_kwargs = raven_kwargs
-        self.to_kill = False
 
     def __repr__(self):
         return "local cluster %s job \"%s\"" % (
@@ -1134,7 +1170,7 @@ class ParallelRavenJob(ClusterTSSJob):
 
         self.write_file(
             os.path.join(self.scratch_dir, "%s.ini" % self.name),
-            **extra_kwargs, **self.raven_kwargs
+            **extra_kwargs, **self.algorithm_kwargs
         )
 
         job_file = os.path.join(self.scratch_dir, "%s.job" % self.name)
@@ -1152,8 +1188,8 @@ class ParallelRavenJob(ClusterTSSJob):
             python_exe, "-m",
             "Raven", "parallel", "%s.ini" % self.name, "template", job_file,
         ]
-        if self.raven_kwargs["restart"]:
-            args.extend(["restart", self.raven_kwargs["restart"]])
+        if self.algorithm_kwargs["restart"]:
+            args.extend(["restart", self.algorithm_kwargs["restart"]])
         
         log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
         log.write("executing:\n%s\n\n" % " ".join(args))
@@ -1201,6 +1237,7 @@ class ParallelRavenJob(ClusterTSSJob):
 
 class GaussianSTQNJob(TSSJob):
     tss_algorithm = "synchornous transit-guided quasi-Newton"
+    format_name = "log"
     
     def run(self):
         self.scratch_dir = os.path.join(
@@ -1251,6 +1288,7 @@ class GaussianSTQNJob(TSSJob):
 
 class ORCANEBJob(TSSJob):
     tss_algorithm = "nudged elastic band"
+    format_name = "out"
 
     def run(self):
         self.start_time = asctime(localtime())
@@ -1310,6 +1348,7 @@ class ORCANEBJob(TSSJob):
 
 class QChemFSMJob(TSSJob):
     tss_algorithm = "freezing string method"
+    format_name = "out"
     
     def run(self):
         self.start_time = asctime(localtime())

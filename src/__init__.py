@@ -230,7 +230,7 @@ class _SEQCROW_API(BundleAPI):
         """
         start tools
         """
-        if ti.name == "Browse AaronTools Libraries":
+        if ti.name == "AaronTools Fragment Library":
             from .tools import AaronTools_Library
             tool = AaronTools_Library(session, ti.name)
             return tool
@@ -582,6 +582,9 @@ class _SEQCROW_API(BundleAPI):
             elif name == "Q-Chem":
                 from SEQCROW.input_file_formats import QChemFileInfo
                 return QChemFileInfo()
+            elif name == "xTB":
+                from SEQCROW.input_file_formats import XTBFileInfo
+                return XTBFileInfo()
 
         elif mgr is session.seqcrow_job_manager:
             if name == "Gaussian":
@@ -599,6 +602,9 @@ class _SEQCROW_API(BundleAPI):
             elif name == "Q-Chem":
                 from SEQCROW.jobs import QChemJob
                 return QChemJob
+            elif name == "xTB":
+                from SEQCROW.jobs import XTBJob
+                return XTBJob
             elif name == "Raven":
                 from SEQCROW.jobs import SerialRavenJob
                 return SerialRavenJob
@@ -645,6 +651,10 @@ class _SEQCROW_API(BundleAPI):
             elif name == "SQM":
                 from .managers.cluster_template_manager import SQMSlurmTemplate
                 return SQMSlurmTemplate
+             
+            elif name == "xTB":
+                from .managers.cluster_template_manager import XTBSlurmTemplate
+                return XTBSlurmTemplate
  
         elif mgr is session.seqcrow_pbs_manager:
             if name == "Gaussian":
@@ -666,6 +676,10 @@ class _SEQCROW_API(BundleAPI):
             elif name == "SQM":
                 from .managers.cluster_template_manager import SQMPBSTemplate
                 return SQMPBSTemplate
+            
+            elif name == "xTB":
+                from .managers.cluster_template_manager import XTBPBSTemplate
+                return XTBPBSTemplate
 
         elif mgr is session.seqcrow_sge_manager:
             if name == "Gaussian":
@@ -687,6 +701,10 @@ class _SEQCROW_API(BundleAPI):
             elif name == "SQM":
                 from .managers.cluster_template_manager import SQMSGETemplate
                 return SQMSGETemplate
+            
+            elif name == "xTB":
+                from .managers.cluster_template_manager import XTBSGETemplate
+                return XTBSGETemplate
 
         elif mgr is session.seqcrow_lsf_manager:
             if name == "Gaussian":
@@ -708,6 +726,10 @@ class _SEQCROW_API(BundleAPI):
             elif name == "SQM":
                 from .managers.cluster_template_manager import SQMLSFTemplate
                 return SQMLSFTemplate
+            
+            elif name == "xTB":
+                from .managers.cluster_template_manager import XTBLSFTemplate
+                return XTBLSFTemplate
 
         elif mgr is session.tss_finder_manager:
             if name == "GPR growing string method":
@@ -722,6 +744,9 @@ class _SEQCROW_API(BundleAPI):
             elif name == "freezing string method":
                 from .tss_finder_methods import FSM
                 return FSM()
+            elif name == "metadynamics pathfinding":
+                from .tss_finder_methods import MDPF
+                return MDPF()
  
         elif mgr is session.test_manager:
             if name == "fuseRing_command":
