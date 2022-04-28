@@ -10,6 +10,7 @@ from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.core.commands import run
 from chimerax.core.settings import Settings
+from chimerax.std_commands.coordset_gui import CoordinateSetSlider
 
 from Qt.QtCore import Qt, QRegularExpression, Signal, QTime
 from Qt.QtGui import (
@@ -79,6 +80,13 @@ from AaronTools.theory import *
 from AaronTools.theory.method import KNOWN_SEMI_EMPIRICAL
 from AaronTools.utils.utils import combine_dicts
 from AaronTools.json_extension import ATDecoder, ATEncoder
+
+from Raven.pathway import Pathway
+
+
+class _NoScrollComboBox(QComboBox):
+    def wheelEvent(self, *args, **kwargs):
+        pass
 
 
 def ele_order(name):
@@ -279,6 +287,10 @@ class BuildRaven(BuildQM, ToolInstance):
         warnings.triggered.connect(self.show_warnings)
         view.addAction(warnings)
         
+        warnings = QAction("&Linear path", self.tool_window.ui_area)
+        warnings.triggered.connect(self.load_initial_path)
+        view.addAction(warnings)
+        
         queue = QAction("&Queue", self.tool_window.ui_area)
         queue.triggered.connect(self.show_queue)
         view.addAction(queue)
@@ -307,6 +319,48 @@ class BuildRaven(BuildQM, ToolInstance):
 
         self.tool_window.manage(None)
         menu.setVisible(True)
+
+    def load_initial_path(self):
+        """
+        show the initial path to make sure the atoms are ordered correctly
+        """
+        reactant = self.reactant_selector.currentData()
+        product = self.product_selector.currentData()
+        if not reactant or not product:
+            self.session.logger.warning("reactant or product not set")
+            return 
+
+        reactant = ResidueCollection(
+            reactant,
+            bonds_matter=False
+        )
+        reactant_ndx = self.job_widget.reactant_order()
+        reactant.atoms = [reactant.atoms[i] for i in reactant_ndx]
+
+        product = ResidueCollection(
+            product,
+            bonds_matter=False
+        )
+        product_ndx = self.job_widget.product_order()
+        product.atoms = [product.atoms[i] for i in product_ndx]
+        product.RMSD(reactant, align=True, sort=False)
+        
+        if np.linalg.norm(reactant.coords - product.coords) < 1e-3:
+            self.session.logger.error("reactant and product are the same")
+            return
+        
+        path = Pathway([reactant.coords, product.coords])
+        reactant.refresh_connected()
+        new_mol = reactant.get_chimera(self.session)
+        new_mol.name = "linear cartesian interpolation"
+        
+        coordsets = np.zeros((51, len(reactant.atoms), 3))
+        for i, t in enumerate(np.linspace(0, 1, num=51)):
+            coordsets[i] = path.interpolate_coords(t)
+        new_mol.add_coordsets(coordsets, replace=True)
+        self.session.models.add([new_mol])
+        css = CoordinateSetSlider(self.session, new_mol)
+        css.play()
 
     def change_tss_algorithm(self, text):
         self.file_type.blockSignals(True)
@@ -514,6 +568,9 @@ class BuildRaven(BuildQM, ToolInstance):
 
     def update_preview(self):
         model = self.product_selector.currentData()
+        if not model:
+            return
+        model = self.reactant_selector.currentData()
         if not model:
             return
 
@@ -781,14 +838,13 @@ class BuildRaven(BuildQM, ToolInstance):
         if program in self.session.seqcrow_job_manager.formats:
             job_cls = self.session.tss_finder_manager.get_info(tss_info).cluster_job_cls[program]
 
-            kwargs = dict()
             defaults = loads(self.raven_settings.stored_defaults)
             for option, widget in self.job_widget.options.items():
                 defaults[option] = widget.value
             self.raven_settings.stored_defaults = dumps(defaults)
                 
             sig = inspect.signature(job_cls.__init__)
-            kwargs = dict()
+            algorithm_kwargs = dict()
             defaults = loads(self.raven_settings.stored_defaults)
             for option, widget in self.job_widget.options.items():
                 defaults[option] = widget.value
@@ -797,7 +853,7 @@ class BuildRaven(BuildQM, ToolInstance):
                     param.kind == param.VAR_KEYWORD
                     for param in sig.parameters.values()
                 ):
-                    kwargs[option] = defaults[option]
+                    algorithm_kwargs[option] = defaults[option]
             self.raven_settings.stored_defaults = dumps(defaults)
         
             if restart and any(
@@ -805,24 +861,24 @@ class BuildRaven(BuildQM, ToolInstance):
                 param.kind == param.VAR_KEYWORD
                 for param in sig.parameters.values()
             ):
-                kwargs["restart"] = restart
+                algorithm_kwargs["restart"] = restart
 
             job = job_cls(
                 name,
                 self.session,
                 self.theory,
-                program,
                 reactant,
                 product,
+                program,
                 tss_info,
-                queue_type,
+                algorithm_kwargs,
+                queue_type=queue_type,
                 template=template,
                 template_kwargs=template_kwargs,
                 processors=self.job_widget.getNProc(),
                 memory=memory,
                 auto_update=auto_update,
                 auto_open=auto_open,
-                **kwargs
             )
     
             self.session.logger.status("adding %s to queue" % name)
@@ -875,7 +931,7 @@ class BuildRaven(BuildQM, ToolInstance):
             job_cls = self.session.tss_finder_manager.get_info(tss_info).local_job_cls[program]
         
             sig = inspect.signature(job_cls.__init__)
-            kwargs = dict()
+            algorithm_kwargs = dict()
             defaults = loads(self.raven_settings.stored_defaults)
             for option, widget in self.job_widget.options.items():
                 defaults[option] = widget.value
@@ -884,7 +940,7 @@ class BuildRaven(BuildQM, ToolInstance):
                     param.kind == param.VAR_KEYWORD
                     for param in sig.parameters.values()
                 ):
-                    kwargs[option] = defaults[option]
+                    algorithm_kwargs[option] = defaults[option]
             self.raven_settings.stored_defaults = dumps(defaults)
         
             if restart and any(
@@ -892,11 +948,11 @@ class BuildRaven(BuildQM, ToolInstance):
                 param.kind == param.VAR_KEYWORD
                 for param in sig.parameters.values()
             ):
-                kwargs["restart"] = restart
+                algorithm_kwargs["restart"] = restart
             else:
-                kwargs["restart"] = None
+                algorithm_kwargs["restart"] = None
 
-            print(kwargs)
+            print(algorithm_kwargs)
             
             job = job_cls(
                 name,
@@ -905,8 +961,8 @@ class BuildRaven(BuildQM, ToolInstance):
                 reactant,
                 product,
                 program,
+                algorithm_kwargs,
                 **job_kwargs,
-                **kwargs,
             )
     
             self.session.logger.status("adding %s to queue" % name)
@@ -1036,7 +1092,7 @@ class TSSWidget(QWidget):
         self.atom_order_table.setColumnCount(2)
         self.atom_order_table.setHorizontalHeaderLabels(["reactant", "product"])
         self.atom_order_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.atom_order_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Interactive)
+        self.atom_order_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.atom_order_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.atom_order_table.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
         atom_order_layout.insertWidget(0, self.atom_order_table, 1)
@@ -1077,7 +1133,7 @@ class TSSWidget(QWidget):
             row = self.atom_order_table.rowCount()
             
             self.atom_order_table.insertRow(row)
-            r_combobox = QComboBox()
+            r_combobox = _NoScrollComboBox()
             r_combobox.addItems(r_atomspecs)
             ndx = -1
             if row < len(reactant_order):
@@ -1087,7 +1143,7 @@ class TSSWidget(QWidget):
             r_combobox.setCurrentIndex(ndx)
             self.atom_order_table.setCellWidget(row, 0, r_combobox)
             
-            p_combobox = QComboBox()
+            p_combobox = _NoScrollComboBox()
             p_combobox.addItems(p_atomspecs)
             ndx = -1
             if row < len(product_order):
@@ -1120,6 +1176,11 @@ class TSSWidget(QWidget):
                 "reactant and product do not have the same bonding pattern\n"
                 "systematic ordering may not be the same for both"
             )
+            self.session.logger.warning(
+                "it is recommended that you add all bonds that are present in "
+                "the reactant or product to both structures (even if they are "
+                "unreasonable)"
+            )
     
     def reactant_order(self):
         order = np.zeros(self.atom_order_table.rowCount(), dtype=int)
@@ -1140,7 +1201,7 @@ class TSSWidget(QWidget):
             self.session.logger.error("some reactant atom has been specified multiple times")
         
         return order
-        
+
     def product_order(self):
         order = np.zeros(self.atom_order_table.rowCount(), dtype=int)
         for i in range(0, self.atom_order_table.rowCount()):
@@ -1178,8 +1239,8 @@ class TSSWidget(QWidget):
         self.solvent_names.clear()
         self.solvent_option.addItems(["None"])
         
-        if file_info.solvent_models is not None:
-            self.solvent_option.addItems(file_info.solvent_models)
+        if file_info.solvents is not None:
+            self.solvent_option.addItems(list(file_info.solvents.keys()))
         if file_info.solvents:
             ndx = self.solvent_option.findText(self.job_settings.previous_solvent_model)
             if ndx >= 0:
@@ -1224,6 +1285,13 @@ class TSSWidget(QWidget):
                 obj.widget
             )
             self.options[name] = obj
+
+    def set_algorithm_options(self, algorithm_dict):
+        for key, value in algorithm_dict.items():
+            try:
+                self.options[key].set_value(value)
+            except KeyError:
+                continue
 
     def change_selected_solvent(self):
         """when a solvent is selected in the list, the solvent is set to that"""

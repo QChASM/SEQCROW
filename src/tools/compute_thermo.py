@@ -758,14 +758,14 @@ class Thermochem(ToolInstance):
                     "Grimme's Quasi-RRHO",
                     "vibrational entropy of each real mode is damped and complemented\n"
                     "with free rotor entropy, with the damping function being stronger for\n"
-                    "frequencies < 𝜔\u2080\n"
+                    "frequencies < ω\u2080\n"
                     "can mitigate error from inaccuracies in the harmonic oscillator\n"
                     "approximation for low-frequency vibrations",
                 ), (
                     "δG<sub>Quasi-Harmonic</sub> =",
                     qharm_dg,
                     "Truhlar's Quasi-Harmonic",
-                    "real vibrational frequencies below 𝜔\u2080 are treated as 𝜔\u2080\n"
+                    "real vibrational frequencies below ω\u2080 are treated as ω\u2080\n"
                     "can mitigate error from inaccuracies in the harmonic oscillator\n"
                     "approximation for low-frequency vibrations",
                 ),

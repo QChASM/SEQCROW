@@ -21,10 +21,19 @@ class _SEQCROW_API(BundleAPI):
         from SEQCROW import settings as seqcrow_settings
         seqcrow_settings.settings = settings._SEQCROWSettings(session, "SEQCROW")
         if session.ui.is_gui:
-            from .presets import seqcrow_bse, seqcrow_s, seqcrow_vdw, indexLabel
+            from .presets import (
+                seqcrow_bse,
+                seqcrow_bse_cartoon,
+                seqcrow_s,
+                seqcrow_s_cartoon,
+                seqcrow_vdw,
+                indexLabel,
+            )
 
             session.presets.add_presets("SEQCROW", {"ball-stick-endcap":lambda p=seqcrow_bse: p(session)})
+            session.presets.add_presets("SEQCROW", {"ball-stick-endcap 2":lambda p=seqcrow_bse_cartoon: p(session)})
             session.presets.add_presets("SEQCROW", {"sticks":lambda p=seqcrow_s: p(session)})
+            session.presets.add_presets("SEQCROW", {"sticks 2":lambda p=seqcrow_s_cartoon: p(session)})
             session.presets.add_presets("SEQCROW", {"VDW":lambda p=seqcrow_vdw: p(session)})
             session.presets.add_presets("SEQCROW", {"index labels":lambda p=indexLabel: p(session)})
 
@@ -221,7 +230,7 @@ class _SEQCROW_API(BundleAPI):
         """
         start tools
         """
-        if ti.name == "Browse AaronTools Libraries":
+        if ti.name == "AaronTools Fragment Library":
             from .tools import AaronTools_Library
             tool = AaronTools_Library(session, ti.name)
             return tool
@@ -573,6 +582,9 @@ class _SEQCROW_API(BundleAPI):
             elif name == "Q-Chem":
                 from SEQCROW.input_file_formats import QChemFileInfo
                 return QChemFileInfo()
+            elif name == "xTB":
+                from SEQCROW.input_file_formats import XTBFileInfo
+                return XTBFileInfo()
 
         elif mgr is session.seqcrow_job_manager:
             if name == "Gaussian":
@@ -590,6 +602,9 @@ class _SEQCROW_API(BundleAPI):
             elif name == "Q-Chem":
                 from SEQCROW.jobs import QChemJob
                 return QChemJob
+            elif name == "xTB":
+                from SEQCROW.jobs import XTBJob
+                return XTBJob
             elif name == "Raven":
                 from SEQCROW.jobs import SerialRavenJob
                 return SerialRavenJob
@@ -636,6 +651,10 @@ class _SEQCROW_API(BundleAPI):
             elif name == "SQM":
                 from .managers.cluster_template_manager import SQMSlurmTemplate
                 return SQMSlurmTemplate
+             
+            elif name == "xTB":
+                from .managers.cluster_template_manager import XTBSlurmTemplate
+                return XTBSlurmTemplate
  
         elif mgr is session.seqcrow_pbs_manager:
             if name == "Gaussian":
@@ -657,6 +676,10 @@ class _SEQCROW_API(BundleAPI):
             elif name == "SQM":
                 from .managers.cluster_template_manager import SQMPBSTemplate
                 return SQMPBSTemplate
+            
+            elif name == "xTB":
+                from .managers.cluster_template_manager import XTBPBSTemplate
+                return XTBPBSTemplate
 
         elif mgr is session.seqcrow_sge_manager:
             if name == "Gaussian":
@@ -678,6 +701,10 @@ class _SEQCROW_API(BundleAPI):
             elif name == "SQM":
                 from .managers.cluster_template_manager import SQMSGETemplate
                 return SQMSGETemplate
+            
+            elif name == "xTB":
+                from .managers.cluster_template_manager import XTBSGETemplate
+                return XTBSGETemplate
 
         elif mgr is session.seqcrow_lsf_manager:
             if name == "Gaussian":
@@ -699,6 +726,10 @@ class _SEQCROW_API(BundleAPI):
             elif name == "SQM":
                 from .managers.cluster_template_manager import SQMLSFTemplate
                 return SQMLSFTemplate
+            
+            elif name == "xTB":
+                from .managers.cluster_template_manager import XTBLSFTemplate
+                return XTBLSFTemplate
 
         elif mgr is session.tss_finder_manager:
             if name == "GPR growing string method":
@@ -713,6 +744,9 @@ class _SEQCROW_API(BundleAPI):
             elif name == "freezing string method":
                 from .tss_finder_methods import FSM
                 return FSM()
+            elif name == "metadynamics pathfinding":
+                from .tss_finder_methods import MDPF
+                return MDPF()
  
         elif mgr is session.test_manager:
             if name == "fuseRing_command":

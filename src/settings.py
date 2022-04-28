@@ -38,6 +38,7 @@ class _SEQCROWSettings(Settings):
         'GAUSSIAN_EXE': Value("g09.exe" if platform == "win32" else "g09", StringArg),
         'PSI4_EXE': Value("psi4", StringArg),
         'QCHEM_EXE': Value("qchem", StringArg),
+        'XTB_EXE': Value("xtb", StringArg),
         'SCRATCH_DIR': Value(path.join(path.expanduser('~'), "SEQCROW_SCRATCH"), StringArg), 
         'JOB_FINISHED_NOTIFICATION': Value(
             'log notification', 
@@ -170,6 +171,12 @@ from that file type
             "Q-Chem executable", 
             FileOption, 
             "Path to Q-Chem executable"
+        ), 
+        
+        "XTB_EXE" : (
+            "xTB executable", 
+            FileOption, 
+            "Path to xTB executable"
         ), 
         
         "SCRATCH_DIR" : (

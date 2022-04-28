@@ -23,7 +23,6 @@ class JobManager(ProviderManager):
         self.remote_jobs = []
         self.unknown_status_jobs = []
         self.paused = False
-        self._thread = None
         self.queue_dict = {}
         self.formats = {}
 
@@ -93,15 +92,17 @@ class JobManager(ProviderManager):
                                     self.session,
                                     job['theory'],
                                 ]
-                                kwargs = dict()
-                                if name == "Raven":
-                                    kwargs = job["raven_kwargs"]
+                                kwargs = job["job_options"]
                                 if issubclass(job_cls, TSSJob):
                                     args.extend([
                                         job["reactant"],
                                         job["product"],
                                         job["file_type"],
+                                        job["algorithm_kwargs"]
                                     ])
+                                
+                                elif "geometry" in job:
+                                    kwargs["geometry"] = job["geometry"]
                                 break
                         else:
                             self.session.logger.warning(
@@ -116,10 +117,7 @@ class JobManager(ProviderManager):
                             job['theory'],
                             job['file_type'],
                         ]
-                        if "format" in job and job["format"] == "Raven":
-                            job_cls = ParallelRavenJob
-                            kwargs = job["raven_kwargs"]
-                        elif "tss_algorithm" in job:
+                        if "tss_algorithm" in job:
                             job_cls = ClusterTSSJob
                             args = [
                                 job["name"],
@@ -130,6 +128,10 @@ class JobManager(ProviderManager):
                                 job["file_type"],
                                 job["tss_algorithm"],
                             ]
+                            try:
+                                kwargs = job["algorithm_kwargs"]
+                            except KeyError:
+                                kwargs = dict()
                         else:
                             job_cls = LocalClusterJob
                             kwargs = {
@@ -146,10 +148,6 @@ class JobManager(ProviderManager):
                     else:
                         self.session.logger.warning("job with unknown server: %s" % job['server'])
                         continue
-
-                    print(job_cls)
-                    print(args)
-                    print(kwargs)
 
                     local_job = job_cls(
                         *args,
@@ -266,12 +264,14 @@ class JobManager(ProviderManager):
             job.session.logger.info("%s: %s" % (trigger_name, job))
 
         if isinstance(job, LocalJob):
-            self._thread = None
             if (
                 not hasattr(job, "output_name") or
                 not job.output_name or (
                     isinstance(job.output_name, str) and
                     not os.path.exists(job.output_name)
+                ) or (
+                    isinstance(job.output_name, dict) and
+                    not all(os.path.exists(f) for f in job.output_name.values())
                 ) or (
                     not isinstance(job.output_name, str) and
                     hasattr(job.output_name, "__iter__") and
@@ -369,6 +369,7 @@ class JobManager(ProviderManager):
                     self.session.logger.warning("cannot determine status of job %s" % job)
                     continue
         
+        print(self.has_local_job_running)
         if not self.has_local_job_running:
             unstarted_local_jobs = []
             for job in self.local_jobs:
@@ -379,10 +380,7 @@ class JobManager(ProviderManager):
             if len(unstarted_local_jobs) > 0 and not self.paused:
                 start_job = unstarted_local_jobs.pop(0)
 
-                self._thread = start_job
                 start_job.finished.connect(lambda data=start_job: self.triggers.activate_trigger(JOB_FINISHED, data))
                 start_job.started.connect(lambda data=start_job: self.triggers.activate_trigger(JOB_STARTED, data))
                 start_job.start()
 
-            else:
-                self._thread = None

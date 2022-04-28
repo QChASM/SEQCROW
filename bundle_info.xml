@@ -209,6 +209,7 @@
                 <Provider name="ORCA"/>
                 <Provider name="Psi4"/>
                 <Provider name="SQM"/>
+                <Provider name="xTB"/>
                 <Provider name="Raven"/>
                 <Provider name="ParallelRaven"/>
                 <Provider name="Gaussian STQN"/>
@@ -227,6 +228,7 @@
                 <Provider name="Psi4"/>
                 <Provider name="SQM"/>
                 <Provider name="Q-Chem"/>
+                <Provider name="xTB"/>
             </Providers>
             
             <Providers manager="test_manager">
@@ -253,6 +255,7 @@
                 <Provider name="Psi4"/>
                 <Provider name="Q-Chem"/>
                 <Provider name="SQM"/>
+                <Provider name="xTB"/>
             </Providers>
     
             <Providers manager="SGE">
@@ -261,6 +264,7 @@
                 <Provider name="Psi4"/>
                 <Provider name="Q-Chem"/>
                 <Provider name="SQM"/>
+                <Provider name="xTB"/>
             </Providers>
       
             <Providers manager="PBS">
@@ -269,6 +273,7 @@
                 <Provider name="Psi4"/>
                 <Provider name="Q-Chem"/>
                 <Provider name="SQM"/>
+                <Provider name="xTB"/>
             </Providers>
         
             <Providers manager="LSF">
@@ -277,6 +282,7 @@
                 <Provider name="Psi4"/>
                 <Provider name="Q-Chem"/>
                 <Provider name="SQM"/>
+                <Provider name="xTB"/>
             </Providers>
   
             <!--
@@ -350,6 +356,7 @@
 				<Provider name="synchornous transit-guided quasi-Newton"/>
 				<Provider name="nudged elastic band"/>
 				<Provider name="freezing string method"/>
+				<Provider name="metadynamics pathfinding"/>
 			</Providers>
 			
             <Classifiers>
@@ -368,29 +375,31 @@
                 ChimeraX's devel build
                 ChimeraXClassifier>ChimeraX :: Bundle :: General,Input/Output,Structure Editing,External Program :: 1,1 :: SEQCROW :: ChimAARON,SEQCRO,SEQCROW :: true</ChimeraXClassifier
                 -->
-                <ChimeraXClassifier>ChimeraX :: Tool :: Build QM Input                 :: AaronTools           :: Create Gaussian, ORCA, or Psi4 input file</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Build QM Input                 :: Computing Data       :: Create Gaussian, ORCA, or Psi4 input file</ChimeraXClassifier>
+                <!--
                 <ChimeraXClassifier>ChimeraX :: Tool :: Structure Modification         :: AaronTools           :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
+                -->
                 <ChimeraXClassifier>ChimeraX :: Tool :: Change Substituents            :: Structure Editing    :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Swap Transition Metal Ligands  :: Structure Editing    :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Fuse Ring                      :: Structure Editing    :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Browse AaronTools Libraries    :: AaronTools           :: Browse the AaronTools ligand, substituent, and ring libraries</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Process QM Thermochemistry     :: AaronTools           :: Compute the free energy of a molecule with frequency data</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: AaronTools Fragment Library    :: SEQCROW              :: Browse the AaronTools ligand, substituent, and ring libraries</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Thermochemistry                :: Computing Data       :: Compute the free energy of a molecule with frequency data</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Managed Models                 :: SEQCROW              :: see models managed by SEQCROW</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Add to Personal Library        :: AaronTools           :: Add to your personal ligand, substituent, and ring libraries</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Visualize Normal Modes         :: AaronTools           :: Visualize normal modes from a frequency output file as displacement vectors or as an animation</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Add to Personal Library        :: SEQCROW              :: Add to your personal ligand, substituent, and ring libraries</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Visualize Normal Modes         :: Computing Data       :: Visualize normal modes from a frequency output file as displacement vectors or as an animation</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Job Queue                      :: SEQCROW              :: View status of jobs</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Substituent Sterimol           :: Structure Analysis   :: Calculate L, and B1-B5 Sterimol parameters for a substituent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Bond Editor                    :: Structure Editing    :: Draw or erase bonds</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Change Element                 :: Structure Editing    :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Rotate Atoms                   :: Structure Editing    :: Rotate all or part of a molecular structure</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Buried Volume                  :: Structure Analysis   :: Calculate percent buried volume</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: File Info                      :: AaronTools           :: Miscellaneous file data</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: File Info                      :: SEQCROW              :: Miscellaneous file data</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Cone Angle                     :: Structure Analysis   :: Calculate ligand cone angles</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Coordination Complex Generator :: Structure Editing    :: Create coordination complexes with mono- or bidentate ligands</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Orbital Viewer                 :: AaronTools           :: View molecular orbitals</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Orbital Viewer                 :: Computing Data       :: View molecular orbitals</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Ligand Sterimol                :: Structure Analysis   :: Calculate Sterimol parameters for ligands on organo- or organometallic catalysts</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: IR Spectrum                    :: AaronTools           :: plot simulated IR spectra</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: UV/Vis Spectrum                :: AaronTools           :: plot simulated UV/vis spectra</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: IR Spectrum                    :: Computing Data       :: plot simulated IR spectra</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: UV/Vis Spectrum                :: Computing Data       :: plot simulated UV/vis spectra</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: 2D Builder                     :: Structure Editing    :: molecule using ChemDoodle Web Components</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Transition State Structures    :: Structure Prediction :: locate transition state structures using the growing string method</ChimeraXClassifier>
                 <!--<ChimeraXClassifier>ChimeraX :: Tool :: AaronJr Input Builder          :: AaronJr            :: Create input files for AaronJr</ChimeraXClassifier>-->
