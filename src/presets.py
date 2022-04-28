@@ -40,8 +40,7 @@ def seqcrow_bse(session, models=None, atoms=None):
         models = [models]
     
     for m in models:
-        if atoms is None:
-            m.ball_scale = 0.4
+        m.ball_scale = 0.4
         
         if atoms is None:
             atom_list = m.atoms
