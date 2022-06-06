@@ -151,7 +151,7 @@ class LigandSterimol(ToolInstance):
         
         copy = QAction("&Copy CSV to clipboard", self.tool_window.ui_area)
         copy.triggered.connect(self.copy_csv)
-        shortcut = QKeySequence(Qt.CTRL + Qt.Key_C)
+        shortcut = QKeySequence(QKeySequence.Copy)
         copy.setShortcut(shortcut)
         export.addAction(copy)
         

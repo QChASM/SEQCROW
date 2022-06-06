@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="1.3.2">
+            version="1.4">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -70,6 +70,7 @@
                 <Dependency name="scipy"/>
                 <Dependency name="Send2Trash"/>
                 <Dependency name="psutil"/>
+                <Dependency name="jinja2"/>
                 <!-- wait for numpy to fix fortran stuff in python 3.8
                 I've tried installing this with just gfortran on windows, but no luck
                 <Dependency name="stripy"/>
@@ -92,6 +93,12 @@
                 <Manager name="filereader_manager" uiOnly="false"/>
                 <Manager name="seqcrow_job_manager" uiOnly="false"/>
                 <Manager name="seqcrow_qm_input_manager" uiOnly="true"/>
+                <Manager name="seqcrow_cluster_scheduling_software_manager" uiOnly="true"/>
+                <Manager name="Slurm" uiOnly="true"/>
+                <Manager name="SGE" uiOnly="true"/>
+                <Manager name="PBS" uiOnly="true"/>
+                <Manager name="LSF" uiOnly="true"/>
+				<Manager name="tss_finder_manager" uiOnly="true"/>
             </Managers>
             
             <Providers manager="data formats">
@@ -202,11 +209,19 @@
                 <Provider name="ORCA"/>
                 <Provider name="Psi4"/>
                 <Provider name="SQM"/>
+                <Provider name="xTB"/>
                 <!--
-                I have not gotten this to work
-                maybe something in ChimeraX's environment conflicts with Q-Chem
-                <Provider name="Q-Chem"/>
+                <Provider name="Raven"/>
                 -->
+                <Provider name="ParallelRaven"/>
+                <Provider name="Gaussian STQN"/>
+                <Provider name="ORCA NEB"/>
+                <!--
+                I have not gotten Q-Chem jobs to work
+                maybe something in ChimeraX's environment conflicts with Q-Chem
+                -->
+                <Provider name="Q-Chem FSM"/>
+                <Provider name="Q-Chem"/>
             </Providers>
             
             <Providers manager="seqcrow_qm_input_manager">
@@ -215,6 +230,7 @@
                 <Provider name="Psi4"/>
                 <Provider name="SQM"/>
                 <Provider name="Q-Chem"/>
+                <Provider name="xTB"/>
             </Providers>
             
             <Providers manager="test_manager">
@@ -226,6 +242,49 @@
                 <Provider name="lookDown_command"/>
                 <Provider name="cone_angle"/>
                 <Provider name="substituent_sterimol"/>
+            </Providers>
+  
+            <Providers manager="seqcrow_cluster_scheduling_software_manager">
+                <Provider name="Slurm"/>
+                <Provider name="SGE"/>
+                <Provider name="PBS"/>
+                <Provider name="LSF"/>
+            </Providers>
+  
+            <Providers manager="Slurm">
+                <Provider name="Gaussian"/>
+                <Provider name="ORCA"/>
+                <Provider name="Psi4"/>
+                <Provider name="Q-Chem"/>
+                <Provider name="SQM"/>
+                <Provider name="xTB"/>
+            </Providers>
+    
+            <Providers manager="SGE">
+                <Provider name="Gaussian"/>
+                <Provider name="ORCA"/>
+                <Provider name="Psi4"/>
+                <Provider name="Q-Chem"/>
+                <Provider name="SQM"/>
+                <Provider name="xTB"/>
+            </Providers>
+      
+            <Providers manager="PBS">
+                <Provider name="Gaussian"/>
+                <Provider name="ORCA"/>
+                <Provider name="Psi4"/>
+                <Provider name="Q-Chem"/>
+                <Provider name="SQM"/>
+                <Provider name="xTB"/>
+            </Providers>
+        
+            <Providers manager="LSF">
+                <Provider name="Gaussian"/>
+                <Provider name="ORCA"/>
+                <Provider name="Psi4"/>
+                <Provider name="Q-Chem"/>
+                <Provider name="SQM"/>
+                <Provider name="xTB"/>
             </Providers>
   
             <!--
@@ -294,6 +353,16 @@
                 />
             </Providers>
             
+			<Providers manager="tss_finder_manager">
+                <!--
+				<Provider name="GPR growing string method"/>
+                -->
+				<Provider name="synchornous transit-guided quasi-Newton"/>
+				<Provider name="nudged elastic band"/>
+				<Provider name="freezing string method"/>
+				<Provider name="metadynamics pathfinding"/>
+			</Providers>
+			
             <Classifiers>
                 <PythonClassifier>Development Status :: 4 - Beta</PythonClassifier>
                 <PythonClassifier>License :: OSI Approved :: GNU General Public License v3 (GPLv3)</PythonClassifier>
@@ -310,68 +379,113 @@
                 ChimeraX's devel build
                 ChimeraXClassifier>ChimeraX :: Bundle :: General,Input/Output,Structure Editing,External Program :: 1,1 :: SEQCROW :: ChimAARON,SEQCRO,SEQCROW :: true</ChimeraXClassifier
                 -->
-                <ChimeraXClassifier>ChimeraX :: Tool :: Build QM Input                 :: AaronTools         :: Create Gaussian, ORCA, or Psi4 input file</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Structure Modification         :: AaronTools         :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Change Substituents            :: Structure Editing  :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Swap Transition Metal Ligands  :: Structure Editing  :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Fuse Ring                      :: Structure Editing  :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Browse AaronTools Libraries    :: AaronTools         :: Browse the AaronTools ligand, substituent, and ring libraries</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Process QM Thermochemistry     :: AaronTools         :: Compute the free energy of a molecule with frequency data</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Managed Models                 :: SEQCROW            :: see models managed by SEQCROW</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Add to Personal Library        :: AaronTools         :: Add to your personal ligand, substituent, and ring libraries</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Visualize Normal Modes         :: AaronTools         :: Visualize normal modes from a frequency output file as displacement vectors or as an animation</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Job Queue                      :: SEQCROW            :: View status of jobs</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Substituent Sterimol           :: Structure Analysis :: Calculate L, and B1-B5 Sterimol parameters for a substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Bond Editor                    :: Structure Editing  :: Draw or erase bonds</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Change Element                 :: Structure Editing  :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Rotate Atoms                   :: Structure Editing  :: Rotate all or part of a molecular structure</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Buried Volume                  :: Structure Analysis :: Calculate percent buried volume</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: File Info                      :: AaronTools         :: Miscellaneous file data</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Cone Angle                     :: Structure Analysis :: Calculate ligand cone angles</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Coordination Complex Generator :: Structure Editing  :: Create coordination complexes with mono- or bidentate ligands</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Orbital Viewer                 :: AaronTools         :: View molecular orbitals</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: Ligand Sterimol                :: Structure Analysis :: Calculate Sterimol parameters for ligands on organo- or organometallic catalysts</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: IR Spectrum                    :: AaronTools         :: plot simulated IR spectra</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: UV/Vis Spectrum                :: AaronTools         :: plot simulated UV/vis spectra</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Tool :: 2D Builder                     :: Structure Editing  :: molecule using ChemDoodle Web Components</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Build QM Input                 :: Quantum Chemistry    :: Create Gaussian, ORCA, Psi4, Q-Chem, xTB, or SQM input file</ChimeraXClassifier>
+                <!--
+                <ChimeraXClassifier>ChimeraX :: Tool :: Structure Modification         :: AaronTools           :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
+                -->
+                <ChimeraXClassifier>ChimeraX :: Tool :: Change Substituents            :: Structure Editing    :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Swap Transition Metal Ligands  :: Structure Editing    :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Fuse Ring                      :: Structure Editing    :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: AaronTools Fragment Library    :: SEQCROW              :: Browse the AaronTools ligand, substituent, and ring libraries</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Thermochemistry                :: Quantum Chemistry    :: Compute the free energy of a molecule with frequency data</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Managed Models                 :: SEQCROW              :: see models managed by SEQCROW</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Add to Personal Library        :: SEQCROW              :: Add to your personal ligand, substituent, and ring libraries</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Visualize Normal Modes         :: Quantum Chemistry    :: Visualize normal modes from a frequency output file as displacement vectors or as an animation</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Job Queue                      :: SEQCROW              :: View status of jobs</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Substituent Sterimol           :: Structure Analysis   :: Calculate L, and B1-B5 Sterimol parameters for a substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Bond Editor                    :: Structure Editing    :: Draw or erase bonds</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Change Element                 :: Structure Editing    :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Rotate Atoms                   :: Structure Editing    :: Rotate all or part of a molecular structure</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Buried Volume                  :: Structure Analysis   :: Calculate percent buried volume</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: File Info                      :: SEQCROW              :: Miscellaneous file data</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Cone Angle                     :: Structure Analysis   :: Calculate ligand cone angles</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Coordination Complex Generator :: Structure Editing    :: Create coordination complexes with mono- or bidentate ligands</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Orbital Viewer                 :: Quantum Chemistry    :: View molecular orbitals</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Ligand Sterimol                :: Structure Analysis   :: Calculate Sterimol parameters for ligands on organo- or organometallic catalysts</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: IR Spectrum                    :: Quantum Chemistry    :: plot simulated IR spectra</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: UV/Vis Spectrum                :: Quantum Chemistry    :: plot simulated UV/vis spectra</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: 2D Builder                     :: Structure Editing    :: molecule using ChemDoodle Web Components</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Transition State Structures    :: Structure Prediction :: locate transition state structures using the growing string method</ChimeraXClassifier>
                 <!--<ChimeraXClassifier>ChimeraX :: Tool :: AaronJr Input Builder          :: AaronJr            :: Create input files for AaronJr</ChimeraXClassifier>-->
                 <!--ChimeraXClassifier>ChimeraX :: Tool :: AARON Input Builder :: AARON :: Build AARON input file</ChimeraXClassifier-->
                 
-                <ChimeraXClassifier>ChimeraX :: Selector :: tm        :: Transition metals</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: Ad        :: Adamantyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: BF2       :: Difluoroboro substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CCH       :: Alkynyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CF3       :: Trifluoromethyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CH2Cl     :: Chloromethyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CH2F      :: Fluoromethyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CH2OH     :: Hydroxymethyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CHCH2     :: Vinyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CHCl2     :: Dichloromethyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CHF2      :: Difluoromethyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CHO       :: Formyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: CN        :: Cyano substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: COCH3     :: Acetyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: COOCH3    :: Methylcarboxyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: Cy        :: Cyclohexyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: Et        :: Ethyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: iPr       :: iso-Propyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: Me        :: Methyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: Mes       :: Mesityl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: NH2       :: Amino substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: NHOH      :: Hydroxylamino substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: NO        :: Nitroso substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: NO2       :: Nitro substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: OCF3      :: Trifluoromethoxy substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: OH        :: Hydroxyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: OMe       :: Methoxy substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: Ph        :: Phenyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: SCH3      :: Methylthio substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: SH        :: Thio substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: SiF3      :: Trifluorosilyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: SiH3      :: Silyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: SuperMes  :: Super Mesityl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: tBu       :: tert-Butyl substituent</ChimeraXClassifier>
-                <ChimeraXClassifier>ChimeraX :: Selector :: connected :: fragment of current selection</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: tm             :: Transition metals</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: Ad             :: Adamantyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: BF2            :: Difluoroboro substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CCH            :: Alkynyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CF3            :: Trifluoromethyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CH2Cl          :: Chloromethyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CH2F           :: Fluoromethyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CH2OH          :: Hydroxymethyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CHCH2          :: Vinyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CHCl2          :: Dichloromethyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CHF2           :: Difluoromethyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CHO            :: Formyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: CN             :: Cyano substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: COCH3          :: Acetyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: COOCH3         :: Methylcarboxyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: Cy             :: Cyclohexyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: Et             :: Ethyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: iPr            :: iso-Propyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: Me             :: Methyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: Mes            :: Mesityl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: NH2            :: Amino substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: NHOH           :: Hydroxylamino substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: NO             :: Nitroso substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: NO2            :: Nitro substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: OCF3           :: Trifluoromethoxy substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: OH             :: Hydroxyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: OMe            :: Methoxy substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: Ph             :: Phenyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: SCH3           :: Methylthio substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: SH             :: Thio substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: SiF3           :: Trifluorosilyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: SiH3           :: Silyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: SuperMes       :: Super Mesityl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: tBu            :: tert-Butyl substituent</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: connected      :: fragment of current selection</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: chiral-centers :: chiral centers</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: spiro-centers  :: chiral centers</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: bridgehead     :: chiral centers</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: linear :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: bent :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: planar :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: t-shaped :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: trigonal-planar :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: tetrahedral :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: sawhorse :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: seesaw :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: square-planar :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: trigonal-pyramidal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: trigonal-bipyramidal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: square-pyramidal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: pentagonal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: octahedral :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: hexagonal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: trigonal-prismatic :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: pentagonal-pyramidal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: capped-octahedral :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: capped-trigonal-prismatic :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: heptagonal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: hexagonal-pyramidal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: pentagonal-bipyramidal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: biaugmented-trigonal-prismatic :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: cubic :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: elongated-trigonal-bipyramidal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: hexagonal-bipyramidal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: heptagonal-pyramidal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: octagonal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: square-antiprismatic :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: trigonal-dodecahedral :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: capped-cube :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: capped-square-antiprismatic :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: enneagonal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: hula-hoop :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: tridiminished-icosahedral :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: muffin :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: octagonal-pyramidal :: VSEPR </ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: tricapped-trigonal-prismatic :: VSEPR </ChimeraXClassifier>
+
 
                 <!--NOTE: this synopsis will not appear when `help <command>` is used-->
                 <ChimeraXClassifier>ChimeraX :: Command :: rmsdAlign           :: Structure Analysis :: Calculate RMSD between structures</ChimeraXClassifier>
@@ -393,12 +507,14 @@
     
     <AdditionalPackages>
         <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools"/>
-        <!--
         <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
-        -->
         <!--
-        <Package name="AaronTools" folder="/home/tony/Documents/GitHub/AaronTools"/>
-        <Package name="AaronTools.test" folder="/home/tony/Documents/GitHub/AaronTools/test"/>
+        <Package name="Raven" folder="C:\Users\normn\Documents\GitHub\Raven"/>
+        <Package name="Raven" folder="/home/ajs99778/pyQCHASM/Raven"/>
+        <Package name="AaronTools" folder="/home/ajs99778/pyQCHASM/AaronTools"/>
+        <Package name="AaronTools.test" folder="/home/ajs99778/pyQCHASM/AaronTools/test"/>
+        <Package name="AaronTools" folder="/home/tschaefer/QChASM/AaronTools"/>
+        <Package name="AaronTools.test" folder="/home/tschaefer/QChASM/AaronTools/test"/>
         -->
     </AdditionalPackages>
 
@@ -417,14 +533,20 @@
         <DataFile>README.md</DataFile>
         <DataFile>LICENSE</DataFile>
     </DataFiles>
-    
-    <!--
+
     <DataFiles package="AaronTools.test">
         <DataDir>test_files</DataDir>
         <DataDir>ref_files</DataDir>
     </DataFiles>
+
+    <!--
+    <DataFiles package="Raven">
+		<DataFile>LICENSE</DataFile>
+        <DataDir>bin</DataDir>
+    </DataFiles>
     -->
-    
+	
+
     <DataFiles>
         <DataDir>docs</DataDir>
         <DataDir>icons</DataDir>

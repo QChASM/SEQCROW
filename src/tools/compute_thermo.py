@@ -174,7 +174,7 @@ class Thermochem(ToolInstance):
         self.v0_edit.valueChanged.connect(self.set_thermo)
         self.v0_edit.setMinimum(0)
         self.v0_edit.setToolTip("frequency parameter for quasi treatments of entropy")
-        thermo_layout.addRow("𝜔<sub>0</sub> =", self.v0_edit)
+        thermo_layout.addRow("ω<sub>0</sub> =", self.v0_edit)
 
         self.thermo_table = QTableWidget()
         self.thermo_table.setColumnCount(3)
@@ -249,7 +249,7 @@ class Thermochem(ToolInstance):
         self.relative_v0.setMinimum(0)
         self.relative_v0.setToolTip("frequency parameter for quasi treatments of entropy")
         self.relative_v0.valueChanged.connect(self.calc_relative_thermo)
-        relative_layout.addWidget(QLabel("𝜔<sub>0</sub> ="), 2, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
+        relative_layout.addWidget(QLabel("ω<sub>0</sub> ="), 2, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
         
         relative_layout.addWidget(self.relative_v0, 2, 1, 1, 5, Qt.AlignLeft | Qt.AlignVCenter)
 
@@ -275,7 +275,7 @@ class Thermochem(ToolInstance):
         export = menu.addMenu("&Export")
         copy = QAction("&Copy CSV to clipboard", self.tool_window.ui_area)
         copy.triggered.connect(self.copy_csv)
-        shortcut = QKeySequence(Qt.CTRL + Qt.Key_C)
+        shortcut = QKeySequence(QKeySequence.Copy)
         copy.setShortcut(shortcut)
         export.addAction(copy)
         self.copy = copy
@@ -720,7 +720,7 @@ class Thermochem(ToolInstance):
             qharm_dg = co.calc_G_corr(v0=v0, temperature=T, method="QHARM")
             
             items = [(
-                "𝛿ZPE =",
+                "δZPE =",
                 dZPE,
                 None,
                 "lowest energy the molecule can have\n"
@@ -731,7 +731,7 @@ class Thermochem(ToolInstance):
             if fr.other["frequency"].anharm_data:
                 dZPE_anh = co.calc_zpe(anharmonic=True)
                 items.append((
-                    "𝛿ZPE<sub>anh</sub> =",
+                    "δZPE<sub>anh</sub> =",
                     dZPE_anh,
                     None,
                     "lowest energy the molecule can have\n"
@@ -741,31 +741,31 @@ class Thermochem(ToolInstance):
             
             items.extend([
                 (
-                    "𝛿H<sub>RRHO</sub> =",
+                    "δH<sub>RRHO</sub> =",
                     dH,
                     None,
                     "enthalpy of formation",
                 ), (
-                    "𝛿G<sub>RRHO</sub> =",
+                    "δG<sub>RRHO</sub> =",
                     rrho_dg,
                     None,
                     "energy after taking into account the average\n"
                     "population of vibrational, rotational, and translational\n"
                     "degrees of freedom",
                 ), (
-                    "𝛿G<sub>Quasi-RRHO</sub> =",
+                    "δG<sub>Quasi-RRHO</sub> =",
                     qrrho_dg,
                     "Grimme's Quasi-RRHO",
                     "vibrational entropy of each real mode is damped and complemented\n"
-                    "with rotational entropy, with the damping function being stronger for\n"
-                    "frequencies < 𝜔\u2080\n"
+                    "with free rotor entropy, with the damping function being stronger for\n"
+                    "frequencies < ω\u2080\n"
                     "can mitigate error from inaccuracies in the harmonic oscillator\n"
                     "approximation for low-frequency vibrations",
                 ), (
-                    "𝛿G<sub>Quasi-Harmonic</sub> =",
+                    "δG<sub>Quasi-Harmonic</sub> =",
                     qharm_dg,
                     "Truhlar's Quasi-Harmonic",
-                    "real vibrational frequencies below 𝜔\u2080 are treated as 𝜔\u2080\n"
+                    "real vibrational frequencies below ω\u2080 are treated as ω\u2080\n"
                     "can mitigate error from inaccuracies in the harmonic oscillator\n"
                     "approximation for low-frequency vibrations",
                 ),
@@ -821,7 +821,7 @@ class Thermochem(ToolInstance):
 
             label = self.thermo_table.cellWidget(row, 0)
             tooltip = label.toolTip()
-            text = label.text().replace("𝛿", "")
+            text = label.text().replace("δ", "")
             sum_label = QLabel(text)
             if "href=" in text:
                 sum_label = QLabel()

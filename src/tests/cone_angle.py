@@ -36,7 +36,7 @@ class ConeAngleToolTest(TestWithSession):
         elif delim_name == "space":
             delim = " "
 
-        ref = delim.join(["model", "center_atom", "cone_angle\n"]) + delim.join(["tm_single-lig.xyz", "/a:1@Cu1", "234.14"])
+        ref = delim.join(["model", "center_atom", "cone_angle\n"]) + delim.join(["tm_single-lig", "/a:1@Cu1", "234.14"])
 
         csv_lines = csv.splitlines()
         ref_lines = ref.splitlines()

@@ -21,10 +21,19 @@ class _SEQCROW_API(BundleAPI):
         from SEQCROW import settings as seqcrow_settings
         seqcrow_settings.settings = settings._SEQCROWSettings(session, "SEQCROW")
         if session.ui.is_gui:
-            from .presets import seqcrow_bse, seqcrow_s, seqcrow_vdw, indexLabel
+            from .presets import (
+                seqcrow_bse,
+                seqcrow_bse_cartoon,
+                seqcrow_s,
+                seqcrow_s_cartoon,
+                seqcrow_vdw,
+                indexLabel,
+            )
 
             session.presets.add_presets("SEQCROW", {"ball-stick-endcap":lambda p=seqcrow_bse: p(session)})
+            session.presets.add_presets("SEQCROW", {"ball-stick-endcap 2":lambda p=seqcrow_bse_cartoon: p(session)})
             session.presets.add_presets("SEQCROW", {"sticks":lambda p=seqcrow_s: p(session)})
+            session.presets.add_presets("SEQCROW", {"sticks 2":lambda p=seqcrow_s_cartoon: p(session)})
             session.presets.add_presets("SEQCROW", {"VDW":lambda p=seqcrow_vdw: p(session)})
             session.presets.add_presets("SEQCROW", {"index labels":lambda p=indexLabel: p(session)})
 
@@ -69,6 +78,14 @@ class _SEQCROW_API(BundleAPI):
         #apply AARONLIB setting
         if seqcrow_settings.settings.AARONLIB is not None:
             os.environ['AARONLIB'] = seqcrow_settings.settings.AARONLIB
+            import AaronTools.const
+            AaronTools.const.AARONLIB = seqcrow_settings.settings.AARONLIB
+
+        # set queue type
+        if seqcrow_settings.settings.QUEUE_TYPE != "None":
+            os.environ['QUEUE_TYPE'] = seqcrow_settings.settings.QUEUE_TYPE
+            import AaronTools.job_control
+            AaronTools.job_control.QUEUE_TYPE = seqcrow_settings.settings.QUEUE_TYPE.upper()
 
         session.seqcrow_settings = seqcrow_settings
 
@@ -175,6 +192,36 @@ class _SEQCROW_API(BundleAPI):
             session.seqcrow_qm_input_manager = QMInputManager(session, name)
             return session.seqcrow_qm_input_manager
 
+        elif name == "seqcrow_cluster_scheduling_software_manager":
+            from SEQCROW.managers import ClusterSchedulingSoftwareManager
+            session.seqcrow_cluster_scheduling_software_manager = ClusterSchedulingSoftwareManager(session, name)
+            return session.seqcrow_cluster_scheduling_software_manager
+
+        elif name == "Slurm":
+            from SEQCROW.managers import SlurmDefault
+            session.seqcrow_slurm_manager = SlurmDefault(session, name)
+            return session.seqcrow_slurm_manager
+
+        elif name == "SGE":
+            from SEQCROW.managers import SGEDefault
+            session.seqcrow_sge_manager = SGEDefault(session, name)
+            return session.seqcrow_sge_manager
+
+        elif name == "PBS":
+            from SEQCROW.managers import PBSDefault
+            session.seqcrow_pbs_manager =  PBSDefault(session, name)
+            return session.seqcrow_pbs_manager
+
+        elif name == "LSF":
+            from SEQCROW.managers import LSFDefault
+            session.seqcrow_lsf_manager = LSFDefault(session, name)
+            return session.seqcrow_lsf_manager
+
+        elif name == "tss_finder_manager":
+            from SEQCROW.managers import TSSFinderManager
+            session.tss_finder_manager = TSSFinderManager(session, name)
+            return session.tss_finder_manager
+
         else:
             raise RuntimeError("manager named '%s' is unknown to SEQCROW" % name)
 
@@ -183,7 +230,7 @@ class _SEQCROW_API(BundleAPI):
         """
         start tools
         """
-        if ti.name == "Browse AaronTools Libraries":
+        if ti.name == "AaronTools Fragment Library":
             from .tools import AaronTools_Library
             tool = AaronTools_Library(session, ti.name)
             return tool
@@ -308,6 +355,10 @@ class _SEQCROW_API(BundleAPI):
         elif ti.name == "2D Builder":
             from .tools import MolBuilder
             return MolBuilder(session, ti.name)
+
+        elif ti.name == "Transition State Structures":
+            from .tools import BuildRaven
+            return BuildRaven(session, ti.name)
 
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)
@@ -531,6 +582,9 @@ class _SEQCROW_API(BundleAPI):
             elif name == "Q-Chem":
                 from SEQCROW.input_file_formats import QChemFileInfo
                 return QChemFileInfo()
+            elif name == "xTB":
+                from SEQCROW.input_file_formats import XTBFileInfo
+                return XTBFileInfo()
 
         elif mgr is session.seqcrow_job_manager:
             if name == "Gaussian":
@@ -548,7 +602,152 @@ class _SEQCROW_API(BundleAPI):
             elif name == "Q-Chem":
                 from SEQCROW.jobs import QChemJob
                 return QChemJob
+            elif name == "xTB":
+                from SEQCROW.jobs import XTBJob
+                return XTBJob
+            elif name == "Raven":
+                from SEQCROW.jobs import SerialRavenJob
+                return SerialRavenJob
+            elif name == "ParallelRaven":
+                from SEQCROW.jobs import ParallelRavenJob
+                return ParallelRavenJob
+            elif name == "Gaussian STQN":
+                from SEQCROW.jobs import GaussianSTQNJob
+                return GaussianSTQNJob
+            elif name == "ORCA NEB":
+                from SEQCROW.jobs import ORCANEBJob
+                return ORCANEBJob
+            elif name == "Q-Chem FSM":
+                from SEQCROW.jobs import QChemFSMJob
+                return QChemFSMJob
 
+        elif mgr is session.seqcrow_cluster_scheduling_software_manager:
+            if name == "Slurm":
+                return session.seqcrow_slurm_manager
+            elif name == "SGE":
+                return session.seqcrow_sge_manager
+            elif name == "PBS":
+                return session.seqcrow_pbs_manager
+            elif name == "LSF":
+                return session.seqcrow_lsf_manager
+
+        elif mgr is session.seqcrow_slurm_manager:
+            if name == "Gaussian":
+                from .managers.cluster_template_manager import GaussianSlurmTemplate
+                return GaussianSlurmTemplate
+            
+            elif name == "ORCA":
+                from .managers.cluster_template_manager import ORCASlurmTemplate
+                return ORCASlurmTemplate
+            
+            elif name == "Psi4":
+                from .managers.cluster_template_manager import Psi4SlurmTemplate
+                return Psi4SlurmTemplate
+             
+            elif name == "Q-Chem":
+                from .managers.cluster_template_manager import QChemSlurmTemplate
+                return QChemSlurmTemplate
+            
+            elif name == "SQM":
+                from .managers.cluster_template_manager import SQMSlurmTemplate
+                return SQMSlurmTemplate
+             
+            elif name == "xTB":
+                from .managers.cluster_template_manager import XTBSlurmTemplate
+                return XTBSlurmTemplate
+ 
+        elif mgr is session.seqcrow_pbs_manager:
+            if name == "Gaussian":
+                from .managers.cluster_template_manager import GaussianPBSTemplate
+                return GaussianPBSTemplate
+            
+            elif name == "ORCA":
+                from .managers.cluster_template_manager import ORCAPBSTemplate
+                return ORCAPBSTemplate
+            
+            elif name == "Psi4":
+                from .managers.cluster_template_manager import Psi4PBSTemplate
+                return Psi4PBSTemplate
+             
+            elif name == "Q-Chem":
+                from .managers.cluster_template_manager import QChemPBSTemplate
+                return QChemPBSTemplate
+            
+            elif name == "SQM":
+                from .managers.cluster_template_manager import SQMPBSTemplate
+                return SQMPBSTemplate
+            
+            elif name == "xTB":
+                from .managers.cluster_template_manager import XTBPBSTemplate
+                return XTBPBSTemplate
+
+        elif mgr is session.seqcrow_sge_manager:
+            if name == "Gaussian":
+                from .managers.cluster_template_manager import GaussianSGETemplate
+                return GaussianSGETemplate
+            
+            elif name == "ORCA":
+                from .managers.cluster_template_manager import ORCASGETemplate
+                return ORCASGETemplate
+            
+            elif name == "Psi4":
+                from .managers.cluster_template_manager import Psi4SGETemplate
+                return Psi4SGETemplate
+             
+            elif name == "Q-Chem":
+                from .managers.cluster_template_manager import QChemSGETemplate
+                return QChemSGETemplate
+            
+            elif name == "SQM":
+                from .managers.cluster_template_manager import SQMSGETemplate
+                return SQMSGETemplate
+            
+            elif name == "xTB":
+                from .managers.cluster_template_manager import XTBSGETemplate
+                return XTBSGETemplate
+
+        elif mgr is session.seqcrow_lsf_manager:
+            if name == "Gaussian":
+                from .managers.cluster_template_manager import GaussianLSFTemplate
+                return GaussianLSFTemplate
+            
+            elif name == "ORCA":
+                from .managers.cluster_template_manager import ORCALSFTemplate
+                return ORCALSFTemplate
+            
+            elif name == "Psi4":
+                from .managers.cluster_template_manager import Psi4LSFTemplate
+                return Psi4LSFTemplate
+             
+            elif name == "Q-Chem":
+                from .managers.cluster_template_manager import QChemLSFTemplate
+                return QChemLSFTemplate
+            
+            elif name == "SQM":
+                from .managers.cluster_template_manager import SQMLSFTemplate
+                return SQMLSFTemplate
+            
+            elif name == "xTB":
+                from .managers.cluster_template_manager import XTBLSFTemplate
+                return XTBLSFTemplate
+
+        elif mgr is session.tss_finder_manager:
+            if name == "GPR growing string method":
+                from .tss_finder_methods import GPRGSM
+                return GPRGSM()
+            elif name == "synchornous transit-guided quasi-Newton":
+                from .tss_finder_methods import STQN
+                return STQN()
+            elif name == "nudged elastic band":
+                from .tss_finder_methods import NEB
+                return NEB()
+            elif name == "freezing string method":
+                from .tss_finder_methods import FSM
+                return FSM()
+            elif name == "metadynamics pathfinding":
+                from .tss_finder_methods import MDPF
+                return MDPF()
+ 
         elif mgr is session.test_manager:
             if name == "fuseRing_command":
                 from .tests.fuseRing_command import FuseRingCmdTest
@@ -659,12 +858,58 @@ class _SEQCROW_API(BundleAPI):
             if len(sub) > 1 and any(not (c.isalnum() or c in "+-") for c in sub[1:]):
                 # print(sub, "contains non-alphanumeric character")
                 continue
-            add_selector(substituent_menu, sub, sub)
+            add_selector(substituent_menu, sub)
 
         # connected selector
         mw = session.ui.main_window
         structure_menu = add_submenu([], '&Structure')
         structure_menu.addAction(QAction("Connected", mw))
+        structure_menu.addAction(QAction("Chiral centers", mw))
+        structure_menu.addAction(QAction("Spiro centers", mw))
+        structure_menu.addAction(QAction("Bridgehead", mw))
+        
+        vsepr_menu = add_submenu(['Che&mistry'], 'Shape')
+        for vsepr in [
+            "linear",
+            "bent",
+            "planar",
+            "t-shaped",
+            "trigonal planar",
+            "tetrahedral",
+            "sawhorse",
+            "seesaw",
+            "square planar",
+            "trigonal pyramidal",
+            "trigonal bipyramidal",
+            "square pyramidal",
+            "pentagonal",
+            "octahedral",
+            "hexagonal",
+            "trigonal prismatic",
+            "pentagonal pyramidal",
+            "capped octahedral",
+            "capped trigonal prismatic",
+            "heptagonal",
+            "hexagonal pyramidal",
+            "pentagonal bipyramidal",
+            "biaugmented trigonal prismatic",
+            "cubic",
+            "elongated trigonal bipyramidal",
+            "hexagonal bipyramidal",
+            "heptagonal pyramidal",
+            "octagonal",
+            "square antiprismatic",
+            "trigonal dodecahedral",
+            "capped cube",
+            "capped square antiprismatic",
+            "enneagonal",
+            "hula-hoop",
+            "tridiminished icosahedral",
+            "muffin",
+            "octagonal pyramidal",
+            "tricapped trigonal prismatic",
+        ]:
+            add_selector(vsepr_menu, vsepr, selector_text=vsepr.replace(" ", "-"))
 
     @staticmethod
     def register_tutorials(session):

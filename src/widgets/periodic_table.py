@@ -20,10 +20,10 @@ class ElementButton(QPushButton):
         self._tristate = False
         self._single_state = single_state
 
-        self.setMinimumWidth(int(1.4*self.fontMetrics().boundingRect("QQ").width()))
-        self.setMaximumWidth(int(1.4*self.fontMetrics().boundingRect("QQ").width()))
-        self.setMinimumHeight(int(1.5*self.fontMetrics().boundingRect("QQ").height()))
-        self.setMaximumHeight(int(1.5*self.fontMetrics().boundingRect("QQ").height()))
+        self.setMinimumWidth(int(1.6*self.fontMetrics().boundingRect("Qy").width()))
+        self.setMaximumWidth(int(1.6*self.fontMetrics().boundingRect("Qy").width()))
+        self.setMinimumHeight(int(1.5*self.fontMetrics().boundingRect("Qy").height()))
+        self.setMaximumHeight(int(1.5*self.fontMetrics().boundingRect("Qy").height()))
         
         self.ele_color = tuple(list(element_color(ELEMENTS.index(element)))[:-1])
         

@@ -9,9 +9,7 @@ from chimerax.core.commands import run
 
 from json import load, dump
 
-from SEQCROW.jobs import LocalJob
-from SEQCROW.managers import ADD_FILEREADER
-from SEQCROW.residue_collection import ResidueCollection
+from SEQCROW.jobs import LocalJob, LocalClusterJob, ParallelRavenJob, TSSJob
 
 JOB_FINISHED = "job finished"
 JOB_STARTED = "job started"
@@ -25,7 +23,6 @@ class JobManager(ProviderManager):
         self.remote_jobs = []
         self.unknown_status_jobs = []
         self.paused = False
-        self._thread = None
         self.queue_dict = {}
         self.formats = {}
 
@@ -57,7 +54,11 @@ class JobManager(ProviderManager):
     def has_job_running(self):
         return any([job.isRunning() for job in self.local_jobs])
 
-    def add_provider(self, bundle_info, name):
+    @property
+    def has_local_job_running(self):
+        return any([job.isRunning() for job in self.local_jobs if not isinstance(job, LocalClusterJob)])
+
+    def add_provider(self, bundle_info, name, **kw):
         # if name in self.formats:
         #     self.session.logger.warning(
         #         "local job type %s from %s supplanted that from %s" % (
@@ -86,56 +87,110 @@ class JobManager(ProviderManager):
                                     name,
                                     self
                                 )
-                                local_job = job_cls(
+                                args = [
                                     job['name'],
                                     self.session,
                                     job['theory'],
-                                    geometry=job['geometry'],
-                                    auto_update=job['auto_update'],
-                                    auto_open=job['auto_open'],
-                                )
+                                ]
+                                kwargs = job["job_options"]
+                                if issubclass(job_cls, TSSJob):
+                                    args.extend([
+                                        job["reactant"],
+                                        job["product"],
+                                        job["file_type"],
+                                        job["algorithm_kwargs"]
+                                    ])
                                 
-                                if section == "check":
-                                    if 'output' in job and job['output'] and os.path.exists(job['output']):
-                                        fr = FileReader(job['output'], just_geom=False)
-                                        if 'finished' in fr.other and fr.other['finished']:
-                                            local_job.isFinished = lambda *args, **kwargs: True
-                                        else:
-                                            local_job.isRunning = lambda *args, **kwargs: True
-                                            self.unknown_status_jobs.append(local_job)
-    
-                                elif section == "finished":
-                                    #shh it's finished
-                                    local_job.isFinished = lambda *args, **kwargs: True
-                                    local_job.output_name = job['output']
-                                    local_job.scratch_dir = job['scratch']
-                                
-                                elif section == "error":
-                                    #shh it's finished
-                                    local_job.isFinished = lambda *args, **kwargs: True
-                                    local_job.error = True
-                                    local_job.output_name = job['output']
-                                    local_job.scratch_dir = job['scratch']
-                                
-                                elif section == "killed":
-                                    local_job.isFinished = lambda *args, **kwargs: True
-                                    local_job.killed = True
-                                    local_job.output_name = job['output']
-                                    local_job.scratch_dir = job['scratch']
-    
-                                local_job.output_name = job['output']
-                                local_job.scratch_dir = job['scratch']
-                                
-                                self.local_jobs.append(local_job)
-                                # self.session.logger.info("added %s (%s job) from previous session" % (job['name'], job['format']))
+                                elif "geometry" in job:
+                                    kwargs["geometry"] = job["geometry"]
                                 break
                         else:
                             self.session.logger.warning(
                                 "local job provider for %s jobs is no longer installed," % job["format"] +
                                 "job named '%s' will be removed from the queue" % job["name"]
                             )
+                    
+                    elif job['server'] == "cluster":
+                        args = [
+                            job['name'],
+                            self.session,
+                            job['theory'],
+                            job['file_type'],
+                        ]
+                        if "tss_algorithm" in job:
+                            job_cls = ClusterTSSJob
+                            args = [
+                                job["name"],
+                                self.session,
+                                job["theory"],
+                                job["reactant"],
+                                job["product"],
+                                job["file_type"],
+                                job["tss_algorithm"],
+                            ]
+                            try:
+                                kwargs = job["algorithm_kwargs"]
+                            except KeyError:
+                                kwargs = dict()
+                        else:
+                            job_cls = LocalClusterJob
+                            kwargs = {
+                                "geometry": job['geometry'],
+                            }
+                   
+                        kwargs["queue_type"] = job["queue_type"]
+                        kwargs["template_kwargs"] = job["template_kwargs"]
+                        kwargs["template"] = job["template"]
+                        kwargs["processors"] = job["processors"]
+                        kwargs["walltime"] = job["walltime"]
+                        kwargs["memory"] = job["memory"]
+
+                    else:
+                        self.session.logger.warning("job with unknown server: %s" % job['server'])
+                        continue
+
+                    local_job = job_cls(
+                        *args,
+                        auto_update=job['auto_update'],
+                        auto_open=job['auto_open'],
+                        **kwargs
+                    )
+
+                    if section == "check":
+                        if 'output' in job and job['output'] and os.path.exists(job['output']):
+                            fr = FileReader(job['output'], just_geom=False)
+                            if 'finished' in fr.other and fr.other['finished']:
+                                local_job.isFinished = lambda *args, **kwargs: True
+                            else:
+                                local_job.isRunning = lambda *args, **kwargs: True
+                                self.unknown_status_jobs.append(local_job)
     
-                            self.local_jobs.append(local_job)
+                    elif section == "finished":
+                        #shh it's finished
+                        local_job.isFinished = lambda *args, **kwargs: True
+                        local_job.output_name = job['output']
+                        local_job.scratch_dir = job['scratch']
+                                
+                    elif section == "error":
+                        #shh it's finished
+                        local_job.isFinished = lambda *args, **kwargs: True
+                        local_job.isFinished = lambda *args, **kwargs: True
+                        local_job.error = True
+                        local_job.output_name = job['output']
+                        local_job.scratch_dir = job['scratch']
+                                
+                    elif section == "killed":
+                        local_job.isFinished = lambda *args, **kwargs: True
+                        local_job.isFinished = lambda *args, **kwargs: True
+                        local_job.killed = True
+                        local_job.output_name = job['output']
+                        local_job.scratch_dir = job['scratch']
+    
+                        local_job.output_name = job['output']
+                        local_job.scratch_dir = job['scratch']
+
+                    self.local_jobs.append(local_job)
+                    # self.session.logger.info("added %s (%s job) from previous session" % (job['name'], job['format']))
 
             self.paused = queue_dict['job_running']
 
@@ -176,7 +231,7 @@ class JobManager(ProviderManager):
                     job_running = True
                     # print("check")
 
-            elif job.isFinished():
+            elif job.isFinished() and job.killed:
                 d['killed'].append(job.get_json())
                 # print("killed")
 
@@ -194,6 +249,11 @@ class JobManager(ProviderManager):
 
     def job_finished(self, trigger_name, job):
         """when a job is finished, open or update the structure as requested"""
+
+        from SEQCROW.managers import ADD_FILEREADER
+        from SEQCROW.residue_collection import ResidueCollection
+
+
         if self.session.seqcrow_settings.settings.JOB_FINISHED_NOTIFICATION == \
           'log and popup notifications' and self.session.ui.is_gui:
             #it's just an error message for now
@@ -204,94 +264,46 @@ class JobManager(ProviderManager):
             job.session.logger.info("%s: %s" % (trigger_name, job))
 
         if isinstance(job, LocalJob):
-            self._thread = None
-            if not hasattr(job, "output_name") or \
-               not job.output_name or \
-               not os.path.exists(job.output_name):
+            if (
+                not hasattr(job, "output_name") or
+                not job.output_name or (
+                    isinstance(job.output_name, str) and
+                    not os.path.exists(job.output_name)
+                ) or (
+                    isinstance(job.output_name, dict) and
+                    not all(os.path.exists(f) for f in job.output_name.values())
+                ) or (
+                    not isinstance(job.output_name, str) and
+                    hasattr(job.output_name, "__iter__") and
+                    not all(os.path.exists(f) for f in job.output_name)
+                )
+            ):
                 job.error = True
             
             else:
                 try:
-                    fr = FileReader(job.output_name, just_geom=False)
-                    if 'finished' not in fr.other or not fr.other['finished']:
-                        job.error = True
+                    if isinstance(job.output_name, str):
+                        fr = FileReader(job.output_name, just_geom=False)
+                        if 'finished' not in fr.other or not fr.other['finished']:
+                            job.error = True
+                    else:
+                        for f in job.output_name:
+                            fr = FileReader(f, just_geom=False)
+                            if 'finished' in fr.other and not fr.other['finished']:
+                                job.error = True
                 except NotImplementedError:
                     pass
         
         self.triggers.activate_trigger(JOB_QUEUED, trigger_name)
 
         if job.auto_update and (
-                job.theory.geometry.chix_atomicstructure is not None and
-                not job.theory.geometry.chix_atomicstructure.deleted
+            job.theory.geometry.chix_atomicstructure is not None and
+            not job.theory.geometry.chix_atomicstructure.deleted
         ):
-            if os.path.exists(job.output_name):
-                finfo = job.output_name
-                try:
-                    finfo = (job.output_name, job.format_name, None)
-
-                    fr = FileReader(finfo, get_all=True, just_geom=False)
-                    if len(fr.atoms) > 0:
-                        job.session.filereader_manager.triggers.activate_trigger(
-                            ADD_FILEREADER, 
-                            ([job.theory.geometry.chix_atomicstructure], [fr])
-                        )
-        
-                        rescol = ResidueCollection(fr)
-                        rescol.update_chix(job.theory.geometry.chix_atomicstructure)
-
-                    if fr.all_geom is not None and len(fr.all_geom) > 1:
-                        coordsets = rescol.all_geom_coordsets(fr)
-        
-                        job.theory.geometry.chix_atomicstructure.remove_coordsets()
-                        job.theory.geometry.chix_atomicstructure.add_coordsets(coordsets)
-        
-                        for i, coordset in enumerate(coordsets):
-                            job.theory.geometry.chix_atomicstructure.active_coordset_id = i + 1
-                            
-                            for atom, coord in zip(job.theory.geometry.chix_atomicstructure.atoms, coordset):
-                                atom.coord = coord
-        
-                        job.theory.geometry.chix_atomicstructure.active_coordset_id = job.theory.geometry.chix_atomicstructure.num_coordsets
-
-                except Exception:
-                    if job.__class__.update_structure is not LocalJob.update_structure:
-                        job.update_structure(job.theory.geometry.chix_atomicstructure)
-                    
-                    else:
-                        self.session.logger.warning(
-                            "can only update the structure of AaronTools file formats"
-                        )
-                        if (
-                                hasattr(job, "output_name") and
-                                job.output_name and os.path.exists(job.output_name)
-                        ):
-                            if job.format_name:
-                                run(
-                                    job.session,
-                                    "open \"%s\" format %s" % (
-                                        job.output_name,
-                                        job.format_name
-                                    )
-                                )
-                            else:
-                                run(job.session, "open \"%s\"" % job.output_name)
-                        else:
-                            self.session.logger.error("could not open output of %s" % repr(job))
-
+            job.update_structure(job.theory.geometry.chix_atomicstructure)
 
         elif job.auto_open or job.auto_update:
-            if hasattr(job, "output_name") and job.output_name and os.path.exists(job.output_name):
-                if job.format_name:
-                    if job.format_name in read_types:
-                        run(job.session, "open \"%s\" coordsets true format %s" % (job.output_name, job.format_name))
-                    else:
-                        run(job.session, "open \"%s\" format %s" % (job.output_name, job.format_name))
-                else:
-                    run(job.session, "open \"%s\" coordsets true" % job.output_name)
-            else:
-                self.session.logger.error("could not open output of %s" % repr(job))
-
-        pass
+            job.open_structure()
 
     def job_started(self, trigger_name, job):
         """prints 'job started' notification to log"""
@@ -346,27 +358,30 @@ class JobManager(ProviderManager):
         """check to see if a waiting job can run"""
         for job in self.unknown_status_jobs:
             if isinstance(job, LocalJob):
-                fr = FileReader(job.output_name, just_geom=False)
-                if 'finished' in fr.other and fr.other['finished']:
-                    job.isFinished = lambda *args, **kwargs: True
-                    job.isRunning = lambda *args, **kwargs: False
-                    self.unknown_status_jobs.remove(job)
-                    self.triggers.activate_trigger(JOB_FINISHED, job)
-                    return
+                try:
+                    fr = FileReader(job.output_name, just_geom=False)
+                    if 'finished' in fr.other and fr.other['finished']:
+                        job.isFinished = lambda *args, **kwargs: True
+                        job.isRunning = lambda *args, **kwargs: False
+                        self.unknown_status_jobs.remove(job)
+                        self.triggers.activate_trigger(JOB_FINISHED, job)
+                except NotImplementedError:
+                    self.session.logger.warning("cannot determine status of job %s" % job)
+                    continue
         
-        if not self.has_job_running:
-            unstarted_local_jobs = []
-            for job in self.local_jobs:
-                if not job.isFinished() and not job.killed:
-                    unstarted_local_jobs.append(job)
-                    
+        unstarted_local_jobs = []
+        for job in self.local_jobs:
+            if not job.isFinished() and not job.killed and not job.isRunning():
+                unstarted_local_jobs.append(job)
             if len(unstarted_local_jobs) > 0 and not self.paused:
-                start_job = unstarted_local_jobs.pop(0)
+                for start_job in unstarted_local_jobs:
+                    if (
+                        isinstance(start_job, LocalClusterJob)
+                    ) or (
+                        not self.has_local_job_running
+                    ):
+                        start_job.finished.connect(lambda data=start_job: self.triggers.activate_trigger(JOB_FINISHED, data))
+                        start_job.started.connect(lambda data=start_job: self.triggers.activate_trigger(JOB_STARTED, data))
+                        start_job.start()
+                        break
 
-                self._thread = start_job
-                start_job.finished.connect(lambda data=start_job: self.triggers.activate_trigger(JOB_FINISHED, data))
-                start_job.started.connect(lambda data=start_job: self.triggers.activate_trigger(JOB_STARTED, data))
-                start_job.start()
-
-            else:
-                self._thread = None

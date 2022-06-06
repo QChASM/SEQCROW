@@ -23,6 +23,8 @@ def rmsdAlign(session, models, reference, align=True, sort=False, heavyOnly=Fals
     ref = ResidueCollection(reference)
     order1 = None
     
+    rmsd_list = []
+    
     for model in models:
         if not isinstance(model, AtomicStructure):
             continue
@@ -62,4 +64,9 @@ def rmsdAlign(session, models, reference, align=True, sort=False, heavyOnly=Fals
             rmsd = np.sqrt(rmsd / atoms)
 
             session.logger.info("rmsd between %s and %s: %.4f" % (ref.atomspec, model.atomspec, rmsd))
+            
+        rmsd_list.append(rmsd)
+    
+    return rmsd_list
+    
     

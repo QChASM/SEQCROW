@@ -141,7 +141,7 @@ class AaronTools_Library(ToolInstance):
         self.tool_window.manage(None)
 
     def showKeyAtoms(self, state):
-        if state == QtCore.Qt.Checked:
+        if Qt.CheckState(state) == QtCore.Qt.Checked:
             self.showLigKeyBool = True
         else:
             self.showLigKeyBool = False
@@ -170,7 +170,7 @@ class AaronTools_Library(ToolInstance):
                 self.session.models.add(bild_obj, parent=chimera_ligand)
 
     def showGhostConnection(self, state):
-        if state == QtCore.Qt.Checked:
+        if Qt.CheckState(state) == QtCore.Qt.Checked:
             self.showSubGhostBool = True
         else:
             self.showSubGhostBool = False
@@ -199,7 +199,7 @@ class AaronTools_Library(ToolInstance):
                 self.session.models.add(bild_obj, parent=chimera_substituent)
 
     def showRingWalk(self, state):
-        if state == QtCore.Qt.Checked:
+        if Qt.CheckState(state) == QtCore.Qt.Checked:
             self.showRingWalkBool = True
         else:
             self.showRingWalkBool = False

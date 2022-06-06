@@ -1,6 +1,8 @@
 import os.path
 import re
 
+from jinja2 import Template
+
 from chimerax.atomic import selected_atoms, selected_bonds, selected_pseudobonds, get_triggers
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
@@ -13,8 +15,8 @@ from json import dumps, loads, dump, load
 
 from configparser import ConfigParser
 
-from Qt.QtCore import Qt, QRegularExpression, Signal
-from Qt.QtGui import QKeySequence, QFontDatabase, QIcon
+from Qt.QtCore import Qt, QRegularExpression, Signal, QTime
+from Qt.QtGui import QKeySequence, QFontDatabase, QIcon, QPixmap
 from Qt.QtWidgets import (
     QCheckBox,
     QLabel,
@@ -48,6 +50,7 @@ from Qt.QtWidgets import (
     QStyle,
 )
 
+from SEQCROW.jobs import LocalClusterJob
 from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.utils import iter2str
 from SEQCROW.widgets.periodic_table import PeriodicTable, ElementButton
@@ -62,6 +65,121 @@ from AaronTools.utils.utils import combine_dicts
 from AaronTools.json_extension import ATDecoder, ATEncoder
 
 # import cProfile
+
+# pencil icon
+edit_pencil = QPixmap([
+    "48 48 3  1",
+    "I c None",
+    "B c #000000",
+    "c c #555555",
+    "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIcccccccIIIII",
+    "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIcBBBBBBBccIII",
+    "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIcBBBBBBBBBBcII",
+    "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIcBBBBBBBBBBBBBcI",
+    "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIcBBBBBBBBBBBBBcI",
+    "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIcBBBBBBBBBBBBBBc",
+    "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIcBBBBBBBBBBBBBc",
+    "IIIIIIIIIIIIIIIIIIIIIIIIIIIccIIIIIcBBBBBBBBBBBBc",
+    "IIIIIIIIIIIIIIIIIIIIIIIIIIcBBcIIIIIcBBBBBBBBBBBc",
+    "IIIIIIIIIIIIIIIIIIIIIIIIIcBBBBcIIIIIcBBBBBBBBBBc",
+    "IIIIIIIIIIIIIIIIIIIIIIIIcBBBBBBcIIIIIcBBBBBBBBBc",
+    "IIIIIIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIcBBBBBBBcI",
+    "IIIIIIIIIIIIIIIIIIIIIIcBBBBBBBBBBcIIIIIcBBBBBcII",
+    "IIIIIIIIIIIIIIIIIIIIIcBBBBBBBBBBBBcIIIIIcBBBcIII",
+    "IIIIIIIIIIIIIIIIIIIIcBBBBBBBBBBBBBBcIIIIIcccIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBBBBBBBBBcIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIcBBBBBBBBBBBBBBBBBBcIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIcBBBBBBBBBBBBBBBBBBBBcIIIIIIIII",
+    "IIIIIIIIIIIIIIIIcBBBBBBBBBBBBBBBBBBBBBBcIIIIIIII",
+    "IIIIIIIIIIIIIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIII",
+    "IIIIIIIIIIIIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIII",
+    "IIIIIIIIIIIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIII",
+    "IIIIIIIIIIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIII",
+    "IIIIIIIIIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIII",
+    "IIIIIIIIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIII",
+    "IIIIIIIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIIII",
+    "IIIIIIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIIIII",
+    "IIIIIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIIIIII",
+    "IIIIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIIIIIII",
+    "IIIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIIIIIIII",
+    "IIIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIcBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIIIIIIIIII",
+    "IIIBBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIIIIIIIIIII",
+    "IIIBBBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIIIIIIIIIIII",
+    "IIIcBBBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIIIIIIIIIIIII",
+    "IIIIcBBBBBBBBBBBBBBBBBBcIIIIIIIIIIIIIIIIIIIIIIII",
+    "IIIIIcBBBBBBBBBBBBBBBBcIIIIIIIIIIIIIIIIIIIIIIIII",
+    "IIIIIIcBBBBBBBBBBBBBBcIIIIIIIIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIcBBBBBBBBBBBBcIIIIIIIIIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIcBBBBBBBBBBcIIIIIIIIIIIIIIIIIIIIIIIIIIII",
+    "IccIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIIIIIIIIIIIII",
+    "IBBcIIIIIIcBBBBBBcIIIIIIIIIIIIIIIIIIIIIIIIIIIIII",
+    "IBBBcIIIIIIcBBBBcIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII",
+    "IBBBBcIIIIIIcBBcIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII",
+    "cBBBBBcIIIIIIccIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII",
+    "cBBBBBBcIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII",
+    "cBBBBBccIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII",
+    "ccccccIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII",
+])
+pencil_icon = QIcon(edit_pencil)
+
+
+plus_symbol = QPixmap([
+    "48 48 3  1",
+    "I c None",
+    "B c #3cde30",
+    "c c #3a3a3a",
+    "IIIIIIIIIIIIIIIIIIIIIccccccIIIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIIcBBBBBBcIIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIccccccccccccccccccBBBBBBBBcccccccccccccccccccI",
+    "IcBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBcI",
+    "cBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBc",
+    "cBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBc",
+    "cBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBc",
+    "cBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBc",
+    "cBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBc",
+    "cBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBc",
+    "IcBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBcI",
+    "IIccccccccccccccccccBBBBBBBBcccccccccccccccccccI",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIcBBBBBBBBcIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIIcBBBBBBcIIIIIIIIIIIIIIIIIIII",
+    "IIIIIIIIIIIIIIIIIIIIIccccccIIIIIIIIIIIIIIIIIIIII",
+])
+plus_icon = QIcon(plus_symbol)
+
 
 class UserRoleSortableTableWidget(QTableWidgetItem):
     def __lt__(self, other):
@@ -108,6 +226,12 @@ class _InputGeneratorSettings(Settings):
         'last_options': Value(dumps(dict()), StringArg),
         'previous_options': Value(dumps(dict()), StringArg),
         'last_program': Value("Gaussian", StringArg),
+        'queue_kwargs': Value(dumps({"queue": ["general", "batch", "all.q"]}), StringArg),
+        'last_queue_kwargs': Value(dumps(dict()), StringArg),
+        'templates': Value(dumps(dict()), StringArg),
+        'last_template': Value(dumps(dict()), StringArg),
+        'last_walltime': 4,
+        'last_submit_memory': 4,
     }
 
     AUTO_SAVE = {
@@ -136,7 +260,7 @@ class BuildQM(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False
 
-    help = "https://github.com/QChASM/SEQCROW/wiki/Build-QM-Input-Tool"
+    help = "help:user/tools/buildqminput.html"
 
     def __init__(self, session, name):
         super().__init__(session, name)
@@ -151,9 +275,11 @@ class BuildQM(ToolInstance):
         self.warning_window = None
         self.preset_window = None
         self.job_local_prep = None
+        self.job_cluster_prep = None
         self.remove_preset_window = None
         self.export_preset_window = None
         self.program = None
+        self.templates = loads(self.settings.templates)
 
         self._build_ui()
 
@@ -257,7 +383,7 @@ class BuildQM(ToolInstance):
         self.copy = copy
 
         save = QAction("&Save Input", self.tool_window.ui_area)
-        save.triggered.connect(self.save_input)
+        save.triggered.connect(self.open_save_dialog)
         #this shortcut interferes with main window's save shortcut
         #I've tried different shortcut contexts to no avail
         #thanks Qt...
@@ -312,21 +438,27 @@ class BuildQM(ToolInstance):
         self.presets_menu.addAction(self.export_preset)
 
         run = menu.addMenu("&Run")
-        locally = QAction("&Locally", self.tool_window.ui_area)
+        locally = QAction("&On this computer...", self.tool_window.ui_area)
         #remotely = QAction("R&emotely - coming eventually", self.tool_window.ui_area)
         locally.triggered.connect(self.show_local_job_prep)
         run.addAction(locally)
+        #run.addAction(remotely)
+
+        clusterly = QAction("&Submit to local cluster...", self.tool_window.ui_area)
+        #remotely = QAction("R&emotely - coming eventually", self.tool_window.ui_area)
+        clusterly.triggered.connect(self.show_cluster_job_prep)
+        run.addAction(clusterly)
         #run.addAction(remotely)
 
         menu.setNativeMenuBar(False)
 
         self._menu = menu
         layout.setMenuBar(menu)
-        menu.setVisible(True)
 
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(None)
+        menu.setVisible(True)
 
     def migrate_settings_from_v2(self):
         """
@@ -620,12 +752,13 @@ class BuildQM(ToolInstance):
 
         self.settings.presets = dumps(self.presets, cls=ATEncoder)
 
-        sep = self.presets_menu.addSeparator()
-        self.presets_menu.addAction(sep)
-        self.presets_menu.addAction(self.new_preset)
-        self.presets_menu.addAction(self.remove_preset)
-        self.presets_menu.addAction(self.import_preset)
-        self.presets_menu.addAction(self.export_preset)
+        if hasattr(self, "new_preset"):
+            sep = self.presets_menu.addSeparator()
+            self.presets_menu.addAction(sep)
+            self.presets_menu.addAction(self.new_preset)
+            self.presets_menu.addAction(self.remove_preset)
+            self.presets_menu.addAction(self.import_preset)
+            self.presets_menu.addAction(self.export_preset)
 
     def show_new_preset(self):
         """open 'save preset' child tool"""
@@ -837,7 +970,10 @@ class BuildQM(ToolInstance):
     def struc_mod_update_preview(self, *args, **kwargs):
         """whenever a setting is changed, this should be called to update the preview"""
         if self.changed:
-            self.job_widget.check_constraints()
+            if not self.job_widget.structure.deleted:
+                self.job_widget.setStructure(self.job_widget.structure)
+            else:
+                self.job_widget.check_constraints()
             self.update_preview()
             self.changed = False
 
@@ -858,6 +994,11 @@ class BuildQM(ToolInstance):
                     self.preview_window.setPreview(contents, warnings)
                 if self.warning_window is not None:
                     self.warning_window.setWarnings(warnings)
+        else:
+            self.update_theory(update_settings=False)
+
+        if self.job_local_prep:
+            self.job_local_prep.eval_conditions()
 
         # profile.disable()
         # profile.print_stats()
@@ -999,7 +1140,8 @@ class BuildQM(ToolInstance):
         if mdl is not None:
             elements = set(mdl.atoms.elements.names)
             self.basis_widget.setElements(elements)
-            self.job_widget.check_deleted_atoms()
+            if hasattr(self.job_widget, "check_deleted_atoms"):
+                self.job_widget.check_deleted_atoms()
             self.method_widget.sapt_layers.check_deleted_atoms()
 
     def get_basis_set(self, update_settings=False):
@@ -1011,9 +1153,87 @@ class BuildQM(ToolInstance):
     def show_local_job_prep(self):
         """open run local job child window"""
         if self.job_local_prep is None:
-            self.job_local_prep = self.tool_window.create_child_window("Launch Job", window_class=PrepLocalJob)
+            self.job_local_prep = self.tool_window.create_child_window(
+                "Launch Job", window_class=PrepLocalJob
+            )
 
-    def run_local_job(self, *args, name="local_job", auto_update=False, auto_open=False):
+    def show_cluster_job_prep(self):
+        """open run cluster job child window"""
+        if self.session.seqcrow_settings.settings.QUEUE_TYPE == "None":
+            self.session.logger.error(
+                "you must set your scheduling software before submitting a job to a local cluster\n"
+                "this can be found under the \"SEQCROW Jobs\" section of ChimeraX's settings"
+            )
+            return
+        if self.job_cluster_prep is None:
+            self.job_cluster_prep = self.tool_window.create_child_window(
+                "Submit Job", window_class=PrepClusterJob
+            )
+
+    def get_local_job_type(self):
+        program = self.file_type.currentText()
+        if program in self.session.seqcrow_job_manager.formats:
+            job_cls = self.session.seqcrow_job_manager.formats[program].run_provider(
+                self.session,
+                program,
+                self.session.seqcrow_job_manager,
+            )
+        else:
+            raise NotImplementedError("no provider for running local %s jobs" % program)
+        
+        return job_cls
+
+    def run_local_job(self, *args, name="local_job", **kwargs):
+        """run job"""
+        self.update_theory(update_settings=True)
+
+        # need to convert constraints to atoms so they can be encoded by the 
+        # job manager
+        for job in self.theory.job_type:
+            if isinstance(job, OptimizationJob):
+                if job.constraints:
+                    for key in job.constraints:
+                        if key == "atoms":
+                            if not job.constraints["atoms"]:
+                                continue
+                            job.constraints["atoms"] = [
+                                "%i" % (self.theory.geometry.atoms.index(atom) + 1)
+                                for atom in self.theory.geometry.find(job.constraints["atoms"])
+                            ]
+                        else:
+                            for i, con in enumerate(job.constraints[key]):
+                                job.constraints[key][i] = [
+                                    "%i" % (self.theory.geometry.atoms.index(atom) + 1)
+                                    for atom in self.theory.geometry.find(con)
+                                ]
+
+        program = self.file_type.currentText()
+        self.settings.last_program = program
+
+        job_cls = self.get_local_job_type()
+        job = job_cls(
+            name,
+            self.session,
+            self.theory,
+            **kwargs,
+        )
+    
+        self.session.logger.status("adding %s to queue" % name)
+    
+        self.session.seqcrow_job_manager.add_job(job)
+
+        self.update_preview()
+
+    def run_cluster_job(
+        self,
+        memory,
+        template_name,
+        walltime,
+        name="cluster_job",
+        auto_update=False,
+        auto_open=False,
+        template_kwargs=None,
+    ):
         """run job"""
         self.update_theory(update_settings=True)
 
@@ -1040,18 +1260,23 @@ class BuildQM(ToolInstance):
         self.settings.last_program = self.file_type.currentText()
 
         program = self.file_type.currentText()
+        queue_type = self.session.seqcrow_settings.settings.QUEUE_TYPE
+        cluster_type = self.session.seqcrow_cluster_scheduling_software_manager.get_queue_manager(queue_type).get_template(program)()
+        template = self.templates[queue_type][program][template_name]
         if program in self.session.seqcrow_job_manager.formats:
-            job_cls = self.session.seqcrow_job_manager.formats[program].run_provider(
-                self.session,
-                program,
-                self.session.seqcrow_job_manager,
-            )
-            job = job_cls(
+            job = LocalClusterJob(
                 name,
                 self.session,
                 self.theory,
+                program,
+                queue_type,
                 auto_update=auto_update,
-                auto_open=auto_open
+                auto_open=auto_open,
+                template=template,
+                walltime=walltime,
+                processors=self.job_widget.getNProc(),
+                memory=memory,
+                template_kwargs=template_kwargs,
             )
     
             self.session.logger.status("adding %s to queue" % name)
@@ -1061,6 +1286,27 @@ class BuildQM(ToolInstance):
             raise NotImplementedError("no provider for running local %s jobs" % program)
 
         self.update_preview()
+
+    def new_template(self, *args, start_from=None):
+        default_text = ""
+        title = "New template"
+        queue_type = self.session.seqcrow_settings.settings.QUEUE_TYPE
+        if queue_type in self.session.seqcrow_cluster_scheduling_software_manager.queues:
+            default_templates = self.session.seqcrow_cluster_scheduling_software_manager.get_queue_manager(queue_type)
+            program = self.file_type.currentText()
+            if program in default_templates.templates:
+                default_text = default_templates.get_template(program).template
+        
+        if start_from is not None:
+            default_text = self.templates[queue_type][program][start_from]
+            title = "Edit %s" % start_from
+        
+        self.tool_window.create_child_window(
+            title,
+            window_class=NewTemplate,
+            default_text=default_text,
+            default_name=start_from
+        )
 
     def copy_input(self):
         """copies input file to the clipboard"""
@@ -1078,9 +1324,9 @@ class BuildQM(ToolInstance):
             self.session.logger.warning(warning)
 
         for line in output.splitlines():
-            if "{ name }" in line:
+            if "{{ name }}" in line:
                 self.session.logger.warning(
-                    "{ name } was used in the input file, but this feature is not available when copying the file to the clipboard because the file name is unknown"
+                    "{{ name }} was used in the input file, but this feature is not available when copying the file to the clipboard because the file name is unknown"
                 )
 
         app = QApplication.instance()
@@ -1091,9 +1337,10 @@ class BuildQM(ToolInstance):
 
         self.session.logger.status("copied to clipboard")
 
-    def save_input(self):
-        """save input to a file
-        a file dialog will open asking for a file location"""
+    def open_save_dialog(self):
+        """
+        open a dialog to select the save file location
+        """
 
         program = self.file_type.currentText()
         info = self.session.seqcrow_qm_input_manager.get_info(program)
@@ -1102,24 +1349,34 @@ class BuildQM(ToolInstance):
 
         if not filename:
             return
+        
+        self.save_file(filename)
 
+    def save_file(self, filename):
+        """
+        save the input file contents to filename
+        """
         contents, warnings = self.get_file_contents(update_settings=True)
 
         if isinstance(contents, dict):
+            dirname, outname = os.path.split(filename)
+            name, ext = os.path.splitext(outname)
             for key, item in contents.items():
-                if "%" in key:
-                    fname = key % filename
+                if "." in key:
+                    fname = os.path.join(
+                        dirname, key
+                    )
                 else:
-                    fname = filename
-                outname = os.path.basename(fname)
-                name, ext = os.path.splitext(outname)
-                item = item.replace("{ name }", name)
+                    fname = os.path.join(
+                        dirname, name + ".%s" % key
+                    )
+                item = item.replace("{{ name }}", name)
                 with open(fname, "w") as f:
                     f.write(item)
         else:
             outname = os.path.basename(filename)
             name, ext = os.path.splitext(outname)
-            contents = contents.replace("{ name }", name)
+            contents = contents.replace("{{ name }}", name)
             with open(filename, "w") as f:
                 f.write(contents)
 
@@ -1214,7 +1471,7 @@ class JobTypeOption(QWidget):
         job_type_layout.addRow("charge:", self.charge)
 
         self.multiplicity = QSpinBox()
-        self.multiplicity.setRange(1, 3)
+        self.multiplicity.setRange(1, 10)
         self.multiplicity.setSingleStep(1)
         self.multiplicity.setValue(self.settings.previous_mult)
         self.multiplicity.setToolTip(
@@ -1295,7 +1552,7 @@ class JobTypeOption(QWidget):
         file_browse_layout.setContentsMargins(*new_margins)
         self.chk_file_path = QLineEdit()
         self.chk_file_path.setPlaceholderText(
-            "{ name } will be replaced if file is saved"
+            "{{ name }} will be replaced if file is saved"
         )
         self.chk_file_path.textChanged.connect(self.something_changed)
         self.chk_browse_button = QPushButton("browse...")
@@ -1317,6 +1574,36 @@ class JobTypeOption(QWidget):
         runtime_outer_shell_layout.setRowStretch(2, 1)
 
         self.job_type_opts.addTab(self.runtime, "execution")
+
+
+        solvent_widget = QWidget()
+        solvent_layout = QGridLayout(solvent_widget)
+
+        solvent_form = QWidget()
+        solvent_form_layout = QFormLayout(solvent_form)
+
+        self.solvent_option = QComboBox()
+        self.solvent_option.currentTextChanged.connect(self.change_solvent_model)
+        solvent_form_layout.addRow("implicit solvent model:", self.solvent_option)
+
+        self.solvent_name_label = QLabel("solvent:")
+        self.solvent_name = QLineEdit()
+        self.solvent_name.setText(self.settings.previous_solvent_name)
+        self.solvent_name.textChanged.connect(self.filter_solvents)
+        self.solvent_name.setClearButtonEnabled(True)
+        solvent_form_layout.addRow(self.solvent_name_label, self.solvent_name)
+
+        solvent_layout.addWidget(solvent_form, 0, 0, Qt.AlignTop)
+
+        self.solvent_names = QListWidget()
+        self.solvent_names.setSelectionMode(self.solvent_names.SingleSelection)
+        self.solvent_names.itemSelectionChanged.connect(self.change_selected_solvent)
+        self.solvent_names.itemDoubleClicked.connect(self.change_selected_solvent)
+
+        solvent_layout.addWidget(self.solvent_names)
+
+        self.job_type_opts.addTab(solvent_widget, "solvent")
+
 
         self.geom_opt = QWidget()
         geom_opt_layout = QGridLayout(self.geom_opt)
@@ -1455,33 +1742,6 @@ class JobTypeOption(QWidget):
 
         self.job_type_opts.addTab(self.freq_opt, "frequency settings")
 
-        solvent_widget = QWidget()
-        solvent_layout = QGridLayout(solvent_widget)
-
-        solvent_form = QWidget()
-        solvent_form_layout = QFormLayout(solvent_form)
-
-        self.solvent_option = QComboBox()
-        self.solvent_option.currentTextChanged.connect(self.change_solvent_model)
-        solvent_form_layout.addRow("implicit solvent model:", self.solvent_option)
-
-        self.solvent_name_label = QLabel("solvent:")
-        self.solvent_name = QLineEdit()
-        self.solvent_name.setText(self.settings.previous_solvent_name)
-        self.solvent_name.textChanged.connect(self.filter_solvents)
-        self.solvent_name.setClearButtonEnabled(True)
-        solvent_form_layout.addRow(self.solvent_name_label, self.solvent_name)
-
-        solvent_layout.addWidget(solvent_form, 0, 0, Qt.AlignTop)
-
-        self.solvent_names = QListWidget()
-        self.solvent_names.setSelectionMode(self.solvent_names.SingleSelection)
-        self.solvent_names.itemSelectionChanged.connect(self.change_selected_solvent)
-        self.solvent_names.itemDoubleClicked.connect(self.change_selected_solvent)
-
-        solvent_layout.addWidget(self.solvent_names)
-
-        self.job_type_opts.addTab(solvent_widget, "solvent")
 
         self.job_type_opts.tabBarDoubleClicked.connect(self.tab_dble_click)
 
@@ -1539,10 +1799,10 @@ class JobTypeOption(QWidget):
     def tab_dble_click(self, ndx):
         """toggle job type when optimization or frequency tab is clicked
         this is done so that the job type can be changed when the top half has been collapsed"""
-        if ndx == 1 and self.form.optimization:
+        if ndx == 2 and self.form.optimization:
             self.do_geom_opt.setChecked(not self.do_geom_opt.checkState() == Qt.Checked)
 
-        elif ndx == 2 and self.form.frequency:
+        elif ndx == 3 and self.form.frequency:
             self.do_freq.setChecked(not self.do_freq.checkState() == Qt.Checked)
 
     def open_chk_save(self):
@@ -1570,28 +1830,28 @@ class JobTypeOption(QWidget):
 
     def opt_checked(self, state):
         """when optimization is checked, switch the tab widget to show optimization settings"""
-        if state == Qt.Checked:
-            self.job_type_opts.setCurrentIndex(1)
+        if Qt.CheckState(state) == Qt.Checked:
+            self.job_type_opts.setCurrentIndex(2)
             if self.form.single_job_type:
                 self.do_freq.blockSignals(True)
                 self.do_freq.setCheckState(Qt.Unchecked)
                 self.do_freq.blockSignals(False)
-        elif self.job_type_opts.currentIndex() == 1:
+        elif self.job_type_opts.currentIndex() == 2:
             self.job_type_opts.setCurrentIndex(0)
 
     def freq_checked(self, state):
         """when frequency is checked, switch the tab widget to show freq settings"""
-        if state == Qt.Checked:
-            self.job_type_opts.setCurrentIndex(2)
+        if Qt.CheckState(state) == Qt.Checked:
+            self.job_type_opts.setCurrentIndex(3)
             if self.form.single_job_type:
                 self.do_geom_opt.blockSignals(True)
                 self.do_geom_opt.setCheckState(Qt.Unchecked)
                 self.do_geom_opt.blockSignals(False)
-        elif self.job_type_opts.currentIndex() == 2:
+        elif self.job_type_opts.currentIndex() == 3:
             self.job_type_opts.setCurrentIndex(0) 
 
     def chk_state_changed(self, state):
-        if state == Qt.Checked:
+        if Qt.CheckState(state) == Qt.Checked:
             self.chk_file_path.setEnabled(bool(self.form.read_checkpoint_filter))
             self.chk_browse_button.setEnabled(bool(self.form.read_checkpoint_filter))
         else:
@@ -1619,8 +1879,8 @@ class JobTypeOption(QWidget):
             self.use_contraints.setCheckState(Qt.Unchecked)
         self.use_contraints.setEnabled(file_info.const_optimization)
         
-        if file_info.solvent_models is not None:
-            self.solvent_option.addItems(file_info.solvent_models)
+        if file_info.solvents is not None:
+            self.solvent_option.addItems(list(file_info.solvents.keys()))
         self.hpmodes.setEnabled(file_info.hpmodes_available)
         self.raman.setToolTip("ask %s to compute Raman intensities" % file_info.name)
         self.raman.setEnabled(file_info.raman_available)
@@ -1633,7 +1893,7 @@ class JobTypeOption(QWidget):
             else:
                 self.solvent_names.addItems(file_info.solvents)
             self.solvent_name.setText(self.settings.previous_solvent_name)
-        self.job_type_opts.setTabEnabled(3, bool(file_info.solvent_models))
+        self.job_type_opts.setTabEnabled(1, bool(file_info.solvents))
         if not file_info.read_checkpoint_filter:
             self.use_checkpoint.setCheckState(Qt.Unchecked)
         self.use_checkpoint.setEnabled(
@@ -1710,14 +1970,77 @@ class JobTypeOption(QWidget):
 
     def change_job_type(self, *args):
         """disables tabs when they don't apply to the job type"""
-        self.job_type_opts.setTabEnabled(1, self.do_geom_opt.checkState() == Qt.Checked)
-        self.job_type_opts.setTabEnabled(2, self.do_freq.checkState() == Qt.Checked)
+        self.job_type_opts.setTabEnabled(2, self.do_geom_opt.checkState() == Qt.Checked)
+        self.job_type_opts.setTabEnabled(3, self.do_freq.checkState() == Qt.Checked)
 
         self.jobTypeChanged.emit()
 
-    def show_contraints(self, value):
+    def set_jobs(self, jobs):
+        self.do_geom_opt.setChecked(False)
+        self.ts_opt.setChecked(False)
+        self.use_contraints.setChecked(False)
+        self.do_freq.setChecked(False)
+        self.raman.setChecked(False)
+        if not jobs:
+            return
+        for job in jobs:
+            if isinstance(job, OptimizationJob):
+                self.do_geom_opt.setChecked(True)
+                self.ts_opt.setChecked(job.transition_state)
+                if not job.constraints:
+                    continue
+                self.use_contraints.setChecked(True)
+                for key, frozen in job.constraints.keys():
+                    if key == "atoms":
+                        for atom in frozen:
+                            self.constrain_atom(
+                                structure.atoms[rescol.atoms.index(atom)]
+                            )
+                    
+                    elif key == "bonds":
+                        for bond in frozen:
+                            atom1, atom2 = bond
+                            ndx1 = rescol.atoms.index(atom1)
+                            ndx2 = rescol.atoms.index(atom2)
+                            self.constrain_bond(
+                                structure.atoms[ndx1],
+                                structure.atoms[ndx2],
+                            )
+                    
+                    elif key == "angles":
+                        for angle in frozen:
+                            atom1, atom2, atom3 = angle
+                            ndx1 = rescol.atoms.index(atom1)
+                            ndx2 = rescol.atoms.index(atom2)
+                            ndx3 = rescol.atoms.index(atom3)
+                            self.constrain_angle(
+                                structure.atoms[ndx1],
+                                structure.atoms[ndx2],
+                                structure.atoms[ndx3],
+                            )
+                    
+                    elif key == "torsions":
+                        for angle in frozen:
+                            atom1, atom2, atom3, atom4 = angle
+                            ndx1 = rescol.atoms.index(atom1)
+                            ndx2 = rescol.atoms.index(atom2)
+                            ndx3 = rescol.atoms.index(atom3)
+                            ndx4 = rescol.atoms.index(atom4)
+                            self.constrain_torsion(
+                                structure.atoms[ndx1],
+                                structure.atoms[ndx2],
+                                structure.atoms[ndx3],
+                                structure.atoms[ndx4],
+                            )
+
+            elif isinstance(job, FrequencyJob):
+                self.do_freq.setChecked(True)
+                self.num_freq.setChecked(job.numerical)
+                self.temperature.setValue(job.temperature)
+
+    def show_contraints(self, state):
         """enable contraints table when doing contrainted optimization"""
-        self.constraints_widget.setEnabled(bool(value))
+        self.constraints_widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
         self.jobTypeChanged.emit()
 
     def getCharge(self, update_settings=True):
@@ -1756,32 +2079,28 @@ class JobTypeOption(QWidget):
     def setStructure(self, structure):
         """changes the structure and clears contraints"""
         self.structure = structure
-        self.constrained_atoms = []
-        self.constrained_bonds = []
-        self.constrained_angles = []
-        self.constrained_torsions = []
 
         for i in range(self.constrained_atom_table.rowCount() - 1, -1, -1):
             atom = self.constrained_atoms[i]
-            if atom.deleted:
-                self.constrain_atoms.pop(i)
+            if atom.deleted or atom not in structure:
+                self.constrained_atoms.pop(i)
                 self.constrained_atom_table.removeRow(i)
 
         for i in range(self.constrained_bond_table.rowCount() - 1, -1, -1):
             bond = self.constrained_bonds[i]
-            if any(atom.deleted for atom in bond):
+            if any(atom.deleted or atom not in structure.atoms for atom in bond):
                 self.constrained_bonds.pop(i)
                 self.constrained_bond_table.removeRow(i)
 
         for i in range(self.constrained_angle_table.rowCount() - 1, -1, -1):
-            angle = self.constrained_bonds[i]
-            if any(atom.deleted for atom in angle):
+            angle = self.constrained_angles[i]
+            if any(atom.deleted or atom not in structure.atoms for atom in angle):
                 self.constrained_angles.pop(i)
                 self.constrained_angle_table.removeRow(i)
 
         for i in range(self.constrained_torsion_table.rowCount() - 1, -1, -1):
-            torsion = self.constrained_bonds[i]
-            if any(atom.deleted for atom in torsion):
+            torsion = self.constrained_torsions[i]
+            if any(atom.deleted or atom not in structure.atoms for atom in torsion):
                 self.constrained_torsions.pop(i)
                 self.constrained_torsion_table.removeRow(i)
 
@@ -1789,7 +2108,6 @@ class JobTypeOption(QWidget):
 
     def check_constraints(self):
         for i in range(self.constrained_atom_table.rowCount(), -1, -1):
-            
             self.constrained_atom_table.removeRow(i)
 
         for i in range(self.constrained_bond_table.rowCount(), -1, -1):
@@ -1849,8 +2167,8 @@ class JobTypeOption(QWidget):
                 constraints = self.getConstraints()
                 new_constraints = {}
                 if "atoms" in constraints:
+                    new_constraints["atoms"] = []
                     for atom in constraints["atoms"]:
-                        new_constraints["atoms"] = []
                         if atom.deleted:
                             continue
                         new_constraints["atoms"].append(AtomSpec(atom.atomspec))
@@ -1936,28 +2254,29 @@ class JobTypeOption(QWidget):
             if atom in self.constrained_atoms:
                 continue
 
-            self.constrained_atoms.append(atom)
-
-            row = self.constrained_atom_table.rowCount()
-            self.constrained_atom_table.insertRow(row)
-            item = QTableWidgetItem()
-            item.setData(Qt.DisplayRole, atom.atomspec)
-            item.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            self.constrained_atom_table.setItem(row, 0, item)
-
-            widget_that_lets_me_horizontally_align_an_icon = QWidget()
-            widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
-            trash_button = QLabel()
-            dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
-            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-            trash_button.setToolTip("click to unfreeze")
-            widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
-            widget_layout.setContentsMargins(2, 2, 2, 2)
-            self.constrained_atom_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
-
-            self.constrained_atom_table.resizeRowToContents(row)
-
+            self.constrain_atom(atom)
         self.jobTypeChanged.emit()
+
+    def constrain_atom(self, atom):
+        self.constrained_atoms.append(atom)
+        row = self.constrained_atom_table.rowCount()
+        self.constrained_atom_table.insertRow(row)
+        item = QTableWidgetItem()
+        item.setData(Qt.DisplayRole, atom.atomspec)
+        item.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        self.constrained_atom_table.setItem(row, 0, item)
+
+        widget_that_lets_me_horizontally_align_an_icon = QWidget()
+        widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
+        trash_button = QLabel()
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
+        trash_button.setToolTip("click to unfreeze")
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
+        self.constrained_atom_table.setCellWidget(row, 1, widget_that_lets_me_horizontally_align_an_icon)
+
+        self.constrained_atom_table.resizeRowToContents(row)
 
     def constrain_bonds(self):
         """adds selected bonds to list of constrained bonds"""
@@ -1968,33 +2287,8 @@ class JobTypeOption(QWidget):
             if any(atom1 in constrained_bond and atom2 in constrained_bond for constrained_bond in self.constrained_bonds):
                 continue
 
-            self.constrained_bonds.append((atom1, atom2))
-
-            row = self.constrained_bond_table.rowCount()
-            self.constrained_bond_table.insertRow(row)
-
-            item1 = QTableWidgetItem()
-            item1.setData(Qt.DisplayRole, atom1.atomspec)
-            item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            self.constrained_bond_table.setItem(row, 0, item1)
-
-            item2 = QTableWidgetItem()
-            item2.setData(Qt.DisplayRole, atom2.atomspec)
-            item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            self.constrained_bond_table.setItem(row, 1, item2)
-
-            widget_that_lets_me_horizontally_align_an_icon = QWidget()
-            widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
-            trash_button = QLabel()
-            dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
-            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-            trash_button.setToolTip("click to unfreeze")
-            widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
-            widget_layout.setContentsMargins(2, 2, 2, 2)
-            self.constrained_bond_table.setCellWidget(row, 2, widget_that_lets_me_horizontally_align_an_icon)
-
-            self.constrained_bond_table.resizeRowToContents(row)
-
+            self.constrain_bond(atom1, atom2)
+            
         current_atoms = [atom for atom in selected_atoms(self.session) if atom.structure is self.structure]
         if len(current_atoms) > 2 or len(current_atoms) == 1:
             self.session.logger.error("can only select two atoms on %s" % self.structure.atomspec)
@@ -2005,34 +2299,36 @@ class JobTypeOption(QWidget):
                 if atom1 in bond and atom2 in bond:
                     return
 
-            self.constrained_bonds.append((atom1, atom2))
-
-            row = self.constrained_bond_table.rowCount()
-            self.constrained_bond_table.insertRow(row)
-
-            item1 = QTableWidgetItem()
-            item1.setData(Qt.DisplayRole, atom1.atomspec)
-            item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            self.constrained_bond_table.setItem(row, 0, item1)
-
-            item2 = QTableWidgetItem()
-            item2.setData(Qt.DisplayRole, atom2.atomspec)
-            item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            self.constrained_bond_table.setItem(row, 1, item2)
-
-            widget_that_lets_me_horizontally_align_an_icon = QWidget()
-            widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
-            trash_button = QLabel()
-            dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
-            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-            trash_button.setToolTip("click to unfreeze")
-            widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
-            widget_layout.setContentsMargins(2, 2, 2, 2)
-            self.constrained_bond_table.setCellWidget(row, 2, widget_that_lets_me_horizontally_align_an_icon)
-
-            self.constrained_bond_table.resizeRowToContents(row)
+            self.constrain_bond(atom1, atom2)
 
         self.jobTypeChanged.emit()
+
+    def constrain_bond(self, atom1, atom2):
+        self.constrained_bonds.append((atom1, atom2))
+        row = self.constrained_bond_table.rowCount()
+        self.constrained_bond_table.insertRow(row)
+
+        item1 = QTableWidgetItem()
+        item1.setData(Qt.DisplayRole, atom1.atomspec)
+        item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        self.constrained_bond_table.setItem(row, 0, item1)
+
+        item2 = QTableWidgetItem()
+        item2.setData(Qt.DisplayRole, atom2.atomspec)
+        item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        self.constrained_bond_table.setItem(row, 1, item2)
+
+        widget_that_lets_me_horizontally_align_an_icon = QWidget()
+        widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
+        trash_button = QLabel()
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
+        trash_button.setToolTip("click to unfreeze")
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
+        self.constrained_bond_table.setCellWidget(row, 2, widget_that_lets_me_horizontally_align_an_icon)
+
+        self.constrained_bond_table.resizeRowToContents(row)
 
     def constrain_angles(self):
         """adds selected bonds to list of contrained angles"""
@@ -2068,37 +2364,7 @@ class JobTypeOption(QWidget):
                 if atom1 is angle[2] and atom2 is angle[1] and atom3 is angle[0]:
                     return
 
-            self.constrained_angles.append((atom1, atom2, atom3))
-
-            row = self.constrained_angle_table.rowCount()
-            self.constrained_angle_table.insertRow(row)
-
-            item1 = QTableWidgetItem()
-            item1.setData(Qt.DisplayRole, atom1.atomspec)
-            item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            self.constrained_angle_table.setItem(row, 0, item1)
-
-            item2 = QTableWidgetItem()
-            item2.setData(Qt.DisplayRole, atom2.atomspec)
-            item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            self.constrained_angle_table.setItem(row, 1, item2)
-
-            item3 = QTableWidgetItem()
-            item3.setData(Qt.DisplayRole, atom3.atomspec)
-            item3.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            self.constrained_angle_table.setItem(row, 2, item3)
-
-            widget_that_lets_me_horizontally_align_an_icon = QWidget()
-            widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
-            trash_button = QLabel()
-            dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
-            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-            trash_button.setToolTip("click to unfreeze")
-            widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
-            widget_layout.setContentsMargins(2, 2, 2, 2)
-            self.constrained_angle_table.setCellWidget(row, 3, widget_that_lets_me_horizontally_align_an_icon)
-
-            self.constrained_angle_table.resizeRowToContents(row)
+            self.constrain_angle(atom1, atom2, atom3)
 
         #try to use ordered selection so that if the user selected 1 -> 2 -> 3, they appear in that order
         current_atoms = [atom for atom in selected_atoms(self.session) if atom.structure is self.structure]
@@ -2118,39 +2384,42 @@ class JobTypeOption(QWidget):
                 if atom1 is angle[2] and atom2 is angle[1] and atom3 is angle[0]:
                     return
 
-            self.constrained_angles.append((atom1, atom2, atom3))
-
-            row = self.constrained_angle_table.rowCount()
-            self.constrained_angle_table.insertRow(row)
-
-            item1 = QTableWidgetItem()
-            item1.setData(Qt.DisplayRole, atom1.atomspec)
-            item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            self.constrained_angle_table.setItem(row, 0, item1)
-
-            item2 = QTableWidgetItem()
-            item2.setData(Qt.DisplayRole, atom2.atomspec)
-            item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            self.constrained_angle_table.setItem(row, 1, item2)
-
-            item3 = QTableWidgetItem()
-            item3.setData(Qt.DisplayRole, atom3.atomspec)
-            item3.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            self.constrained_angle_table.setItem(row, 2, item3)
-
-            widget_that_lets_me_horizontally_align_an_icon = QWidget()
-            widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
-            trash_button = QLabel()
-            dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
-            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-            trash_button.setToolTip("click to unfreeze")
-            widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
-            widget_layout.setContentsMargins(2, 2, 2, 2)
-            self.constrained_angle_table.setCellWidget(row, 3, widget_that_lets_me_horizontally_align_an_icon)
-
-            self.constrained_angle_table.resizeRowToContents(row)
+        self.constrain_angle(atom1, atom2, atom3)
 
         self.jobTypeChanged.emit()
+
+    def constrain_angle(self, atom1, atom2, atom3):
+        self.constrained_angles.append((atom1, atom2, atom3))
+
+        row = self.constrained_angle_table.rowCount()
+        self.constrained_angle_table.insertRow(row)
+
+        item1 = QTableWidgetItem()
+        item1.setData(Qt.DisplayRole, atom1.atomspec)
+        item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        self.constrained_angle_table.setItem(row, 0, item1)
+
+        item2 = QTableWidgetItem()
+        item2.setData(Qt.DisplayRole, atom2.atomspec)
+        item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        self.constrained_angle_table.setItem(row, 1, item2)
+
+        item3 = QTableWidgetItem()
+        item3.setData(Qt.DisplayRole, atom3.atomspec)
+        item3.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        self.constrained_angle_table.setItem(row, 2, item3)
+
+        widget_that_lets_me_horizontally_align_an_icon = QWidget()
+        widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
+        trash_button = QLabel()
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
+        trash_button.setToolTip("click to unfreeze")
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
+        self.constrained_angle_table.setCellWidget(row, 3, widget_that_lets_me_horizontally_align_an_icon)
+
+        self.constrained_angle_table.resizeRowToContents(row)
 
     def constrain_torsions(self):
         """adds selected bonds/atoms to list of constrained torsions"""
@@ -2205,42 +2474,7 @@ class JobTypeOption(QWidget):
                 if atom1 is torsion[3] and atom2 is torsion[2] and atom3 is torsion[1] and atom4 is torsion[0]:
                     return
 
-            self.constrained_torsions.append((atom1, atom2, atom3, atom4))
-
-            row = self.constrained_torsion_table.rowCount()
-            self.constrained_torsion_table.insertRow(row)
-
-            item1 = QTableWidgetItem()
-            item1.setData(Qt.DisplayRole, atom1.atomspec)
-            item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            self.constrained_torsion_table.setItem(row, 0, item1)
-
-            item2 = QTableWidgetItem()
-            item2.setData(Qt.DisplayRole, atom2.atomspec)
-            item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            self.constrained_torsion_table.setItem(row, 1, item2)
-
-            item3 = QTableWidgetItem()
-            item3.setData(Qt.DisplayRole, atom3.atomspec)
-            item3.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            self.constrained_torsion_table.setItem(row, 2, item3)
-
-            item4 = QTableWidgetItem()
-            item4.setData(Qt.DisplayRole, atom4.atomspec)
-            item4.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            self.constrained_torsion_table.setItem(row, 3, item4)
-
-            widget_that_lets_me_horizontally_align_an_icon = QWidget()
-            widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
-            trash_button = QLabel()
-            dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
-            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-            trash_button.setToolTip("click to unfreeze")
-            widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
-            widget_layout.setContentsMargins(2, 2, 2, 2)
-            self.constrained_torsion_table.setCellWidget(row, 4, widget_that_lets_me_horizontally_align_an_icon)
-
-            self.constrained_torsion_table.resizeRowToContents(row)
+            self.constrain_torsion(atom1, atom2, atom3, atom4)
 
         current_atoms = [atom for atom in selected_atoms(self.session) if atom.structure is self.structure]
         #if the user didn't pick the atoms one by one, fall back on selected_atoms
@@ -2258,45 +2492,47 @@ class JobTypeOption(QWidget):
 
                 if atom1 is torsion[3] and atom2 is torsion[2] and atom3 is torsion[1] and atom4 is torsion[0]:
                     return
-
-            self.constrained_torsions.append((atom1, atom2, atom3, atom4))
-
-            row = self.constrained_torsion_table.rowCount()
-            self.constrained_torsion_table.insertRow(row)
-
-            item1 = QTableWidgetItem()
-            item1.setData(Qt.DisplayRole, atom1.atomspec)
-            item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            self.constrained_torsion_table.setItem(row, 0, item1)
-
-            item2 = QTableWidgetItem()
-            item2.setData(Qt.DisplayRole, atom2.atomspec)
-            item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            self.constrained_torsion_table.setItem(row, 1, item2)
-
-            item3 = QTableWidgetItem()
-            item3.setData(Qt.DisplayRole, atom3.atomspec)
-            item3.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            self.constrained_torsion_table.setItem(row, 2, item3)
-
-            item4 = QTableWidgetItem()
-            item4.setData(Qt.DisplayRole, atom4.atomspec)
-            item4.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            self.constrained_torsion_table.setItem(row, 3, item4)
-
-            widget_that_lets_me_horizontally_align_an_icon = QWidget()
-            widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
-            trash_button = QLabel()
-            dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
-            trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
-            trash_button.setToolTip("click to unfreeze")
-            widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
-            widget_layout.setContentsMargins(2, 2, 2, 2)
-            self.constrained_torsion_table.setCellWidget(row, 4, widget_that_lets_me_horizontally_align_an_icon)
-
-            self.constrained_torsion_table.resizeRowToContents(row)
+            self.constrain_torsion(atom1, atom2, atom3, atom4)
 
         self.jobTypeChanged.emit()
+
+    def constrain_torsion(self, atom1, atom2, atom3, atom4):
+        self.constrained_torsions.append((atom1, atom2, atom3, atom4))
+
+        row = self.constrained_torsion_table.rowCount()
+        self.constrained_torsion_table.insertRow(row)
+
+        item1 = QTableWidgetItem()
+        item1.setData(Qt.DisplayRole, atom1.atomspec)
+        item1.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        self.constrained_torsion_table.setItem(row, 0, item1)
+
+        item2 = QTableWidgetItem()
+        item2.setData(Qt.DisplayRole, atom2.atomspec)
+        item2.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        self.constrained_torsion_table.setItem(row, 1, item2)
+
+        item3 = QTableWidgetItem()
+        item3.setData(Qt.DisplayRole, atom3.atomspec)
+        item3.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        self.constrained_torsion_table.setItem(row, 2, item3)
+
+        item4 = QTableWidgetItem()
+        item4.setData(Qt.DisplayRole, atom4.atomspec)
+        item4.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        self.constrained_torsion_table.setItem(row, 3, item4)
+
+        widget_that_lets_me_horizontally_align_an_icon = QWidget()
+        widget_layout = QHBoxLayout(widget_that_lets_me_horizontally_align_an_icon)
+        trash_button = QLabel()
+        dim = int(1.5*self.fontMetrics().boundingRect("Q").height())
+        trash_button.setPixmap(QIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton)).pixmap(dim, dim))
+        trash_button.setToolTip("click to unfreeze")
+        widget_layout.addWidget(trash_button, 0, Qt.AlignHCenter)
+        widget_layout.setContentsMargins(2, 2, 2, 2)
+        self.constrained_torsion_table.setCellWidget(row, 4, widget_that_lets_me_horizontally_align_an_icon)
+
+        self.constrained_torsion_table.resizeRowToContents(row)
 
     def clicked_atom_table(self, row, column):
         """remove atom from constraints if 'X' is clicked"""
@@ -2582,11 +2818,19 @@ class MethodOption(QWidget):
 
     methodChanged = Signal()
 
-    def __init__(self, settings, session, init_form, parent=None):
+    def __init__(
+        self,
+        settings,
+        session,
+        init_form,
+        use_raven=False,
+        parent=None,
+    ):
         super().__init__(parent)
 
         self.settings = settings
         self.form = init_form
+        self.use_raven = use_raven
 
         layout = QGridLayout(self)
         margins = layout.contentsMargins()
@@ -2800,7 +3044,10 @@ class MethodOption(QWidget):
         self.dispersion.clear()
         self.grid.clear()
         self.form = file_info
-        self.method_option.addItems(file_info.methods)
+        if self.use_raven and file_info.raven_methods:
+            self.method_option.addItems(file_info.raven_methods)
+        else:
+            self.method_option.addItems(file_info.methods)
         self.method_option.addItem("other")
 
         self.dispersion.addItem("None")
@@ -3022,7 +3269,7 @@ class CompactElementList(QTableWidget):
     def sizeHintForRow(self, row):
         if self.cellWidget(row, 0):
             return self.cellWidget(row, 0).maximumHeight()
-        return int(1.5 * self.fontMetrics().boundingRect("QQ").width())
+        return int(1.7 * self.fontMetrics().boundingRect("Qy").width())
 
 
 class BasisOption(QWidget):
@@ -3087,10 +3334,10 @@ class BasisOption(QWidget):
         #make element list roughly as wide as two characters + a scroll bar
         #this keeps the widget as narrow as possible so it doesn't take up the entire screen
         scroll_width = self.style().pixelMetric(QStyle.PM_ScrollBarExtent)
-        self.elements.setMinimumWidth(2 + scroll_width + int(1.5 * self.fontMetrics().boundingRect("QQ").width()))
-        self.elements.setMaximumWidth(2 + scroll_width + int(1.5 * self.fontMetrics().boundingRect("QQ").width()))
+        self.elements.setMinimumWidth(2 + scroll_width + int(1.7 * self.fontMetrics().boundingRect("Qy").width()))
+        self.elements.setMaximumWidth(2 + scroll_width + int(1.7 * self.fontMetrics().boundingRect("Qy").width()))
         #set the max. height too b/c I can't seem to get it to respect setRowStretch
-        self.elements.setMaximumHeight(int(6*self.fontMetrics().boundingRect("QQ").height()))
+        self.elements.setMaximumHeight(int(6*self.fontMetrics().boundingRect("Qy").height()))
         self.layout.addWidget(self.elements, 0, 2, 3, 1, Qt.AlignTop)
 
         self.custom_basis_kw = QLineEdit()
@@ -3227,7 +3474,7 @@ class BasisOption(QWidget):
             self.aux_type.addItems(file_info.aux_options)
 
         self.setAux(aux)
-        self.setBasis(basis.name)
+        self.setBasis(basis.name, basis_path=basis.user_defined)
 
         self.blockSignals(False)
 
@@ -3265,7 +3512,7 @@ class BasisOption(QWidget):
     def show_gen_path(self, state):
         """show/hide the path to external basis file when the 'builtin' checkbox is toggled"""
         for option in self.gen_options:
-            option.setVisible(state == Qt.Unchecked)
+            option.setVisible(Qt.CheckState(state) == Qt.Unchecked)
 
     def basis_changed(self):
         """tracks changes to basis set dropdown menu
@@ -3490,7 +3737,6 @@ class BasisOption(QWidget):
     def setElements(self, elements):
         """sets the available elements"""
         for i in range(0, self.elements.rowCount()):
-            print(i)
             item = self.elements.cellWidget(i, 0)
             item.deleteLater()
             item.removeRow(i)
@@ -3582,9 +3828,9 @@ class BasisOption(QWidget):
     def setBasis(self, name=None, custom_kw=None, basis_path=False):
         """set options to match these options"""
         if name is not None:
-            ndx = self.basis_option.findData(name, Qt.MatchExactly)
+            ndx = self.basis_option.findText(name, Qt.MatchExactly)
             if ndx < 0 and name:
-                ndx = self.basis_option.findData("other", Qt.MatchExactly)
+                ndx = self.basis_option.findText("other", Qt.MatchExactly)
                 self.custom_basis_kw.setText(name)
 
             self.basis_option.setCurrentIndex(ndx)
@@ -3609,7 +3855,7 @@ class BasisOption(QWidget):
         if name is None:
             name = "no"
 
-        ndx = self.aux_type.findData(name, Qt.MatchExactly)
+        ndx = self.aux_type.findData(name, flags=Qt.MatchExactly)
         if ndx >= 0:
             self.aux_type.setCurrentIndex(ndx)
             return True
@@ -4281,7 +4527,7 @@ class OneLayerKeyWordOption(QWidget):
         if self.multiline:
             self.new_kw = QTextEdit()
             self.new_kw.setAcceptRichText(False)
-            self.new_kw.setMaximumHeight(int(6*self.fontMetrics().boundingRect("QQ").height()))
+            self.new_kw.setMaximumHeight(int(6*self.fontMetrics().boundingRect("Qy").height()))
         else:
             self.new_kw = QLineEdit()
             self.new_kw.setClearButtonEnabled(True)
@@ -5345,9 +5591,9 @@ class InputPreview(ChildToolWindow):
         if isinstance(text, dict):
             s = ""
             for key, item in text.items():
-                s += "<<- %s\n" % key
+                s += "<<<- %s ->>>\n" % key
                 s += item
-                s += "%s\n\n\n" % key
+                s += "\n"
             text = s
         self.preview.setText(text)
         if len(warnings_list) > 0:
@@ -5511,7 +5757,9 @@ class SavePreset(ChildToolWindow):
         self.basis_elements.refresh_basis()
         layout.addRow(self.basis_elements)
 
-        self.basis.stateChanged.connect(lambda state, widget=self.basis_elements: widget.setEnabled(state == Qt.Checked))
+        self.basis.stateChanged.connect(
+            lambda state, widget=self.basis_elements: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
+        )
 
         self.additional = QCheckBox()
         self.additional.setChecked(True)
@@ -5683,10 +5931,15 @@ class PrepLocalJob(ChildToolWindow):
     def __init__(self, tool_instance, title, **kwargs):
         super().__init__(tool_instance, title, statusbar=False, **kwargs)
 
+        self.conditions = []
+
         self._build_ui()
+        self.change_job_options()
 
         self.form = self.tool_instance.file_type.currentText()
-        self.tool_instance.file_type.currentTextChanged.connect(lambda program, widget=self: widget.__setattr__("form", program))
+        self.tool_instance.file_type.currentTextChanged.connect(
+            self.change_job_options
+        )
 
     def _build_ui(self):
         layout = QFormLayout()
@@ -5696,6 +5949,11 @@ class PrepLocalJob(ChildToolWindow):
         ndx = self.auto_update.findText(self.tool_instance.settings.on_finished)
         self.auto_update.setCurrentIndex(ndx)
         layout.addRow("when finished:", self.auto_update)
+
+        self.options_widget = QGroupBox("")
+        self.options_layout = QFormLayout(self.options_widget)
+        layout.addRow(self.options_widget)
+        self.options = dict()
 
         self.job_name = QLineEdit()
         self.job_name.returnPressed.connect(self.run_job)
@@ -5723,13 +5981,348 @@ class PrepLocalJob(ChildToolWindow):
         auto_open = self.auto_update.currentText() == 'open structure'
         self.tool_instance.settings.on_finished = self.auto_update.currentText()
 
-        self.tool_instance.run_local_job(name=job_name, auto_update=auto_update, auto_open=auto_open)
+        kwargs = dict()
+        for option, widget in self.options.items():
+            if not widget.enabled:
+                kwargs[option] = False
+                continue
+            kwargs[option] = widget.value
+
+        self.tool_instance.run_local_job(
+            name=job_name, auto_update=auto_update, auto_open=auto_open, **kwargs
+        )
 
         self.status.showMessage("queued \"%s\"; see the log for any details" % job_name)
+
+    def change_job_options(self):
+        for i in range(0, self.options_layout.rowCount()):
+            self.options_layout.removeRow(0)
+        self.conditions = []
+
+        job_type = self.tool_instance.get_local_job_type()
+        if not job_type.exec_options:
+            self.options_widget.setTitle("no options for %s jobs" % job_type.info_type)
+            return
+        
+        self.options_widget.setTitle("%s job options" % job_type.info_type)
+        
+        for name, option in job_type.exec_options.items():
+            cls = option[0]
+            kwargs = option[1]
+            if "callback" not in kwargs:
+                kwargs["callback"] = None
+            if "default" not in kwargs:
+                kwargs["default"] = None
+            if "name" not in kwargs:
+                kwargs["name"] = name
+            obj = cls(**kwargs)
+            self.options_layout.addRow(
+                "%s:" % kwargs["name"].replace("_", " "),
+                obj.widget
+            )
+            self.options[name] = obj
+            if len(option) > 2:
+                condition = option[2]
+                self.conditions.append((condition, obj))
+
+        self.eval_conditions()
+
+    def eval_conditions(self):
+        for condition, obj in self.conditions:
+            if not self.tool_instance.theory:
+                obj.enabled = False
+                continue
+            obj.enabled = condition(self.tool_instance.theory)
 
     def cleanup(self):
         self.tool_instance.job_local_prep = None
 
+        super().cleanup()
+
+
+class PrepClusterJob(ChildToolWindow):
+    """window for running a local cluster job"""
+    def __init__(self, tool_instance, title, **kwargs):
+        super().__init__(tool_instance, title, statusbar=False, **kwargs)
+
+        self._build_ui()
+
+        self.shrink_to_fit()
+        self.set_template_list()
+    
+    def _build_ui(self):
+        layout = QFormLayout()
+
+        tabs = QTabWidget()
+        layout.addRow(tabs)
+
+        basic_options = QWidget()
+        basic_layout = QFormLayout(basic_options)
+        tabs.addTab(basic_options, "standard options")
+
+        more_options = QWidget()
+        more_layout = QFormLayout(more_options)
+        tabs.addTab(more_options, "additional options")
+
+        template_options = QGroupBox("execution instructions")
+        template_layout = QHBoxLayout(template_options)
+        basic_layout.addRow(template_options)
+
+        template_layout.addWidget(QLabel("template:"), 0, Qt.AlignRight)
+
+        self.template = QComboBox()
+        self.tool_instance.file_type.currentTextChanged.connect(self.set_template_list)
+        template_layout.addWidget(self.template, 1)
+
+        edit = QPushButton(template_options)
+        edit.setIcon(pencil_icon)
+        edit.setToolTip("edit selected template")
+        edit.clicked.connect(self.show_editor)
+        template_layout.addWidget(edit, 0)
+        
+        new_template = QPushButton(template_options)
+        new_template.setIcon(plus_icon)
+        new_template.setToolTip("create a new template")
+        new_template.clicked.connect(self.tool_instance.new_template)
+        template_layout.addWidget(new_template, 0)
+        
+        delete_template = QPushButton(template_options)
+        delete_template.setIcon(QIcon(tabs.style().standardIcon(QStyle.SP_TrashIcon)))
+        delete_template.setToolTip("delete selected template")
+        delete_template.clicked.connect(self.delete_template)
+        template_layout.addWidget(delete_template, 0)
+
+        resource_options = QGroupBox("requested resources")
+        resource_layout = QFormLayout(resource_options)
+        basic_layout.addRow(resource_options)
+        
+        self.memory = QSpinBox()
+        self.memory.setRange(1, 512)
+        self.memory.setSuffix(" GB")
+        self.memory.setToolTip(
+            "memory requested from the cluster resources\n\n"
+            "the amount requested for the software package is typically\n"
+            "just for the major memory uses (e.g. overlap integrals), "
+            "so the actual amount memory the software requires could\n"
+            "be a bit more"
+        )
+        self.memory.setSingleStep(1)
+        
+        self.tool_instance.job_widget.mem.valueChanged.connect(
+            self.set_min_mem,
+        )
+        self.tool_instance.file_type.currentTextChanged.connect(
+            self.set_min_mem,
+        )
+        self.set_min_mem()
+        
+        resource_layout.addRow("memory:", self.memory)
+
+        # try QTimeEdit
+        # that might require some changes to SubmitProcess
+        self.walltime = QSpinBox()
+        self.walltime.setSuffix(" h")
+        self.walltime.setRange(1, 720)
+        self.walltime.setToolTip("wall time limit for the job")
+        resource_layout.addRow("time limit:", self.walltime)
+        
+
+        kwarg_options = QGroupBox("other variables")
+        kwarg_layout = QFormLayout(kwarg_options)
+        more_layout.addRow(kwarg_options)
+
+        previous_options = loads(self.tool_instance.settings.queue_kwargs)
+        last_options = loads(self.tool_instance.settings.last_queue_kwargs)
+        submitproc_kwargs = TwoLayerKeyWordOption(
+            "variables",
+            last_options,
+            previous_options,
+            "double click to replace {{ %s }} with %s",
+            one_opt_per_kw=True,
+            parent=None,
+            allow_dup=False,
+            banned_settings=[
+                "name",
+                "walltime",
+                "processors",
+                "memory",
+                "exec_memory",
+                "wait",
+            ],
+        )
+        submitproc_kwargs.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        kwarg_options.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        kwarg_layout.addRow(submitproc_kwargs)
+        self.submitproc_kwargs = submitproc_kwargs
+
+        self.auto_update = QComboBox()
+        self.auto_update.addItems(['do nothing', 'open structure', 'change model'])
+        ndx = self.auto_update.findText(self.tool_instance.settings.on_finished)
+        self.auto_update.setCurrentIndex(ndx)
+        basic_layout.addRow("when finished:", self.auto_update)
+
+        self.job_name = QLineEdit()
+        self.job_name.returnPressed.connect(self.run_job)
+        basic_layout.addRow("job name:", self.job_name)
+
+        run = QPushButton("submit job")
+        run.clicked.connect(self.run_job)
+        basic_layout.addRow(run)
+
+        self.status = QStatusBar()
+        self.status.setSizeGripEnabled(False)
+        layout.addRow(self.status)
+
+        self.ui_area.setLayout(layout)
+        self.manage(None)
+
+    def delete_template(self):
+        name = self.template.currentText()
+        if not name:
+            return
+        program = self.tool_instance.file_type.currentText()
+        queue_type = self.session.seqcrow_settings.settings.QUEUE_TYPE
+        
+        are_you_sure = QMessageBox.question(
+            None,
+            "Delete preset?",
+            "Are you sure you want to delete the %s template '%s' for %s?" % (
+                queue_type, name, program
+            ),
+            defaultButton=QMessageBox.No,
+        )
+        if are_you_sure != QMessageBox.Yes:
+            return
+        self.tool_instance.templates[queue_type][program].pop(name)
+        self.tool_instance.settings.templates = dumps(self.tool_instance.templates)
+        self.tool_instance.settings.save()
+        self.set_template_list()
+
+    def set_template_list(self):
+        self.template.clear()
+        new_templates = []
+        queue_type = self.session.seqcrow_settings.settings.QUEUE_TYPE
+        program = self.tool_instance.file_type.currentText()
+        
+        try:
+            new_templates = self.tool_instance.templates[queue_type][program].keys()
+        except KeyError:
+            pass
+        
+        self.template.addItems(new_templates)
+        
+        try:
+            last_template = loads(self.tool_instance.settings.last_template)[
+                queue_type
+            ][
+                program
+            ]
+            ndx = self.template.findText(last_template, Qt.MatchExactly)
+            if ndx >= 0:
+                self.template.setCurrentIndex(ndx)
+        except KeyError:
+            pass
+
+    def show_editor(self, *args):
+        current_template = self.template.currentText()
+        if not current_template:
+            self.session.logger.warning("no template selected, creating a new template instead")
+            self.tool_instance.new_template()
+            return
+        self.tool_instance.new_template(start_from=current_template)
+
+    def run_job(self):
+        template_name = self.template.currentText()
+        if not template_name:
+            self.session.logger.error("no template selected")
+            return
+    
+        job_name = self.job_name.text().strip()
+
+        kwargs = dict()
+        for key in self.submitproc_kwargs.last_dict.keys():
+            if self.submitproc_kwargs.last_dict[key]:
+                kwargs[key] = self.submitproc_kwargs.last_dict[key][0]
+        
+        kwargs["exec_memory"] = str(self.tool_instance.job_widget.getMem())
+
+        if not job_name.replace('-', '').replace('_','').isalnum():
+            self.session.logger.error("invalid job name: '%s'\nmust be alphanumeric" % job_name)
+            return
+
+        auto_update = self.auto_update.currentText() == 'change model'
+        auto_open = self.auto_update.currentText() == 'open structure'
+        self.tool_instance.settings.on_finished = self.auto_update.currentText()
+
+        self.tool_instance.run_cluster_job(
+            self.memory.value(),
+            template_name,
+            self.walltime.value(),
+            name=job_name,
+            auto_update=auto_update,
+            auto_open=auto_open,
+            template_kwargs=kwargs,
+        )
+        
+        for kw in self.submitproc_kwargs.last_dict:
+            if kw not in self.submitproc_kwargs.previous_dict:
+                self.submitproc_kwargs.previous_dict[kw] = [x for x in self.submitproc_kwargs.last_dict[kw]]
+                self.submitproc_kwargs.add_item_to_previous_kw_table(kw)
+
+                if self.submitproc_kwargs.selected_kw == kw:
+                    known_opts = []
+                    for opt in self.submitproc_kwargs.previous_dict[kw]:
+                        if opt not in known_opts:
+                            self.submitproc_kwargs.add_item_to_previous_opt_table(opt)
+                            known_opts.append(opt)
+
+            else:
+                for opt in self.submitproc_kwargs.last_dict[kw]:
+                    if opt not in self.submitproc_kwargs.previous_dict[kw]:
+                        self.submitproc_kwargs.previous_dict[kw].append(opt)
+
+                        if self.submitproc_kwargs.selected_kw == kw:
+                            self.submitproc_kwargs.add_item_to_previous_opt_table(opt)
+
+        self.tool_instance.settings.last_queue_kwargs = dumps(
+            self.submitproc_kwargs.last_dict
+        )
+        self.tool_instance.settings.queue_kwargs = dumps(
+            self.submitproc_kwargs.previous_dict
+        )
+
+        queue_type = self.session.seqcrow_settings.settings.QUEUE_TYPE
+        program = self.tool_instance.file_type.currentText()
+        last_template = loads(self.tool_instance.settings.last_template)
+        if queue_type not in last_template:
+            last_template[queue_type] = dict()
+        last_template[queue_type][program] = template_name
+        self.tool_instance.settings.last_template = dumps(last_template)
+
+        self.tool_instance.settings.save()
+
+        self.status.showMessage("queued \"%s\"; see the log for any details" % job_name)
+
+    def set_min_mem(self, *args):
+        value = self.tool_instance.job_widget.mem.value()
+        if value <= 0:
+            value = 1
+        if not self.tool_instance.job_widget.mem.isEnabled():
+            value = 1
+        self.memory.setMinimum(value)
+
+    def cleanup(self):
+        self.tool_instance.job_cluster_prep = None
+        self.tool_instance.file_type.currentTextChanged.disconnect(
+            self.set_template_list
+        )
+        self.tool_instance.file_type.currentTextChanged.disconnect(
+            self.set_min_mem,
+        )
+        self.tool_instance.job_widget.mem.valueChanged.disconnect(
+            self.set_min_mem,
+        )
+        
         super().cleanup()
 
 
@@ -5938,3 +6531,87 @@ class ExportPreset(ChildToolWindow):
         self.tool_instance.export_preset_window = None
 
         super().cleanup()
+
+
+class NewTemplate(ChildToolWindow):
+    """window showing new template"""
+    def __init__(
+        self,
+        tool_instance,
+        title,
+        default_text="",
+        default_name=None,
+        **kwargs
+    ):
+        super().__init__(tool_instance, title, statusbar=False, **kwargs)
+
+        self._build_ui()
+        self.contents.setText(default_text)
+        if default_name:
+            self.new_name.setText(default_name)
+        self.default_name = default_name
+        self.queue_type = self.session.seqcrow_settings.settings.QUEUE_TYPE
+        self.program = self.tool_instance.file_type.currentText()
+
+    def _build_ui(self):
+        layout = QFormLayout()
+
+        self.contents = QTextEdit()
+        font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
+        self.contents.setFont(font)
+        layout.addRow(self.contents)
+        
+        self.new_name = QLineEdit()
+        layout.addRow("name:", self.new_name)
+        
+        save_template = QPushButton("save template")
+        save_template.clicked.connect(self.save_template)
+        layout.addRow(save_template)
+
+        self.ui_area.setLayout(layout)
+
+        self.manage(None)
+    
+    def save_template(self):
+        name = self.new_name.text()
+        if not name:
+            self.session.logger.error(
+                "enter a name for this template"
+            )
+            return
+        
+        program = self.program
+        cur_program = self.tool_instance.file_type.currentText()
+        if cur_program != self.program:
+            which_program = QMessageBox.question(
+                None,
+                "Select program",
+                "this was initially a %s template\nwould you like to save it as a %s template?" % (
+                    self.program, cur_program
+                ),
+                defaultButton=QMessageBox.No,
+            )
+            if which_program == QMessageBox.Yes:
+                program = cur_program
+        
+        if self.queue_type not in self.tool_instance.templates:
+            self.tool_instance.templates[self.queue_type] = dict()
+        
+        if program not in self.tool_instance.templates[self.queue_type]:
+            self.tool_instance.templates[self.queue_type][program] = dict()
+        
+        self.tool_instance.templates[self.queue_type][program][name] = self.contents.toPlainText()
+        self.tool_instance.settings.templates = dumps(
+            self.tool_instance.templates
+        )
+        self.tool_instance.settings.save()
+        
+        if self.tool_instance.job_cluster_prep:
+            self.tool_instance.job_cluster_prep.set_template_list()
+            ndx = self.tool_instance.job_cluster_prep.template.findText(
+                name, Qt.MatchExactly
+            )
+            if ndx >= 0:
+                self.tool_instance.job_cluster_prep.template.setCurrentIndex(ndx)
+        
+        self.destroy()

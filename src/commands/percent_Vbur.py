@@ -63,6 +63,7 @@ vbur_description = CmdDesc(
         ("labels", EnumOf(["none", "quadrants", "octants"])), 
         ("reportComponent", EnumOf(["total", "quadrants", "octants"])),
         ("useScene", BoolArg), 
+        ("difference", BoolArg), 
     ],
     synopsis="calculate volume buried by ligands around a center",
     url="https://github.com/QChASM/SEQCROW/wiki/Commands#percentVolumeBuried",
@@ -92,9 +93,11 @@ def percent_vbur(
         shape="circle",
         labels="none",
         reportComponent="total",
+        difference=False,
 ):
     
     out = []
+    rescols = []
     
     models = {
         model:[atom for atom in model.atoms if onlyAtoms is not None and atom in onlyAtoms]
@@ -119,6 +122,7 @@ def percent_vbur(
             mdl_center = []
         
         rescol = ResidueCollection(model)
+        rescols.append(rescol)
         
         if useScene:
             oop_vector = session.view.camera.get_position().axes()[2]
@@ -137,7 +141,7 @@ def percent_vbur(
             mdl_center = rescol.center
         elif not isinstance(center, np.ndarray):
             mdl_center = rescol.find([AtomSpec(c.atomspec) for c in center])
-        
+
         key_atoms = None
 
         if not useCentroid and not isinstance(center, np.ndarray):
@@ -151,7 +155,7 @@ def percent_vbur(
                 else:
                     key_atoms = None
                 
-                if (labels != "none" or reportComponent != "total") and not useScene:
+                if (labels != "none" or reportComponent != "total" or difference) and not useScene:
                     if not key_atoms:
                         session.logger.warning(
                             "bonds between center and coordinating atoms is required to"
@@ -203,9 +207,9 @@ def percent_vbur(
                 )
                 
                 if steric_map:
-                    out.append((model, c.atomspec, vbur, (x, y, z, min_alt, max_alt)))
+                    out.append((model, c, targets, basis, vbur, (x, y, z, min_alt, max_alt)))
                 else:
-                    out.append((model, c.atomspec, vbur))
+                    out.append((model, c, targets, basis, vbur))
                 s += "%s\t%s\t" % (model.name, c.atomspec)
                 if hasattr(vbur, "__iter__"):
                     if reportComponent == "octants":
@@ -224,21 +228,21 @@ def percent_vbur(
                 else:
                     s += "%.1f%%\n" % vbur
         
-                if displaySphere is not None:
+                if displaySphere is not None and not difference:
                     mdl = vbur_vis(
-                            session,
-                            rescol,
-                            targets,
-                            radii,
-                            scale,
-                            radius,
-                            c,
-                            pointSpacing,
-                            intersectionScale,
-                            displaySphere,
-                            vbur,
-                            labels,
-                            basis=basis,
+                        session,
+                        rescol,
+                        targets,
+                        radii,
+                        scale,
+                        radius,
+                        c,
+                        pointSpacing,
+                        intersectionScale,
+                        displaySphere,
+                        vbur,
+                        labels,
+                        basis=basis,
                     )
                     model.add(mdl)
                     atomspec = mdl[0].atomspec
@@ -264,7 +268,7 @@ def percent_vbur(
             else:
                 key_atoms = None
 
-            if (labels != "none" or reportComponent != "total") and not useScene:
+            if (labels != "none" or reportComponent != "total" or difference) and not useScene:
                 if not key_atoms:
                     session.logger.warning(
                         "bonds between center and coordinating atoms is required to"
@@ -324,16 +328,16 @@ def percent_vbur(
             
             if steric_map:
                 if not isinstance(mdl_center, np.ndarray):
-                    out.append((model, ",".join([c.atomspec for c in mdl_center]), vbur, (x, y, z, min_alt, max_alt)))
+                    out.append((model, mdl_center, targets, basis, vbur, (x, y, z, min_alt, max_alt)))
                 else:
-                    out.append((model, ",".join(["%.3f" % c for c in mdl_center]), vbur, (x, y, z, min_alt, max_alt)))
+                    out.append((model, mdl_center, targets, basis, vbur, (x, y, z, min_alt, max_alt)))
             else:
                 if not isinstance(mdl_center, np.ndarray):
                     s += "%s\t%s\t" % (model.name, ", ".join([c.atomspec for c in mdl_center]))
-                    out.append((model, ", ".join([c.atomspec for c in mdl_center]), vbur))
+                    out.append((model, mdl_center, targets, basis, vbur))
                 else:
                     s += "%s\t%s\t" % (model.name, ",".join(["%.3f" % c for c in mdl_center]))
-                    out.append((model, ",".join(["%.3f" % c for c in mdl_center]), vbur))
+                    out.append((model, mdl_center, targets, basis, vbur))
                 
             if hasattr(vbur, "__iter__"):
                 if reportComponent == "octants":
@@ -352,7 +356,7 @@ def percent_vbur(
             else:
                 s += "%.1f%%\n" % vbur
 
-            if displaySphere is not None:
+            if displaySphere is not None and not difference:
                 mdl = vbur_vis(
                         session,
                         rescol,
@@ -387,6 +391,48 @@ def percent_vbur(
                 
                 run(session, " ".join(args))
     
+    
+    if difference and displaySphere:
+        if len(out) < 2:
+            session.logger.warning(
+                "difference of %s volume was requested, but only one cutout was drawn; calculate "
+                "the buried volume for multiple centers to visualize the differences between them"
+            )
+        for i, data1 in enumerate(out):
+            rescol1 = rescols[i]
+            model1, center1, targets1, basis1, vbur1 = data1[:5]
+            for j, data2 in enumerate(out[i+1:]):
+                rescol2 = rescols[i + j + 1]
+                model2, center2, targets2, basis2, vbur2 = data2[:5]
+                mdl = vbur_difference_vis(
+                    session,
+                    rescol1, rescol2,
+                    targets1, targets2,
+                    radii,
+                    scale,
+                    radius,
+                    center1, center2,
+                    pointSpacing,
+                    intersectionScale,
+                    displaySphere,
+                    vbur1, vbur2,
+                    labels,
+                    basis1, basis2,
+                )
+                model1.add(mdl)
+                args = [
+                    "color", mdl[0].atomspec, "red"
+                    ";",
+                    "transparency", mdl[0].atomspec, "50", 
+                ]
+                run(session, " ".join(args))
+                args = [
+                    "color", mdl[1].atomspec, "blue"
+                    ";",
+                    "transparency", mdl[1].atomspec, "50", 
+                ]
+                run(session, " ".join(args))
+    
     s = s.strip()
     s += "</pre>"
     
@@ -410,7 +456,6 @@ def vbur_vis(
         vbur,
         labels,
         basis=None,
-        key_atoms=None,
 ):
     # from cProfile import Profile
     # 
@@ -729,7 +774,7 @@ def vbur_vis(
     # stream.flush()
 
     if labels != "none":   
-        d = model.new_drawing("octants")
+        d = model.new_drawing(labels)
         d.display_style = d.Mesh
         d.use_lighting = False
         d.casts_shadows = False
@@ -850,3 +895,815 @@ def vbur_vis(
         return [model]
     
     return [model]
+    
+
+
+def vbur_difference_vis(
+        session,
+        geom1, geom2,
+        targets1, targets2,
+        radii,
+        scale,
+        radius, 
+        center1, center2,
+        point_spacing, 
+        intersection_scale,
+        volume_type,
+        vbur1, vbur2,
+        labels,
+        basis1, basis2
+):
+
+    # number of points is based on surface area
+    n_grid = int(4 * np.pi * radius**2 / point_spacing)
+
+    # to display the difference between buried/free volumes, I use basically
+    # the same procedure as the buried/free volume for a single structure
+    # first, we need to draw a portion of a sphere for each atom
+    # any vertices on these spheres that would be covered up by another
+    # atom's sphere from the same structure is removed
+    # vertices are added at the intersection of atom pairs to make it look
+    # less jagged
+    # then we need to determine whether the vertex belongs to model_a or model_b
+    # model_a and model_b switch depending on whether we are showing the difference
+    # in buried volume or in free volume
+    # if a vertex is covered by geom1 atoms but not geom2 atoms, add it to model_a
+    # for the flipped criteria, add the vertex to model_b
+
+    if isinstance(radii, dict):
+        radii_dict = radii
+    elif radii.lower() == "umn":
+        radii_dict = VDW_RADII
+    elif radii.lower() == "bondi":
+        radii_dict = BONDI_RADII
+    else:
+        raise RuntimeError(
+            "received %s for radii, must be umn or bondi" % radii
+        )
+    
+    models = []
+
+    vertices1 = []
+    normals1 = []
+    triangles1 = []
+    
+    vertices2 = []
+    normals2 = []
+    triangles2 = []
+
+    if basis1 is None:
+        basis1 = np.eye(3)
+    
+    if basis2 is None:
+        basis2 = np.eye(3)
+
+    if volume_type == "buried":
+        model_a = Surface("%%Vburied %s only" % geom1.name, session)
+        model_b = Surface("%%Vburied %s only" % geom2.name, session)
+    else:
+        model_b = Surface("%%Vfree %s only" % geom1.name, session)
+        model_a = Surface("%%Vfree %s only" % geom2.name, session)
+
+    if isinstance(center1, np.ndarray):
+        center_coords1 = center1
+    else:
+        center_coords1 = geom1.COM(center1)
+    
+    if not hasattr(center1, "__iter__"):
+        center1 = [center1]
+     
+    if isinstance(center2, np.ndarray):
+        center_coords2 = center2
+    else:
+        center_coords2 = geom2.COM(center2)
+
+    if not hasattr(center2, "__iter__"):
+        center = [center2]
+    
+    if targets1 is None:
+        if len(center1) == 1:
+            atoms1 = [atom for atom in geom1.atoms if atom not in center1]
+        else:
+            atoms1 = geom1.atoms
+    else:
+        atoms1 = geom1.find(targets1)
+    
+    if targets2 is None:
+        if len(center2) == 1:
+            atoms2 = [atom for atom in geom2.atoms if atom not in center2]
+        else:
+            atoms2 = geom2.atoms
+    else:
+        atoms2 = geom2.find(targets2)
+    
+    atoms_within_radius1 = []
+    for atom in atoms1:
+        # determine which atom's radii extend within the sphere
+        # reduces the number of distances we need to calculate
+        d = np.linalg.norm(center_coords1 - atom.coords)
+        inner_edge = d - scale * radii_dict[atom.element]
+        if inner_edge < radius:
+            atoms_within_radius1.append(atom)
+    
+    atoms_within_radius2 = []
+    for atom in atoms2:
+        d = np.linalg.norm(center_coords2 - atom.coords)
+        inner_edge = d - scale * radii_dict[atom.element]
+        if inner_edge < radius:
+            atoms_within_radius2.append(atom)
+    
+    
+    # sort atoms based on their distance to the center
+    # this makes is so we usually break out of looping over the atoms faster
+    atoms_within_radius1.sort(
+        key=lambda a, c=center_coords1: np.linalg.norm(a.coords - c)
+    )
+    atoms_within_radius2.sort(
+        key=lambda a, c=center_coords2: np.linalg.norm(a.coords - c)
+    )
+    
+    radius_list1 = np.array([
+        scale * radii_dict[atom.element] for atom in atoms_within_radius1
+    ])
+
+    radius_list2 = np.array([
+        scale * radii_dict[atom.element] for atom in atoms_within_radius2
+    ])
+
+    coords1 = geom1.coordinates(atoms_within_radius1)
+    coords2 = geom2.coordinates(atoms_within_radius2)
+    coords2 -= center_coords2
+    basis2_inv = np.linalg.inv(basis2)
+    coords2 = np.dot(coords2, basis2_inv)
+    coords2 = np.dot(coords2, basis1)
+    coords2 += center_coords1
+    
+    atom_dist1 = distance_matrix(coords1, coords1)
+    atom_dist12 = distance_matrix(coords1, coords2)
+    atom_dist2 = distance_matrix(coords2, coords2)
+    
+    sphere1 = fibonacci_sphere(num=n_grid, radius=radius)
+    sphere2 = fibonacci_sphere(num=n_grid, radius=radius)
+    
+    # add points right where spheres intersect
+    # this makes the intersections look less pokey
+    d_ac1 = distance_matrix(coords1, [center_coords1])
+    d_ac2 = distance_matrix(coords2, [center_coords1])
+    center_added_points1 = []
+    center_added_points2 = []
+    atom_added_points1 = [[] for atom in atoms_within_radius1]
+    pair_added_points1 = [[] for atom in atoms_within_radius1]
+    atom_added_points2 = [[] for atom in atoms_within_radius2]
+    pair_added_points2 = [[] for atom in atoms_within_radius2]
+    for i in range(0, len(coords1)):
+        r1 = radius_list1[i]    
+        v_n = coords1[i] - center_coords1
+        v_n /= np.linalg.norm(v_n)
+        d = d_ac1[i, 0]
+        # intersection with big sphere
+        if d + r1 > radius:
+            theta = np.arccos((r1 ** 2 - radius ** 2 - d ** 2) / (-2 * d * radius))
+            h = radius * np.sin(theta)
+            b = radius * np.cos(theta)
+            p = b * v_n
+            
+            circ = 2 * np.pi * h
+            n_added = int(np.ceil(intersection_scale * circ / point_spacing))
+            r_t = perp_vector(v_n)
+            
+            r0 = np.cross(r_t, v_n)
+            r0 *= h / np.linalg.norm(r0)
+            
+            rot_angle = 2 * np.pi / n_added
+            R = rotation_matrix(rot_angle, v_n)
+            prev_r = r0
+            prev_r_list = []
+            for x in np.linspace(0, 2*np.pi, num=n_added):
+                prev_r = np.dot(R, prev_r)
+                prev_r_list.append(prev_r)
+            prev_r_list = np.array(prev_r_list)
+            d_ep = distance_matrix(prev_r_list + p + center_coords1, coords1)
+            # if the point is obscured by another atom, don't bother adding it
+            # this saves time on triangulation
+            diff_mat = d_ep - radius_list1[np.newaxis, :]
+            diff_mat[:, i] = 1
+            mask = np.invert(np.any(diff_mat < 0, axis=1))
+
+            center_added_points1.extend(prev_r_list[mask] + p)
+            atom_added_points1[i].extend(prev_r_list[mask] + p + center_coords1)
+    
+        for j in range(0, i):
+            d = atom_dist1[i, j]
+            r2 = radius_list1[j]
+            if d < r1 + r2 and d > abs(r1 - r2):
+                v_n = coords1[j] - coords1[i]
+                v_n /= np.linalg.norm(v_n)
+                theta = np.arccos((r2 ** 2 - r1 ** 2 - d ** 2) / (-2 * r1 * d))
+                h = r1 * np.sin(theta)
+                b = r1 * np.cos(theta)
+                p = b * v_n
+                
+                circ = 2 * np.pi * h
+                n_added = int(np.ceil(intersection_scale * circ / point_spacing))
+                r_t = perp_vector(v_n)
+                
+                r0 = np.cross(r_t, v_n)
+                r0 *= h / np.linalg.norm(r0)
+    
+                rot_angle = 2*np.pi / n_added
+                R = rotation_matrix(rot_angle, v_n)
+                prev_r = r0
+                prev_r_list = []
+                for x in np.linspace(0, 2 * np.pi, num=n_added):
+                    prev_r = np.dot(R, prev_r)
+                    prev_r_list.append(prev_r)
+                prev_r_list = np.array(prev_r_list)
+                norm_mask = np.linalg.norm(
+                    center_coords1 - (prev_r_list + p + coords1[i]), axis=1
+                ) < radius
+                prev_r_list = prev_r_list[norm_mask]
+                
+                if not len(prev_r_list):
+                    continue
+                d_ep = distance_matrix(prev_r_list + p + coords1[i], coords1)
+                diff_mat = d_ep - radius_list1
+                diff_mat[:, i] = 1
+                diff_mat[:, j] = 1
+                mask = np.invert(np.any(diff_mat < 0, axis=1))
+                if any(mask):
+                    atom_added_points1[i].extend(prev_r_list[mask] + p + coords1[i])
+                    atom_added_points1[j].extend(prev_r_list[mask] + p + coords1[i])
+    
+        for j in range(0, len(coords2)):
+            d = atom_dist12[i, j]
+            r2 = radius_list2[j]
+            if d < r1 + r2 and d > abs(r1 - r2):
+                v_n = coords2[j] - coords1[i]
+                v_n /= np.linalg.norm(v_n)
+                theta = np.arccos((r2 ** 2 - r1 ** 2 - d ** 2) / (-2 * r1 * d))
+                h = r1 * np.sin(theta)
+                b = r1 * np.cos(theta)
+                p = b * v_n
+                
+                circ = 2 * np.pi * h
+                n_added = int(np.ceil(intersection_scale * circ / point_spacing))
+                r_t = perp_vector(v_n)
+                
+                r0 = np.cross(r_t, v_n)
+                r0 *= h / np.linalg.norm(r0)
+    
+                rot_angle = 2 * np.pi / n_added
+                R = rotation_matrix(rot_angle, v_n)
+                prev_r = r0
+                prev_r_list = []
+                for x in np.linspace(0, 2 * np.pi, num=n_added):
+                    prev_r = np.dot(R, prev_r)
+                    prev_r_list.append(prev_r)
+                prev_r_list = np.array(prev_r_list)
+                norm_mask = np.linalg.norm(
+                    center_coords1 - (prev_r_list + p + coords1[i]), axis=1
+                ) < radius
+                prev_r_list = prev_r_list[norm_mask]
+                
+                if not len(prev_r_list):
+                    continue
+                
+                d_ep = distance_matrix(prev_r_list + p + coords1[i], coords1)
+                diff_mat = d_ep - radius_list1
+                diff_mat[:, i] = 1
+                mask = np.invert(np.any(diff_mat < 0, axis=1))
+                if any(mask):
+                    prev_r_list = prev_r_list[mask]
+                    excl_d_ep = distance_matrix(prev_r_list + p + coords1[i], coords2)
+                    excl_diff_mat = excl_d_ep - radius_list2
+                    excl_diff_mat[:, j] = 1
+                    excl_mask = np.invert(np.any(excl_diff_mat < 0, axis=1))
+                    if any(excl_mask):
+                        pair_added_points1[i].extend(prev_r_list[excl_mask] + p + coords1[i])
+                        pair_added_points2[j].extend(prev_r_list[excl_mask] + p + coords1[i])
+    
+    
+    
+    for i in range(0, len(coords2)):
+        r1 = radius_list2[i]    
+        v_n = coords2[i] - center_coords1
+        v_n /= np.linalg.norm(v_n)
+        d = d_ac2[i, 0]
+        # intersection with big sphere
+        if d + r1 > radius:
+            theta = np.arccos((r1 ** 2 - radius ** 2 - d ** 2) / (-2 * d * radius))
+            h = radius * np.sin(theta)
+            b = radius * np.cos(theta)
+            p = b * v_n
+            
+            circ = 2 * np.pi * h
+            n_added = int(np.ceil(intersection_scale * circ / point_spacing))
+            r_t = perp_vector(v_n)
+            
+            r0 = np.cross(r_t, v_n)
+            r0 *= h / np.linalg.norm(r0)
+            
+            rot_angle = 2 * np.pi / n_added
+            R = rotation_matrix(rot_angle, v_n)
+            prev_r = r0
+            prev_r_list = []
+            for x in np.linspace(0, 2*np.pi, num=n_added):
+                prev_r = np.dot(R, prev_r)
+                prev_r_list.append(prev_r)
+            prev_r_list = np.array(prev_r_list)
+            d_ep = distance_matrix(prev_r_list + p + center_coords1, coords2)
+            # if the point is obscured by another atom, don't bother adding it
+            # this saves time on triangulation
+            diff_mat = d_ep - radius_list2[np.newaxis, :]
+            diff_mat[:, i] = 1
+            mask = np.invert(np.any(diff_mat < 0, axis=1))
+
+            center_added_points2.extend(prev_r_list[mask] + p)
+            atom_added_points2[i].extend(prev_r_list[mask] + p + center_coords1)
+    
+        for j in range(0, i):
+            d = atom_dist2[i, j]
+            r2 = radius_list2[j]
+            if d < r1 + r2 and d > abs(r1 - r2):
+                v_n = coords2[j] - coords2[i]
+                v_n /= np.linalg.norm(v_n)
+                theta = np.arccos((r2 ** 2 - r1 ** 2 - d ** 2) / (-2 * r1 * d))
+                h = r1 * np.sin(theta)
+                b = r1 * np.cos(theta)
+                p = b * v_n
+
+                circ = 2 * np.pi * h
+                n_added = int(np.ceil(intersection_scale * circ / point_spacing))
+                r_t = perp_vector(v_n)
+                
+                r0 = np.cross(r_t, v_n)
+                r0 *= h / np.linalg.norm(r0)
+    
+                rot_angle = 2 * np.pi / n_added
+                R = rotation_matrix(rot_angle, v_n)
+                prev_r = r0
+                prev_r_list = []
+                for x in np.linspace(0, 2 * np.pi, num=n_added):
+                    prev_r = np.dot(R, prev_r)
+                    prev_r_list.append(prev_r)
+                prev_r_list = np.array(prev_r_list)
+                norm_mask = np.linalg.norm(
+                    center_coords1 - (prev_r_list + p + coords2[i]), axis=1
+                ) < radius
+                prev_r_list = prev_r_list[norm_mask]
+                
+                if not len(prev_r_list):
+                    continue
+                
+                d_ep = distance_matrix(prev_r_list + p + coords2[i], coords2)
+                diff_mat = d_ep - radius_list2
+                diff_mat[:, i] = 1
+                diff_mat[:, j] = 1
+                mask = np.invert(np.any(diff_mat < 0, axis=1))
+                if any(mask):
+                    atom_added_points2[i].extend(prev_r_list[mask] + p + coords2[i])
+                    atom_added_points2[j].extend(prev_r_list[mask] + p + coords2[i])
+
+    tol = 0
+    for i in range(0, len(coords1)):
+        # get a grid of points around each atom
+        # remove any points that are close to an intersection
+        # this makes it less likely for the triangulation to choose
+        # one of these points instead of one that we already added
+        # then, if we have to remove a triangle involving one of these points later,
+        # it won't leave a gap
+        n_atom_grid = int(radius_list1[i] ** 2 * n_grid / radius ** 2)
+        atom_sphere = fibonacci_sphere(radius=radius_list1[i], num=n_atom_grid)
+
+        mask = np.ones(len(atom_sphere), dtype=bool)
+        n_atom_grid = len(atom_sphere)
+        if len(atom_added_points1[i]) > 0:
+
+            dist_mat = distance_matrix(
+                atom_sphere,
+                np.array(atom_added_points1[i]) - coords1[i]
+            )
+            mask[np.min((dist_mat - tol), axis=1) < 0] = False
+    
+            atom_sphere = atom_sphere[mask]
+    
+            atom_sphere = np.array(atom_sphere)
+            n_atom_grid = len(atom_sphere)
+            atom_sphere = np.concatenate((
+                atom_sphere,
+                np.array(atom_added_points1[i]) - coords1[i],
+            ))
+            if pair_added_points1[i]:
+                atom_sphere = np.concatenate((
+                    atom_sphere,
+                    np.array(pair_added_points1[i]) - coords1[i]
+                ))
+                
+        if len(atom_sphere) < 4:
+            continue
+
+        atom_hull = ConvexHull(atom_sphere / radius_list1[i])
+        tri = atom_hull.simplices
+    
+        atom_sphere += coords1[i]
+        
+        add_to_mdl_1_verts = []
+        add_to_mdl_2_verts = []
+    
+        # remove any points that are covered by another atom
+        # only loop over n_atom_grid points so we don't remove
+        # any points right on the intersection b/c of 
+        # numerical issues
+        atom_grid_dist = distance_matrix(atom_sphere, coords1)
+        excl_atom_grid_dist = distance_matrix(atom_sphere, coords2)
+        center_atom_grid_dist = distance_matrix(atom_sphere, [center_coords1])[:,0]
+        for j in range(0, len(atom_sphere) - len(pair_added_points1[i])):
+            if j < n_atom_grid:
+                if center_atom_grid_dist[j] > radius:
+                    continue
+                
+                mask = np.ones(len(radius_list1), dtype=bool)
+                mask[i] = False
+                
+                if np.any(atom_grid_dist[j, mask] < radius_list1[mask]):
+                    continue
+
+            if np.any(excl_atom_grid_dist[j, :] <= (radius_list2)):
+                add_to_mdl_2_verts.append(j)
+            
+            if np.all(excl_atom_grid_dist[j, :] >= (radius_list2)):
+                add_to_mdl_1_verts.append(j)
+            
+        add_to_mdl_1_verts.extend(
+            np.arange(
+                len(atom_sphere) - len(pair_added_points1[i]),
+                len(atom_sphere),
+                dtype=int
+            )
+        )
+        add_to_mdl_2_verts.extend(
+            np.arange(
+                len(atom_sphere) - len(pair_added_points1[i]),
+                len(atom_sphere),
+                dtype=int
+            )
+        )
+        
+        if len(add_to_mdl_1_verts) > 3:
+            new_order = {old: new for new, old in enumerate(add_to_mdl_1_verts)}
+            mask = np.min(np.isin(tri, add_to_mdl_1_verts), axis=1)
+            keep_atom_sphere = atom_sphere[add_to_mdl_1_verts]
+            keep_tri = tri[mask]
+            if len(keep_tri) > 1:
+                keep_tri = np.vectorize(new_order.get)(keep_tri)
+                norms = -(keep_atom_sphere - coords1[i]) / radius_list1[i]
+                
+                triangles1.extend(keep_tri + len(vertices1))
+                vertices1.extend(keep_atom_sphere)
+                normals1.extend(norms)
+            
+        if len(add_to_mdl_2_verts) > 3:
+            new_order = {old: new for new, old in enumerate(add_to_mdl_2_verts)}
+            mask = np.min(np.isin(tri, add_to_mdl_2_verts), axis=1)
+            keep_atom_sphere = atom_sphere[add_to_mdl_2_verts]
+            keep_tri = tri[mask]
+            # mask = np.all(keep_tri <= len(atom_sphere) - len(pair_added_points1[i]), axis=1)
+            # keep_tri = keep_tri[mask]
+            if len(keep_tri) > 1:
+                keep_tri = np.vectorize(new_order.get)(keep_tri)
+                norms = -(keep_atom_sphere - coords1[i]) / radius_list1[i]
+                
+                triangles2.extend(keep_tri + len(vertices2))
+                vertices2.extend(keep_atom_sphere)
+                normals2.extend(norms)
+
+
+    for i in range(0, len(coords2)):
+        # get a grid of points around each atom
+        # remove any points that are close to an intersection
+        # this makes it less likely for the triangulation to choose
+        # one of these points instead of one that we already added
+        # then, if we have to remove a triangle involving one of these points later,
+        # it won't leave a gap
+        n_atom_grid = int(radius_list2[i] ** 2 * n_grid / radius ** 2)
+        atom_sphere = fibonacci_sphere(radius=radius_list2[i], num=n_atom_grid)
+        mask = np.ones(len(atom_sphere), dtype=bool)
+        n_atom_grid = len(atom_sphere)
+        if len(atom_added_points2[i]) > 0:
+            dist_mat = distance_matrix(
+                atom_sphere,
+                np.array(atom_added_points2[i]) - coords2[i]
+            )
+            mask[np.min((dist_mat - tol), axis=1) < 0] = False
+    
+            atom_sphere = atom_sphere[mask]
+    
+            atom_sphere = np.array(atom_sphere)
+            n_atom_grid = len(atom_sphere)
+            atom_sphere = np.concatenate((
+                atom_sphere,
+                np.array(atom_added_points2[i]) - coords2[i],
+            ))
+            if pair_added_points2[i]:
+                atom_sphere = np.concatenate((
+                    atom_sphere,
+                    np.array(pair_added_points2[i]) - coords2[i]
+                ))
+                
+        if len(atom_sphere) < 4:
+            continue
+
+        atom_hull = ConvexHull(atom_sphere / radius_list2[i])
+        tri = atom_hull.simplices
+    
+        atom_sphere += coords2[i]
+        
+        add_to_mdl_1_verts = []
+        add_to_mdl_2_verts = []
+    
+        atom_grid_dist = distance_matrix(atom_sphere, coords2)
+        excl_atom_grid_dist = distance_matrix(atom_sphere, coords1)
+        center_atom_grid_dist = distance_matrix(atom_sphere, [center_coords1])[:,0]
+        for j in range(0, len(atom_sphere) - len(pair_added_points2[i])):
+            if j < n_atom_grid:
+                if center_atom_grid_dist[j] > radius:
+                    continue
+                
+                mask = np.ones(len(radius_list2), dtype=bool)
+                mask[i] = False
+                
+                if np.any(atom_grid_dist[j, mask] < radius_list2[mask]):
+                    continue
+
+            if np.any(excl_atom_grid_dist[j, :] <= (radius_list1)):
+                add_to_mdl_1_verts.append(j)
+            
+            if np.all(excl_atom_grid_dist[j, :] >= (radius_list1)):
+                add_to_mdl_2_verts.append(j)
+
+            
+        add_to_mdl_1_verts.extend(
+            np.arange(
+                len(atom_sphere) - len(pair_added_points2[i]),
+                len(atom_sphere),
+                dtype=int
+            )
+        )
+        add_to_mdl_2_verts.extend(
+            np.arange(
+                len(atom_sphere) - len(pair_added_points2[i]),
+                len(atom_sphere),
+                dtype=int
+            )
+        )
+        
+
+        if len(add_to_mdl_1_verts) > 3:
+            new_order = {old: new for new, old in enumerate(add_to_mdl_1_verts)}
+            mask = np.min(np.isin(tri, add_to_mdl_1_verts), axis=1)
+            keep_atom_sphere = atom_sphere[add_to_mdl_1_verts]
+            keep_tri = tri[mask]
+            if len(keep_tri) > 1:
+                keep_tri = np.vectorize(new_order.get)(keep_tri)
+                norms = -(keep_atom_sphere - coords2[i]) / radius_list2[i]
+                
+                triangles1.extend(keep_tri + len(vertices1))
+                vertices1.extend(keep_atom_sphere)
+                normals1.extend(norms)
+            
+        if len(add_to_mdl_2_verts) > 3:
+            new_order = {old: new for new, old in enumerate(add_to_mdl_2_verts)}
+            mask = np.min(np.isin(tri, add_to_mdl_2_verts), axis=1)
+            keep_atom_sphere = atom_sphere[add_to_mdl_2_verts]
+            keep_tri = tri[mask]
+            # mask = np.all(keep_tri <= len(atom_sphere) - len(pair_added_points2[i]), axis=1)
+            # keep_tri = keep_tri[mask]
+            if len(keep_tri) > 1:
+                keep_tri = np.vectorize(new_order.get)(keep_tri)
+                norms = -(keep_atom_sphere - coords2[i]) / radius_list2[i]
+                
+                triangles2.extend(keep_tri + len(vertices2))
+                vertices2.extend(keep_atom_sphere)
+                normals2.extend(norms)
+
+    sphere = fibonacci_sphere(radius=radius, num=n_grid)
+    if len(center_added_points1) > 1:
+        mask = np.ones(len(sphere), dtype=bool)
+        dist_mat = distance_matrix(
+            sphere + center_coords1, np.array(center_added_points1)
+        )
+        mask[np.min((dist_mat - tol), axis=1) < 0] = False
+    
+        sphere = sphere[mask]
+    
+        sphere = np.array(sphere)
+    sphere = np.concatenate((
+        sphere,
+        np.array(center_added_points1),
+    ))
+    
+    if len(center_added_points2) > 1:
+        mask = np.ones(len(sphere), dtype=bool)
+        dist_mat = distance_matrix(
+            sphere, np.array(center_added_points2)
+        )
+        mask[np.min((dist_mat - tol), axis=1) < 0] = False
+    
+        sphere = sphere[mask]
+    
+        sphere = np.array(sphere)
+        n_sphere = len(sphere)
+    sphere = np.concatenate((
+        sphere,
+        np.array(center_added_points2),
+    ))
+
+    center_hull = ConvexHull(sphere / radius)
+    sphere += center_coords1
+    tri = center_hull.simplices
+    
+    add_to_mdl_1_verts = []
+    add_to_mdl_2_verts = []
+    d_sphere_atoms1 = distance_matrix(sphere, coords1) - radius_list1[np.newaxis, :]
+    d_sphere_atoms2 = distance_matrix(sphere, coords2) - radius_list2[np.newaxis, :]
+    for j in range(0, len(sphere)):
+        if np.any(d_sphere_atoms1[j] <= 1e-4) and np.all(d_sphere_atoms2[j] >= -1e-4):
+            add_to_mdl_1_verts.append(j)
+        elif np.any(d_sphere_atoms2[j] <= 1e-4) and np.all(d_sphere_atoms1[j] >= -1e-4):
+            add_to_mdl_2_verts.append(j)
+    
+
+    if len(add_to_mdl_1_verts) > 3:
+        new_order = {old: new for new, old in enumerate(add_to_mdl_1_verts)}
+        mask = np.min(np.isin(tri, add_to_mdl_1_verts), axis=1)
+        keep_sphere = sphere[add_to_mdl_1_verts]
+        keep_tri = tri[mask]
+        if len(keep_tri) > 1:
+            keep_tri = np.vectorize(new_order.get)(keep_tri)
+            norms = -keep_sphere / radius
+
+            triangles1.extend(keep_tri + len(vertices1))
+            vertices1.extend(keep_sphere + center_coords1)
+            normals1.extend(norms)
+        
+    if len(add_to_mdl_2_verts) > 3:
+        new_order = {old: new for new, old in enumerate(add_to_mdl_2_verts)}
+        mask = np.min(np.isin(tri, add_to_mdl_2_verts), axis=1)
+        keep_sphere = sphere[add_to_mdl_2_verts]
+        keep_tri = tri[mask]
+        if len(keep_tri) > 1:
+            keep_tri = np.vectorize(new_order.get)(keep_tri)
+            norms = -keep_sphere / radius
+
+            triangles2.extend(keep_tri + len(vertices2))
+            vertices2.extend(keep_sphere + center_coords1)
+            normals2.extend(norms)
+
+    # the triangles need to be reordered so the points are 
+    # clockwise (or counterclockwise? i don't remember)
+    vertices1 = np.array(vertices1)
+    normals1 = np.array(normals1)
+    triangles1 = np.array(triangles1)
+    v1 = vertices1[triangles1[:,1]] - vertices1[triangles1[:,0]]
+    v2 = vertices1[triangles1[:,2]] - vertices1[triangles1[:,0]]
+    c = np.cross(v1, v2)
+    mask = np.sum(c * normals1[triangles1[:,0]], axis=1) < 0
+    triangles1[mask] = triangles1[mask, ::-1]
+
+    vertices2 = np.array(vertices2)
+    normals2 = np.array(normals2)
+    triangles2 = np.array(triangles2)
+    v1 = vertices2[triangles2[:,1]] - vertices2[triangles2[:,0]]
+    v2 = vertices2[triangles2[:,2]] - vertices2[triangles2[:,0]]
+    c = np.cross(v1, v2)
+    mask = np.sum(c * normals2[triangles2[:,0]], axis=1) < 0
+    triangles2[mask] = triangles2[mask, ::-1]
+
+    model_a.set_geometry(vertices1, normals1, triangles1)
+    model_b.set_geometry(vertices2, normals2, triangles2)
+
+    if labels != "none":
+        vbur = [v1 - v2 for v1, v2 in zip(vbur1, vbur2)]
+        d = model_a.new_drawing(labels)
+        d.display_style = d.Mesh
+        d.use_lighting = False
+        d.casts_shadows = False
+        d.pickable = False
+        
+        d_theta = np.pi / 180
+        oct_radius = radius + 1e-2
+        verts = [np.zeros(3)]
+        triangles = []
+        for k, v in enumerate(basis1.T):            
+            if labels == "quadrants" and k == 2:
+                continue
+            
+            start_ndx = len(verts)
+            prev_vert = oct_radius * perp_vector(v)
+            verts.append(prev_vert)
+            R = rotation_matrix(d_theta, v)
+
+            for i in range(1, 360):
+                triangles.append([0, start_ndx + i - 1, start_ndx + i])
+                prev_vert = np.dot(R, prev_vert)
+                verts.append(prev_vert)
+            
+            triangles.append([0, start_ndx, start_ndx + i - 1])
+            
+            for v2 in basis1.T[:k]:
+                v3 = np.cross(v, v2)
+                v3 /= np.linalg.norm(v3)
+                v3 *= oct_radius
+                ndx = len(verts)
+                verts.append(v)
+                verts.append(v3)
+                triangles.append([ndx, 0, ndx + 1])
+                ndx = len(verts)
+                verts.append(v)
+                verts.append(-v3)
+                triangles.append([ndx, 0, ndx + 1])
+                ndx = len(verts)
+                verts.append(-v)
+                verts.append(-v3)
+                triangles.append([ndx, 0, ndx + 1])
+                ndx = len(verts)
+                verts.append(-v)
+                verts.append(v3)
+                triangles.append([ndx, 0, ndx + 1])
+
+        norms = np.array(verts) / oct_radius
+        verts = np.array(verts) + center_coords1
+        triangles = np.array(triangles)
+        
+        d.set_geometry(verts, norms, triangles)
+        d.set_edge_mask(2 * np.ones(len(triangles), dtype=int))
+    
+        label_list = []
+        x = basis1.T[0]
+        x = x / np.linalg.norm(x)
+        y = basis1.T[1]
+        y = y / np.linalg.norm(y)
+        z = basis1.T[2]
+        z = z / np.linalg.norm(z)
+        if labels == "octants":
+            for i, val in enumerate(vbur):
+                coordinates = np.zeros(3)
+    
+                if any(i == n for n in [1, 2, 5, 6]):
+                    coordinates -= x
+                else:
+                    coordinates += x
+                if any(i == n for n in [2, 3, 4, 5]):
+                    coordinates -= y
+                else:
+                    coordinates += y
+                if i > 3:
+                    coordinates -= z
+                else:
+                    coordinates += z
+                if volume_type == "free":
+                    l = "%.1f%%" % -val
+                else:
+                    l = "%.1f%%" % val
+                coordinates /= np.linalg.norm(coordinates)
+                coordinates *= radius
+                coordinates += center_coords1
+                label_list.append(
+                    VoidLabel(l, coordinates, session.main_view)
+                )
+        else:
+            quad_vbur = [
+                vbur[0] + vbur[7],
+                vbur[1] + vbur[6],
+                vbur[2] + vbur[5],
+                vbur[3] + vbur[4],
+            ]
+            for i, val in enumerate(quad_vbur):
+                coordinates = np.zeros(3)
+                if any(i == n for n in [1, 2]):
+                    coordinates -= x
+                else:
+                    coordinates += x
+                if any(i == n for n in [2, 3]):
+                    coordinates -= y
+                else:
+                    coordinates += y
+
+                if volume_type == "free":
+                    l = "%.1f%%" % -val
+                else:
+                    l = "%.1f%%" % val
+                coordinates /= np.linalg.norm(coordinates)
+                coordinates *= radius
+                coordinates += center_coords1
+                label_list.append(
+                    VoidLabel(l, coordinates, session.main_view)
+                )
+        label_object = VoidLabels(session)
+        label_object.add_labels(label_list)
+        model_a.add([label_object])
+
+    if volume_type == "buried":
+        return [model_a, model_b]
+    
+    return [model_b, model_a]

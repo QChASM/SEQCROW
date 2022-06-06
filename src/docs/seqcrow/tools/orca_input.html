@@ -1,0 +1,51 @@
+<html>
+
+    <head>
+        <meta charset="UTF-8">
+        <title>ORCA Input Files</title>
+        <meta http-equiv="Content-Type" content="text/html">
+        <link rel="icon" href="../images/SEQCROW.png" type="image/png">
+        <link rel="stylesheet" href="../style.css">
+    </head>
+    
+    <div class="head">
+        <object data="../ribbon.html" class="head"></object>
+    </div>
+	
+	<body>
+	
+	<h1>Anatomy of an ORCA Input File</h1>
+	<p>
+	You can find the full specification of ORCA input files in the ORCA manual, which can be downloaded from their online forum.
+	The input builder splits this into sections:
+	<ul>
+		<li>Simple input - method, basis set, job type, and other options</li>
+		<li>Molecule - charge, multiplicity, atoms and their coordinates</li>
+		<li>Various blocks - some job types may require more input than what is in the simple input</li>
+	</ul>
+	<p>
+	General options for simple input, comments, and blocks can be modified on the "additional options" page.
+	More commonly-used options have a dedicated widget or page on the tool window (e.g. basis sets).
+	</p>
+	<pre style="background-color: #e3e3e3; font-family: monospace"><span class="highlight">#cf1.log<span class="tooltip">comment</span></span><span class="highlight">! STEOM-DLPNO-CCSD RIJCOSX def2-TZVPD def2-SVP/C CPCM(Pyridine)<span class="tooltip">simple input</span></span><span class="highlight">%MDCI
+	NRoots 15
+	DoSolv True
+end<span class="tooltip">an "MDCI" block</span></span>	<span class="highlight">*xyz 0 1
+C    -1.535090   1.395008   0.412179
+H    -1.506020   1.176098   1.479739
+H    -2.555630   1.663889   0.144319
+H    -0.882859   2.241368   0.202949
+C    -1.117800   0.168908  -0.398901
+C     0.284090  -0.303962  -0.039941
+O     0.509259  -1.398822   0.425549
+O     1.217230   0.611467  -0.300511
+C     2.580410   0.249287   0.006879
+H     2.874710  -0.626003  -0.567751
+H     2.683010   0.039537   1.069109
+H     3.178060   1.110027  -0.273001
+O    -2.030770  -0.894351  -0.203241
+H    -1.524641  -1.640202   0.150709
+H    -1.102040   0.433488  -1.461761
+*<span class="tooltip">molecule specification</span></span></pre>
+	</body>
+</html>

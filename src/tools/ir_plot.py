@@ -162,7 +162,7 @@ class IRSpectrum(ToolInstance):
         self.w0.setSingleStep(5)
         self.w0.setValue(self.settings.w0)
         self.w0.setSuffix(" cm\u207b\u00b9")
-        component_layout.addWidget(QLabel("𝜔<sub>0</sub> ="), 1, 4, 1, 1, Qt.AlignRight | Qt.AlignHCenter)
+        component_layout.addWidget(QLabel("ω<sub>0</sub> ="), 1, 4, 1, 1, Qt.AlignRight | Qt.AlignHCenter)
         component_layout.addWidget(self.w0, 1, 5, 1, 1, Qt.AlignLeft | Qt.AlignHCenter)
 
         self.weight_method = QComboBox()
@@ -479,7 +479,7 @@ class IRSpectrum(ToolInstance):
         line_color.set_color(color_cycle[color_ndx - 1])
         line_color.setEnabled(False)
         show_line.stateChanged.connect(
-            lambda state, widget=line_color: widget.setEnabled(state == Qt.Checked)
+            lambda state, widget=line_color: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
         )
         line_widget_layout.insertWidget(2, line_color, 1, Qt.AlignLeft | Qt.AlignVCenter)
         
@@ -496,7 +496,7 @@ class IRSpectrum(ToolInstance):
         line_widget_layout2.insertWidget(1, line_style, 1, Qt.AlignLeft | Qt.AlignVCenter)
         line_widget2.setEnabled(False)
         show_line.stateChanged.connect(
-            lambda state, widget=line_widget2: widget.setEnabled(state == Qt.Checked)
+            lambda state, widget=line_widget2: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
         )
         
         style_group = QTreeWidgetItem(mol_group)
@@ -585,7 +585,7 @@ class IRSpectrum(ToolInstance):
         line_color.set_color(color_cycle[color_ndx])
         line_color.setEnabled(False)
         show_line.stateChanged.connect(
-            lambda state, widget=line_color: widget.setEnabled(state == Qt.Checked)
+            lambda state, widget=line_color: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
         )
         line_widget_layout.insertWidget(2, line_color, 0, Qt.AlignRight | Qt.AlignVCenter)
         
@@ -604,7 +604,7 @@ class IRSpectrum(ToolInstance):
         line_widget_layout2.insertWidget(1, line_style, 1, Qt.AlignLeft | Qt.AlignVCenter)
         line_widget2.setEnabled(False)
         show_line.stateChanged.connect(
-            lambda state, widget=line_widget2: widget.setEnabled(state == Qt.Checked)
+            lambda state, widget=line_widget2: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
         )
         trash_button.clicked.connect(
             lambda *args, child=conformer_item: conf_group_widget.removeChild(style_group)
@@ -933,9 +933,8 @@ class IRSpectrum(ToolInstance):
                         return
                     
                     data_list = getattr(freq, data_attr)
-                    frequencies = np.array(
-                        [data.frequency for data in data_list if data.frequency > 0]
-                    )
+                    data_list = [data for data in data_list if data.frequency > 0]
+                    frequencies = np.array([data.frequency for data in data_list])
                     c1 = self.linear.value()
                     c2 = self.quadratic.value()
                     frequencies -= c1 * frequencies + c2 * frequencies ** 2

@@ -280,7 +280,7 @@ class DrawBondMouseMode(MouseMode):
                 x1, x2 = self.session.main_view.clip_plane_points(x, y)
                 v = x2 - x1
                 v /= np.linalg.norm(v)
-                p = np.dot(self._atom1.scene_coord - x1, v)
+                p = np.dot(self._atom1.coord - self._atom1.scene_coord - x1, v)
                 pt = x1 + p * v + (self._atom1.coord - self._atom1.scene_coord)
                 if self._markerset.num_atoms > 1:
                     self._markerset.atoms[1].delete()
@@ -516,7 +516,9 @@ class _ElementPicker(ToolInstance):
         do_it.clicked.connect(self.set_selected)
         layout.addRow(do_it)
 
-        self.keep_open.stateChanged.connect(lambda state: do_it.setVisible(state != Qt.Checked))
+        self.keep_open.stateChanged.connect(
+            lambda state: do_it.setVisible(Qt.CheckState(state) != Qt.Checked)
+        )
         self.keep_open.stateChanged.connect(self.element_changed)
 
         self.tool_window.ui_area.setLayout(layout)
@@ -813,7 +815,9 @@ class _SubstituentSelector(ToolInstance):
         do_it.clicked.connect(self.set_sub)
         layout.addRow(do_it)
 
-        self.keep_open.stateChanged.connect(lambda state: do_it.setVisible(state != Qt.Checked))
+        self.keep_open.stateChanged.connect(
+            lambda state: do_it.setVisible(Qt.CheckState(state) != Qt.Checked)
+        )
         self.keep_open.stateChanged.connect(self.sub_changed)
 
         self.substituent_table.table.itemSelectionChanged.connect(self.sub_changed)

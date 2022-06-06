@@ -1,0 +1,67 @@
+<html>
+
+    <head>
+        <meta charset="UTF-8">
+        <title>SQM Input Files</title>
+        <meta http-equiv="Content-Type" content="text/html">
+        <link rel="icon" href="../images/SEQCROW.png" type="image/png">
+        <link rel="stylesheet" href="../style.css">
+    </head>
+    
+    <div class="head">
+        <object data="../ribbon.html" class="head"></object>
+    </div>
+	
+	<body>
+	
+	<h1>Anatomy of an SQM Input File</h1>
+	<p>
+	You can find the full specification of SQM input files in the Amber manual, which can be downloaded from the <a href="https://ambermd.org/Manuals.php">Amber website</a>.
+	The input builder splits this into three sections:
+	<ul>
+		<li>Title - optional description of the job</li>
+		<li>QMMM namelist - everything except atoms and their coordinates</li>
+		<li>Molecule - atoms and their coordinates</li>
+	</ul>
+	<p>
+	General QMMM namelist options and comments can be added on the "additional options" page.
+	Commonly-used options have a dedicated widget or page on the tool window (e.g. methods).
+	</p>
+	<p>
+	Note that if you are editing these files by hand, spaces at the start of each line and empty lines can be important.
+	</p>
+	<pre style="background-color: #e3e3e3; font-family: monospace"><span class="highlight">test.out<span class="tooltip">title</span></span><span class="highlight"> &qmmm
+    qmcharge=0,
+    spin=1,
+    maxcyc=0,
+    qm_theory='AM1',
+ /<span class="tooltip">QMMM namelist</span></span><span class="highlight">  6   C    2.39106   -1.43137    0.27947
+  6   C    1.46636   -0.62867   -0.42763
+  6   C    1.48196    0.76923   -0.25443
+  6   C    2.41856    1.31663    0.64327
+  6   C    3.31356    0.52043    1.34477
+  6   C    3.30246   -0.86187    1.15737
+  7   N    0.60456   -1.34167   -1.34273
+  7   N   -0.59734   -1.42507   -1.30493
+  6   C   -1.47444   -0.72277   -0.39673
+  6   C   -1.56604    0.68583   -0.45883
+  6   C   -0.74854    1.44643   -1.44113
+  6   C    0.66696    1.76703   -1.00493
+  6   C   -2.29984   -1.44257    0.48247
+  6   C   -3.20014   -0.76307    1.29977
+  6   C   -3.28934    0.62683    1.24557
+  6   C   -2.48014    1.34483    0.36717
+  1   H    2.39126   -2.52417    0.13527
+  1   H    2.44226    2.40803    0.79137
+  1   H    4.03036    0.97803    2.04247
+  1   H    4.01306   -1.50077    1.70217
+  1   H   -0.72874    0.90413   -2.42613
+  1   H   -1.25864    2.42963   -1.65003
+  1   H    0.61156    2.70313   -0.37813
+  1   H    1.25236    2.03513   -1.93133
+  1   H   -2.23854   -2.54087    0.52917
+  1   H   -3.84294   -1.32977    1.98977
+  1   H   -4.00184    1.15873    1.89317
+  1   H   -2.56094    2.44153    0.32027<span class="tooltip">molecule</span></span></pre>
+	</body>
+</html>

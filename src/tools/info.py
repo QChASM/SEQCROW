@@ -98,19 +98,19 @@ class Info(ToolInstance):
     
     def _build_ui(self):
         layout = QVBoxLayout()
-        
+
         self.file_selector = FilereaderComboBox(self.session)
         self.file_selector.currentIndexChanged.connect(self.fill_table)
         layout.insertWidget(0, self.file_selector, 0)
-        
+
         tabs = QTabWidget()
         self.tabs = tabs
         layout.insertWidget(1, self.tabs, 1)
-        
+
         general_info = QWidget()
         general_layout = QVBoxLayout(general_info)
         tabs.addTab(general_info, "general")
-        
+
         self.table = QTableWidget()
         self.table.setColumnCount(2)
         self.table.setHorizontalHeaderLabels(['Data', 'Value'])
@@ -119,18 +119,18 @@ class Info(ToolInstance):
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
-        general_layout.insertWidget(1, self.table, 1)
-        
+        general_layout.insertWidget(0, self.table, 1)
+
         self.filter = QLineEdit()
         self.filter.setPlaceholderText("filter data")
         self.filter.textChanged.connect(self.apply_filter)
         self.filter.setClearButtonEnabled(True)
-        general_layout.insertWidget(2, self.filter, 0)
-        
+        general_layout.insertWidget(1, self.filter, 0)
+
         freq_info = QWidget()
         freq_layout = QVBoxLayout(freq_info)
         tabs.addTab(freq_info, "harmonic frequencies")
-        
+
         self.freq_table = QTableWidget()
         self.freq_table.setColumnCount(4)
         self.freq_table.setHorizontalHeaderLabels(
@@ -145,22 +145,22 @@ class Info(ToolInstance):
         self.freq_table.setEditTriggers(QTableWidget.NoEditTriggers)
         for i in range(0, 4):
             self.freq_table.resizeColumnToContents(i)
-        
+
         self.freq_table.horizontalHeader().setStretchLastSection(False)            
         self.freq_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
         self.freq_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)        
         self.freq_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)        
         self.freq_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)        
-        
+
         self.freq_table.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
-        freq_layout.insertWidget(1, self.freq_table, 1)        
+        freq_layout.insertWidget(0, self.freq_table, 1)        
 
         anharm_info = QWidget()
         anharm_layout = QVBoxLayout(anharm_info)
         tabs.addTab(anharm_info, "anharmonic frequencies")
-        
+
         anharm_layout.insertWidget(0, QLabel("fundamentals:"), 0)
-        
+
         self.fundamental_table = QTableWidget()
         self.fundamental_table.setColumnCount(3)
         self.fundamental_table.setHorizontalHeaderLabels(
@@ -174,12 +174,12 @@ class Info(ToolInstance):
         self.fundamental_table.setEditTriggers(QTableWidget.NoEditTriggers)
         for i in range(0, 3):
             self.fundamental_table.resizeColumnToContents(i)
-        
+
         self.fundamental_table.horizontalHeader().setStretchLastSection(False)            
         self.fundamental_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
         self.fundamental_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)        
         self.fundamental_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)        
-        
+
         self.fundamental_table.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
         anharm_layout.insertWidget(1, self.fundamental_table, 1)
 
@@ -204,7 +204,7 @@ class Info(ToolInstance):
         # 
         # self.overtone_table.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
         # anharm_layout.insertWidget(2, self.overtone_table, 1)
-        
+
         anharm_layout.insertWidget(2, QLabel("combinations and overtones:"), 0)
 
         self.combo_table = QTableWidget()
@@ -221,52 +221,52 @@ class Info(ToolInstance):
         self.combo_table.setEditTriggers(QTableWidget.NoEditTriggers)
         for i in range(0, 3):
             self.combo_table.resizeColumnToContents(i)
-        
+
         self.combo_table.horizontalHeader().setStretchLastSection(False)            
         self.combo_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
         self.combo_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)        
         self.combo_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)        
         self.combo_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)        
-        
+
         self.combo_table.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
         anharm_layout.insertWidget(3, self.combo_table, 1)
-        
+
         menu = QMenuBar()
-        
+
         export = menu.addMenu("&Export")
         copy = QAction("&Copy CSV to clipboard", self.tool_window.ui_area)
         copy.triggered.connect(self.copy_csv)
-        shortcut = QKeySequence(Qt.CTRL + Qt.Key_C)
+        shortcut = QKeySequence(QKeySequence.Copy)
         copy.setShortcut(shortcut)
         export.addAction(copy)
         self.copy = copy
-        
+
         save = QAction("&Save CSV...", self.tool_window.ui_area)
         save.triggered.connect(self.save_csv)
         export.addAction(save)
 
         delimiter = export.addMenu("Delimiter")
-        
+
         comma = QAction("comma", self.tool_window.ui_area, checkable=True)
         comma.setChecked(self.settings.delimiter == "comma")
         comma.triggered.connect(lambda *args, delim="comma": self.settings.__setattr__("delimiter", delim))
         delimiter.addAction(comma)
-        
+
         tab = QAction("tab", self.tool_window.ui_area, checkable=True)
         tab.setChecked(self.settings.delimiter == "tab")
         tab.triggered.connect(lambda *args, delim="tab": self.settings.__setattr__("delimiter", delim))
         delimiter.addAction(tab)
-        
+
         # space = QAction("space", self.tool_window.ui_area, checkable=True)
         # space.setChecked(self.settings.delimiter == "space")
         # space.triggered.connect(lambda *args, delim="space": self.settings.__setattr__("delimiter", delim))
         # delimiter.addAction(space)
-        
+
         semicolon = QAction("semicolon", self.tool_window.ui_area, checkable=True)
         semicolon.setChecked(self.settings.delimiter == "semicolon")
         semicolon.triggered.connect(lambda *args, delim="semicolon": self.settings.__setattr__("delimiter", delim))
         delimiter.addAction(semicolon)
-        
+
         add_header = QAction("&Include CSV header", self.tool_window.ui_area, checkable=True)
         add_header.setChecked(self.settings.include_header)
         add_header.triggered.connect(self.header_check)
@@ -274,15 +274,15 @@ class Info(ToolInstance):
 
         tab.triggered.connect(lambda *args, action=semicolon: action.setChecked(False))
         semicolon.triggered.connect(lambda *args, action=tab: action.setChecked(False))
-        
+
         archive = QAction("Include archive if present", self.tool_window.ui_area, checkable=True)
         archive.triggered.connect(lambda checked: setattr(self.settings, "archive", checked))
         archive.triggered.connect(lambda *args: self.fill_table(self.file_selector.count() - 1))
         archive.setChecked(self.settings.archive)
         export.addAction(archive)
-        
+
         unit = menu.addMenu("&Units")
-        
+
         energy = unit.addMenu("energy")
         hartree = QAction("Hartree", self.tool_window.ui_area, checkable=True)
         hartree.setChecked(self.settings.energy == "Hartree")
@@ -298,12 +298,12 @@ class Info(ToolInstance):
         hartree.triggered.connect(lambda *args: self.fill_table(self.file_selector.count() - 1))
         hartree.triggered.connect(lambda *args, action=kcal: action.setChecked(False))
         hartree.triggered.connect(lambda *args, action=kjoule: action.setChecked(False))
-        
+
         kcal.triggered.connect(lambda *args, val="kcal/mol": setattr(self.settings, "energy", val))
         kcal.triggered.connect(lambda *args: self.fill_table(self.file_selector.count() - 1))
         kcal.triggered.connect(lambda *args, action=hartree: action.setChecked(False))
         kcal.triggered.connect(lambda *args, action=kjoule: action.setChecked(False))
-        
+
         kjoule.triggered.connect(lambda *args, val="kJ/mol": setattr(self.settings, "energy", val))
         kjoule.triggered.connect(lambda *args: self.fill_table(self.file_selector.count() - 1))
         kjoule.triggered.connect(lambda *args, action=hartree: action.setChecked(False))
@@ -349,7 +349,7 @@ class Info(ToolInstance):
 
         if len(self.session.filereader_manager.list()) > 0:
             self.fill_table(0)
-        
+
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(None)
