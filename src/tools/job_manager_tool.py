@@ -32,6 +32,24 @@ from AaronTools.fileIO import read_types, FileReader
 from AaronTools.theory import OptimizationJob, FrequencyJob
 
 
+def job_order(job, session):
+    if job in session.seqcrow_job_manager.unknown_status_jobs:
+        return 0
+    
+    if job.isRunning():
+        return 1
+
+    if job.error:
+        return 2
+    
+    if job.killed:
+        return 3
+
+    if job.isFinished():
+        return 4
+
+    return 5
+
 class JobQueue(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False
@@ -136,7 +154,7 @@ class JobQueue(ToolInstance):
 
         jobs = self.session.seqcrow_job_manager.jobs
 
-        for job in jobs:
+        for job in sorted(jobs, key=lambda job, ses=self.session: job_order(job, ses)):
             name = job.name
             parent = item_stack[0]
             item = QTreeWidgetItem(parent)
@@ -146,21 +164,7 @@ class JobQueue(ToolInstance):
             item.setText(self.NAME_COL, name)
             
             if isinstance(job, LocalJob):
-                if job.killed:
-                    item.setText(self.STATUS_COL, "killed")
-
-                    del_job_widget = QWidget()
-                    del_job_layout = QGridLayout(del_job_widget)
-                    del_job = QPushButton()
-                    del_job.clicked.connect(lambda *args, job=job: self.remove_job(job))
-                    del_job.setIcon(QIcon(del_job_widget.style().standardIcon(QStyle.SP_DialogDiscardButton)))
-                    del_job.setFlat(True)
-                    del_job_layout.addWidget(del_job, 0, 0, 1, 1, Qt.AlignHCenter)
-                    del_job_layout.setColumnStretch(0, 1)
-                    del_job_layout.setContentsMargins(0, 0, 0, 0)
-                    self.tree.setItemWidget(item, self.DEL_COL, del_job_widget)
-
-                elif job.isRunning():
+                if job.isRunning():
                     if job in self.session.seqcrow_job_manager.unknown_status_jobs:
                         unk_widget = QWidget()
                         unk_layout = QGridLayout(unk_widget)
@@ -188,6 +192,20 @@ class JobQueue(ToolInstance):
                         kill_layout.setContentsMargins(0, 0, 0, 0)
                         self.tree.setItemWidget(item, self.KILL_COL, kill_widget)
 
+                elif job.killed:
+                    item.setText(self.STATUS_COL, "killed")
+
+                    del_job_widget = QWidget()
+                    del_job_layout = QGridLayout(del_job_widget)
+                    del_job = QPushButton()
+                    del_job.clicked.connect(lambda *args, job=job: self.remove_job(job))
+                    del_job.setIcon(QIcon(del_job_widget.style().standardIcon(QStyle.SP_DialogDiscardButton)))
+                    del_job.setFlat(True)
+                    del_job_layout.addWidget(del_job, 0, 0, 1, 1, Qt.AlignHCenter)
+                    del_job_layout.setColumnStretch(0, 1)
+                    del_job_layout.setContentsMargins(0, 0, 0, 0)
+                    self.tree.setItemWidget(item, self.DEL_COL, del_job_widget)
+                
                 elif job.isFinished():
                     if not job.error:
                         item.setText(self.STATUS_COL, "finished")

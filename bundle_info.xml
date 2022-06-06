@@ -508,14 +508,14 @@
     <AdditionalPackages>
         <!--
         <Package name="Raven" folder="C:\Users\normn\Documents\GitHub\Raven"/>
-        -->
         <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools"/>
         <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
-        <!--
         <Package name="Raven" folder="/home/ajs99778/pyQCHASM/Raven"/>
         <Package name="AaronTools" folder="/home/ajs99778/pyQCHASM/AaronTools"/>
         <Package name="AaronTools.test" folder="/home/ajs99778/pyQCHASM/AaronTools/test"/>
         -->
+        <Package name="AaronTools" folder="/home/tschaefer/QChASM/AaronTools"/>
+        <Package name="AaronTools.test" folder="/home/tschaefer/QChASM/AaronTools/test"/>
     </AdditionalPackages>
 
     <DataFiles package="AaronTools">

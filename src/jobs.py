@@ -276,9 +276,6 @@ class LocalJob(QThread):
         else:
             keep_files.extend(self.output_name)
         
-        for f in keep_files:
-            print(f)
-        
         keep_paths = [Path(f) for f in keep_files]
         
         for f in os.listdir(self.scratch_dir):
@@ -784,7 +781,7 @@ class LocalClusterJob(LocalJob):
     def kill(self):
         self.session.logger.warning("killing %s..." % self)
 
-        if self.process is not None:
+        if self.isRunning():
             self.session.logger.warning(
                 "stopping cluster jobs is not implemented"
             )

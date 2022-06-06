@@ -2171,7 +2171,6 @@ class JobTypeOption(QWidget):
                     for atom in constraints["atoms"]:
                         if atom.deleted:
                             continue
-                        print("tool", AtomSpec(atom.atomspec))
                         new_constraints["atoms"].append(AtomSpec(atom.atomspec))
 
                     for key in ["bonds", "angles", "torsions"]:
@@ -3738,7 +3737,6 @@ class BasisOption(QWidget):
     def setElements(self, elements):
         """sets the available elements"""
         for i in range(0, self.elements.rowCount()):
-            print(i)
             item = self.elements.cellWidget(i, 0)
             item.deleteLater()
             item.removeRow(i)
@@ -5989,8 +5987,6 @@ class PrepLocalJob(ChildToolWindow):
                 kwargs[option] = False
                 continue
             kwargs[option] = widget.value
-
-        print(kwargs)
 
         self.tool_instance.run_local_job(
             name=job_name, auto_update=auto_update, auto_open=auto_open, **kwargs
