@@ -210,7 +210,9 @@
                 <Provider name="Psi4"/>
                 <Provider name="SQM"/>
                 <Provider name="xTB"/>
+                <!--
                 <Provider name="Raven"/>
+                -->
                 <Provider name="ParallelRaven"/>
                 <Provider name="Gaussian STQN"/>
                 <Provider name="ORCA NEB"/>
@@ -352,7 +354,9 @@
             </Providers>
             
 			<Providers manager="tss_finder_manager">
+                <!--
 				<Provider name="GPR growing string method"/>
+                -->
 				<Provider name="synchornous transit-guided quasi-Newton"/>
 				<Provider name="nudged elastic band"/>
 				<Provider name="freezing string method"/>
@@ -375,7 +379,7 @@
                 ChimeraX's devel build
                 ChimeraXClassifier>ChimeraX :: Bundle :: General,Input/Output,Structure Editing,External Program :: 1,1 :: SEQCROW :: ChimAARON,SEQCRO,SEQCROW :: true</ChimeraXClassifier
                 -->
-                <ChimeraXClassifier>ChimeraX :: Tool :: Build QM Input                 :: Computing Data       :: Create Gaussian, ORCA, or Psi4 input file</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Build QM Input                 :: Computing Data       :: Create Gaussian, ORCA, Psi4, Q-Chem, xTB, or SQM input file</ChimeraXClassifier>
                 <!--
                 <ChimeraXClassifier>ChimeraX :: Tool :: Structure Modification         :: AaronTools           :: Modify substituents, swap ligands, and fuse rings</ChimeraXClassifier>
                 -->
@@ -502,7 +506,9 @@
        </Classifiers>
     
     <AdditionalPackages>
+        <!--
         <Package name="Raven" folder="C:\Users\normn\Documents\GitHub\Raven"/>
+        -->
         <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools"/>
         <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
         <!--
@@ -533,10 +539,12 @@
         <DataDir>ref_files</DataDir>
     </DataFiles>
 
+    <!--
     <DataFiles package="Raven">
 		<DataFile>LICENSE</DataFile>
         <DataDir>bin</DataDir>
     </DataFiles>
+    -->
 	
 
     <DataFiles>

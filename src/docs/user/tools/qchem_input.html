@@ -1,0 +1,82 @@
+<html>
+
+    <head>
+        <meta charset="UTF-8">
+        <title>SQM Input Files</title>
+        <meta http-equiv="Content-Type" content="text/html">
+        <link rel="icon" href="../../seqcrow/images/SEQCROW.png" type="image/png">
+        <link rel="stylesheet" href="../../seqcrow/style.css">
+    </head>
+    
+    <div class="head">
+        <object data="../../seqcrow/ribbon.html" class="head"></object>
+    </div>
+	
+	<body>
+	
+	<h1>Anatomy of a Q-Chem Input File</h1>
+	<p>
+	You can find the full specification of Q-Chem input files in the Q-Chem manual, which can be found <a href="https://manual.q-chem.com">online</a>.
+	The input builder splits the input file into different sections:
+	<ul>
+		<li>Comment - optional description of the job</li>
+		<li>Settings - the $REM section</li>
+		<li>Sections - all other sections aside from $REM</li>
+		<li>Molecule - atoms and their coordinates</li>
+	</ul>
+	<p>
+	General $REM settings, other sections, and and comments can be added on the "additional options" page.
+	Commonly-used options have a dedicated widget or page on the tool window (e.g. methods).
+	</p>
+	<pre style="background-color: #e3e3e3; font-family: monospace"><span class="highlight">$rem
+    MAKE_CUBE_FILES      =   true
+    PLOTS                =   true
+    BASIS                =   def2-SVP
+    METHOD               =   B3LYP
+$end<span class="tooltip">Settings</span></span>
+<span class="highlight">$plots
+    grid_range                     (-8,8) (-8,8) (-8,8)
+    grid_points                    40 40 40
+    total_density                  0-2
+    transition_density             1-2
+    attachment_detachment_density  1-2
+    alpha_molecular_orbital        28-31
+$end<span class="tooltip">"plots" section</span></span>
+<span class="highlight">$comments
+    test.out
+$end<span class="tooltip">comments</span></span>
+<span class="highlight">$molecule
+    0 1
+    C      2.39106     -1.43137      0.27947
+    C      1.46636     -0.62867     -0.42763
+    C      1.48196      0.76923     -0.25443
+    C      2.41856      1.31663      0.64327
+    C      3.31356      0.52043      1.34477
+    C      3.30246     -0.86187      1.15737
+    N      0.60456     -1.34167     -1.34273
+    N     -0.59734     -1.42507     -1.30493
+    C     -1.47444     -0.72277     -0.39673
+    C     -1.56604      0.68583     -0.45883
+    C     -0.74854      1.44643     -1.44113
+    C      0.66696      1.76703     -1.00493
+    C     -2.29984     -1.44257      0.48247
+    C     -3.20014     -0.76307      1.29977
+    C     -3.28934      0.62683      1.24557
+    C     -2.48014      1.34483      0.36717
+    H      2.39126     -2.52417      0.13527
+    H      2.44226      2.40803      0.79137
+    H      4.03036      0.97803      2.04247
+    H      4.01306     -1.50077      1.70217
+    H     -0.72874      0.90413     -2.42613
+    H     -1.25864      2.42963     -1.65003
+    H      0.61156      2.70313     -0.37813
+    H      1.25236      2.03513     -1.93133
+    H     -2.23854     -2.54087      0.52917
+    H     -3.84294     -1.32977      1.98977
+    H     -4.00184      1.15873      1.89317
+    H     -2.56094      2.44153      0.32027
+$end<span class="tooltip">molecule</span></span></pre>
+	</body>
+</html>
+
+

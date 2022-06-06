@@ -1,5 +1,6 @@
 def open_aarontools(session, stream, file_name, format_name=None, coordsets=None):
     from AaronTools.fileIO import FileReader
+    from AaronTools.utils.utils import get_filename
     from SEQCROW.residue_collection import ResidueCollection
     from SEQCROW.managers import ADD_FILEREADER
     from warnings import warn
@@ -97,6 +98,7 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
         
     status = "Opened %s as %s %s %s" % (file_name, a_or_an, format_name, "movie" if coordsets else "")
 
+    structure.name = get_filename(file_name, include_parent_dir=False)
     structure.filename = file_name
 
     return [structure], status

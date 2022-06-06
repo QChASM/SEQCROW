@@ -548,11 +548,11 @@ class NormalModes(ToolInstance):
         X = geom.coords
         Xr = geom.coords - dX
         
-        S = Pathway(geom, np.array([Xf, X, Xr, X, Xf]))
+        S = Pathway(np.array([Xf, X, Xr, X, Xf]))
         
         coordsets = np.zeros((frames, len(geom.atoms), 3))
         for i, t in enumerate(np.linspace(0, 1, num=frames, endpoint=False)):
-            coordsets[i] = S.coords_func(t)
+            coordsets[i] = S.interpolate_coords(t)
             
         model.add_coordsets(coordsets, replace=True)
         for i, coordset in enumerate(coordsets):
@@ -571,7 +571,12 @@ class NormalModes(ToolInstance):
 
         pause_frames = (60 // anim_fps)
 
-        slider =  CoordinateSetSlider(self.session, model, movie_framerate=anim_fps, pause_frames=pause_frames)
+        slider =  CoordinateSetSlider(
+            self.session,
+            model,
+            movie_framerate=anim_fps,
+            pause_frames=pause_frames,
+        )
         slider.play_cb()
 
     def stop_anim(self):

@@ -260,7 +260,7 @@ class BuildQM(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False
 
-    help = "help:seqcrow/tools/input_builder.html"
+    help = "help:user/tools/buildqminput.html"
 
     def __init__(self, session, name):
         super().__init__(session, name)

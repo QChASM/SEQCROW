@@ -426,7 +426,7 @@ H    -2.521911  -3.271171   0.001704
             self.assertTrue(False)
 
         ref_file = """#benzene_1-NO2_4-Cl.xyz 12,11=>H
-basis {
+basis this_basis {
     assign    def2-SVP
 }
 
@@ -491,7 +491,7 @@ nrg = optimize('HF')
             self.assertTrue(False)
 
         ref_file = """#benzene_1-NO2_4-Cl.xyz 12,11=>H
-basis {
+basis this_basis {
     assign    aug-cc-pVDZ
 }
 

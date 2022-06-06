@@ -1,0 +1,63 @@
+<html>
+
+    <head>
+        <meta charset="UTF-8">
+        <title>Psi4 Input Files</title>
+        <meta http-equiv="Content-Type" content="text/html">
+        <link rel="icon" href="../../seqcrow/images/SEQCROW.png" type="image/png">
+        <link rel="stylesheet" href="../../seqcrow/style.css">
+    </head>
+    
+    <div class="head">
+        <object data="../../seqcrow/ribbon.html" class="head"></object>
+    </div>
+	
+	<body>
+	
+	<h1>Anatomy of a Psi4 Input File</h1>
+	<p>
+	You can find the full specification of Psi4 input files in the <a href="https://psicode.org/psi4manual/master/index.html">Psi4 online documentation</a>.
+	The input builder splits this into sections:
+	<ul>
+		<li>Settings - global settings</li>
+		<li>Job - job type and computational method</li>
+		<li>Basis - basis set</li>
+		<li>Molecule - charge, multiplicity, atoms and their coordinates</li>
+		<li>Before job - miscellaneous lines that will appear before the job</li>
+		<li>After job - miscellaneous lines that will appear after the job</li>
+		<li>OptKing - settings for Psi4's geometry optimizer</li>
+		<li>Before molecule - miscellaneous lines that will appear before the molecule (and settings)</li>
+		<li>PCM solver - settings for an interface to PCMSolver, a library for computations using the polarizable continuum model for solvents</li>
+		<li>Comments - optional description of the job</li>
+	</ul>
+	<p>
+	General options for these (except basis) can be modified on the "additional options" page.
+	Commonly-used options have a dedicated widget or page on the tool window (e.g. basis sets).
+	</p>
+	<pre style="background-color: #e3e3e3; font-family: monospace"><span class="highlight">#cf1.log<span class="tooltip">comment</span></span><span class="highlight">from psi4.driver.procrouting.response.scf_response import tdscf_excitations<span class="tooltip">before molecule</span></span><span class="highlight">basis {
+	assign    def2-TZVP
+	}<span class="tooltip">basis set</span></span>	<span class="highlight">molecule {
+	0 1
+	C       -1.53509        1.39501        0.41218
+	H       -1.50602        1.17610        1.47974
+	H       -2.55563        1.66389        0.14432
+	H       -0.88286        2.24137        0.20295
+	C       -1.11780        0.16891       -0.39890
+	C        0.28409       -0.30396       -0.03994
+	O        0.50926       -1.39882        0.42555
+	O        1.21723        0.61147       -0.30051
+	C        2.58041        0.24929        0.00688
+	H        2.87471       -0.62600       -0.56775
+	H        2.68301        0.03954        1.06911
+	H        3.17806        1.11003       -0.27300
+	O       -2.03077       -0.89435       -0.20324
+	H       -1.52464       -1.64020        0.15071
+	H       -1.10204        0.43349       -1.46176
+}<span class="tooltip">molecule specification</span></span>
+	<span class="highlight">set {
+	save_jk                 true
+}<span class="tooltip">settings</span></span>
+	<span class="highlight">nrg, wfn = energy('B3LYP-d3bj', return_wfn=True)<span class="tooltip">job</span></span><span class="highlight">res = tdscf_excitations(wfn, states=15)<span class="tooltip">after job</span></span>
+	</pre>
+	</body>
+</html>
