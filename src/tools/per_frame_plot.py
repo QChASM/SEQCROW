@@ -79,34 +79,37 @@ class EnergyPlot(ToolInstance):
             return
 
         data = []
-        for step in fr.all_geom:
+        self.xs = []
+        for i, (step, cs_id) in enumerate(zip(fr.all_geom, self.structure.coordset_ids)):
             info = [item for item in step if isinstance(item, dict) and "energy" in item]
             if len(info) < 1:
+                continue
                 #we will be unable to load an enegy plot because some structure does not have an associated energy
-                self.opened = False
-                self.session.logger.error("not enough iterations to plot - %i found" % len(info))
-                return
+
             else:
                 info = info[0]
-            data.append(info["energy"])
+                self.xs.append(cs_id)
+                data.append(info["energy"])
         
-        if self.structure.num_coordsets > len(data):
-            data.append(fr.other["energy"])
+        if len(data) < 1:
+            self.opened = False
+            # self.session.logger.error("not enough iterations to plot - %i found" % len(data))
+            return
 
         self.ys = data
 
         se = np.ptp(data)
     
-        self.nrg_plot = ax.plot(self.structure.coordset_ids, data, marker='o', c='gray', markersize=3)
+        self.nrg_plot = ax.plot(self.xs, self.ys, marker='o', c='gray', markersize=3)
         self.nrg_plot = self.nrg_plot[0]
         ax.set_xlabel('iteration')
         ax.set_ylabel(r'energy ($E_h$)')
         ax.set_ylim(bottom=(min(data) - se/10), top=(max(data) + se/10))
         
-        minlocs = [self.structure.coordset_ids[i] for i in range(0, self.structure.num_coordsets) if data[i] == min(data)]
+        minlocs = [cs_id for i, cs_id in enumerate(self.xs) if data[i] == min(data)]
         mins = [min(data) for m in minlocs]        
         
-        maxlocs = [self.structure.coordset_ids[i] for i in range(0, self.structure.num_coordsets) if data[i] == max(data)]
+        maxlocs = [cs_id for i, cs_id in enumerate(self.xs) if data[i] == max(data)]
         maxs = [max(data) for m in maxlocs]
     
         ax.plot(minlocs, mins, marker='*', c='blue', markersize=5)
@@ -120,7 +123,7 @@ class EnergyPlot(ToolInstance):
         self.canvas.mpl_connect('motion_notify_event', self.drag)
         self.canvas.mpl_connect('scroll_event', self.zoom)
 
-        self.annotation = ax.annotate("", xy=(0,0), xytext=(0, 10), textcoords="offset points", fontfamily='Arial')
+        self.annotation = ax.annotate("", xy=(0,0), xytext=(0, 10), textcoords="offset points", fontfamily='sans-serif')
         self.annotation.set_visible(False)
 
         ax.autoscale()
@@ -158,8 +161,8 @@ class EnergyPlot(ToolInstance):
         filename, _ = QFileDialog.getSaveFileName(filter="CSV Files (*.csv)")
         if filename:
             s = "iteration,energy\n"
-            for i, nrg in enumerate(self.ys):
-                s += "%i,%f\n" % (self.structure.coordset_ids[i], nrg)
+            for cs_id, nrg in zip(self.xs, self.ys):
+                s += "%i,%f\n" % (cs_id, nrg)
                 
             with open(filename, 'w') as f:
                 f.write(s.strip())
@@ -240,8 +243,8 @@ class EnergyPlot(ToolInstance):
             else:
                 self.structure.active_coordset_id = x
 
-    def update_label(self, ndx):
-        self.annotation.xy = (self.structure.coordset_ids[ndx], self.ys[ndx])
+    def update_label(self, cs_id, ndx):
+        self.annotation.xy = (cs_id, self.ys[ndx])
         if self.ys[ndx] == max(self.ys):
             self.annotation.set_text("%s (maxima)" % repr(self.ys[ndx]))
         elif self.ys[ndx] == min(self.ys):
@@ -249,7 +252,7 @@ class EnergyPlot(ToolInstance):
         else:
             self.annotation.set_text(repr(self.ys[ndx]))
     
-    def update_hover(self, ndx):  
+    def update_hover(self, cs_id, ndx):  
         ax = self.figure.gca()
         for line in ax.lines:
             if line.get_label() == "hover":
@@ -257,7 +260,7 @@ class EnergyPlot(ToolInstance):
                 break
         
         ax.plot(
-            self.structure.coordset_ids[ndx],
+            cs_id,
             self.ys[ndx],
             marker='o',
             markersize=5,
@@ -278,10 +281,11 @@ class EnergyPlot(ToolInstance):
         elif event.button == 1:
             vis = self.annotation.get_visible()
             if event.xdata:
-                ndx = max(0, int(round(event.xdata)) - 1)
-                ndx = min(self.structure.num_coordsets - 1, ndx)
-                self.update_hover(ndx)
-                self.update_label(ndx)
+                cs_id = max(self.xs[0], int(round(event.xdata)))
+                cs_id = min(self.xs[-1], cs_id)
+                ndx = self.xs.index(cs_id)
+                self.update_hover(cs_id, ndx)
+                self.update_label(cs_id, ndx)
                 self.annotation.set_visible(True)
                 self.canvas.draw()
             return self.change_coordset(event)
@@ -289,8 +293,10 @@ class EnergyPlot(ToolInstance):
             vis = self.annotation.get_visible()
             on_item, ndx = self.nrg_plot.contains(event)
             if on_item:
-                self.update_label(ndx['ind'][0])
-                self.update_hover(ndx['ind'][0])
+                ndx = ndx['ind'][0]
+                cs_id = self.xs[ndx]
+                self.update_label(cs_id, ndx)
+                self.update_hover(cs_id, ndx)
                 self.annotation.set_visible(True)
                 self.canvas.draw()
             else:
