@@ -261,7 +261,7 @@ class Residue(Geometry):
                 atom.name = atom.element.name
     
             at_atom.chix_name = atom.name
-            at_atom.atomspec = atom.atomspec
+            at_atom.chix_atom = atom
             at_atom.serial_number = atom.serial_number
 
             # print("final name:", atom.name)
