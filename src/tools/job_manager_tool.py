@@ -435,14 +435,14 @@ class JobQueue(ToolInstance):
         self.session.seqcrow_job_manager.triggers.activate_trigger(JOB_QUEUED, "resume")
 
     def open_jobs(self):
-        jobs = self.session.seqcrow_job_manager.jobs
+        jobs = sorted(self.session.seqcrow_job_manager.jobs, key=lambda job, ses=self.session: job_order(job, ses))
         ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
         for ndx in ndxs:
             job = jobs[ndx]
             job.open_structure()
 
     def open_log(self):
-        jobs = self.session.seqcrow_job_manager.jobs
+        jobs = sorted(self.session.seqcrow_job_manager.jobs, key=lambda job, ses=self.session: job_order(job, ses))
         ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
         for ndx in ndxs:
             job = jobs[ndx]
@@ -450,7 +450,7 @@ class JobQueue(ToolInstance):
                 self.tool_window.create_child_window("%s log" % job.name, window_class=JobLog, scr_dir=job.scratch_dir)        
 
     def open_output(self):
-        jobs = self.session.seqcrow_job_manager.jobs
+        jobs = sorted(self.session.seqcrow_job_manager.jobs, key=lambda job, ses=self.session: job_order(job, ses))
         ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
         for ndx in ndxs:
             job = jobs[ndx]
@@ -458,7 +458,7 @@ class JobQueue(ToolInstance):
                 self.tool_window.create_child_window("%s log" % job.name, window_class=JobOutput, file=job.output_name)        
 
     def kill_running(self):
-        jobs = self.session.seqcrow_job_manager.jobs
+        jobs = sorted(self.session.seqcrow_job_manager.jobs, key=lambda job, ses=self.session: job_order(job, ses))
         ndxs = list(set([item.row() for item in self.tree.selectedIndexes()]))
         for ndx in ndxs:
             job = jobs[ndx]

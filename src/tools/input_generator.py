@@ -1317,7 +1317,7 @@ class BuildQM(ToolInstance):
             for key, item in output.items():
                 s += "<<- %s\n" % key
                 s += item
-                s += "%s\n\n\n" % key
+                s += "\n\n\n"
             output = s
 
         for warning in warnings:

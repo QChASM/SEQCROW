@@ -1236,6 +1236,9 @@ class GaussianSTQNJob(TSSJob):
     tss_algorithm = "synchornous transit-guided quasi-Newton"
     format_name = "log"
     
+    def __repr__(self):
+        return "local ORCA QST job \"%s\"" % self.name
+
     def run(self):
         self.scratch_dir = os.path.join(
             os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
@@ -1286,6 +1289,9 @@ class GaussianSTQNJob(TSSJob):
 class ORCANEBJob(TSSJob):
     tss_algorithm = "nudged elastic band"
     format_name = "out"
+
+    def __repr__(self):
+        return "local ORCA NEB job \"%s\"" % self.name
 
     def run(self):
         self.start_time = asctime(localtime())
@@ -1346,7 +1352,10 @@ class ORCANEBJob(TSSJob):
 class QChemFSMJob(TSSJob):
     tss_algorithm = "freezing string method"
     format_name = "out"
-    
+
+    def __repr__(self):
+        return "local Q-Chem FSM job \"%s\"" % self.name
+
     def run(self):
         self.start_time = asctime(localtime())
 

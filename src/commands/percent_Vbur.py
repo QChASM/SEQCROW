@@ -14,6 +14,9 @@ from SEQCROW.finders import AtomSpec
 from scipy.spatial import distance_matrix, ConvexHull
 
 
+# TODO: improve %Vbur visuals by adding vertices on planes
+# parallel to intersections of vdw radii
+
 class VoidLabel(ObjectLabel):
     def __init__(self, text, location, view):
         self._location = location
