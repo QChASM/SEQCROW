@@ -21,7 +21,7 @@ class SubstituteCmdTest(TestWithSession):
         mdl = self.session.models.list()[0]
         rescol = ResidueCollection(mdl)
         
-        self.assertTrue(validate(ref, rescol))
+        self.assertTrue(validate(ref, rescol, thresh="loose"))
     
     def test_substitute_copy(self):
         ref1 = ResidueCollection(self.chlorobenzene)
@@ -35,6 +35,6 @@ class SubstituteCmdTest(TestWithSession):
         mdl2 = self.session.models.list()[2]
         rescol2 = ResidueCollection(mdl2)
         
-        self.assertTrue(validate(ref1, rescol1))
-        self.assertTrue(validate(ref2, rescol2))
+        self.assertTrue(validate(ref1, rescol1, thresh="loose"))
+        self.assertTrue(validate(ref2, rescol2, thresh="loose"))
     

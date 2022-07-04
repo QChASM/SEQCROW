@@ -481,14 +481,12 @@ class Psi4Job(LocalJob):
         else:
             self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log)
 
-        possible_fchk_name = os.path.join(
-            self.scratch_dir, self.name + ".fchk"
-        )
-        if os.path.exists(possible_fchk_name):
-            self.output_name = [
-                self.output_name,
-                possible_fchk_name
-            ]
+        for f in os.listdir(self.scratch_dir):
+            if f.lower().endswith("fchk") or f.lower().endswith("fch"):
+                self.output_name = {
+                    "out": self.output_name,
+                    "fchk": os.path.join(self.scratch_dir, f),
+                }
 
         self.process.communicate()
         self.process = None

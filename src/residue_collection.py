@@ -933,6 +933,26 @@ class ResidueCollection(Geometry):
                     
                     self.update_geometry(cur_coords)
         
+        if filereader is not None and "Löwdin Charges" in filereader.other:
+            for atom, charge in zip(struc.atoms, filereader.other["Löwdin Charges"]):
+                atom.loewdinCharge = charge
+                atom.charge = charge
+            
+                if not any(attr[0] == "loewdinCharge" for attr in atom.custom_attrs):
+                    atom.register_attr(
+                        session,
+                        "loewdinCharge",
+                        "seqcrow ResidueCollection.get_chimera",
+                        attr_type=float
+                    )
+                if not any(attr[0] == "charge" for attr in atom.custom_attrs):
+                    atom.register_attr(
+                        session,
+                        "charge",
+                        "seqcrow ResidueCollection.get_chimera",
+                        attr_type=float
+                    )
+        
         if filereader is not None and "Mulliken Charges" in filereader.other:
             for atom, charge in zip(struc.atoms, filereader.other["Mulliken Charges"]):
                 atom.mullikenCharge = charge

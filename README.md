@@ -1,4 +1,4 @@
-![SEQCROW](SEQCROW.png)
+![SEQCROW](SEQCROW_dev.png)
 # SEQCROW
 SEQCROW is an AaronTools-based plugin for <a href="https://www.cgl.ucsf.edu/chimerax/" target="_blank">UCSF ChimeraX</a>, a cross-platform 3D molecular graphics program.
 SEQCROW extends ChimeraX by adding tools to build and modify complex molecular structures, map new catalysts and ligands onto previously-computed structures, and manage AaronTools libraries.

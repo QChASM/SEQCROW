@@ -1036,11 +1036,14 @@ def vbur_difference_vis(
     coords1 = geom1.coordinates(atoms_within_radius1)
     coords2 = geom2.coordinates(atoms_within_radius2)
     coords2 -= center_coords2
-    basis2_inv = np.linalg.inv(basis2)
-    coords2 = np.dot(coords2, basis2_inv)
-    coords2 = np.dot(coords2, basis1)
+    h = np.dot(basis2.T, basis1)
+    u, s, v = np.linalg.svd(h)
+    R = np.matmul(v, u.T)
+    if np.sign(np.linalg.det(R)) < 0:
+        R[:, 2] *= -1
+    coords2 = np.matmul(coords2, R.T)
     coords2 += center_coords1
-    
+
     atom_dist1 = distance_matrix(coords1, coords1)
     atom_dist12 = distance_matrix(coords1, coords2)
     atom_dist2 = distance_matrix(coords2, coords2)
@@ -1195,6 +1198,8 @@ def vbur_difference_vis(
         # intersection with big sphere
         if d + r1 > radius:
             theta = np.arccos((r1 ** 2 - radius ** 2 - d ** 2) / (-2 * d * radius))
+            if np.isnan(theta):
+                continue
             h = radius * np.sin(theta)
             b = radius * np.cos(theta)
             p = b * v_n
@@ -1500,10 +1505,11 @@ def vbur_difference_vis(
         sphere = sphere[mask]
     
         sphere = np.array(sphere)
-    sphere = np.concatenate((
-        sphere,
-        np.array(center_added_points1),
-    ))
+        
+        sphere = np.concatenate((
+            sphere,
+            np.array(center_added_points1),
+        ))
     
     if len(center_added_points2) > 1:
         mask = np.ones(len(sphere), dtype=bool)
@@ -1516,10 +1522,11 @@ def vbur_difference_vis(
     
         sphere = np.array(sphere)
         n_sphere = len(sphere)
-    sphere = np.concatenate((
-        sphere,
-        np.array(center_added_points2),
-    ))
+    
+        sphere = np.concatenate((
+            sphere,
+            np.array(center_added_points2),
+        ))
 
     center_hull = ConvexHull(sphere / radius)
     sphere += center_coords1
@@ -1546,7 +1553,7 @@ def vbur_difference_vis(
             norms = -keep_sphere / radius
 
             triangles1.extend(keep_tri + len(vertices1))
-            vertices1.extend(keep_sphere + center_coords1)
+            vertices1.extend(keep_sphere)
             normals1.extend(norms)
         
     if len(add_to_mdl_2_verts) > 3:
@@ -1559,7 +1566,7 @@ def vbur_difference_vis(
             norms = -keep_sphere / radius
 
             triangles2.extend(keep_tri + len(vertices2))
-            vertices2.extend(keep_sphere + center_coords1)
+            vertices2.extend(keep_sphere)
             normals2.extend(norms)
 
     # the triangles need to be reordered so the points are 

@@ -8,10 +8,26 @@ from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 
 from Qt.QtCore import Qt
 from Qt.QtGui import QKeySequence
-from Qt.QtWidgets import QPushButton, QFormLayout, QComboBox, QCheckBox, QMenuBar, QAction, \
-    QFileDialog, QApplication, QTableWidget, QTableWidgetItem, \
-    QHeaderView, QSpinBox, QWidget, QGridLayout, \
-    QTabWidget, QDoubleSpinBox, QMessageBox
+from Qt.QtWidgets import (
+    QPushButton,
+    QFormLayout,
+    QComboBox,
+    QCheckBox,
+    QMenuBar,
+    QAction,
+    QFileDialog,
+    QApplication,
+    QTableWidget,
+    QTableWidgetItem,
+    QHeaderView,
+    QSpinBox,
+    QWidget,
+    QGridLayout,
+    QTabWidget,
+    QDoubleSpinBox,
+    QMessageBox,
+    QLabel,
+)
 
 from SEQCROW.commands.percent_Vbur import percent_vbur as percent_vbur_cmd
 from SEQCROW.tools.per_frame_plot import NavigationToolbar
@@ -101,6 +117,7 @@ class PercentVolumeBuried(ToolInstance):
         self.scale.setRange(1., 1.5)
         settings_layout.addRow("VDW scale:", self.scale)
         
+        calc_layout.addRow("1.", QLabel("select ligand"))
         set_ligand_atoms = QPushButton("set ligands to current selection")
         set_ligand_atoms.clicked.connect(self.set_ligand_atoms)
         set_ligand_atoms.setToolTip(
@@ -108,7 +125,7 @@ class PercentVolumeBuried(ToolInstance):
             "by default, all atoms will be used unless a single center is specified\n" +
             "in the case of a single center, all atoms except the center is used"
         )
-        calc_layout.addRow(set_ligand_atoms)
+        calc_layout.addRow("2.", set_ligand_atoms)
         self.set_ligand_atoms = set_ligand_atoms
         
         self.radius = QDoubleSpinBox()
@@ -197,13 +214,13 @@ class PercentVolumeBuried(ToolInstance):
             lambda text, widget=mc_widget: widget.setVisible(text == "Monte-Carlo")
         )
 
-        self.use_centroid = QCheckBox()
+        calc_layout.addRow("3.", QLabel("change selection to reaction center"))
+        self.use_centroid = QCheckBox("use centroid of centers")
         self.use_centroid.setChecked(self.settings.use_centroid)
         self.use_centroid.setToolTip(
-            "place the center between selected atoms\n" +
-            "might be useful for polydentate ligands"
+            "place the center between selected atoms"
         )
-        calc_layout.addRow("use centroid of centers:", self.use_centroid)
+        calc_layout.addRow(self.use_centroid)
 
 
         self.steric_map = QCheckBox()
@@ -342,7 +359,7 @@ class PercentVolumeBuried(ToolInstance):
 
         calc_vbur_button = QPushButton("calculate % buried volume for selected centers")
         calc_vbur_button.clicked.connect(self.calc_vbur)
-        calc_layout.addRow(calc_vbur_button)
+        calc_layout.addRow("4.", calc_vbur_button)
         self.calc_vbur_button = calc_vbur_button
         
         remove_vbur_button = QPushButton("remove % buried volume visualizations")
@@ -720,7 +737,6 @@ class PercentVolumeBuried(ToolInstance):
         self.table.resizeColumnToContents(1)
         self.table.resizeColumnToContents(2)
 
-    
     def header_check(self, state):
         """user has [un]checked the 'include header' option on the menu"""
         if state:

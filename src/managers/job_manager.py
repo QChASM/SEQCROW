@@ -92,7 +92,10 @@ class JobManager(ProviderManager):
                                     self.session,
                                     job['theory'],
                                 ]
-                                kwargs = job["job_options"]
+                                try:
+                                    kwargs = job["job_options"]
+                                except KeyError:
+                                    kwargs = {}
                                 if issubclass(job_cls, TSSJob):
                                     args.extend([
                                         job["reactant"],
