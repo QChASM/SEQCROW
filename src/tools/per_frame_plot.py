@@ -1,11 +1,21 @@
+from collections import OrderedDict
+
 import numpy as np
 
 from chimerax.core.tools import ToolInstance
 from chimerax.core.models import REMOVE_MODELS
 
 from Qt.QtCore import Qt
-from Qt.QtGui import QGuiApplication
-from Qt.QtWidgets import QGridLayout, QWidget, QMenuBar, QFileDialog
+from Qt.QtGui import QGuiApplication, QBrush, QColor
+from Qt.QtWidgets import (
+    QGridLayout,
+    QWidget,
+    QMenuBar,
+    QFileDialog,
+    QTabWidget, 
+    QTableWidget,
+    QTableWidgetItem,
+)
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
@@ -68,8 +78,15 @@ class EnergyPlot(ToolInstance):
     def _build_ui(self):
         layout = QGridLayout()
         
+        tabs = QTabWidget()
+        layout.addWidget(tabs)
+        
         self.figure = Figure(figsize=(2,2))
         self.canvas = Canvas(self.figure)
+        
+        nrg_plot = QWidget()
+        nrg_plot_layout = QGridLayout(nrg_plot)
+        tabs.addTab(nrg_plot, "energy")
         
         ax = self.figure.add_axes((0.15, 0.20, 0.80, 0.70))
 
@@ -78,39 +95,56 @@ class EnergyPlot(ToolInstance):
             self.opened = False
             return
 
-        data = []
-        self.xs = []
+        self.data = OrderedDict()
+        info = []
         for i, (step, cs_id) in enumerate(zip(fr.all_geom, self.structure.coordset_ids)):
             info = [item for item in step if isinstance(item, dict) and "energy" in item]
             if len(info) < 1:
                 continue
-                #we will be unable to load an enegy plot because some structure does not have an associated energy
 
             else:
                 info = info[0]
-                self.xs.append(cs_id)
-                data.append(info["energy"])
+                self.data[cs_id] = {"energy": {"value": info["energy"]}}
+                if "gradient" in info:
+                    self.data[cs_id].update(info["gradient"])
         
-        if len(data) < 1:
+        if len(self.data) < len(self.structure.coordset_ids):
+            if "energy" in info and "energy" in fr and info["energy"] != fr["energy"]:
+                self.data[self.structure.coordset_ids[-1]] = {"energy": {"value": fr["energy"]}}
+            
+            if (
+                "gradient" in info and
+                "gradient" in fr and
+                info["gradient"] != fr["gradient"]
+            ) or (
+                "gradient" in fr and
+                not "gradient" in info
+            ):
+                self.data[self.structure.coordset_ids[-1]].update(fr["gradient"])
+
+        if len(self.data) < 1:
             self.opened = False
             # self.session.logger.error("not enough iterations to plot - %i found" % len(data))
             return
 
-        self.ys = data
+        self.xs = [x for x, y in self.data.items() if "energy" in y]
+        self.ys = [y["energy"]["value"] for y in self.data.values()]
 
-        se = np.ptp(data)
+        se = np.ptp(self.ys)
     
         self.nrg_plot = ax.plot(self.xs, self.ys, marker='o', c='gray', markersize=3)
         self.nrg_plot = self.nrg_plot[0]
         ax.set_xlabel('iteration')
         ax.set_ylabel(r'energy ($E_h$)')
-        ax.set_ylim(bottom=(min(data) - se/10), top=(max(data) + se/10))
+        ax.set_ylim(bottom=(min(self.ys) - se/10), top=(max(self.ys) + se/10))
         
-        minlocs = [cs_id for i, cs_id in enumerate(self.xs) if data[i] == min(data)]
-        mins = [min(data) for m in minlocs]        
+        min_y = min(self.ys)
+        minlocs = [cs_id for i, cs_id in enumerate(self.xs) if self.ys[i] == min_y]
+        mins = [min_y for m in minlocs]        
         
-        maxlocs = [cs_id for i, cs_id in enumerate(self.xs) if data[i] == max(data)]
-        maxs = [max(data) for m in maxlocs]
+        max_y = max(self.ys)
+        maxlocs = [cs_id for i, cs_id in enumerate(self.xs) if self.ys[i] == max_y]
+        maxs = [max_y for m in maxlocs]
     
         ax.plot(minlocs, mins, marker='*', c='blue', markersize=5)
         ax.plot(maxlocs, maxs, marker='*', c='red', markersize=5)
@@ -130,14 +164,69 @@ class EnergyPlot(ToolInstance):
         self.canvas.draw()
         self.canvas.setMinimumWidth(400)
         self.canvas.setMinimumHeight(200)
-        layout.addWidget(self.canvas)
+        nrg_plot_layout.addWidget(self.canvas)
         
         toolbar_widget = QWidget()
         toolbar = NavigationToolbar(self.canvas, toolbar_widget)
 
         toolbar.setMaximumHeight(32)
         self.toolbar = toolbar
-        layout.addWidget(toolbar)
+        nrg_plot_layout.addWidget(toolbar)
+        
+        
+        conv_widget = QWidget()
+        conv_layout = QGridLayout(conv_widget)
+        tabs.addTab(conv_widget, "convergence")
+        
+        conv_table = QTableWidget()
+        conv_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        color = QColor(200, 235, 210)
+        black = QColor(0, 0, 0)
+        brush = QBrush(color)
+        black_brush = QBrush(black)
+        keys = set()
+        for data in self.data.values():
+            keys.update(set(data.keys()))
+        keys = sorted(keys)
+        conv_table.setColumnCount(len(keys))
+        conv_table.setHorizontalHeaderLabels(keys)
+        conv_table.setSelectionBehavior(QTableWidget.SelectRows)
+        conv_table.setSelectionMode(QTableWidget.SingleSelection)
+        for key, value in sorted(self.data.items(), key=lambda a: a[0]):
+            row = conv_table.rowCount()
+            conv_table.insertRow(row)
+        
+            for ndx, label in enumerate(keys):
+                if label not in value:
+                    continue
+                widget = QTableWidgetItem()
+                try:
+                    if label == "energy":
+                        widget.setData(Qt.DisplayRole, "%.5f" % float(value[label]["value"]))
+                    else:
+                        widget.setData(Qt.DisplayRole, "%.2e" % float(value[label]["value"]))
+                    widget.setData(Qt.UserRole, key)
+                    widget.setTextAlignment(Qt.AlignRight)
+                    try:
+                        if value[label]["converged"]:
+                            widget.setBackground(brush)
+                            widget.setForeground(black_brush)
+                    except KeyError:
+                        pass
+                    
+                    conv_table.setItem(row, ndx, widget)
+                
+                except ValueError:
+                    continue
+            
+
+        for i in range(0, conv_table.columnCount()):
+            conv_table.resizeColumnToContents(i)
+        
+        conv_table.itemSelectionChanged.connect(self.set_table_cs_id)
+        self.conv_table = conv_table
+        conv_layout.addWidget(conv_table)
+
         
         #menu bar for saving stuff
         menu = QMenuBar()
@@ -155,6 +244,8 @@ class EnergyPlot(ToolInstance):
         
         self.tool_window.manage(None)
         
+        conv_table.scrollToBottom()
+
         self.opened = True
 
     def save(self):
@@ -168,6 +259,14 @@ class EnergyPlot(ToolInstance):
                 f.write(s.strip())
                 
             print("saved to %s" % filename)
+    
+    def set_table_cs_id(self):
+        selection = self.conv_table.selectedItems()
+        if not selection:
+            return
+        item = selection[0]
+        cs_id = item.data(Qt.UserRole)
+        self.structure.active_coordset_id = cs_id
     
     def zoom(self, event):
         if event.xdata is None:

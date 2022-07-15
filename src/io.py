@@ -60,12 +60,15 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
     if fr.all_geom and "energy" in fr.other and (
         coordsets is None or coordsets is True
     ):
-        from SEQCROW.tools import EnergyPlot
-        nrg_plot = EnergyPlot(session, structure, fr)
-        if not nrg_plot.opened:
-            warn("energy plot could not be opened\n" + \
-                 "there might be a mismatch between energy entries and structure entries in %s" % file_name)
-            nrg_plot.delete()
+        try:
+            from SEQCROW.tools import EnergyPlot
+            nrg_plot = EnergyPlot(session, structure, fr)
+            if not nrg_plot.opened:
+                warn("energy plot could not be opened\n" + \
+                    "there might be a mismatch between energy entries and structure entries in %s" % file_name)
+                nrg_plot.delete()
+        except Exception as e:
+            session.logger.warning(e)
     
     coordsets = coordsets and fr.all_geom
 
