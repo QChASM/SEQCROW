@@ -1,5 +1,6 @@
 def open_aarontools(session, stream, file_name, format_name=None, coordsets=None):
     from AaronTools.fileIO import FileReader
+    from AaronTools.utils.utils import get_filename
     from SEQCROW.residue_collection import ResidueCollection
     from SEQCROW.managers import ADD_FILEREADER
     from warnings import warn
@@ -59,12 +60,15 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
     if fr.all_geom and "energy" in fr.other and (
         coordsets is None or coordsets is True
     ):
-        from SEQCROW.tools import EnergyPlot
-        nrg_plot = EnergyPlot(session, structure, fr)
-        if not nrg_plot.opened:
-            warn("energy plot could not be opened\n" + \
-                 "there might be a mismatch between energy entries and structure entries in %s" % file_name)
-            nrg_plot.delete()
+        try:
+            from SEQCROW.tools import EnergyPlot
+            nrg_plot = EnergyPlot(session, structure, fr)
+            if not nrg_plot.opened:
+                warn("energy plot could not be opened\n" + \
+                    "there might be a mismatch between energy entries and structure entries in %s" % file_name)
+                nrg_plot.delete()
+        except Exception as e:
+            session.logger.warning(e)
     
     coordsets = coordsets and fr.all_geom
 
@@ -97,6 +101,7 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
         
     status = "Opened %s as %s %s %s" % (file_name, a_or_an, format_name, "movie" if coordsets else "")
 
+    structure.name = get_filename(file_name, include_parent_dir=False)
     structure.filename = file_name
 
     return [structure], status

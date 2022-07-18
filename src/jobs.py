@@ -276,9 +276,6 @@ class LocalJob(QThread):
         else:
             keep_files.extend(self.output_name)
         
-        for f in keep_files:
-            print(f)
-        
         keep_paths = [Path(f) for f in keep_files]
         
         for f in os.listdir(self.scratch_dir):
@@ -484,14 +481,12 @@ class Psi4Job(LocalJob):
         else:
             self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log)
 
-        possible_fchk_name = os.path.join(
-            self.scratch_dir, self.name + ".fchk"
-        )
-        if os.path.exists(possible_fchk_name):
-            self.output_name = [
-                self.output_name,
-                possible_fchk_name
-            ]
+        for f in os.listdir(self.scratch_dir):
+            if f.lower().endswith("fchk") or f.lower().endswith("fch"):
+                self.output_name = {
+                    "out": self.output_name,
+                    "fchk": os.path.join(self.scratch_dir, f),
+                }
 
         self.process.communicate()
         self.process = None
@@ -784,7 +779,7 @@ class LocalClusterJob(LocalJob):
     def kill(self):
         self.session.logger.warning("killing %s..." % self)
 
-        if self.process is not None:
+        if self.isRunning():
             self.session.logger.warning(
                 "stopping cluster jobs is not implemented"
             )
@@ -1239,6 +1234,9 @@ class GaussianSTQNJob(TSSJob):
     tss_algorithm = "synchornous transit-guided quasi-Newton"
     format_name = "log"
     
+    def __repr__(self):
+        return "local ORCA QST job \"%s\"" % self.name
+
     def run(self):
         self.scratch_dir = os.path.join(
             os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
@@ -1289,6 +1287,9 @@ class GaussianSTQNJob(TSSJob):
 class ORCANEBJob(TSSJob):
     tss_algorithm = "nudged elastic band"
     format_name = "out"
+
+    def __repr__(self):
+        return "local ORCA NEB job \"%s\"" % self.name
 
     def run(self):
         self.start_time = asctime(localtime())
@@ -1349,7 +1350,10 @@ class ORCANEBJob(TSSJob):
 class QChemFSMJob(TSSJob):
     tss_algorithm = "freezing string method"
     format_name = "out"
-    
+
+    def __repr__(self):
+        return "local Q-Chem FSM job \"%s\"" % self.name
+
     def run(self):
         self.start_time = asctime(localtime())
 

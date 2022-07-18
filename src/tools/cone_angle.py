@@ -21,6 +21,9 @@ from Qt.QtWidgets import (
     QTableWidgetItem,
     QHeaderView,
     QMessageBox,
+    QLabel,
+    QTabWidget,
+    QWidget,
 )
 
 from AaronTools.component import Component
@@ -59,43 +62,60 @@ class ConeAngle(ToolInstance):
         self._build_ui()
     
     def _build_ui(self):
+        tabs = QTabWidget()
+        
         layout = QFormLayout()
+        layout.addRow(tabs)
+        
+        cone_widget = QWidget()
+        cone_layout = QFormLayout(cone_widget)
+
+        cone_layout.addRow("1.", QLabel("select ligand"))
+
+        set_ligand_button = QPushButton("set ligand to current selection")
+        set_ligand_button.clicked.connect(self.set_ligand)
+        cone_layout.addRow("2.", set_ligand_button)
+        self.set_ligand_button = set_ligand_button
+
+        cone_layout.addRow("3.", QLabel("change selection to metal center"))
+
+        calc_cone_button = QPushButton("calculate cone angle")
+        calc_cone_button.clicked.connect(self.calc_cone)
+        cone_layout.addRow("4.", calc_cone_button)
+        self.calc_cone_button = calc_cone_button
+
+        tabs.addTab(cone_widget, "cone angle")
+
+        settings = QWidget()
+        settings_layout = QFormLayout(settings)
 
         self.cone_option = QComboBox()
         self.cone_option.addItems(["Tolman (Unsymmetrical)", "Exact"])
         ndx = self.cone_option.findText(self.settings.cone_option, Qt.MatchExactly)
         self.cone_option.setCurrentIndex(ndx)
-        layout.addRow("method:", self.cone_option)
+        settings_layout.addRow("method:", self.cone_option)
 
         self.radii_option = QComboBox()
         self.radii_option.addItems(["Bondi", "UMN"])
         ndx = self.radii_option.findText(self.settings.radii, Qt.MatchExactly)
         self.radii_option.setCurrentIndex(ndx)
-        layout.addRow("radii:", self.radii_option)
+        settings_layout.addRow("radii:", self.radii_option)
 
         self.display_cone = QCheckBox()
         self.display_cone.setChecked(self.settings.display_cone)
-        layout.addRow("show cone:", self.display_cone)
-        
+        settings_layout.addRow("show cone:", self.display_cone)
+
         self.display_radii = QCheckBox()
         self.display_radii.setChecked(self.settings.display_radii)
-        layout.addRow("show radii:", self.display_radii)
+        settings_layout.addRow("show radii:", self.display_radii)
 
-        set_ligand_button = QPushButton("set ligand to current selection")
-        set_ligand_button.clicked.connect(self.set_ligand)
-        layout.addRow(set_ligand_button)
-        self.set_ligand_button = set_ligand_button
-
-        calc_cone_button = QPushButton("calculate cone angle for ligand on selected center")
-        calc_cone_button.clicked.connect(self.calc_cone)
-        layout.addRow(calc_cone_button)
-        self.calc_cone_button = calc_cone_button
-        
         remove_cone_button = QPushButton("remove cone visualizations")
         remove_cone_button.clicked.connect(self.del_cone)
-        layout.addRow(remove_cone_button)
+        settings_layout.addRow(remove_cone_button)
         self.remove_cone_button = remove_cone_button
         
+        tabs.addTab(settings, "options")
+
         self.table = QTableWidget()
         self.table.setColumnCount(3)
         self.table.setHorizontalHeaderLabels(
@@ -290,12 +310,13 @@ class ConeAngle(ToolInstance):
             rescol = ResidueCollection(center_atom.structure)
             at_center = rescol.find_exact(AtomSpec(center_atom.atomspec))[0]
             if center_atom.structure in self.ligands:
+                lig_atoms = [AtomSpec(atom.atomspec) for atom in self.ligands[center_atom.structure]]
                 comp = Component(
                     rescol.find(
-                        [AtomSpec(atom.atomspec) for atom in self.ligands[center_atom.structure]]
+                        lig_atoms,
                     ),
                     to_center=rescol.find_exact(AtomSpec(center_atom.atomspec)),
-                    key_atoms=rescol.find(BondedTo(at_center)),
+                    key_atoms=rescol.find(BondedTo(at_center), lig_atoms),
                 )
             else:
                 comp = Component(
@@ -303,6 +324,18 @@ class ConeAngle(ToolInstance):
                     to_center=rescol.find_exact(AtomSpec(center_atom.atomspec)),
                     key_atoms=rescol.find(BondedTo(at_center)),
                 )
+            
+            if method == "tolman":
+                if not comp.key_atoms or len(comp.key_atoms) > 2:
+                    self.session.logger.error(
+                        "Tolman cone angles only implemented for mono- or bidentate ligands\n"
+                        "ligand on %s has %i coordinating atoms: %s" % (
+                            center_atom.structure.name,
+                            len(comp.key_atoms),
+                            ", ".join([key.chix_atom.atomspec for key in comp.key_atoms])
+                        )
+                    )
+                    continue
             
             cone_angle = comp.cone_angle(
                 center=rescol.find(AtomSpec(center_atom.atomspec)),

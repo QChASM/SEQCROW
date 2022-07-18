@@ -73,6 +73,7 @@ from SEQCROW.utils import iter2str
 from SEQCROW.widgets.periodic_table import PeriodicTable, ElementButton
 from SEQCROW.widgets.comboboxes import ModelComboBox
 from SEQCROW.finders import AtomSpec
+from SEQCROW.presets import seqcrow_bse
 
 
 from AaronTools.const import ELEMENTS
@@ -80,8 +81,8 @@ from AaronTools.theory import *
 from AaronTools.theory.method import KNOWN_SEMI_EMPIRICAL
 from AaronTools.utils.utils import combine_dicts
 from AaronTools.json_extension import ATDecoder, ATEncoder
+from AaronTools.pathway import Pathway
 
-from Raven.pathway import Pathway
 
 
 class _NoScrollComboBox(QComboBox):
@@ -332,26 +333,27 @@ class BuildRaven(BuildQM, ToolInstance):
 
         reactant = ResidueCollection(
             reactant,
-            bonds_matter=False
+            bonds_matter=True
         )
         reactant_ndx = self.job_widget.reactant_order()
         reactant.atoms = [reactant.atoms[i] for i in reactant_ndx]
 
         product = ResidueCollection(
             product,
-            bonds_matter=False
+            bonds_matter=True
         )
         product_ndx = self.job_widget.product_order()
         product.atoms = [product.atoms[i] for i in product_ndx]
         product.RMSD(reactant, align=True, sort=False)
+        
+        broken, formed = reactant.compare_connectivity(product, return_idx=True)
         
         if np.linalg.norm(reactant.coords - product.coords) < 1e-3:
             self.session.logger.error("reactant and product are the same")
             return
         
         path = Pathway([reactant.coords, product.coords])
-        reactant.refresh_connected()
-        new_mol = reactant.get_chimera(self.session)
+        new_mol = reactant.get_chimera(self.session, discard_residues=True)
         new_mol.name = "linear cartesian interpolation"
         
         coordsets = np.zeros((51, len(reactant.atoms), 3))
@@ -359,8 +361,19 @@ class BuildRaven(BuildQM, ToolInstance):
             coordsets[i] = path.interpolate_coords(t)
         new_mol.add_coordsets(coordsets, replace=True)
         self.session.models.add([new_mol])
+        seqcrow_bse(self.session, models=[new_mol])
+        for (a1, a2) in [*broken, *formed]:
+            run(
+                self.session,
+                "tsbond %s %s" % (
+                    new_mol.atoms[a1].atomspec,
+                    new_mol.atoms[a2].atomspec,
+                ),
+                log=False
+            )
+            
         css = CoordinateSetSlider(self.session, new_mol)
-        css.play()
+        css.play_cb()
 
     def change_tss_algorithm(self, text):
         self.file_type.blockSignals(True)

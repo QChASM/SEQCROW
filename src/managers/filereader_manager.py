@@ -154,23 +154,40 @@ def apply_non_seqcrow_preset(model):
         return
     preset = model.session.seqcrow_settings.settings.NON_SEQCROW_IO_PRESET
     atomspec = model.atomspec
-    for line in preset:
-        cmd = line.replace("<model>", atomspec)
-        fmt = fmt_only.match(cmd)
-        if fmt is not None and hasattr(model, "filename") and isinstance(model.filename, str):
-            file_types = fmt.group(1).split(",")
+    file_types = []
+    if hasattr(model, "opened_data_format"):
+        if model.opened_data_format:
+            file_types = [suffix[1:] for suffix in model.opened_data_format.suffixes]
+            file_types.extend([nick for nick in model.opened_data_format.nicknames])
+    
+    else:
+        if (
+            hasattr(model, "filename") and
+            isinstance(model.filename, str) and
+            "." in model.filename
+        ):
             root, ext = path.splitext(model.filename)
-            ext = ext.strip(".")
-            if any(ext.lower() == e.lower() or model.name.lower().startswith("%s:" % e.lower()) for e in file_types):
-                run(model.session, fmt.group(2).strip())
+            file_types.append(ext[1:])
         
-        elif fmt is not None:
-            file_types = fmt.group(1).split(",")
+        if ":" in model.name:
+            file_types.append(model.name.split(":")[0])
+        
+        if "." in model.name:
             root, ext = path.splitext(model.name)
-            ext = ext.strip(".")
-            if any(ext.lower() == e.lower() or model.name.lower().startswith("%s:" % e.lower()) for e in file_types):
-                run(model.session, fmt.group(2).strip())
+            file_types.append(ext[1:])
+        
+    file_types = [s.lower() for s in file_types]
+    
+    for line in preset:
+        if fmt_only.match(line):
+            formats = [fmt.strip() for fmt in fmt_only.match(line).group(1).split(",")]
+            for fmt in formats:
+                if any(fmt.lower() == s for s in file_types):
+                    cmd = fmt_only.match(line).group(2)
+                    cmd = cmd.replace("<model>", atomspec)
+                    run(model.session, cmd)
             
         else:
+            cmd = line.replace("<model>", atomspec)
             run(model.session, cmd)
     

@@ -294,7 +294,7 @@ class _SEQCROW_API(BundleAPI):
             tool = FileReaderPanel(session, ti.name)
             return tool
 
-        elif ti.name == "Process QM Thermochemistry":
+        elif ti.name == "Thermochemistry":
             from .tools import Thermochem
             tool = Thermochem(session, ti.name)
             return tool

@@ -92,7 +92,10 @@ class JobManager(ProviderManager):
                                     self.session,
                                     job['theory'],
                                 ]
-                                kwargs = job["job_options"]
+                                try:
+                                    kwargs = job["job_options"]
+                                except KeyError:
+                                    kwargs = {}
                                 if issubclass(job_cls, TSSJob):
                                     args.extend([
                                         job["reactant"],
@@ -369,18 +372,19 @@ class JobManager(ProviderManager):
                     self.session.logger.warning("cannot determine status of job %s" % job)
                     continue
         
-        print(self.has_local_job_running)
-        if not self.has_local_job_running:
-            unstarted_local_jobs = []
-            for job in self.local_jobs:
-                if not job.isFinished() and not job.killed:
-                    # print("unstarted job:", job)
-                    unstarted_local_jobs.append(job)
-                    
+        unstarted_local_jobs = []
+        for job in self.local_jobs:
+            if not job.isFinished() and not job.killed and not job.isRunning():
+                unstarted_local_jobs.append(job)
             if len(unstarted_local_jobs) > 0 and not self.paused:
-                start_job = unstarted_local_jobs.pop(0)
-
-                start_job.finished.connect(lambda data=start_job: self.triggers.activate_trigger(JOB_FINISHED, data))
-                start_job.started.connect(lambda data=start_job: self.triggers.activate_trigger(JOB_STARTED, data))
-                start_job.start()
+                for start_job in unstarted_local_jobs:
+                    if (
+                        isinstance(start_job, LocalClusterJob)
+                    ) or (
+                        not self.has_local_job_running
+                    ):
+                        start_job.finished.connect(lambda data=start_job: self.triggers.activate_trigger(JOB_FINISHED, data))
+                        start_job.started.connect(lambda data=start_job: self.triggers.activate_trigger(JOB_STARTED, data))
+                        start_job.start()
+                        break
 

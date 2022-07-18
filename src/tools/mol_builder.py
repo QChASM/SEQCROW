@@ -622,7 +622,15 @@ class MolBuilder(HtmlToolInstance):
             .decode("utf8")
         )
         name = query["name"][0]
-        fr = FileReader((name, "sd", s_sd))
+        try:
+            fr = FileReader((name, "sd", s_sd))
+        except Exception:
+            self.session.logger.error(
+                "failed to open structure: %s\n\n%s" % (
+                    molfile, s_sd
+                )
+            )
+            return
         rescol = ResidueCollection(fr)
         # if not optimization was requested, open the new molecule
         if query["method"][0] == "no":

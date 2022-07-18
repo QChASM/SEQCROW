@@ -8,16 +8,33 @@ from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 
 from Qt.QtCore import Qt
 from Qt.QtGui import QKeySequence
-from Qt.QtWidgets import QPushButton, QFormLayout, QComboBox, QCheckBox, QMenuBar, QAction, \
-    QFileDialog, QApplication, QTableWidget, QTableWidgetItem, \
-    QHeaderView, QSpinBox, QWidget, QGridLayout, \
-    QTabWidget, QDoubleSpinBox, QMessageBox
+from Qt.QtWidgets import (
+    QPushButton,
+    QFormLayout,
+    QComboBox,
+    QCheckBox,
+    QMenuBar,
+    QAction,
+    QFileDialog,
+    QApplication,
+    QTableWidget,
+    QTableWidgetItem,
+    QHeaderView,
+    QSpinBox,
+    QWidget,
+    QGridLayout,
+    QTabWidget,
+    QDoubleSpinBox,
+    QMessageBox,
+    QLabel,
+)
 
 from SEQCROW.commands.percent_Vbur import percent_vbur as percent_vbur_cmd
 from SEQCROW.tools.per_frame_plot import NavigationToolbar
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
 
 import copy
 
@@ -100,6 +117,7 @@ class PercentVolumeBuried(ToolInstance):
         self.scale.setRange(1., 1.5)
         settings_layout.addRow("VDW scale:", self.scale)
         
+        calc_layout.addRow("1.", QLabel("select ligand"))
         set_ligand_atoms = QPushButton("set ligands to current selection")
         set_ligand_atoms.clicked.connect(self.set_ligand_atoms)
         set_ligand_atoms.setToolTip(
@@ -107,7 +125,7 @@ class PercentVolumeBuried(ToolInstance):
             "by default, all atoms will be used unless a single center is specified\n" +
             "in the case of a single center, all atoms except the center is used"
         )
-        calc_layout.addRow(set_ligand_atoms)
+        calc_layout.addRow("2.", set_ligand_atoms)
         self.set_ligand_atoms = set_ligand_atoms
         
         self.radius = QDoubleSpinBox()
@@ -196,19 +214,22 @@ class PercentVolumeBuried(ToolInstance):
             lambda text, widget=mc_widget: widget.setVisible(text == "Monte-Carlo")
         )
 
-        self.use_centroid = QCheckBox()
+        calc_layout.addRow("3.", QLabel("change selection to reaction center"))
+        self.use_centroid = QCheckBox("use centroid of centers")
         self.use_centroid.setChecked(self.settings.use_centroid)
         self.use_centroid.setToolTip(
-            "place the center between selected atoms\n" +
-            "might be useful for polydentate ligands"
+            "place the center between selected atoms"
         )
-        calc_layout.addRow("use centroid of centers:", self.use_centroid)
+        calc_layout.addRow(self.use_centroid)
 
 
         self.steric_map = QCheckBox()
         self.steric_map.setChecked(self.settings.steric_map)
         self.steric_map.setToolTip("produce a 2D projection of steric bulk\ncauses buried volume to be reported for individual quadrants")
         steric_layout.addRow("create steric map:", self.steric_map)
+
+        self.pair_difference_map = QCheckBox()
+        steric_layout.addRow("pairwise difference:", self.pair_difference_map)
 
         self.num_pts = QSpinBox()
         self.num_pts.setRange(25, 250)
@@ -247,6 +268,11 @@ class PercentVolumeBuried(ToolInstance):
         self.num_pts.setEnabled(self.settings.steric_map)
         self.steric_map.stateChanged.connect(
             lambda state, widget=self.num_pts: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
+        )
+        
+        self.pair_difference_map.setEnabled(self.settings.steric_map)
+        self.steric_map.stateChanged.connect(
+            lambda state, widget=self.pair_difference_map: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
         )
         
         self.include_vbur.setEnabled(self.settings.steric_map)
@@ -288,6 +314,9 @@ class PercentVolumeBuried(ToolInstance):
         self.display_cutout.setToolTip("show free or buried volume")
         vol_cutout_layout.addRow("display volume:", self.display_cutout)
         
+        self.pair_difference_cutout = QCheckBox()
+        vol_cutout_layout.addRow("pairwise difference:", self.pair_difference_cutout)
+        
         self.point_spacing = QDoubleSpinBox()
         self.point_spacing.setDecimals(3)
         self.point_spacing.setRange(0.01, 0.5)
@@ -317,18 +346,20 @@ class PercentVolumeBuried(ToolInstance):
         ndx = self.cutout_labels.findText(self.settings.cutout_labels, Qt.MatchExactly)
         self.cutout_labels.setCurrentIndex(ndx)
         vol_cutout_layout.addRow("label sections:", self.cutout_labels)
-        
+
         self.point_spacing.setEnabled(self.settings.display_cutout != "no")
+        self.pair_difference_cutout.setEnabled(self.settings.display_cutout != "no")
         self.intersection_scale.setEnabled(self.settings.display_cutout != "no")
         self.cutout_labels.setEnabled(self.settings.display_cutout != "no")
         
         self.display_cutout.currentTextChanged.connect(lambda text, widget=self.point_spacing: widget.setEnabled(text != "no"))
+        self.display_cutout.currentTextChanged.connect(lambda text, widget=self.pair_difference_cutout: widget.setEnabled(text != "no"))
         self.display_cutout.currentTextChanged.connect(lambda text, widget=self.intersection_scale: widget.setEnabled(text != "no"))
         self.display_cutout.currentTextChanged.connect(lambda text, widget=self.cutout_labels: widget.setEnabled(text != "no"))
 
         calc_vbur_button = QPushButton("calculate % buried volume for selected centers")
         calc_vbur_button.clicked.connect(self.calc_vbur)
-        calc_layout.addRow(calc_vbur_button)
+        calc_layout.addRow("4.", calc_vbur_button)
         self.calc_vbur_button = calc_vbur_button
         
         remove_vbur_button = QPushButton("remove % buried volume visualizations")
@@ -533,6 +564,9 @@ class PercentVolumeBuried(ToolInstance):
             self.settings.cutout_labels = cutout_labels
             args["labels"] = cutout_labels
 
+            if self.pair_difference_cutout.isChecked():
+                args["difference"] = True
+
         if len(self.ligand_atoms) > 0:
             args["onlyAtoms"] = [a for a in self.ligand_atoms if not a.deleted]
             if len(args["onlyAtoms"]) == 0:
@@ -544,7 +578,7 @@ class PercentVolumeBuried(ToolInstance):
             map_max = self.map_max.value()
             self.settings.map_max = map_max
             
-            map_min = self.settings.map_min
+            map_min = self.map_min.value()
             self.settings.map_min = map_min
 
         info = percent_vbur_cmd(
@@ -557,7 +591,7 @@ class PercentVolumeBuried(ToolInstance):
         # self.table.setRowCount(0)
         
         if steric_map:
-            for mdl, cent, vbur, map_info in info:
+            for mdl, cent, _, _, vbur, map_info in info:
                 row = self.table.rowCount()
                 self.table.insertRow(row)
                 
@@ -566,7 +600,11 @@ class PercentVolumeBuried(ToolInstance):
                 self.table.setItem(row, 0, m)
                 
                 c = QTableWidgetItem()
-                c.setData(Qt.DisplayRole, cent)
+                if hasattr(cent, "__iter__"):
+                    c.setData(Qt.DisplayRole, ", ".join([a.atomspec for a in cent]))
+                else:
+                    c.setData(Qt.DisplayRole, cent.atomspec)
+
                 self.table.setItem(row, 1, c)
                 
                 v = QTableWidgetItem()
@@ -595,6 +633,9 @@ class PercentVolumeBuried(ToolInstance):
                 v.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
                 self.table.setItem(row, 2, v)
                 
+                if self.pair_difference_map.isChecked():
+                    continue
+                
                 x, y, z, min_alt, max_alt = map_info
                 plot = self.tool_window.create_child_window(
                     "steric map of %s" % mdl.name, window_class=StericMap
@@ -604,8 +645,54 @@ class PercentVolumeBuried(ToolInstance):
                 else:
                     plot.set_data(x, y, z, map_min, map_max, vbur, radius, include_vbur)
 
+        
+            if self.pair_difference_map.isChecked():
+                for i, (mdl1, cent1, _, _, vbur1, map_info1) in enumerate(info):
+                    x, y, z1, min_alt1, max_alt1 = map_info1
+                    for mdl2, cent2, _, _, vbur2, map_info2 in info[i + 1:]:
+                        x, y, z2, min_alt2, max_alt2 = map_info2
+                        z = z1 - z2
+                        a_not_in_b = np.zeros(z.shape)
+                        b_not_in_a = np.zeros(z.shape)
+                        for i in range(0, z.shape[0]):
+                            for j in range(0, z.shape[1]):
+                                if z1[i, j] < min_alt1:
+                                    z[i, j] = -1000
+                                    if z2[i, j] > min_alt2:
+                                        b_not_in_a[i, j] = 1
+                                elif z2[i, j] < min_alt2:
+                                    z[i, j] = -1000
+                                    if z1[i, j] > min_alt1:
+                                        a_not_in_b[i, j] = 1
+                        
+                        min_alt = np.min(z[z > (min_alt1 - max_alt2)])
+                        max_alt = np.max(z)
+    
+                        plot = self.tool_window.create_child_window(
+                            "steric map difference of %s and %s" % (mdl1.name, mdl2.name),
+                            window_class=StericMap
+                        )
+                        if auto_minmax:
+                            plot.set_difference_data(
+                                x, y, z,
+                                a_not_in_b, b_not_in_a,
+                                min_alt, max_alt, 
+                                vbur1, vbur2,
+                                radius,
+                                include_vbur,
+                            )
+                        else:
+                            plot.set_difference_data(
+                                x, y, z, 
+                                a_not_in_b, b_not_in_a,
+                                map_min, map_max, 
+                                vbur1, vbur2,
+                                radius,
+                                include_vbur,
+                            )
+
         else:
-            for mdl, cent, vbur in info:
+            for mdl, cent, _, _, vbur in info:
                 row = self.table.rowCount()
                 self.table.insertRow(row)
                 
@@ -615,6 +702,10 @@ class PercentVolumeBuried(ToolInstance):
                 
                 c = QTableWidgetItem()
                 c.setData(Qt.DisplayRole, cent)
+                if hasattr(cent, "__iter__"):
+                    c.setData(Qt.DisplayRole, ", ".join([a.atomspec for a in cent]))
+                else:
+                    c.setData(Qt.DisplayRole, cent.atomspec)
                 self.table.setItem(row, 1, c)
                 
                 v = QTableWidgetItem()
@@ -645,7 +736,7 @@ class PercentVolumeBuried(ToolInstance):
         
         self.table.resizeColumnToContents(1)
         self.table.resizeColumnToContents(2)
-    
+
     def header_check(self, state):
         """user has [un]checked the 'include header' option on the menu"""
         if state:
@@ -749,7 +840,105 @@ class StericMap(ChildToolWindow):
             ax.text(-0.9 * radius, -0.9 * radius, "%.1f%%" % vbur_3)
             ax.text(+0.7 * radius, -0.9 * radius, "%.1f%%" % vbur_4)
         
+            circle = plt.Circle((0, 0), radius, color="k", fill=False, linewidth=4)
+            ax.add_artist(circle)
+        
+        canvas = Canvas(fig)
+        
+        self.layout.addWidget(canvas)
+        
+        toolbar_widget = QWidget()
+        toolbar = NavigationToolbar(canvas, toolbar_widget)
+        toolbar.setMaximumHeight(32)
+        self.layout.addWidget(toolbar) 
+
+    def set_difference_data(
+        self,
+        x, y, z,
+        a_not_in_b, b_not_in_a,
+        min_alt, max_alt,
+        vbur1, vbur2,
+        radius,
+        include_vbur
+    ):
+        vbur = [v1 - v2 for v1, v2 in zip(vbur1, vbur2)]
+        fig, ax = plt.subplots()
+        cmap = copy.copy(plt.cm.get_cmap("bwr"))
+        cmap_a_not_in_b = LinearSegmentedColormap.from_list("a_not_in_b", [(0.5, 0, 0), (0.5, 0, 0)])
+        cmap_b_not_in_a = LinearSegmentedColormap.from_list("a_not_in_b", [(0, 0, 0.5), (0, 0, 0.5)])
+        if abs(min_alt) < abs(max_alt):
+            cmap_range = [-abs(max_alt), max_alt]
+        else:
+            cmap_range = [min_alt, abs(min_alt)]
+        
+        cmap_range.sort()
+        
+        cmap.set_under("w")
+        steric_map = ax.contourf(
+            x,
+            y,
+            z,
+            extend="min",
+            cmap=cmap,
+            levels=np.linspace(*cmap_range, num=21),
+        )
+        ax.contourf(
+            x,
+            y,
+            a_not_in_b,
+            extend="neither",
+            cmap=cmap_a_not_in_b,
+            levels=[0.99, 1],
+        )
+        ax.contourf(
+            x,
+            y,
+            b_not_in_a,
+            extend="neither",
+            cmap=cmap_b_not_in_a,
+            levels=[0.99, 1],
+        )
+        steric_lines = ax.contour(
+            x,
+            y,
+            z,
+            extend="min",
+            colors="k",
+            levels=np.linspace(*cmap_range, num=21),
+        )
+        steric_lines = ax.contour(
+            x,
+            y,
+            a_not_in_b,
+            extend="neither",
+            colors="k",
+            levels=[0.99, 1],
+        )
+        steric_lines = ax.contour(
+            x,
+            y,
+            b_not_in_a,
+            extend="neither",
+            colors="k",
+            levels=[0.99, 1],
+        )
+        bar = fig.colorbar(steric_map, format="%.1f")
+        bar.set_label("\u0394altitude (Å)")
+        ax.set_aspect("equal")
+
         if include_vbur:
+            ax.hlines(0, -radius, radius, color="k")
+            ax.vlines(0, -radius, radius, color="k")
+    
+            vbur_1 = vbur[0] + vbur[7]
+            vbur_2 = vbur[1] + vbur[6]
+            vbur_3 = vbur[2] + vbur[5]
+            vbur_4 = vbur[3] + vbur[4]
+            ax.text(+0.7 * radius, +0.9 * radius, "%.1f%%" % vbur_1)
+            ax.text(-0.9 * radius, +0.9 * radius, "%.1f%%" % vbur_2)
+            ax.text(-0.9 * radius, -0.9 * radius, "%.1f%%" % vbur_3)
+            ax.text(+0.7 * radius, -0.9 * radius, "%.1f%%" % vbur_4)
+
             circle = plt.Circle((0, 0), radius, color="k", fill=False, linewidth=4)
             ax.add_artist(circle)
         
