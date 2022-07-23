@@ -112,15 +112,15 @@ class EnergyPlot(ToolInstance):
             if "energy" in info and "energy" in fr and info["energy"] != fr["energy"]:
                 self.data[self.structure.coordset_ids[-1]] = {"energy": {"value": fr["energy"]}}
             
-            if (
-                "gradient" in info and
-                "gradient" in fr and
-                info["gradient"] != fr["gradient"]
-            ) or (
-                "gradient" in fr and
-                not "gradient" in info
-            ):
-                self.data[self.structure.coordset_ids[-1]].update(fr["gradient"])
+                if (
+                    "gradient" in info and
+                    "gradient" in fr and
+                    info["gradient"] != fr["gradient"]
+                ) or (
+                    "gradient" in fr and
+                    not "gradient" in info
+                ):
+                    self.data[self.structure.coordset_ids[-1]].update(fr["gradient"])
 
         if len(self.data) < 1:
             self.opened = False

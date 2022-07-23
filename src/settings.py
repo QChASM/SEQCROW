@@ -39,6 +39,7 @@ class _SEQCROWSettings(Settings):
         'PSI4_EXE': Value("psi4", StringArg),
         'QCHEM_EXE': Value("qchem", StringArg),
         'XTB_EXE': Value("xtb", StringArg),
+        'CREST_EXE': Value("crest", StringArg),
         'SCRATCH_DIR': Value(path.join(path.expanduser('~'), "SEQCROW_SCRATCH"), StringArg), 
         'JOB_FINISHED_NOTIFICATION': Value(
             'log notification', 
@@ -177,6 +178,12 @@ from that file type
             "xTB executable", 
             FileOption, 
             "Path to xTB executable"
+        ), 
+
+        "CREST_EXE" : (
+            "CREST executable", 
+            FileOption, 
+            "Path to CREST executable"
         ), 
         
         "SCRATCH_DIR" : (

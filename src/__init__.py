@@ -221,6 +221,11 @@ class _SEQCROW_API(BundleAPI):
             from SEQCROW.managers import TSSFinderManager
             session.tss_finder_manager = TSSFinderManager(session, name)
             return session.tss_finder_manager
+        
+        elif name == "conformer_search_manager":
+            from SEQCROW.managers import ConformerSearch
+            session.conformer_search_manager = ConformerSearch(session, name)
+            return session.conformer_search_manager
 
         else:
             raise RuntimeError("manager named '%s' is unknown to SEQCROW" % name)
@@ -359,6 +364,14 @@ class _SEQCROW_API(BundleAPI):
         elif ti.name == "Transition State Structures":
             from .tools import BuildRaven
             return BuildRaven(session, ti.name)
+        
+        elif ti.name == "Ligand Solid Angle":
+            from .tools import SolidAngle
+            return SolidAngle(session, ti.name)
+        
+        elif ti.name == "Conformer Search":
+            from .tools import ConformerTool
+            return ConformerTool(session, ti.name)
 
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)
@@ -620,6 +633,9 @@ class _SEQCROW_API(BundleAPI):
             elif name == "Q-Chem FSM":
                 from SEQCROW.jobs import QChemFSMJob
                 return QChemFSMJob
+            elif name == "CREST":
+                from SEQCROW.jobs import CRESTJob
+                return CRESTJob
 
         elif mgr is session.seqcrow_cluster_scheduling_software_manager:
             if name == "Slurm":
@@ -747,6 +763,11 @@ class _SEQCROW_API(BundleAPI):
             elif name == "metadynamics pathfinding":
                 from .tss_finder_methods import MDPF
                 return MDPF()
+        
+        elif mgr is session.conformer_search_manager:
+            if name == "CREST":
+                from .conformer_search_formats import CREST
+                return CREST()
  
         elif mgr is session.test_manager:
             if name == "fuseRing_command":
@@ -833,6 +854,10 @@ class _SEQCROW_API(BundleAPI):
         elif command_info.name == "ligandSterimol":
             from .commands.ligand_sterimol import ligandSterimol, sterimol_description
             register("ligandSterimol", sterimol_description, ligandSterimol)
+        
+        elif command_info.name == "solidAngle":
+            from .commands.solid_angle import solid_angle, solid_angle_description
+            register("solidAngle", solid_angle_description, solid_angle)
 
     @staticmethod
     def register_selector_menus(session):

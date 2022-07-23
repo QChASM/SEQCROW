@@ -297,7 +297,8 @@ class BuildQM(ToolInstance):
             self.session.logger.warning("settings migrated from version 2")
             self.settings.settings_version = self.settings.settings_version + 1
 
-        self.refresh_presets()
+        if hasattr(self, "presets_menu"):
+            self.refresh_presets()
 
         global_triggers = get_triggers()
 
@@ -1453,7 +1454,10 @@ class JobTypeOption(QWidget):
         self.constrained_bonds = []
         self.constrained_angles = []
         self.constrained_torsions = []
+        
+        self._build_ui()
 
+    def _build_ui(self):
         self.layout = QGridLayout(self)
 
         job_form = QWidget()
@@ -2260,6 +2264,7 @@ class JobTypeOption(QWidget):
     def constrain_atom(self, atom):
         self.constrained_atoms.append(atom)
         row = self.constrained_atom_table.rowCount()
+        print("adding row", row)
         self.constrained_atom_table.insertRow(row)
         item = QTableWidgetItem()
         item.setData(Qt.DisplayRole, atom.atomspec)

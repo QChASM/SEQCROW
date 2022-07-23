@@ -9,3 +9,4 @@ from .cluster_template_manager import (
     LSFDefault,
 )
 from .tss_finder import TSSFinderManager
+from .conformer_search_manager import ConformerSearch

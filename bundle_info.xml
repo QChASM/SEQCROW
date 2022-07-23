@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="1.4.5a1">
+            version="1.5a1">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -99,6 +99,7 @@
                 <Manager name="PBS" uiOnly="true"/>
                 <Manager name="LSF" uiOnly="true"/>
 				<Manager name="tss_finder_manager" uiOnly="true"/>
+				<Manager name="conformer_search_manager" uiOnly="true"/>
             </Managers>
             
             <Providers manager="data formats">
@@ -363,6 +364,10 @@
 				<Provider name="metadynamics pathfinding"/>
 			</Providers>
 			
+			<Providers manager="conformer_search_manager">
+				<Provider name="CREST"/>
+			</Providers>
+			
             <Classifiers>
                 <PythonClassifier>Development Status :: 4 - Beta</PythonClassifier>
                 <PythonClassifier>License :: OSI Approved :: GNU General Public License v3 (GPLv3)</PythonClassifier>
@@ -406,6 +411,8 @@
                 <ChimeraXClassifier>ChimeraX :: Tool :: UV/Vis Spectrum                :: Quantum Chemistry    :: plot simulated UV/vis spectra</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: 2D Builder                     :: Structure Editing    :: molecule using ChemDoodle Web Components</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Transition State Structures    :: Structure Prediction :: locate transition state structures using the growing string method</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Ligand Solid Angle             :: Structure Analysis   :: Calculate ligand solid angles</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Conformer Search               :: Structure Prediction :: automated conformer search</ChimeraXClassifier>
                 <!--<ChimeraXClassifier>ChimeraX :: Tool :: AaronJr Input Builder          :: AaronJr            :: Create input files for AaronJr</ChimeraXClassifier>-->
                 <!--ChimeraXClassifier>ChimeraX :: Tool :: AARON Input Builder :: AARON :: Build AARON input file</ChimeraXClassifier-->
                 
@@ -500,6 +507,7 @@
                 <ChimeraXClassifier>ChimeraX :: Command :: lookDown            :: General            :: reorient molecule along bond</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: pointGroup          :: General            :: print the point group of atomic structures to the log</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: ligandSterimol      :: Structure Analysis :: calculate sterimol parameters for ligands on a metal center</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: solidAngle          :: Structure Analysis :: calculate ligand solid angle</ChimeraXClassifier>
                 <!--
                 <ChimeraXClassifier>ChimeraX :: Command :: duplicate           :: Structure Editing  :: duplicate selected atoms</ChimeraXClassifier>
                 -->

@@ -679,6 +679,65 @@ class XTBJob(LocalJob):
         return d
 
 
+class CRESTJob(LocalJob):
+    format_name = "xyz"
+    info_type = "CREST"
+
+    def __repr__(self):
+        return "local CREST job \"%s\"" % self.name
+
+    def run(self):
+        self.start_time = asctime(localtime())
+
+        self.scratch_dir = os.path.join(
+            os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR),
+            "%s %s" % (self.name, self.start_time.replace(':', '.')),
+        )
+
+        if not os.path.exists(self.scratch_dir):
+            os.makedirs(self.scratch_dir)
+
+        infile = self.name
+        infile = infile.replace(' ', '_')
+        infile_path = os.path.join(self.scratch_dir, infile)
+        self.write_file(infile_path)
+        executable = os.path.abspath(self.session.seqcrow_settings.settings.CREST_EXE)
+        if not os.path.exists(executable):
+            executable = self.session.seqcrow_settings.settings.CREST_EXE
+
+        args = self.theory.get_xtb_cmd(return_warnings=False, split_words=True)
+        args[0] = executable
+        
+        self.output_name = os.path.join(self.scratch_dir, self.name + '.out')
+        outfile = open(self.output_name, 'w')
+
+        log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
+        log.write("executing:\n%s\n\n" % " ".join(args))
+
+        log.close()
+        log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'a')
+
+        if platform == "win32":
+            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+        else:        
+            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log)
+
+        self.process.communicate()
+        self.process = None
+
+        self.output_name = "crest_conformers.xyz"
+
+        if self.job_options.get("delete_everything_but_output_file", False):
+            self.remove_extra_files()
+
+        return 
+
+    def get_json(self):
+        d = super().get_json()
+        d["format"] = "CREST"
+        return d
+
+
 class LocalClusterJob(LocalJob):
     format_name = None
     """

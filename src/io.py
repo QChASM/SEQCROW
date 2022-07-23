@@ -68,7 +68,7 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
                     "there might be a mismatch between energy entries and structure entries in %s" % file_name)
                 nrg_plot.delete()
         except Exception as e:
-            session.logger.warning(e)
+            session.logger.warning(repr(e))
     
     coordsets = coordsets and fr.all_geom
 
@@ -98,7 +98,7 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
         a_or_an = "an"
     elif format_name == "Q-Chem output file":
         a_or_an = "a"
-        
+
     status = "Opened %s as %s %s %s" % (file_name, a_or_an, format_name, "movie" if coordsets else "")
 
     structure.name = get_filename(file_name, include_parent_dir=False)
