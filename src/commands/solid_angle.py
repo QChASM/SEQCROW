@@ -240,6 +240,12 @@ def solid_angle_vis(
 
     coord_norms = shifted_coords / np.linalg.norm(shifted_coords, axis=1)[:, np.newaxis]
     X = np.divide(np.sqrt(dx2 - radius_list ** 2), dx2)
+    if np.any(np.isnan(X)):
+        atoms = [atom for i, atom in enumerate(targets) if np.isnan(X[i])]
+        session.logger.warning("one or more atoms overlaps with the center, so everything is in a shadow: %s" % (
+            ", ".join([atom.atomspec for atom in atoms])
+        ))
+        return model
     adjusted_coords = X[:, np.newaxis] * shifted_coords
     H = radius_list / dist
     
