@@ -705,7 +705,7 @@ class CRESTJob(LocalJob):
         if not os.path.exists(executable):
             executable = self.session.seqcrow_settings.settings.CREST_EXE
 
-        args = self.theory.get_xtb_cmd(return_warnings=False, split_words=True)
+        args = self.theory.get_crest_cmd(return_warnings=False, split_words=True)
         args[0] = executable
         
         self.output_name = os.path.join(self.scratch_dir, self.name + '.out')

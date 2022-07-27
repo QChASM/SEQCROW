@@ -127,8 +127,11 @@ class ConformerTool(BuildQM):
     SESSION_ENDURING = False
     SESSION_SAVE = False
 
+    manager_name = "conformer_search_manager"
+
     def __init__(self, session, name):
         ToolInstance.__init__(self, session, name)
+        self.manager = getattr(session, self.manager_name)
 
         self.settings = _ConformerSettings(
             session, name
@@ -162,11 +165,11 @@ class ConformerTool(BuildQM):
             self.tool_window.shrink_to_fit()
 
     def _build_ui(self):
-        if any(x == self.settings.last_program for x in self.session.conformer_search_manager.formats.keys()):
-            init_form = self.session.conformer_search_manager.get_info(self.settings.last_program)
+        if any(x == self.settings.last_program for x in self.manager.formats.keys()):
+            init_form = self.manager.get_info(self.settings.last_program)
         else:
-            init_form = self.session.conformer_search_manager.get_info(
-                list(self.session.conformer_search_manager.formats.keys())[0]
+            init_form = self.manager.get_info(
+                list(self.manager.formats.keys())[0]
             )
 
         layout = QGridLayout()
@@ -175,7 +178,7 @@ class ConformerTool(BuildQM):
         form_layout = QFormLayout(basics_form)
 
         self.file_type = QComboBox()
-        self.file_type.addItems(self.session.conformer_search_manager.formats.keys())
+        self.file_type.addItems(self.manager.formats.keys())
         ndx = self.file_type.findText(init_form.name, Qt.MatchExactly)
         if ndx >= 0:
             self.file_type.setCurrentIndex(ndx)
@@ -267,121 +270,6 @@ class ConformerTool(BuildQM):
 
         self.tool_window.manage(None)
         menu.setVisible(True)
-
-    def change_file_type(self, *args):
-        """change the file type
-        args are ignored, only the contents of self.file_type matters"""
-        #if we don't block signals, the preview will try to update before all widgets
-        #have been updated to give the proper info
-        self.file_type.blockSignals(True)
-        self.method_widget.blockSignals(True)
-        self.basis_widget.blockSignals(True)
-        self.job_widget.blockSignals(True)
-        self.other_keywords_widget.blockSignals(True)
-
-        program = self.file_type.currentText()
-        file_info = self.session.seqcrow_qm_input_manager.get_info(program)
-        self.settings.last_program = program
-        self.method_widget.setOptions(file_info)
-        if file_info.basis_sets is None:
-            self.tabs.setTabEnabled(2, False)
-        else:
-            self.tabs.setTabEnabled(2, True)
-            self.basis_widget.setOptions(file_info)
-        self.job_widget.setOptions(file_info)
-        self.other_keywords_widget.setOptions(file_info)
-
-        self.file_type.blockSignals(False)
-        self.method_widget.blockSignals(False)
-        self.basis_widget.blockSignals(False)
-        self.job_widget.blockSignals(False)
-        self.other_keywords_widget.blockSignals(False)
-
-        self.update_preview()
-    
-    def update_theory(self, update_settings=False):
-        """grabs the current settings and updates self.theory
-        always called before creating an input file"""
-        program = self.file_type.currentText()
-        file_info = self.session.conformer_search_manager.get_info(program)
-
-        rescol = ResidueCollection(self.model_selector.currentData(), bonds_matter=False)
-
-        meth = self.method_widget.getMethod(update_settings)
-        if file_info.basis_sets is not None:
-            basis = self.get_basis_set(update_settings)
-        else:
-            basis = None
-
-        dispersion = self.method_widget.getDispersion(update_settings)
-
-        grid = self.method_widget.getGrid(update_settings)
-        charge = self.job_widget.getCharge(update_settings)
-        mult = self.job_widget.getMultiplicity(update_settings)
-        if isinstance(meth, SAPTMethod):
-            charges = [widget.value() for widget in \
-                [self.method_widget.sapt_layers.tabs.widget(i).charge for i in range(0, self.method_widget.sapt_layers.tabs.count())]
-            ]
-            multiplicities = [widget.value() for widget in \
-                [self.method_widget.sapt_layers.tabs.widget(i).multiplicity for i in range(0, self.method_widget.sapt_layers.tabs.count())]
-            ]
-
-            charge = [charge]
-            charge.extend(charges)
-
-            mult = [mult]
-            mult.extend(multiplicities)
-            
-            rescol.components = [
-                Residue(
-                    rescol.find([AtomSpec(atom.atomspec) for atom in layer]),
-                    refresh_connected=False
-                ) if layer else Residue([], refresh_ranks=False, refresh_connected=False)
-                for layer in self.method_widget.sapt_layers.layers
-            ]
-
-            rescol.components = [
-                Residue(
-                    rescol.find([AtomSpec(atom.atomspec) for atom in layer]),
-                    refresh_connected=False
-                ) if layer else Residue([], refresh_ranks=False, refresh_connected=False)
-                for layer in self.method_widget.sapt_layers.layers
-            ]
-
-        nproc = self.job_widget.getNProc(update_settings)
-        mem = self.job_widget.getMem(update_settings)
-        jobs = self.job_widget.getJobs() #job settings get updated during getKWDict
-
-        solvent = self.job_widget.getSolvent(update_settings)
-        
-        kw_dict = self.job_widget.getKWDict(update_settings=update_settings)
-        other_kw_dict = self.other_keywords_widget.getKWDict(update_settings=update_settings)
-        if update_settings:
-            self.settings.save()
-
-        combined_dict = combine_dicts(kw_dict, other_kw_dict)
-
-        self.theory = Theory(
-            charge=charge,
-            multiplicity=mult,
-            method=meth,
-            basis=basis,
-            empirical_dispersion=dispersion,
-            grid=grid,
-            processors=nproc,
-            memory=mem,
-            job_type=jobs,
-            solvent=solvent,
-            geometry=rescol,
-            **combined_dict
-        )
-
-    def get_file_contents(self, update_settings=False):
-        self.update_theory(update_settings=update_settings)
-
-        program = self.file_type.currentText()
-        contents, warnings = self.session.conformer_search_manager.get_info(program).get_file_contents(self.theory)
-        return contents, warnings
 
 
 class ConformerJob(JobTypeOption):
@@ -745,24 +633,4 @@ class ConformerJob(JobTypeOption):
 
 
 class ConformerKeywordWidget(KeywordWidget):
-    def __init__(self, session, settings, init_form, parent=None):
-        QWidget.__init__(self, parent)
-        self.settings = settings
-        self.form = init_form
-
-        self.layout = QGridLayout(self)
-
-        self.widgets = {}
-        for form in session.conformer_search_manager.formats:
-            info = session.conformer_search_manager.get_info(form)
-            if info.keyword_options:
-                self.widgets[form] = info.keyword_options(info, settings)
-                self.widgets[form].optionsChanged.connect(self.options_changed)
-            else:
-                self.widgets[form] = QWidget()
-            
-            self.widgets[form].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-            self.layout.addWidget(self.widgets[form], 0, 0)
-
-        self.setOptions(init_form)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+    manager_name = "conformer_search_manager"

@@ -260,12 +260,15 @@ class BuildQM(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False
 
+    manager_name = "seqcrow_qm_input_manager"
+
     help = "help:user/tools/buildqminput.html"
 
     def __init__(self, session, name):
         super().__init__(session, name)
 
         self.settings = _InputGeneratorSettings(session, name, version="3")
+        self.manager = getattr(session, self.manager_name)
 
         self.display_name = "QM Input Generator"
 
@@ -288,9 +291,9 @@ class BuildQM(ToolInstance):
             self.change_model(ndx)
 
         self.presets = loads(self.settings.presets, cls=ATDecoder)
-        for file_format in session.seqcrow_qm_input_manager.formats:
+        for file_format in self.manager.formats:
             if file_format not in self.presets:
-                self.presets[file_format] = session.seqcrow_qm_input_manager.get_info(file_format).initial_presets
+                self.presets[file_format] = self.manager.get_info(file_format).initial_presets
 
         if self.settings.settings_version == 2:
             self.migrate_settings_from_v2()
@@ -318,11 +321,11 @@ class BuildQM(ToolInstance):
         #change from one software widget to another when the dropdown menu changes
         #TODO: add a presets tab to save/load presets to aaronrc
         #      so it can easily be used in other tools (like one that makes AARON input files)
-        if any(x == self.settings.last_program for x in self.session.seqcrow_qm_input_manager.formats.keys()):
-            init_form = self.session.seqcrow_qm_input_manager.get_info(self.settings.last_program)
+        if any(x == self.settings.last_program for x in self.manager.formats.keys()):
+            init_form = self.manager.get_info(self.settings.last_program)
         else:
-            init_form = self.session.seqcrow_qm_input_manager.get_info(
-                list(self.session.seqcrow_qm_input_manager.formats.keys())[0]
+            init_form = self.manager.get_info(
+                list(self.manager.formats.keys())[0]
             )
 
         layout = QGridLayout()
@@ -331,7 +334,7 @@ class BuildQM(ToolInstance):
         form_layout = QFormLayout(basics_form)
 
         self.file_type = QComboBox()
-        self.file_type.addItems(self.session.seqcrow_qm_input_manager.formats.keys())
+        self.file_type.addItems(self.manager.formats.keys())
         ndx = self.file_type.findText(init_form.name, Qt.MatchExactly)
         if ndx >= 0:
             self.file_type.setCurrentIndex(ndx)
@@ -870,7 +873,7 @@ class BuildQM(ToolInstance):
             with open(filename, 'r') as f:
                 new_presets = load(f, cls=ATDecoder)
 
-            for program in self.session.seqcrow_qm_input_manager.formats.keys():
+            for program in self.manager.formats.keys():
                 if program in new_presets:
                     for preset_name in new_presets[program]:
                         if preset_name in self.presets[program]:
@@ -898,7 +901,7 @@ class BuildQM(ToolInstance):
                     self.session.logger.info("skipping %s; no program was specified (exec_type)" % section)
                     continue
                 
-                for form in self.session.seqcrow_qm_input_manager.formats.keys():
+                for form in self.manager.formats.keys():
                     if re.match(form, program, flags=re.IGNORECASE):
                         program = form
                         break
@@ -959,7 +962,7 @@ class BuildQM(ToolInstance):
         self.update_theory(update_settings=update_settings)
 
         program = self.file_type.currentText()
-        contents, warnings = self.session.seqcrow_qm_input_manager.get_info(program).get_file_contents(self.theory)
+        contents, warnings = self.manager.get_info(program).get_file_contents(self.theory)
         return contents, warnings
 
     def check_changes(self, trigger_name=None, changes=None):
@@ -1016,7 +1019,7 @@ class BuildQM(ToolInstance):
         self.other_keywords_widget.blockSignals(True)
 
         program = self.file_type.currentText()
-        file_info = self.session.seqcrow_qm_input_manager.get_info(program)
+        file_info = self.manager.get_info(program)
         self.settings.last_program = program
         self.method_widget.setOptions(file_info)
         if file_info.basis_sets is None:
@@ -1039,7 +1042,7 @@ class BuildQM(ToolInstance):
         """grabs the current settings and updates self.theory
         always called before creating an input file"""
         program = self.file_type.currentText()
-        file_info = self.session.seqcrow_qm_input_manager.get_info(program)
+        file_info = self.manager.get_info(program)
 
         rescol = ResidueCollection(self.model_selector.currentData(), bonds_matter=False)
 
@@ -1344,7 +1347,7 @@ class BuildQM(ToolInstance):
         """
 
         program = self.file_type.currentText()
-        info = self.session.seqcrow_qm_input_manager.get_info(program)
+        info = self.manager.get_info(program)
         self.settings.last_program = program
         filename, _ = QFileDialog.getSaveFileName(filter=info.save_file_filter)
 
@@ -5503,16 +5506,19 @@ class KeywordWidget(QWidget):
     """widget shown on 'additional options' tab"""
     additionalOptionsChanged = Signal()
 
+    manager_name = "seqcrow_qm_input_manager"
+
     def __init__(self, session, settings, init_form, parent=None):
         super().__init__(parent)
+        self.manager = getattr(session, self.manager_name)
         self.settings = settings
         self.form = init_form
 
         self.layout = QGridLayout(self)
 
         self.widgets = {}
-        for form in session.seqcrow_qm_input_manager.formats:
-            info = session.seqcrow_qm_input_manager.get_info(form)
+        for form in self.manager.formats:
+            info = self.manager.get_info(form)
             if info.keyword_options:
                 self.widgets[form] = info.keyword_options(info, settings)
                 self.widgets[form].optionsChanged.connect(self.options_changed)
