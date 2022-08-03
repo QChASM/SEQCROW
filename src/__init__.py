@@ -64,6 +64,7 @@ class _SEQCROW_API(BundleAPI):
                 ChangeElementMouseMode,
                 EraserMouseMode,
                 SubstituteMouseMode,
+                SelectSimilarFragments,
             )
 
             session.ui.mouse_modes.add_mode(SelectConnectedMouseMode(session))
@@ -72,6 +73,7 @@ class _SEQCROW_API(BundleAPI):
             session.ui.mouse_modes.add_mode(ChangeElementMouseMode(session))
             session.ui.mouse_modes.add_mode(EraserMouseMode(session))
             session.ui.mouse_modes.add_mode(SubstituteMouseMode(session))
+            session.ui.mouse_modes.add_mode(SelectSimilarFragments(session))
             
             session.triggers.add_handler(ADD_MODELS, _SEQCROW_API.open_useful_tools)
 

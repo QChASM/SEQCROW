@@ -70,11 +70,11 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
         except Exception as e:
             session.logger.warning(repr(e))
     
-    coordsets = coordsets and fr.all_geom
+    coordsets = coordsets is not False and fr.all_geom
 
     if coordsets:
         from chimerax.std_commands.coordset_gui import CoordinateSetSlider
-                
+
         slider = CoordinateSetSlider(session, structure)
 
         if fr.all_geom:

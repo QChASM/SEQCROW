@@ -313,6 +313,14 @@
                           icon="connected.png"
                 />
                 <Provider tab="More Right Mouse"
+                          section="Select"
+                          name="seqcrow_7"
+                          mouse_mode="select similar fragments"
+                          display_name="Select Same Types" 
+                          description="Select molecular fragment of the clicked type"
+                          icon="sel_group_icon.png"
+                />
+                <Provider tab="More Right Mouse"
                           section="Structure Modification"
                           name="seqcrow_2"
                           mouse_mode="bond"
@@ -514,9 +522,11 @@
        </Classifiers>
     
     <AdditionalPackages>
+        <Package name="AaronTools" folder="C:\Users\ajs99778\Documents\GitHub\AaronTools"/>
+        <Package name="AaronTools.test" folder="C:\Users\ajs99778\Documents\GitHub\AaronTools\test"/>
+        <!--
         <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools"/>
         <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
-        <!--
         <Package name="Raven" folder="C:\Users\normn\Documents\GitHub\Raven"/>
         <Package name="Raven" folder="/home/ajs99778/pyQCHASM/Raven"/>
         <Package name="AaronTools" folder="/home/ajs99778/pyQCHASM/AaronTools"/>

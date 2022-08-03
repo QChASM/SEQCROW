@@ -122,7 +122,7 @@ class EnergyPlot(ToolInstance):
                 ):
                     self.data[self.structure.coordset_ids[-1]].update(fr["gradient"])
 
-        if len(self.data) < 1:
+        if len(self.data) <= 1:
             self.opened = False
             # self.session.logger.error("not enough iterations to plot - %i found" % len(data))
             return
