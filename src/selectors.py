@@ -383,6 +383,8 @@ def canonical_rank(structure, heavy_only=False, break_ties=True):
     """
     primes = Primes.list(len(structure.instances()))
     atoms = []
+    indices = dict()
+    atoms_set = set()
     ranks = []
 
     def neighbors_rank(ranks):
@@ -392,9 +394,8 @@ def canonical_rank(structure, heavy_only=False, break_ties=True):
         partitions = {}
         for i, a in enumerate(atoms):
             key = primes[ranks[i]]
-            for b in a.neighbors:
-                if b in atoms:
-                    key *= primes[ranks[atoms.index(b)]]
+            for b in atoms_set.intersection(a.neighbors):
+                key *= primes[ranks[indices[b]]]
             partitions.setdefault(ranks[i], {})
             partitions[ranks[i]].setdefault(key, [])
             partitions[ranks[i]][key] += [i]
@@ -448,7 +449,7 @@ def canonical_rank(structure, heavy_only=False, break_ties=True):
                     if len(connected) == 1:
                         k = connected.pop()
                         if k in atoms:
-                            k = atoms.index(k)
+                            k = indices[k]
                         else:
                             continue
                         groups.setdefault(k, set([i]))
@@ -485,11 +486,15 @@ def canonical_rank(structure, heavy_only=False, break_ties=True):
         return update_ranks(ranks, new_partitions)
 
     # rank all atoms the same initially
+    c = 0
     for a in structure:
         if heavy_only and a.element.name == "H":
             continue
         atoms += [a]
         ranks += [0]
+        indices[a] = c
+        c += 1
+    atoms_set = set(atoms)
 
     # partition and re-rank using invariants
     partitions = {}
@@ -505,7 +510,7 @@ def canonical_rank(structure, heavy_only=False, break_ties=True):
         new_rank += len(idx_list)
 
     # re-rank using neighbors until no change
-    for i in range(500):
+    for i in range(0, min(500, len(ranks))):
         new_ranks = neighbors_rank(ranks)
         if ranks == new_ranks:
             break
@@ -516,7 +521,7 @@ def canonical_rank(structure, heavy_only=False, break_ties=True):
     # break ties using spatial positions
     # AND update neighbors until no change
     if break_ties:
-        for i in range(500):
+        for i in range(0, min(500, len(ranks))):
             new_ranks = tie_break(ranks)
             new_ranks = neighbors_rank(new_ranks)
             if ranks == new_ranks:
