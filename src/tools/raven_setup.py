@@ -1112,7 +1112,7 @@ class TSSWidget(QWidget):
         
         apply_consistent_order = QPushButton("use systematic ordering")
         apply_consistent_order.clicked.connect(self.canonical_reorder)
-        atom_order_layout.insertWidget(1, apply_consistent_order, 0)
+        # atom_order_layout.insertWidget(1, apply_consistent_order, 0)
 
         self.tabs.addTab(atom_order, "atom order")
 

@@ -476,7 +476,9 @@ class JobQueue(ToolInstance):
 
     def remove_job(self, job):
         if isinstance(job, LocalJob):
-            self.tree.takeTopLevelItem(self.session.seqcrow_job_manager.jobs.index(job))
+            job_list = sorted(self.session.seqcrow_job_manager.jobs, key=lambda job, ses=self.session: job_order(job, ses))
+            ndx = job_list.index(job)
+            self.tree.takeTopLevelItem(ndx)
             self.session.seqcrow_job_manager.remove_local_job(job)
             if hasattr(job, "scratch_dir") and os.path.exists(job.scratch_dir):
                 yes = QMessageBox.question(

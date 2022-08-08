@@ -80,7 +80,7 @@ def erase_tsbond(session, selection):
             if all(atom in atoms for atom in bond.atoms) or bond in pbonds:
                 atom1, atom2 = bond.atoms
                 bond.delete()
-                run(
+                new_bond = run(
                     session,
                     "bond %s %s reasonable true" % (atom1.atomspec, atom2.atomspec),
                     log=False
