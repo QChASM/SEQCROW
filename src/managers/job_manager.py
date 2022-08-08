@@ -287,12 +287,16 @@ class JobManager(ProviderManager):
                 try:
                     if isinstance(job.output_name, str):
                         fr = FileReader(job.output_name, just_geom=False)
-                        if 'finished' not in fr.other or not fr.other['finished']:
+                        if 'finished' in fr.other and not fr.other['finished']:
+                            job.error = True
+                        if 'error' in fr.other and fr.other['error']:
                             job.error = True
                     else:
                         for f in job.output_name:
                             fr = FileReader(f, just_geom=False)
                             if 'finished' in fr.other and not fr.other['finished']:
+                                job.error = True
+                            if 'error' in fr.other and fr.other['error']:
                                 job.error = True
                 except NotImplementedError:
                     pass

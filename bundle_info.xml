@@ -211,6 +211,7 @@
                 <Provider name="Psi4"/>
                 <Provider name="SQM"/>
                 <Provider name="xTB"/>
+                <Provider name="CREST"/>
                 <!--
                 <Provider name="Raven"/>
                 -->
@@ -259,6 +260,7 @@
                 <Provider name="Q-Chem"/>
                 <Provider name="SQM"/>
                 <Provider name="xTB"/>
+                <Provider name="CREST"/>
             </Providers>
     
             <Providers manager="SGE">
@@ -268,6 +270,7 @@
                 <Provider name="Q-Chem"/>
                 <Provider name="SQM"/>
                 <Provider name="xTB"/>
+                <Provider name="CREST"/>
             </Providers>
       
             <Providers manager="PBS">
@@ -277,6 +280,7 @@
                 <Provider name="Q-Chem"/>
                 <Provider name="SQM"/>
                 <Provider name="xTB"/>
+                <Provider name="CREST"/>
             </Providers>
         
             <Providers manager="LSF">
@@ -286,6 +290,7 @@
                 <Provider name="Q-Chem"/>
                 <Provider name="SQM"/>
                 <Provider name="xTB"/>
+                <Provider name="CREST"/>
             </Providers>
   
             <!--
@@ -522,18 +527,18 @@
        </Classifiers>
     
     <AdditionalPackages>
+        <!--
         <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
         <Package name="Raven" folder="C:\Users\normn\Documents\GitHub\Raven"/>
-        <!--
         <Package name="AaronTools" folder="C:\Users\ajs99778\Documents\GitHub\AaronTools"/>
         <Package name="AaronTools.test" folder="C:\Users\ajs99778\Documents\GitHub\AaronTools\test"/>
         <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools"/>
         <Package name="Raven" folder="/home/ajs99778/pyQCHASM/Raven"/>
         <Package name="AaronTools" folder="/home/ajs99778/pyQCHASM/AaronTools"/>
         <Package name="AaronTools.test" folder="/home/ajs99778/pyQCHASM/AaronTools/test"/>
+        -->
         <Package name="AaronTools" folder="/home/tschaefer/QChASM/AaronTools"/>
         <Package name="AaronTools.test" folder="/home/tschaefer/QChASM/AaronTools/test"/>
-        -->
     </AdditionalPackages>
 
     <DataFiles package="AaronTools">

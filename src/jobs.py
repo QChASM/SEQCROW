@@ -617,10 +617,10 @@ class QChemJob(LocalJob):
 
 class XTBJob(LocalJob):
     format_name = "xyz"
-    info_type = "XTB"
+    info_type = "xTB"
 
     def __repr__(self):
-        return "local XTB job \"%s\"" % self.name
+        return "local xTB job \"%s\"" % self.name
 
     def run(self):
         self.start_time = asctime(localtime())
@@ -634,15 +634,16 @@ class XTBJob(LocalJob):
             os.makedirs(self.scratch_dir)
 
         infile = self.name
-        infile = infile.replace(' ', '_')
         infile_path = os.path.join(self.scratch_dir, infile)
         self.write_file(infile_path)
         executable = os.path.abspath(self.session.seqcrow_settings.settings.XTB_EXE)
         if not os.path.exists(executable):
             executable = self.session.seqcrow_settings.settings.XTB_EXE
 
-        args = self.theory.get_xtb_cmd(return_warnings=False, split_words=True)
+        args, warnings = self.theory.get_xtb_cmd(return_warnings=False, split_words=True)
         args[0] = executable
+        for i, arg in enumerate(args):
+            args[i] = arg.replace("{{ name }}", self.name)
         
         self.output_name = os.path.join(self.scratch_dir, self.name + '.out')
         outfile = open(self.output_name, 'w')
@@ -663,10 +664,17 @@ class XTBJob(LocalJob):
 
         self.output_name = dict()
         for f in os.listdir(self.scratch_dir):
-            if f.endswith("xyz") and self.name not in f:
-                self.output_name["xyz"] = f
-            elif f == "g98.out":
-                self.output_name["log"] = f
+            if f.endswith("xyz"):
+                if "xyz" in self.output_name:
+                    self.output_name["xyz"] = [
+                        self.output_name["xyz"], os.path.join(self.scratch_dir, f)
+                    ]
+                    continue
+                self.output_name["xyz"] = os.path.join(self.scratch_dir, f)
+            elif f.endswith("g98.out"):
+                self.output_name["log"] = os.path.join(self.scratch_dir, f)
+            elif f.endswith("mol"):
+                self.output_name["mol"] = os.path.join(self.scratch_dir, f)
 
         if self.job_options.get("delete_everything_but_output_file", False):
             self.remove_extra_files()
@@ -675,7 +683,7 @@ class XTBJob(LocalJob):
 
     def get_json(self):
         d = super().get_json()
-        d["format"] = "XTB"
+        d["format"] = "xTB"
         return d
 
 
@@ -685,6 +693,11 @@ class CRESTJob(LocalJob):
 
     def __repr__(self):
         return "local CREST job \"%s\"" % self.name
+
+    def write_file(self, infile_path):
+        self.geometry.write(
+            theory=self.theory, style="crest", outfile=infile_path
+        )
 
     def run(self):
         self.start_time = asctime(localtime())
@@ -697,17 +710,29 @@ class CRESTJob(LocalJob):
         if not os.path.exists(self.scratch_dir):
             os.makedirs(self.scratch_dir)
 
+        self.name = self.name.replace(" ", "_")
         infile = self.name
-        infile = infile.replace(' ', '_')
         infile_path = os.path.join(self.scratch_dir, infile)
         self.write_file(infile_path)
         executable = os.path.abspath(self.session.seqcrow_settings.settings.CREST_EXE)
         if not os.path.exists(executable):
             executable = self.session.seqcrow_settings.settings.CREST_EXE
 
-        args = self.theory.get_crest_cmd(return_warnings=False, split_words=True)
+        xtb_executable = os.path.abspath(self.session.seqcrow_settings.settings.XTB_EXE)
+        if not os.path.exists(xtb_executable):
+            xtb_executable = self.session.seqcrow_settings.settings.XTB_EXE
+
+        if "command_line" in self.theory.kwargs:
+            if not any(x == "xnam" for x in self.theory.kwargs["command_line"]):
+                self.theory.kwargs["command_line"]["xnam"] = [xtb_executable]
+        else:
+            self.theory.kwargs["command_line"] = {"xnam": [xtb_executable]}
+            
+        args, warnings = self.theory.get_crest_cmd(return_warnings=False, split_words=True)
         args[0] = executable
-        
+        for i, arg in enumerate(args):
+            args[i] = arg.replace("{{ name }}", self.name)
+
         self.output_name = os.path.join(self.scratch_dir, self.name + '.out')
         outfile = open(self.output_name, 'w')
 
@@ -725,7 +750,7 @@ class CRESTJob(LocalJob):
         self.process.communicate()
         self.process = None
 
-        self.output_name = "crest_conformers.xyz"
+        self.output_name = os.path.join(self.scratch_dir, "crest_conformers.xyz")
 
         if self.job_options.get("delete_everything_but_output_file", False):
             self.remove_extra_files()

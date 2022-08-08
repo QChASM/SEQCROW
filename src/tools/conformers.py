@@ -120,6 +120,9 @@ class _ConformerSettings(Settings):
         'last_walltime': 4,
         'last_submit_memory': 4,
     }
+    AUTO_SAVE = {
+        "on_finished": Value("do nothing", StringArg),
+    }
     
 
 class ConformerTool(BuildQM):

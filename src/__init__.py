@@ -674,6 +674,10 @@ class _SEQCROW_API(BundleAPI):
                 from .managers.cluster_template_manager import XTBSlurmTemplate
                 return XTBSlurmTemplate
  
+            elif name == "CREST":
+                from .managers.cluster_template_manager import CRESTSlurmTemplate
+                return CRESTSlurmTemplate
+ 
         elif mgr is session.seqcrow_pbs_manager:
             if name == "Gaussian":
                 from .managers.cluster_template_manager import GaussianPBSTemplate
@@ -698,6 +702,10 @@ class _SEQCROW_API(BundleAPI):
             elif name == "xTB":
                 from .managers.cluster_template_manager import XTBPBSTemplate
                 return XTBPBSTemplate
+
+            elif name == "CREST":
+                from .managers.cluster_template_manager import CRESTPBSTemplate
+                return CRESTPBSTemplate
 
         elif mgr is session.seqcrow_sge_manager:
             if name == "Gaussian":
@@ -724,6 +732,10 @@ class _SEQCROW_API(BundleAPI):
                 from .managers.cluster_template_manager import XTBSGETemplate
                 return XTBSGETemplate
 
+            elif name == "CREST":
+                from .managers.cluster_template_manager import CRESTSGETemplate
+                return CRESTSGETemplate
+
         elif mgr is session.seqcrow_lsf_manager:
             if name == "Gaussian":
                 from .managers.cluster_template_manager import GaussianLSFTemplate
@@ -748,6 +760,10 @@ class _SEQCROW_API(BundleAPI):
             elif name == "xTB":
                 from .managers.cluster_template_manager import XTBLSFTemplate
                 return XTBLSFTemplate
+
+            elif name == "CREST":
+                from .managers.cluster_template_manager import CRESTLSFTemplate
+                return CRESTLSFTemplate
 
         elif mgr is session.tss_finder_manager:
             if name == "GPR growing string method":

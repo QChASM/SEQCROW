@@ -122,6 +122,9 @@ class SQMSubmit(ProgramSubmitTemplate):
 class XTBSubmit(ProgramSubmitTemplate):
     pass
     
+class CRESTSubmit(ProgramSubmitTemplate):
+    expected_output_ext = "xyz"
+    
 
 class GaussianSlurmTemplate(ClusterSubmitTemplate, GaussianSubmit):
     template = """#!/bin/bash
@@ -303,7 +306,7 @@ class XTBSlurmTemplate(ClusterSubmitTemplate, XTBSubmit):
 #SBATCH --job-name={{ name }}
 #SBATCH --partition {{ queue }}
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=1
+#SBATCH --cpus-per-task={{ processors }}
 #SBATCH --time={{ walltime }}:00:00
 #SBATCH --mem={{ memory }}gb
 
@@ -311,7 +314,7 @@ class XTBSlurmTemplate(ClusterSubmitTemplate, XTBSubmit):
 # the appropriate value
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
-# * processors - number of cpu cores/threads (sqm will not use more than 1 core)
+# * processors - number of cpu cores/threads 
 # * memory - amount of memory requested from the cluster in GB
 # * walltime - time limit for the job
 #
@@ -320,6 +323,39 @@ class XTBSlurmTemplate(ClusterSubmitTemplate, XTBSubmit):
 module purge
 
 module load xtb
+SCRATCH=/scratch/$USER/$SLURM_JOB_ID
+mkdir -p $SCRATCH
+cd $SCRATCH
+cp $SLURM_SUBMIT_DIR/{{ name }}.* .
+cp $SLURM_SUBMIT_DIR/*.xyz .
+bash {{ name }}.cmd
+cd $SLURM_SUBMIT_DIR
+rm -rf $SCRATCH
+exit"""
+
+
+class CRESTSlurmTemplate(ClusterSubmitTemplate, CRESTSubmit):
+    template = """#!/bin/bash
+#SBATCH --job-name={{ name }}
+#SBATCH --partition {{ queue }}
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task={{ processors }}
+#SBATCH --time={{ walltime }}:00:00
+#SBATCH --mem={{ memory }}gb
+
+# a variable in double curly brackets will be replaced with
+# the appropriate value
+# the following variables are required/strongly recommended:
+# * name - name of the job and associated input/output files
+# * processors - number of cpu cores/threads 
+# * memory - amount of memory requested from the cluster in GB
+# * walltime - time limit for the job
+#
+# the crest command will be in a file named {{ name }}.cmd
+
+module purge
+
+module load crest
 SCRATCH=/scratch/$USER/$SLURM_JOB_ID
 mkdir -p $SCRATCH
 cd $SCRATCH
@@ -506,7 +542,7 @@ class XTBPBSTemplate(ClusterSubmitTemplate, XTBSubmit):
     template = """#PBS -S /bin/bash
 #PBS -N {{ name }}
 #PBS -q {{ queue }}
-#PBS -l nodes=1:ppn=1
+#PBS -l nodes=1:ppn={{ processors }}
 #PBS -l walltime={{ walltime }}:00
 #PBS -l mem={{ memory }}gb
 
@@ -514,7 +550,7 @@ class XTBPBSTemplate(ClusterSubmitTemplate, XTBSubmit):
 # the appropriate value
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
-# * processors - number of cpu cores/threads (sqm will not use more than 1 core)
+# * processors - number of cpu cores/threads 
 # * memory - amount of memory requested from the cluster in GB
 # * walltime - time limit for the job
 #
@@ -523,6 +559,38 @@ class XTBPBSTemplate(ClusterSubmitTemplate, XTBSubmit):
 module purge
 
 module load xtb
+SCRATCH=/scratch/$USER/$PBS_JOBID
+mkdir -p $SCRATCH
+cd $SCRATCH
+cp $PBS_O_WORKDIR/{{ name }}.* .
+cp $PBS_O_WORKDIR/*.xyz .
+bash {{ name }}.cmd
+cd $PBS_O_WORKDIR
+rm -rf $SCRATCH
+exit"""
+
+
+class CRESTPBSTemplate(ClusterSubmitTemplate, CRESTSubmit):
+    template = """#PBS -S /bin/bash
+#PBS -N {{ name }}
+#PBS -q {{ queue }}
+#PBS -l nodes=1:ppn={{ processors }}
+#PBS -l walltime={{ walltime }}:00
+#PBS -l mem={{ memory }}gb
+
+# a variable in double curly brackets will be replaced with
+# the appropriate value
+# the following variables are required/strongly recommended:
+# * name - name of the job and associated input/output files
+# * processors - number of cpu cores/threads 
+# * memory - amount of memory requested from the cluster in GB
+# * walltime - time limit for the job
+#
+# the xtb command will be in a file named {{ name }}.cmd
+
+module purge
+
+module load crest
 SCRATCH=/scratch/$USER/$PBS_JOBID
 mkdir -p $SCRATCH
 cd $SCRATCH
@@ -716,7 +784,7 @@ class XTBSGETemplate(ClusterSubmitTemplate, XTBSubmit):
 # the appropriate value
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
-# * processors - number of cpu cores/threads (sqm will not use more than 1 core)
+# * processors - number of cpu cores/threads 
 # * memory - amount of memory requested from the cluster in GB
 # * walltime - time limit for the job
 #
@@ -725,6 +793,38 @@ class XTBSGETemplate(ClusterSubmitTemplate, XTBSubmit):
 module purge
 
 module load xtb
+SCRATCH=/scratch/$USER/$JOB_ID
+mkdir -p $SCRATCH
+cd $SCRATCH
+cp $SGE_O_WORKDIR/{{ name }}.* .
+cp $SGE_O_WORKDIR/*.xyz .
+bash {{ name }}.cmd
+cd $SGE_O_WORKDIR
+rm -rf $SCRATCH
+exit"""
+
+
+class CRESTSGETemplate(ClusterSubmitTemplate, CRESTSubmit):
+    template = """#!/bin/bash
+#$ -N {{ name }}
+#$ -q {{ queue }}
+#$ -pe smp {{ processors }}
+#$ -l s_rt={{ walltime }}:00:00
+#$ -l s_vmem={{ memory }}G
+
+# a variable in double curly brackets will be replaced with
+# the appropriate value
+# the following variables are required/strongly recommended:
+# * name - name of the job and associated input/output files
+# * processors - number of cpu cores/threads 
+# * memory - amount of memory requested from the cluster in GB
+# * walltime - time limit for the job
+#
+# the crest command will be in a file named {{ name }}.cmd
+
+module purge
+
+module load crest
 SCRATCH=/scratch/$USER/$JOB_ID
 mkdir -p $SCRATCH
 cd $SCRATCH
@@ -918,7 +1018,7 @@ class XTBLSFTemplate(ClusterSubmitTemplate, XTBSubmit):
 # the appropriate value
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
-# * processors - number of cpu cores/threads (sqm will not use more than 1 core)
+# * processors - number of cpu cores/threads 
 # * memory - amount of memory requested from the cluster in GB
 # * walltime - time limit for the job
 #
@@ -927,6 +1027,38 @@ class XTBLSFTemplate(ClusterSubmitTemplate, XTBSubmit):
 module purge
 
 module load xtb
+SCRATCH=/scratch/$USER/$LSB_JOBID
+mkdir -p $SCRATCH
+cd $SCRATCH
+cp $LS_SUBCWD/{{ name }}.* .
+cp $LS_SUBCWD/*.xyz .
+bash {{ name }}.cmd
+cd $LS_SUBCWD
+rm -rf $SCRATCH
+exit"""
+
+
+class CRESTLSFTemplate(ClusterSubmitTemplate, CRESTSubmit):
+    template = """#BSUB -L /bin/bash
+#BSUB -N {{ name }}
+#BSUB -q {{ queue }}
+#BSUB -n {{ processors }}
+#BSUB -W {{ walltime }}:00
+#BSUB -M {{ 1000000 * memory }}
+
+# a variable in double curly brackets will be replaced with
+# the appropriate value
+# the following variables are required/strongly recommended:
+# * name - name of the job and associated input/output files
+# * processors - number of cpu cores/threads 
+# * memory - amount of memory requested from the cluster in GB
+# * walltime - time limit for the job
+#
+# the crest command will be in a file named {{ name }}.cmd
+
+module purge
+
+module load crest
 SCRATCH=/scratch/$USER/$LSB_JOBID
 mkdir -p $SCRATCH
 cd $SCRATCH
