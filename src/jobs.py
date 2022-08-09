@@ -762,6 +762,32 @@ class CRESTJob(LocalJob):
         d["format"] = "CREST"
         return d
 
+    def open_structure(self):
+        fr = FileReader(self.output_name["xyz"])
+        
+        for i, (comment, _) in enumerate(fr.all_geom):
+            fr.all_geom[i].add({"energy": float(comment)})
+        fr.other["energy"] = float(fr.comment)
+        
+        geom = ResidueCollection(fr, refresh_ranks=False).copy(
+            comment=fr.comment, copy_atoms=True
+        )
+        structure = geom.get_chimera(
+            self.session, coordsets=True, filereader=fr
+        )
+        self.session.filereader_manager.triggers.activate_trigger(
+            ADD_FILEREADER, ([structure], [fr])
+        )
+        try:
+            from SEQCROW.tools import EnergyPlot
+            nrg_plot = EnergyPlot(self.session, structure, fr)
+            if not nrg_plot.opened:
+                nrg_plot.delete()
+        except Exception as e:
+            self.session.logger.warning(repr(e))
+        structure.name = self.name
+        self.session.models.add([structure])
+
 
 class LocalClusterJob(LocalJob):
     format_name = None

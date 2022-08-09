@@ -503,7 +503,7 @@ def canonical_rank(structure, heavy_only=False, break_ties=True):
         partitions.setdefault(invariant, [])
         partitions[invariant] += [i]
     new_rank = 0
-    for key in sorted(partitions.keys()):
+    for key in sorted(partitions.keys(), key=int):
         idx_list = partitions[key]
         for idx in idx_list:
             ranks[idx] = new_rank

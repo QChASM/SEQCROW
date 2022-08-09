@@ -25,7 +25,6 @@ from Qt.QtWidgets import (
     QSplitter,
     QLineEdit,
     QSpinBox,
-    QMenuBar,
     QFileDialog,
     QAction,
     QApplication,
@@ -55,6 +54,7 @@ from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.utils import iter2str
 from SEQCROW.widgets.periodic_table import PeriodicTable, ElementButton
 from SEQCROW.widgets.comboboxes import ModelComboBox
+from SEQCROW.widgets.menu import FakeMenu
 from SEQCROW.finders import AtomSpec
 
 from AaronTools.config import Config
@@ -329,7 +329,10 @@ class BuildQM(ToolInstance):
             )
 
         layout = QGridLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
 
+        self._menu = FakeMenu()
+        
         basics_form = QWidget()
         form_layout = QFormLayout(basics_form)
 
@@ -376,17 +379,15 @@ class BuildQM(ToolInstance):
         self.tabs.setTabEnabled(2, init_form.basis_sets is not None)
 
         #menu stuff
-        menu = QMenuBar()
-
-        export = menu.addMenu("&Export")
-        copy = QAction("&Copy input to clipboard", self.tool_window.ui_area)
+        export = self._menu.addMenu("Export")
+        copy = QAction("Copy input to clipboard", self.tool_window.ui_area)
         copy.triggered.connect(self.copy_input)
         shortcut = QKeySequence(QKeySequence.Copy)
         copy.setShortcut(shortcut)
         export.addAction(copy)
         self.copy = copy
 
-        save = QAction("&Save Input", self.tool_window.ui_area)
+        save = QAction("Save Input", self.tool_window.ui_area)
         save.triggered.connect(self.open_save_dialog)
         #this shortcut interferes with main window's save shortcut
         #I've tried different shortcut contexts to no avail
@@ -396,17 +397,17 @@ class BuildQM(ToolInstance):
         #save.setShortcutContext(Qt.WidgetShortcut)
         export.addAction(save)
 
-        view = menu.addMenu("&View")
+        view = self._menu.addMenu("View")
         
-        preview = QAction("&Preview", self.tool_window.ui_area)
+        preview = QAction("Preview", self.tool_window.ui_area)
         preview.triggered.connect(self.show_preview)
         view.addAction(preview)
 
-        warnings = QAction("&Warnings", self.tool_window.ui_area)
+        warnings = QAction("Warnings", self.tool_window.ui_area)
         warnings.triggered.connect(self.show_warnings)
         view.addAction(warnings)
         
-        queue = QAction("&Queue", self.tool_window.ui_area)
+        queue = QAction("Queue", self.tool_window.ui_area)
         queue.triggered.connect(self.show_queue)
         view.addAction(queue)
 
@@ -417,13 +418,13 @@ class BuildQM(ToolInstance):
         #           list of places?
         #               look at how AARON does jobs
 
-        #batch = menu.addMenu("&Batch")
+        #batch = self._menu.addMenu("&Batch")
         #multistructure = QAction("&Multiple structures - coming eventually", self.tool_window.ui_area)
         #focal_point = QAction("&Focal point table - coming eventually", self.tool_window.ui_area)
         #batch.addAction(multistructure)
         #batch.addAction(focal_point)
 
-        self.presets_menu = menu.addMenu("Presets")
+        self.presets_menu = self._menu.addMenu("Presets")
 
         self.new_preset = QAction("Save Preset...", self.tool_window.ui_area)
         self.new_preset.triggered.connect(self.show_new_preset)
@@ -441,28 +442,24 @@ class BuildQM(ToolInstance):
         self.export_preset.triggered.connect(self.show_export_preset)
         self.presets_menu.addAction(self.export_preset)
 
-        run = menu.addMenu("&Run")
-        locally = QAction("&On this computer...", self.tool_window.ui_area)
+        run = self._menu.addMenu("Run")
+        locally = QAction("On this computer...", self.tool_window.ui_area)
         #remotely = QAction("R&emotely - coming eventually", self.tool_window.ui_area)
         locally.triggered.connect(self.show_local_job_prep)
         run.addAction(locally)
         #run.addAction(remotely)
 
-        clusterly = QAction("&Submit to local cluster...", self.tool_window.ui_area)
+        clusterly = QAction("Submit to local cluster...", self.tool_window.ui_area)
         #remotely = QAction("R&emotely - coming eventually", self.tool_window.ui_area)
         clusterly.triggered.connect(self.show_cluster_job_prep)
         run.addAction(clusterly)
         #run.addAction(remotely)
-
-        menu.setNativeMenuBar(False)
-
-        self._menu = menu
-        layout.setMenuBar(menu)
+        
+        layout.setMenuBar(self._menu)
 
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(None)
-        menu.setVisible(True)
 
     def migrate_settings_from_v2(self):
         """

@@ -39,7 +39,6 @@ from Qt.QtWidgets import (
     QFormLayout,
     QCheckBox,
     QHeaderView,
-    QMenuBar,
     QFileDialog,
     QStyle,
     QGroupBox,
@@ -50,7 +49,7 @@ from Qt.QtWidgets import (
 
 from SEQCROW.tools.per_frame_plot import NavigationToolbar
 from SEQCROW.utils import iter2str
-from SEQCROW.widgets import FilereaderComboBox
+from SEQCROW.widgets import FilereaderComboBox, FakeMenu
 
 #TODO:
 #make double clicking something in the table visualize it
@@ -876,17 +875,14 @@ class IRPlot(ChildToolWindow):
         # self.check_vcd()
 
         #menu bar for saving stuff
-        menu = QMenuBar()
-        file = menu.addMenu("&Export")
-        file.addAction("&Save CSV...")
-        menu.setVisible(True)
+        menu = FakeMenu()
+        file = menu.addMenu("Export")
+        file.addAction("Save CSV...")
         
         file.triggered.connect(self.save)
         
-        menu.setNativeMenuBar(False)
         self._menu = menu
         layout.setMenuBar(menu)        
-        menu.setVisible(True)
         self.ui_area.setLayout(layout)
         self.manage(None)
 

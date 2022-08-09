@@ -28,7 +28,6 @@ from Qt.QtWidgets import (
     QSplitter,
     QLineEdit,
     QSpinBox,
-    QMenuBar,
     QFileDialog,
     QAction,
     QApplication,
@@ -72,6 +71,7 @@ from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.utils import iter2str
 from SEQCROW.widgets.periodic_table import PeriodicTable, ElementButton
 from SEQCROW.widgets.comboboxes import ModelComboBox
+from SEQCROW.widgets.menu import FakeMenu
 from SEQCROW.finders import AtomSpec
 from SEQCROW.presets import seqcrow_bse
 
@@ -137,11 +137,17 @@ class BuildRaven(BuildQM, ToolInstance):
         if ndx != -1:
             self.change_product(ndx)
 
+        available_programs = []
+        for algorithm in self.session.tss_finder_manager.formats:
+            info = self.session.tss_finder_manager.get_info(algorithm)
+            available_programs.extend(info.available_for)
+        available_programs = set(available_programs)
+
         self.presets = dict()
         cached = loads(self.settings.presets, cls=ATDecoder)
         for file_format in session.seqcrow_qm_input_manager.formats:
             info = session.seqcrow_qm_input_manager.get_info(file_format)
-            if not info.allow_raven:
+            if info.name not in available_programs:
                 continue
             if file_format not in self.presets:
                 self.presets[file_format] = info.initial_presets
@@ -182,6 +188,9 @@ class BuildRaven(BuildQM, ToolInstance):
             )
 
         layout = QGridLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        self._menu = FakeMenu()
 
         basics_form = QWidget()
         form_layout = QFormLayout(basics_form)
@@ -258,17 +267,15 @@ class BuildRaven(BuildQM, ToolInstance):
         self.tabs.setTabEnabled(2, init_form.basis_sets is not None)
 
         #menu stuff
-        menu = QMenuBar()
-
-        export = menu.addMenu("&Export")
-        copy = QAction("&Copy input to clipboard", self.tool_window.ui_area)
+        export = self._menu.addMenu("Export")
+        copy = QAction("Copy input to clipboard", self.tool_window.ui_area)
         copy.triggered.connect(self.copy_input)
         shortcut = QKeySequence(QKeySequence.Copy)
         copy.setShortcut(shortcut)
         export.addAction(copy)
         self.copy = copy
 
-        save = QAction("&Save Input", self.tool_window.ui_area)
+        save = QAction("Save Input", self.tool_window.ui_area)
         save.triggered.connect(self.open_save_dialog)
         #this shortcut interferes with main window's save shortcut
         #I've tried different shortcut contexts to no avail
@@ -278,48 +285,44 @@ class BuildRaven(BuildQM, ToolInstance):
         #save.setShortcutContext(Qt.WidgetShortcut)
         export.addAction(save)
 
-        view = menu.addMenu("&View")
+        view = self._menu.addMenu("View")
         
-        preview = QAction("&Preview", self.tool_window.ui_area)
+        preview = QAction("Preview", self.tool_window.ui_area)
         preview.triggered.connect(self.show_preview)
         view.addAction(preview)
 
-        warnings = QAction("&Warnings", self.tool_window.ui_area)
+        warnings = QAction("Warnings", self.tool_window.ui_area)
         warnings.triggered.connect(self.show_warnings)
         view.addAction(warnings)
         
-        warnings = QAction("&Linear path", self.tool_window.ui_area)
+        warnings = QAction("Linear path", self.tool_window.ui_area)
         warnings.triggered.connect(self.load_initial_path)
         view.addAction(warnings)
         
-        queue = QAction("&Queue", self.tool_window.ui_area)
+        queue = QAction("Queue", self.tool_window.ui_area)
         queue.triggered.connect(self.show_queue)
         view.addAction(queue)
 
-        self.presets_menu = menu.addMenu("Presets")
+        self.presets_menu = self._menu.addMenu("Presets")
 
-        run_jobs = menu.addMenu("&Run")
-        locally = QAction("&On this computer...", self.tool_window.ui_area)
+        run_jobs = self._menu.addMenu("Run")
+        locally = QAction("On this computer...", self.tool_window.ui_area)
         #remotely = QAction("R&emotely - coming eventually", self.tool_window.ui_area)
         locally.triggered.connect(self.show_local_job_prep)
         run_jobs.addAction(locally)
         #run_jobs.addAction(remotely)
 
-        clusterly = QAction("&Submit to local cluster...", self.tool_window.ui_area)
+        clusterly = QAction("Submit to local cluster...", self.tool_window.ui_area)
         #remotely = QAction("R&emotely - coming eventually", self.tool_window.ui_area)
         clusterly.triggered.connect(self.show_cluster_job_prep)
         run_jobs.addAction(clusterly)
         #run_jobs.addAction(remotely)
 
-        menu.setNativeMenuBar(False)
-
-        self._menu = menu
-        layout.setMenuBar(menu)
+        layout.setMenuBar(self._menu)
 
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(None)
-        menu.setVisible(True)
 
     def load_initial_path(self):
         """
@@ -608,6 +611,13 @@ class BuildRaven(BuildQM, ToolInstance):
         preset = self.presets[program][preset_name]
 
         ndx = self.file_type.findText(program, Qt.MatchExactly)
+        if ndx < 0:
+            self.session.logger.warning(
+                "%s is not available for %s; change algorithms before applying this preset" % (
+                    self.tss_algorithm.currentText(), program,
+                )
+            )
+            return
         self.file_type.setCurrentIndex(ndx)
 
         self.file_type.blockSignals(True)

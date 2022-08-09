@@ -32,7 +32,6 @@ from Qt.QtWidgets import (
     QWidget,
     QFormLayout,
     QCheckBox,
-    QMenuBar,
     QFileDialog,
     QStyle,
     QGroupBox,
@@ -54,7 +53,7 @@ from SEQCROW.tools.uvvis_plot import (
 )
     
 from SEQCROW.utils import iter2str
-from SEQCROW.widgets import FilereaderComboBox
+from SEQCROW.widgets import FilereaderComboBox, FakeMenu
 
 
 rcParams["savefig.dpi"] = 300
@@ -446,17 +445,14 @@ class IRSpectrum(ToolInstance):
         tabs.currentChanged.connect(lambda ndx: self.refresh_plot() if ndx == 1 else None)
 
         #menu bar for saving stuff
-        menu = QMenuBar()
-        file = menu.addMenu("&Export")
-        file.addAction("&Save CSV...")
-        menu.setVisible(True)
+        menu = FakeMenu()
+        file = menu.addMenu("Export")
+        file.addAction("Save CSV...")
         
         file.triggered.connect(self.save)
         
-        menu.setNativeMenuBar(False)
         self._menu = menu
         layout.setMenuBar(menu)        
-        menu.setVisible(True)
         self.tool_window.ui_area.setLayout(layout)
         self.tool_window.manage(None)
 

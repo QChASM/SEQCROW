@@ -57,9 +57,7 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
     session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([structure], [fr]))
 
 
-    if fr.all_geom and "energy" in fr.other and (
-        coordsets is None or coordsets is True
-    ):
+    if fr.all_geom and "energy" in fr.other and coordsets is not False:
         try:
             from SEQCROW.tools import EnergyPlot
             nrg_plot = EnergyPlot(session, structure, fr)
@@ -69,8 +67,6 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
                 nrg_plot.delete()
         except Exception as e:
             session.logger.warning(repr(e))
-    
-    coordsets = coordsets is not False and fr.all_geom
 
     if coordsets:
         from chimerax.std_commands.coordset_gui import CoordinateSetSlider

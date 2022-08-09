@@ -10,7 +10,6 @@ from Qt.QtGui import QGuiApplication, QBrush, QColor
 from Qt.QtWidgets import (
     QGridLayout,
     QWidget,
-    QMenuBar,
     QFileDialog,
     QTabWidget, 
     QTableWidget,
@@ -21,6 +20,9 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
 
 from matplotlib.figure import Figure
+
+from SEQCROW.widgets import FakeMenu
+
 
 keyboardModifiers = QGuiApplication.keyboardModifiers
 
@@ -229,16 +231,14 @@ class EnergyPlot(ToolInstance):
 
         
         #menu bar for saving stuff
-        menu = QMenuBar()
-        file = menu.addMenu("&Export")
-        file.addAction("&Save CSV...")
+        menu = FakeMenu()
+        file = menu.addMenu("Export")
+        file.addAction("Save CSV...")
         
         file.triggered.connect(self.save)
         
-        menu.setNativeMenuBar(False)
         self._menu = menu
         layout.setMenuBar(menu)
-        menu.setVisible(True)
 
         self.tool_window.ui_area.setLayout(layout)
         

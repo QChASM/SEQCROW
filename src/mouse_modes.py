@@ -1028,9 +1028,9 @@ class SelectSimilarFragments(MouseMode):
                         fragments.append(frag)
                         break
         
-                frag_lengths.extend([len(frag) for frag in fragments])
-                frag_elements.extend([sorted(frag.elements.names) for frag in fragments])
-                frag_added.extend([False for frag in fragments])
+            frag_lengths = [len(frag) for frag in fragments]
+            frag_elements = [sorted(frag.elements.names) for frag in fragments]
+            frag_added = [False for frag in fragments]
 
             for p in pick:
                 if isinstance(p, PickedAtoms):
@@ -1104,7 +1104,7 @@ class SelectSimilarFragments(MouseMode):
                 else:
                     continue
 
-                ranks = canonical_rank(connected_atoms)
+                ranks = canonical_rank(connected_atoms, break_ties=False)
                 length = len(connected_atoms)
                 elements = sorted(connected_atoms.elements.names)
                 sorted_frag_atoms = [x for _, x in sorted(zip(ranks, connected_atoms), key=lambda pair: pair[0])]
@@ -1115,13 +1115,13 @@ class SelectSimilarFragments(MouseMode):
                     if frag_lengths[i] != length:
                         continue
                     
-                    if frag_elements[i] != elements:
+                    if any(frag_elements[i][j] != elements[j] for j in range(0, length)):
                         continue
                     
                     try:
                         ranks = frag_ranks[i]
                     except KeyError:
-                        ranks = canonical_rank(other_frag)
+                        ranks = canonical_rank(other_frag, break_ties=False)
                         frag_ranks[i] = ranks
                     
                     sorted_other_frag_atoms = [
@@ -1149,7 +1149,6 @@ class SelectSimilarFragments(MouseMode):
                     else:
                         atoms = atoms.merge(other_frag)
                         frag_added[i] = True
-                    
 
             for atom in atoms:
                 for neighbor, bond in zip(atom.neighbors, atom.bonds):

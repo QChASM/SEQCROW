@@ -11,7 +11,6 @@ from Qt.QtWidgets import (
     QTabWidget,
     QHeaderView,
     QSizePolicy,
-    QMenuBar,
     QAction,
     QFileDialog,
     QApplication,
@@ -28,6 +27,7 @@ from AaronTools.theory import Theory
 from AaronTools.const import UNIT, PHYSICAL
 
 from SEQCROW.tools.normal_modes import FreqTableWidgetItem
+from SEQCROW.widgets import FakeMenu
 
 
 nrg_infos = [
@@ -231,17 +231,17 @@ class Info(ToolInstance):
         self.combo_table.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
         anharm_layout.insertWidget(3, self.combo_table, 1)
 
-        menu = QMenuBar()
+        menu = FakeMenu()
 
-        export = menu.addMenu("&Export")
-        copy = QAction("&Copy CSV to clipboard", self.tool_window.ui_area)
+        export = menu.addMenu("Export")
+        copy = QAction("Copy CSV to clipboard", self.tool_window.ui_area)
         copy.triggered.connect(self.copy_csv)
         shortcut = QKeySequence(QKeySequence.Copy)
         copy.setShortcut(shortcut)
         export.addAction(copy)
         self.copy = copy
 
-        save = QAction("&Save CSV...", self.tool_window.ui_area)
+        save = QAction("Save CSV...", self.tool_window.ui_area)
         save.triggered.connect(self.save_csv)
         export.addAction(save)
 
@@ -267,7 +267,7 @@ class Info(ToolInstance):
         semicolon.triggered.connect(lambda *args, delim="semicolon": self.settings.__setattr__("delimiter", delim))
         delimiter.addAction(semicolon)
 
-        add_header = QAction("&Include CSV header", self.tool_window.ui_area, checkable=True)
+        add_header = QAction("Include CSV header", self.tool_window.ui_area, checkable=True)
         add_header.setChecked(self.settings.include_header)
         add_header.triggered.connect(self.header_check)
         export.addAction(add_header)
@@ -341,11 +341,8 @@ class Info(ToolInstance):
         hertz.triggered.connect(lambda *args: self.fill_table(self.file_selector.count() - 1))
         hertz.triggered.connect(lambda *args, action=temperature: action.setChecked(False))
 
-        menu.setNativeMenuBar(False)
         self._menu = menu
         layout.setMenuBar(menu)
-        menu.setVisible(True)
-
 
         if len(self.session.filereader_manager.list()) > 0:
             self.fill_table(0)

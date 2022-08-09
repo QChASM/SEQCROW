@@ -25,7 +25,6 @@ from Qt.QtWidgets import (
     QSplitter,
     QLineEdit,
     QSpinBox,
-    QMenuBar,
     QFileDialog,
     QAction,
     QApplication,
@@ -55,6 +54,7 @@ from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.utils import iter2str
 from SEQCROW.widgets.periodic_table import PeriodicTable, ElementButton
 from SEQCROW.widgets.comboboxes import ModelComboBox
+from SEQCROW.widgets.menu import FakeMenu
 from SEQCROW.finders import AtomSpec
 from SEQCROW.tools.input_generator import (
     _InputGeneratorSettings,
@@ -223,48 +223,46 @@ class ConformerTool(BuildQM):
         self.tabs.setTabEnabled(2, init_form.basis_sets is not None)
 
         #menu stuff
-        menu = QMenuBar()
+        menu = FakeMenu()
 
-        export = menu.addMenu("&Export")
-        copy = QAction("&Copy input to clipboard", self.tool_window.ui_area)
+        export = menu.addMenu("Export")
+        copy = QAction("Copy input to clipboard", self.tool_window.ui_area)
         copy.triggered.connect(self.copy_input)
         shortcut = QKeySequence(QKeySequence.Copy)
         copy.setShortcut(shortcut)
         export.addAction(copy)
         self.copy = copy
 
-        save = QAction("&Save Input", self.tool_window.ui_area)
+        save = QAction("Save Input", self.tool_window.ui_area)
         save.triggered.connect(self.open_save_dialog)
         export.addAction(save)
 
-        view = menu.addMenu("&View")
+        view = menu.addMenu("View")
         
-        preview = QAction("&Preview", self.tool_window.ui_area)
+        preview = QAction("Preview", self.tool_window.ui_area)
         preview.triggered.connect(self.show_preview)
         view.addAction(preview)
 
-        warnings = QAction("&Warnings", self.tool_window.ui_area)
+        warnings = QAction("Warnings", self.tool_window.ui_area)
         warnings.triggered.connect(self.show_warnings)
         view.addAction(warnings)
         
-        queue = QAction("&Queue", self.tool_window.ui_area)
+        queue = QAction("Queue", self.tool_window.ui_area)
         queue.triggered.connect(self.show_queue)
         view.addAction(queue)
 
-        run = menu.addMenu("&Run")
-        locally = QAction("&On this computer...", self.tool_window.ui_area)
+        run = menu.addMenu("Run")
+        locally = QAction("On this computer...", self.tool_window.ui_area)
         #remotely = QAction("R&emotely - coming eventually", self.tool_window.ui_area)
         locally.triggered.connect(self.show_local_job_prep)
         run.addAction(locally)
         #run.addAction(remotely)
 
-        clusterly = QAction("&Submit to local cluster...", self.tool_window.ui_area)
+        clusterly = QAction("Submit to local cluster...", self.tool_window.ui_area)
         #remotely = QAction("R&emotely - coming eventually", self.tool_window.ui_area)
         clusterly.triggered.connect(self.show_cluster_job_prep)
         run.addAction(clusterly)
         #run.addAction(remotely)
-
-        menu.setNativeMenuBar(False)
 
         self._menu = menu
         layout.setMenuBar(menu)
@@ -272,7 +270,6 @@ class ConformerTool(BuildQM):
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(None)
-        menu.setVisible(True)
 
 
 class ConformerJob(JobTypeOption):

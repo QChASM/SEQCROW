@@ -17,7 +17,6 @@ from Qt.QtWidgets import (
     QSplitter,
     QLineEdit,
     QDoubleSpinBox,
-    QMenuBar,
     QFileDialog,
     QAction,
     QApplication,
@@ -36,7 +35,7 @@ from Qt.QtWidgets import (
     QTextBrowser,
 )
 
-from SEQCROW.widgets import FilereaderComboBox
+from SEQCROW.widgets import FilereaderComboBox, FakeMenu
 
 from AaronTools.comp_output import CompOutput
 from AaronTools.geometry import Geometry
@@ -270,17 +269,17 @@ class Thermochem(ToolInstance):
         self.tab_widget.addTab(relative_widget, "relative")
         
         #menu stuff
-        menu = QMenuBar()
+        menu = FakeMenu()
         
-        export = menu.addMenu("&Export")
-        copy = QAction("&Copy CSV to clipboard", self.tool_window.ui_area)
+        export = menu.addMenu("Export")
+        copy = QAction("Copy CSV to clipboard", self.tool_window.ui_area)
         copy.triggered.connect(self.copy_csv)
         shortcut = QKeySequence(QKeySequence.Copy)
         copy.setShortcut(shortcut)
         export.addAction(copy)
         self.copy = copy
         
-        save = QAction("&Save CSV...", self.tool_window.ui_area)
+        save = QAction("Save CSV...", self.tool_window.ui_area)
         save.triggered.connect(self.save_csv)
         #this shortcut interferes with main window's save shortcut
         #I've tried different shortcut contexts to no avail
@@ -312,7 +311,7 @@ class Thermochem(ToolInstance):
         semicolon.triggered.connect(lambda *args, delim="semicolon": self.settings.__setattr__("delimiter", delim))
         delimiter.addAction(semicolon)
         
-        add_header = QAction("&Include CSV header", self.tool_window.ui_area, checkable=True)
+        add_header = QAction("Include CSV header", self.tool_window.ui_area, checkable=True)
         add_header.setChecked(self.settings.include_header)
         add_header.triggered.connect(self.header_check)
         export.addAction(add_header)
@@ -333,10 +332,8 @@ class Thermochem(ToolInstance):
         semicolon.triggered.connect(lambda *args, action=tab: action.setChecked(False))
         semicolon.triggered.connect(lambda *args, action=space: action.setChecked(False))
 
-        menu.setNativeMenuBar(False)
         self._menu = menu
         layout.setMenuBar(menu)
-        menu.setVisible(True)
 
         self.tool_window.ui_area.setLayout(layout)
 

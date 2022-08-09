@@ -13,7 +13,6 @@ from Qt.QtWidgets import (
     QFormLayout,
     QComboBox,
     QCheckBox,
-    QMenuBar,
     QAction,
     QFileDialog,
     QApplication,
@@ -31,6 +30,7 @@ from Qt.QtWidgets import (
 
 from SEQCROW.commands.percent_Vbur import percent_vbur as percent_vbur_cmd
 from SEQCROW.tools.per_frame_plot import NavigationToolbar
+from SEQCROW.widgets import FakeMenu
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 import matplotlib.pyplot as plt
@@ -379,22 +379,22 @@ class PercentVolumeBuried(ToolInstance):
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         calc_layout.addRow(self.table)
 
-        menu = QMenuBar()
+        menu = FakeMenu()
         
-        export = menu.addMenu("&Export")
+        export = menu.addMenu("Export")
 
         clear = QAction("Clear data table", self.tool_window.ui_area)
         clear.triggered.connect(self.clear_table)
         export.addAction(clear)
 
-        copy = QAction("&Copy CSV to clipboard", self.tool_window.ui_area)
+        copy = QAction("Copy CSV to clipboard", self.tool_window.ui_area)
         copy.triggered.connect(self.copy_csv)
         shortcut = QKeySequence(QKeySequence.Copy)
         copy.setShortcut(shortcut)
         export.addAction(copy)
         self.copy = copy
         
-        save = QAction("&Save CSV...", self.tool_window.ui_area)
+        save = QAction("Save CSV...", self.tool_window.ui_area)
         save.triggered.connect(self.save_csv)
         #this shortcut interferes with main window's save shortcut
         #I've tried different shortcut contexts to no avail
@@ -447,10 +447,8 @@ class PercentVolumeBuried(ToolInstance):
         semicolon.triggered.connect(lambda *args, action=tab: action.setChecked(False))
         semicolon.triggered.connect(lambda *args, action=space: action.setChecked(False))
 
-        menu.setNativeMenuBar(False)
         self._menu = menu
         layout.setMenuBar(menu)
-        menu.setVisible(True)
 
         self.tool_window.ui_area.setLayout(layout)
 

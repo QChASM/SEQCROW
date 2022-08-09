@@ -13,7 +13,6 @@ from Qt.QtWidgets import (
     QFormLayout,
     QComboBox,
     QCheckBox,
-    QMenuBar,
     QAction,
     QFileDialog,
     QApplication,
@@ -32,6 +31,7 @@ from AaronTools.finders import BondedTo, NotAny
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.finders import AtomSpec
+from SEQCROW.widgets import FakeMenu
 
 
 class _ConeAngleSettings(Settings):
@@ -135,21 +135,21 @@ class ConeAngle(ToolInstance):
         layout.addRow(self.table)
 
 
-        menu = QMenuBar()
+        menu = FakeMenu()
         
-        export = menu.addMenu("&Export")
+        export = menu.addMenu("Export")
 
         clear = QAction("Clear data table", self.tool_window.ui_area)
         clear.triggered.connect(self.clear_table)
         export.addAction(clear)
 
-        copy = QAction("&Copy CSV to clipboard", self.tool_window.ui_area)
+        copy = QAction("Copy CSV to clipboard", self.tool_window.ui_area)
         copy.triggered.connect(self.copy_csv)
         shortcut = QKeySequence(QKeySequence.Copy)
         copy.setShortcut(shortcut)
         export.addAction(copy)
         
-        save = QAction("&Save CSV...", self.tool_window.ui_area)
+        save = QAction("Save CSV...", self.tool_window.ui_area)
         save.triggered.connect(self.save_csv)
         #this shortcut interferes with main window's save shortcut
         #I've tried different shortcut contexts to no avail
@@ -202,10 +202,8 @@ class ConeAngle(ToolInstance):
         semicolon.triggered.connect(lambda *args, action=tab: action.setChecked(False))
         semicolon.triggered.connect(lambda *args, action=space: action.setChecked(False))
 
-        menu.setNativeMenuBar(False)
         self._menu = menu
         layout.setMenuBar(menu)
-        menu.setVisible(True)
         
         self.tool_window.ui_area.setLayout(layout)
 
