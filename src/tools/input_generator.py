@@ -6044,6 +6044,9 @@ class PrepLocalJob(ChildToolWindow):
 
     def cleanup(self):
         self.tool_instance.job_local_prep = None
+        self.tool_instance.file_type.currentTextChanged.disconnect(
+            self.change_job_options
+        )
 
         super().cleanup()
 

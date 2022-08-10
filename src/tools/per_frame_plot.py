@@ -53,7 +53,7 @@ class EnergyPlot(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False         
     
-    def __init__(self, session, model, filereader):
+    def __init__(self, session, model, filereader, xlabel="iteration", ylabel=r"energy ($E_h$)"):
         super().__init__(session, model.name)
         
         from chimerax.ui import MainToolWindow
@@ -68,6 +68,8 @@ class EnergyPlot(ToolInstance):
         self._dragged = False
         self._min_drag = 10	# pixels
         self._drag_mode = None
+        self.xlabel = xlabel
+        self.ylabel = ylabel
 
         self._build_ui()
 
@@ -136,8 +138,8 @@ class EnergyPlot(ToolInstance):
     
         self.nrg_plot = ax.plot(self.xs, self.ys, marker='o', c='gray', markersize=3)
         self.nrg_plot = self.nrg_plot[0]
-        ax.set_xlabel('iteration')
-        ax.set_ylabel(r'energy ($E_h$)')
+        ax.set_xlabel(self.xlabel)
+        ax.set_ylabel(self.ylabel)
         ax.set_ylim(bottom=(min(self.ys) - se/10), top=(max(self.ys) + se/10))
         
         min_y = min(self.ys)

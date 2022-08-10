@@ -763,12 +763,14 @@ class CRESTJob(LocalJob):
         return d
 
     def open_structure(self):
-        fr = FileReader(self.output_name["xyz"])
+        fr = FileReader(self.output_name, get_all=True)
         
         for i, (comment, _) in enumerate(fr.all_geom):
-            fr.all_geom[i].add({"energy": float(comment)})
+            fr.all_geom[i] = (*fr.all_geom[i], {"energy": float(comment)})
         fr.other["energy"] = float(fr.comment)
         
+        print(fr.all_geom)
+
         geom = ResidueCollection(fr, refresh_ranks=False).copy(
             comment=fr.comment, copy_atoms=True
         )
@@ -780,8 +782,9 @@ class CRESTJob(LocalJob):
         )
         try:
             from SEQCROW.tools import EnergyPlot
-            nrg_plot = EnergyPlot(self.session, structure, fr)
+            nrg_plot = EnergyPlot(self.session, structure, fr, xlabel="conformer")
             if not nrg_plot.opened:
+                print("not opened")
                 nrg_plot.delete()
         except Exception as e:
             self.session.logger.warning(repr(e))
