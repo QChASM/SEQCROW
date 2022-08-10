@@ -449,7 +449,7 @@ class NEB(TSSFinder):
                     "climbing image",
                     "optimized TSS",
                 ],
-                default: "optimized TSS",
+                "default": "optimized TSS",
             }
         ),
         "optimization_algorithm": (

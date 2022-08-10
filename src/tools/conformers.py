@@ -271,6 +271,25 @@ class ConformerTool(BuildQM):
 
         self.tool_window.manage(None)
 
+    def change_model(self, index):
+        """changes model to the one selected in self.model_selector (index is basically ignored"""
+        if index == -1:
+            self.basis_widget.setElements([])
+            return
+
+        mdl = self.model_selector.currentData()
+
+        self.job_widget.setStructure(mdl)
+        self.check_elements()
+
+        if mdl in self.session.filereader_manager.filereader_dict:
+            for fr in self.session.filereader_manager.filereader_dict[mdl]:
+                if 'charge' in fr.other:
+                    self.job_widget.setCharge(fr.other['charge'])
+
+                if 'multiplicity' in fr.other:
+                    self.job_widget.setMultiplicity(fr.other['multiplicity'])
+
 
 class ConformerJob(JobTypeOption):
     def __init__(self, settings, session, init_form, parent=None):
