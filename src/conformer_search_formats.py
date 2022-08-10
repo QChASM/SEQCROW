@@ -124,7 +124,9 @@ class ConformerSearchInfo:
 class CREST(ConformerSearchInfo):
     # name of program
     name = "CREST"
-    initial_options = dict()
+    initial_options = {
+        "command_line": {"ewin": ["6", "15", "25"]}
+    }
     parallel = True
     memory = False
     save_file_filter = "xTB input file (*.xc)"

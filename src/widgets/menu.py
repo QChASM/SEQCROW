@@ -10,6 +10,7 @@ class FakeMenu(QWidget):
         self.layout.setContentsMargins(0, 0, 0, 0)
 
     def addMenu(self, text):
+        """adds a menu titled 'text' and returns the corresponding QMenu"""
         pushbutton = QPushButton(text)
         pushbutton.setFlat(True)
         menu = QMenu(pushbutton)
