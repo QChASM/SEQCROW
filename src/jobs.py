@@ -126,7 +126,10 @@ class LocalJob(QThread):
         super().terminate()
     
     def write_file(self, filename):
-        input_info = self.session.seqcrow_qm_input_manager.get_info(self.info_type)
+        try:
+            input_info = self.session.seqcrow_qm_input_manager.get_info(self.info_type)
+        except KeyError:
+            input_info = self.session.conformer_search_manager.get_info(self.info_type)
         contents, warnings = input_info.get_file_contents(self.theory)
         self.input_files = []
         if isinstance(contents, dict):
@@ -752,7 +755,7 @@ class CRESTJob(LocalJob):
         self.process = None
 
         for f in ["crest_conformers", "tautomers", "deprotonated", "protomers"]:
-            test_file = os.path.join(self.scratch, f + ".xyz")
+            test_file = os.path.join(self.scratch_dir, f + ".xyz")
             if os.path.exists(test_file):
                 self.output_name = test_file
 
@@ -773,8 +776,6 @@ class CRESTJob(LocalJob):
             fr.all_geom[i] = (*fr.all_geom[i], {"energy": float(comment)})
         fr.other["energy"] = float(fr.comment)
         
-        print(fr.all_geom)
-
         geom = ResidueCollection(fr, refresh_ranks=False).copy(
             comment=fr.comment, copy_atoms=True
         )
@@ -788,7 +789,6 @@ class CRESTJob(LocalJob):
             from SEQCROW.tools import EnergyPlot
             nrg_plot = EnergyPlot(self.session, structure, fr, xlabel="conformer")
             if not nrg_plot.opened:
-                print("not opened")
                 nrg_plot.delete()
         except Exception as e:
             self.session.logger.warning(repr(e))
@@ -875,11 +875,27 @@ class LocalClusterJob(LocalJob):
 
         if not os.path.exists(self.scratch_dir):
             os.makedirs(self.scratch_dir)
-
-        infile = self.name.replace(" ", "_") + "." + self.cluster_type.expected_input_ext
-        outfile = self.name.replace(" ", "_") + "." + self.cluster_type.expected_output_ext
+        
+        if self.cluster_type.expected_input_ext:
+            infile = self.name.replace(" ", "_") + "." + self.cluster_type.expected_input_ext
+        else:
+            infile = self.name.replace(" ", "_")
+        
+        if isinstance(self.cluster_type.expected_output_ext, str):
+            outfile = self.name.replace(" ", "_") + "." + self.cluster_type.expected_output_ext
+        else:
+            if not isinstance(self.cluster_type.expected_output_ext, str):
+                outfile = []
+                for f in self.cluster_type.expected_output_ext:
+                    outfile.append(f)
+            outfile = self.cluster_type.expected_output_ext
         infile_path = os.path.join(self.scratch_dir, infile)
-        self.output_name = os.path.join(self.scratch_dir, outfile)
+        if isinstance(outfile, str):
+            self.output_name = os.path.join(self.scratch_dir, outfile)
+        else:
+            self.output_name = [
+                os.path.join(self.scratch_dir, f) for f in outfile
+            ]
 
         self.write_file(infile_path)
         self.cluster_type.submit_job(
@@ -890,6 +906,9 @@ class LocalClusterJob(LocalJob):
             template=self.template,
             template_kwargs=self.template_kwargs,
         )
+
+        if isinstance(self.output_name, list):
+            self.output_name = [f for f in self.output_name if os.path.exists(f)]
 
         return 
     

@@ -1190,23 +1190,24 @@ class BuildQM(ToolInstance):
 
         # need to convert constraints to atoms so they can be encoded by the 
         # job manager
-        for job in self.theory.job_type:
-            if isinstance(job, OptimizationJob):
-                if job.constraints:
-                    for key in job.constraints:
-                        if key == "atoms":
-                            if not job.constraints["atoms"]:
-                                continue
-                            job.constraints["atoms"] = [
-                                "%i" % (self.theory.geometry.atoms.index(atom) + 1)
-                                for atom in self.theory.geometry.find(job.constraints["atoms"])
-                            ]
-                        else:
-                            for i, con in enumerate(job.constraints[key]):
-                                job.constraints[key][i] = [
+        if self.theory.job_type:
+            for job in self.theory.job_type:
+                if isinstance(job, OptimizationJob) or isinstance(job, ConformerSearchJob):
+                    if job.constraints:
+                        for key in job.constraints:
+                            if key == "atoms":
+                                if not job.constraints["atoms"]:
+                                    continue
+                                job.constraints["atoms"] = [
                                     "%i" % (self.theory.geometry.atoms.index(atom) + 1)
-                                    for atom in self.theory.geometry.find(con)
+                                    for atom in self.theory.geometry.find(job.constraints["atoms"])
                                 ]
+                            else:
+                                for i, con in enumerate(job.constraints[key]):
+                                    job.constraints[key][i] = [
+                                        "%i" % (self.theory.geometry.atoms.index(atom) + 1)
+                                        for atom in self.theory.geometry.find(con)
+                                    ]
 
         program = self.file_type.currentText()
         self.settings.last_program = program

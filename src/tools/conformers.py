@@ -311,6 +311,7 @@ class ConformerTool(BuildQM):
         mult = self.job_widget.getMultiplicity(update_settings)
         nproc = self.job_widget.getNProc(update_settings)
         mem = self.job_widget.getMem(update_settings)
+        jobs = self.job_widget.getJobs()
 
         solvent = self.job_widget.getSolvent(update_settings)
         
@@ -330,6 +331,7 @@ class ConformerTool(BuildQM):
             grid=grid,
             processors=nproc,
             memory=mem,
+            job_type=jobs,
             solvent=solvent,
             geometry=rescol,
             **combined_dict

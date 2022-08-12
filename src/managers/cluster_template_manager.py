@@ -123,7 +123,7 @@ class XTBSubmit(ProgramSubmitTemplate):
     pass
     
 class CRESTSubmit(ProgramSubmitTemplate):
-    expected_output_ext = "xyz"
+    expected_output_ext = ["crest_conformers.xyz", "deprotonated.xyz", "protomers.xyz", "tautomers.xyz"]
     
 
 class GaussianSlurmTemplate(ClusterSubmitTemplate, GaussianSubmit):
