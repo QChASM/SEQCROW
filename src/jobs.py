@@ -690,6 +690,7 @@ class XTBJob(LocalJob):
 class CRESTJob(LocalJob):
     format_name = "xyz"
     info_type = "CREST"
+    exec_options = {}
 
     def __repr__(self):
         return "local CREST job \"%s\"" % self.name
@@ -750,7 +751,10 @@ class CRESTJob(LocalJob):
         self.process.communicate()
         self.process = None
 
-        self.output_name = os.path.join(self.scratch_dir, "crest_conformers.xyz")
+        for f in ["crest_conformers", "tautomers", "deprotonated", "protomers"]:
+            test_file = os.path.join(self.scratch, f + ".xyz")
+            if os.path.exists(test_file):
+                self.output_name = test_file
 
         if self.job_options.get("delete_everything_but_output_file", False):
             self.remove_extra_files()

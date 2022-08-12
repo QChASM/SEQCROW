@@ -1298,7 +1298,7 @@ class TSSWidget(QWidget):
                 kwargs["name"] = name
             obj = cls(**kwargs)
             default_value = defaults.get(name, None)
-            if default_value and (
+            if default_value is not None and (
                 not hasattr(obj, "values") or
                 default_value in obj.values
             ):

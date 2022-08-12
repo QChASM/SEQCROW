@@ -9,6 +9,8 @@ from SEQCROW.tools.input_generator import (
 )
 from SEQCROW.input_file_formats import XTBKeywordOptions
 
+from chimerax.ui.options import FloatOption, IntOption, BooleanOption, EnumOption
+
 
 class ConformerSearchInfo:
     # name of program
@@ -29,12 +31,7 @@ class ConformerSearchInfo:
     use_constraints = True
 
     # file filter for QFileDialog.getOpenFileName
-    # if None, will be disabled when 'read checkpoint' is checked
-    save_checkpoint_filter = None
-    
-    # file filter for QFileDialog.getSaveFileName
-    # if None, will be disabled when 'read checkpoint' is unchecked
-    read_checkpoint_filter = None
+    restart_filter = None
     
     # basis file filter
     basis_file_filter = None
@@ -120,13 +117,61 @@ class ConformerSearchInfo:
         """
         return dict()
 
+    @staticmethod
+    def fixup_theory(theory, restart_file=None):
+        """
+        modify the input theory to run the necessary job type
+        if this is a dictionary, programs are keys
+        and the values are callable
+        otherwise, this is callable and works for all programs
+        
+        restart_file - path to file that can be used to restart
+            the job
+        """
+        return theory
+
+
+class ProtomersOption(EnumOption):
+    values = ("deprotonate", "protonate", "tautomerize", "none")
+
 
 class CREST(ConformerSearchInfo):
     # name of program
     name = "CREST"
-    initial_options = {
-        "command_line": {"ewin": ["6", "15", "25"]}
+    options = {
+        "energy_window": (
+            FloatOption, {
+                "min": 2,
+                "max": 100,
+                "decimal_places": 1,
+                "step": 1,
+                "default": 6,
+                "name": "energy threshold",
+            }
+        ),
+        "RMSD_threshold": (
+            FloatOption, {
+                "min": 0.05,
+                "max": 1.00,
+                "step": 0.1,
+                "default": 0.125,
+                "name": "RMSD threshold",
+            }
+        ),
+        "non_covalent_complex": (
+            BooleanOption, {
+                "default": False,
+                "name": "non-covalent complex",
+            }
+        ),
+        "tautomer_search": (
+            ProtomersOption, {
+                "default": "none",
+                "name": "protonation screening",
+            }
+        ),
     }
+
     parallel = True
     memory = False
     save_file_filter = "xTB input file (*.xc)"
@@ -146,10 +191,36 @@ class CREST(ConformerSearchInfo):
         )
         return contents, warnings   
 
+    def fixup_theory(
+        self,
+        theory,
+        energy_window=6,
+        RMSD_threshold=0.125,
+        non_covalent_complex=False,
+        tautomer_search="none",
+        restart_file=None,
+    ):
+        new_dict = {
+            "command_line": {
+                "ewin": ["%.1f" % energy_window],
+                "rthr": ["%.3f" % RMSD_threshold],
+            }
+        }
+        if non_covalent_complex:
+            new_dict["command_line"]["nci"] = []
+        if tautomer_search != "none":
+            new_dict["command_line"][tautomer_search] = []
+        
+        theory.kwargs = combine_dicts(
+            new_dict, theory.kwargs,
+        )
+        
+        return theory
+
     def get_job_kw_dict(
-            self,
-            read_checkpoint,
-            checkpoint_file,
+        self,
+        read_checkpoint,
+        checkpoint_file,
     ):
         """
         get a keyword dictionary given the settings on the 'job details' tab

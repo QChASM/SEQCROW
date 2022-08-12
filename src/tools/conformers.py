@@ -1,5 +1,4 @@
-import os.path
-import re
+import inspect
 
 from jinja2 import Template
 
@@ -122,6 +121,7 @@ class _ConformerSettings(Settings):
     }
     AUTO_SAVE = {
         "on_finished": Value("do nothing", StringArg),
+        "stored_defaults": "{}",
     }
     
 
@@ -211,7 +211,7 @@ class ConformerTool(BuildQM):
         self.other_keywords_widget.additionalOptionsChanged.connect(self.update_preview)
 
         tabs = QTabWidget()
-        tabs.addTab(self.job_widget, "job details")
+        tabs.addTab(self.job_widget, "conf. search options")
         tabs.addTab(self.method_widget, "method")
         tabs.addTab(self.basis_widget, "basis functions")
         tabs.addTab(self.other_keywords_widget, "additional options")
@@ -290,6 +290,79 @@ class ConformerTool(BuildQM):
                 if 'multiplicity' in fr.other:
                     self.job_widget.setMultiplicity(fr.other['multiplicity'])
 
+    def update_theory(self, update_settings=False):
+        """grabs the current settings and updates self.theory
+        always called before creating an input file"""
+        program = self.file_type.currentText()
+        file_info = self.manager.get_info(program)
+
+        rescol = ResidueCollection(self.model_selector.currentData(), bonds_matter=False)
+
+        meth = self.method_widget.getMethod(update_settings)
+        if file_info.basis_sets is not None:
+            basis = self.get_basis_set(update_settings)
+        else:
+            basis = None
+
+        dispersion = self.method_widget.getDispersion(update_settings)
+
+        grid = self.method_widget.getGrid(update_settings)
+        charge = self.job_widget.getCharge(update_settings)
+        mult = self.job_widget.getMultiplicity(update_settings)
+        nproc = self.job_widget.getNProc(update_settings)
+        mem = self.job_widget.getMem(update_settings)
+
+        solvent = self.job_widget.getSolvent(update_settings)
+        
+        kw_dict = self.job_widget.getKWDict(update_settings=update_settings)
+        other_kw_dict = self.other_keywords_widget.getKWDict(update_settings=update_settings)
+        if update_settings:
+            self.settings.save()
+
+        combined_dict = combine_dicts(kw_dict, other_kw_dict)
+
+        self.theory = Theory(
+            charge=charge,
+            multiplicity=mult,
+            method=meth,
+            basis=basis,
+            empirical_dispersion=dispersion,
+            grid=grid,
+            processors=nproc,
+            memory=mem,
+            solvent=solvent,
+            geometry=rescol,
+            **combined_dict
+        )
+
+        fixup_func = None
+        if file_info.fixup_theory:
+            if callable(file_info.fixup_theory):
+                fixup_func = file_info.fixup_theory
+            else:
+                fixup_func = file_info.fixup_theory[program]
+
+        kwargs = dict()
+        defaults = loads(self.settings.stored_defaults)
+        for option, widget in self.job_widget.options.items():
+            defaults[option] = widget.value
+        self.settings.stored_defaults = dumps(defaults)
+            
+        if fixup_func:
+            sig = inspect.signature(fixup_func)
+            
+            for param in sig.parameters.values():
+                if param.name not in self.job_widget.options:
+                    continue
+                value = self.job_widget.options[param.name].get_value()
+                kwargs[param.name] = value
+            
+            self.theory = fixup_func(
+                self.theory,
+                restart_file=self.job_widget.restart.text(),
+                **kwargs,
+            )
+
 
 class ConformerJob(JobTypeOption):
     def __init__(self, settings, session, init_form, parent=None):
@@ -304,8 +377,13 @@ class ConformerJob(JobTypeOption):
         self.constrained_torsions = []
 
         self.layout = QGridLayout(self)
+        
+        self.tabs = QTabWidget()
+        self.layout.addWidget(self.tabs, 0, 0)
+        
         job_form = QWidget()
         job_type_layout = QFormLayout(job_form)
+
 
         self.charge = QSpinBox()
         self.charge.setRange(-5, 5)
@@ -327,19 +405,7 @@ class ConformerJob(JobTypeOption):
             "e.g. a methylene radical would have a multiplicity of 2"
         )
         self.multiplicity.valueChanged.connect(self.something_changed)
-
         job_type_layout.addRow("multiplicity:", self.multiplicity)
-
-        self.job_type_opts = QTabWidget()
-
-        self.runtime = QWidget()
-        #the lineedit + button aligns poorly with a formlayout's label
-        runtime_outer_shell_layout = QGridLayout(self.runtime)
-        runtime_form = QWidget()
-        runtime_layout = QFormLayout(runtime_form)
-        margins = runtime_layout.contentsMargins()
-        new_margins = (margins.left(), 0, margins.right(), 0)
-        runtime_layout.setContentsMargins(*new_margins)
 
         self.nprocs = QSpinBox()
         self.nprocs.setRange(0, 128)
@@ -347,7 +413,7 @@ class ConformerJob(JobTypeOption):
         self.nprocs.setToolTip("set to 0 to not specify")
         self.nprocs.setValue(self.settings.last_nproc)
         self.nprocs.valueChanged.connect(self.something_changed)
-        runtime_layout.addRow("processors:", self.nprocs)
+        job_type_layout.addRow("processors:", self.nprocs)
 
         self.mem = QSpinBox()
         self.mem.setRange(0, 512)
@@ -356,46 +422,32 @@ class ConformerJob(JobTypeOption):
         self.mem.setToolTip("set to 0 to not specify")
         self.mem.setValue(self.settings.last_mem)
         self.mem.valueChanged.connect(self.something_changed)
-        runtime_layout.addRow("memory:", self.mem)
-
-        self.use_checkpoint = QCheckBox()
-        self.use_checkpoint.stateChanged.connect(self.something_changed)
-        self.use_checkpoint.stateChanged.connect(self.chk_state_changed)
-        runtime_layout.addRow("read checkpoint:", self.use_checkpoint)
-
-        runtime_outer_shell_layout.addWidget(runtime_form, 0, 0, 1, 1, Qt.AlignTop)
-
-        file_browse = QWidget()
-        file_browse_layout = QGridLayout(file_browse)
-        margins = file_browse_layout.contentsMargins()
-        new_margins = (margins.left(), 0, margins.right(), 0)
-        file_browse_layout.setContentsMargins(*new_margins)
-        self.chk_file_path = QLineEdit()
-        self.chk_file_path.setPlaceholderText(
-            "{{ name }} will be replaced if file is saved"
+        job_type_layout.addRow("memory:", self.mem)
+        
+        self.restart = QLineEdit()
+        self.browse = QPushButton("browse...")
+        self.browse.clicked.connect(self.browse_restart)
+        restart_widget = QWidget()
+        restart_layout = QHBoxLayout(restart_widget)
+        restart_layout.setContentsMargins(0, 0, 4, 0)
+        restart_layout.insertWidget(0, self.restart, 1)
+        restart_layout.insertWidget(1, self.browse, 0)
+        job_type_layout.addRow(
+            "restart file:", restart_widget,
         )
-        self.chk_file_path.textChanged.connect(self.something_changed)
-        self.chk_browse_button = QPushButton("browse...")
-        self.chk_browse_button.clicked.connect(self.open_chk_save)
-        label = QLabel("checkpoint path:")
-        file_browse_layout.addWidget(label, 0, 0, Qt.AlignVCenter)
-        file_browse_layout.addWidget(self.chk_file_path, 0, 1, Qt.AlignVCenter)
-        file_browse_layout.addWidget(self.chk_browse_button, 0, 2, Qt.AlignVCenter)
-        file_browse_layout.setColumnStretch(0, 0)
-        file_browse_layout.setColumnStretch(1, 1)
-        file_browse_layout.setColumnStretch(2, 0)
-        runtime_outer_shell_layout.addWidget(file_browse, 1, 0, Qt.AlignTop)
-
-        align_widget = QWidget()
-        runtime_outer_shell_layout.addWidget(align_widget, 2, 0, Qt.AlignTop)
-
-        runtime_outer_shell_layout.setRowStretch(0, 0)
-        runtime_outer_shell_layout.setRowStretch(1, 0)
-        runtime_outer_shell_layout.setRowStretch(2, 1)
-
-        self.job_type_opts.addTab(self.runtime, "execution")
+        
+        self.tabs.addTab(job_form, "job details")
 
 
+        # algorithm-specific options
+        algorithm_widget = QWidget()
+        self.algorithm_layout = QFormLayout(algorithm_widget)
+
+        self.tabs.addTab(algorithm_widget, "algorithm options")
+        self.options = dict()
+
+
+        # implicit solvent
         solvent_widget = QWidget()
         solvent_layout = QGridLayout(solvent_widget)
 
@@ -422,7 +474,7 @@ class ConformerJob(JobTypeOption):
 
         solvent_layout.addWidget(self.solvent_names)
 
-        self.job_type_opts.addTab(solvent_widget, "solvent")
+        self.tabs.addTab(solvent_widget, "solvent")
 
 
         self.geom_opt = QWidget()
@@ -517,15 +569,7 @@ class ConformerJob(JobTypeOption):
         geom_opt_layout.setRowStretch(0, 0)
         geom_opt_layout.setRowStretch(1, 1)
 
-        self.job_type_opts.addTab(self.geom_opt, "constraints")
-
-        splitter = QSplitter(Qt.Vertical)
-        splitter.setChildrenCollapsible(True)
-        splitter.addWidget(job_form)
-        splitter.addWidget(self.job_type_opts)
-        splitter.setStretchFactor(0, 0)
-        splitter.setStretchFactor(1, 1)
-        self.layout.addWidget(splitter)
+        self.tabs.addTab(self.geom_opt, "constraints")
 
         self.setOptions(self.form)
 
@@ -578,22 +622,54 @@ class ConformerJob(JobTypeOption):
                 self.solvent_names.addItems(file_info.solvents)
             self.solvent_name.setText(self.settings.previous_solvent_name)
         
-        self.job_type_opts.setTabEnabled(1, bool(file_info.solvents))
-        if not file_info.read_checkpoint_filter:
-            self.use_checkpoint.setCheckState(Qt.Unchecked)
-        self.use_checkpoint.setEnabled(
-            bool(file_info.read_checkpoint_filter)
-        )
-        self.chk_file_path.setEnabled(
-            (self.use_checkpoint.checkState() == Qt.Checked and bool(file_info.read_checkpoint_filter)) or 
-            (self.use_checkpoint.checkState() == Qt.Unchecked and bool(file_info.save_checkpoint_filter))
-        )
-        self.chk_browse_button.setEnabled(
-            (self.use_checkpoint.checkState() == Qt.Checked and bool(file_info.read_checkpoint_filter)) or 
-            (self.use_checkpoint.checkState() == Qt.Unchecked and bool(file_info.save_checkpoint_filter))
-        )
+        self.tabs.setTabEnabled(1, bool(file_info.solvents))
+        self.restart.setEnabled(bool(file_info.restart_filter))
+        self.browse.setEnabled(bool(file_info.restart_filter))
 
         self.solvent_names.sortItems()
+        
+        self.options = dict()
+        for i in range(0, self.algorithm_layout.rowCount()):
+            self.algorithm_layout.removeRow(0)
+        
+        defaults = loads(self.settings.stored_defaults)
+        
+        for name, option in file_info.options.items():
+            cls = option[0]
+            kwargs = option[1]
+            if "callback" not in kwargs:
+                kwargs["callback"] = None
+            if "default" not in kwargs:
+                kwargs["default"] = None
+            if "name" not in kwargs:
+                kwargs["name"] = name
+            obj = cls(**kwargs)
+            default_value = defaults.get(name, None)
+            if default_value is not None and (
+                not hasattr(obj, "values") or
+                default_value in obj.values
+            ):
+                obj.set_value(default_value)
+            self.algorithm_layout.addRow(
+                "%s:" % kwargs["name"].replace("_", " "),
+                obj.widget
+            )
+            self.options[name] = obj
+
+    def set_algorithm_options(self, algorithm_dict):
+        for key, value in algorithm_dict.items():
+            try:
+                self.options[key].set_value(value)
+            except KeyError:
+                continue
+    
+    def browse_restart(self):
+        filename, _ = QFileDialog.getOpenFileName(
+            filter=self.tss_info.restart_filter
+        )
+
+        if filename:
+            self.restart.setText(filename)
 
     def getConstraints(self):
         """returns dictionary with contraints

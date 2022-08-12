@@ -97,7 +97,7 @@ class TSSFinder:
         restart_file - path to file that can be used to restart
             the job
         """
-        pass
+        return theory
 
 
 def fixup_gaussian_stqn_theory(theory, restart_file=None):
