@@ -955,6 +955,9 @@ class ORCAFileInfo(QMInputFileInfo):
         molecule = ""
         fmt = "{:<3s} {: 10.6f} {: 10.6f} {: 10.6f}\n"
         for atom in theory.geometry.atoms:
+            if atom.is_dummy:
+                molecule += fmt.format("DA", *atom.coords)
+                continue
             molecule += fmt.format(atom.element, *atom.coords)
 
         molecule += "*\n"

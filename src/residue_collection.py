@@ -73,10 +73,13 @@ def fromChimAtom(atom=None, *args, use_scene=False, serial_number=None, atomspec
         coords = atom.scene_coord
     else:
         coords = atom.coord
+    element = atom.element.name
+    if element == "LP":
+        element = "X"
     aarontools_atom = Atom(
         *args,
         name=str(atom.serial_number),
-        element=atom.element.name,
+        element=element,
         coords=coords,
         **kwargs
     )

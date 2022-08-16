@@ -332,10 +332,18 @@ class ORCAJob(LocalJob):
         if " " in infile:
             raise RuntimeError("ORCA input files cannot contain spaces")
 
-        if platform == "win32":
-            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
-        else:        
-            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log)
+        try:
+            if platform == "win32":
+                self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+            else:        
+                self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log)
+        except FileNotFoundError:
+            self.session.logger.error(
+                "job could not start because ORCA executable (%s) was not found\n" % executable +
+                "ensure the correct path to executable is specified in the \"SEQCROW Jobs\"\n" +
+                "settings in Favorites/Preferences > Settings..."
+            )
+            return
 
         self.process.communicate()
         self.process = None
@@ -396,11 +404,19 @@ class GaussianJob(LocalJob):
         log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
         log.write("executing:\n%s\n\n" % " ".join(args))
 
-        if platform == "win32":
-            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
-        else:
-            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log)
-
+        try:
+            if platform == "win32":
+                self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+            else:
+                self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log)
+        except FileNotFoundError:
+            self.session.logger.error(
+                "job could not start because Gaussian executable (%s) was not found\n" % executable +
+                "ensure the correct path to executable is specified in the \"SEQCROW Jobs\"\n" +
+                "settings in Favorites/Preferences > Settings..."
+            )
+            return
+        
         self.process.communicate()
         self.process = None
 
@@ -479,11 +495,19 @@ class Psi4Job(LocalJob):
         log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
         log.write("executing:\n%s\n\n" % " ".join(args))
 
-        if platform == "win32":
-            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
-        else:
-            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log)
-
+        try:
+            if platform == "win32":
+                self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+            else:
+                self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log)
+        except FileNotFoundError:
+            self.session.logger.error(
+                "job could not start because Psi4 executable (%s) was not found\n" % executable +
+                "ensure the correct path to executable is specified in the \"SEQCROW Jobs\"\n" +
+                "settings in Favorites/Preferences > Settings..."
+            )
+            return
+            
         for f in os.listdir(self.scratch_dir):
             if f.lower().endswith("fchk") or f.lower().endswith("fch"):
                 self.output_name = {
@@ -594,15 +618,23 @@ class QChemJob(LocalJob):
         log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
         log.write("executing:\n%s\n\n" % " ".join(args))
 
-        if platform == "win32":
-            self.process = subprocess.Popen(
-                args, cwd=self.scratch_dir, stdout=outfile, stderr=log,
-                creationflags=subprocess.CREATE_NO_WINDOW
+        try:
+            if platform == "win32":
+                self.process = subprocess.Popen(
+                    args, cwd=self.scratch_dir, stdout=outfile, stderr=log,
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                )
+            else:
+                self.process = subprocess.Popen(
+                    args, cwd=self.scratch_dir, stdout=outfile, stderr=log
+                )
+        except FileNotFoundError:
+            self.session.logger.error(
+                "job could not start because Q-Chem executable (%s) was not found\n" % executable +
+                "ensure the correct path to executable is specified in the \"SEQCROW Jobs\"\n" +
+                "settings in Favorites/Preferences > Settings..."
             )
-        else:
-            self.process = subprocess.Popen(
-                args, cwd=self.scratch_dir, stdout=outfile, stderr=log
-            )
+            return
 
         self.process.communicate()
         self.process = None
@@ -657,10 +689,18 @@ class XTBJob(LocalJob):
         log.close()
         log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'a')
 
-        if platform == "win32":
-            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
-        else:        
-            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log)
+        try:
+            if platform == "win32":
+                self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+            else:        
+                self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log)
+        except FileNotFoundError:
+            self.session.logger.error(
+                "job could not start because xTB executable (%s) was not found\n" % executable +
+                "ensure the correct path to executable is specified in the \"SEQCROW Jobs\"\n" +
+                "settings in Favorites/Preferences > Settings..."
+            )
+            return
 
         self.process.communicate()
         self.process = None
@@ -746,11 +786,19 @@ class CRESTJob(LocalJob):
         log.close()
         log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'a')
 
-        if platform == "win32":
-            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
-        else:        
-            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log)
-
+        try:
+            if platform == "win32":
+                self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+            else:        
+                self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log)
+        except FileNotFoundError:
+            self.session.logger.error(
+                "job could not start because CREST executable (%s) was not found\n" % executable +
+                "ensure the correct path to executable is specified in the \"SEQCROW Jobs\"\n" +
+                "settings in Favorites/Preferences > Settings..."
+            )
+            return
+            
         self.process.communicate()
         self.process = None
 
@@ -1401,10 +1449,18 @@ class GaussianSTQNJob(TSSJob):
         log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
         log.write("executing:\n%s\n\n" % " ".join(args))
 
-        if platform == "win32":
-            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
-        else:
-            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log)
+        try:
+            if platform == "win32":
+                self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+            else:
+                self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log)
+        except FileNotFoundError:
+            self.session.logger.error(
+                "job could not start because Gaussian executable (%s) was not found\n" % executable +
+                "ensure the correct path to executable is specified in the \"SEQCROW Jobs\"\n" +
+                "settings in Favorites/Preferences > Settings..."
+            )
+            return
 
         self.process.communicate()
         self.process = None
@@ -1464,11 +1520,19 @@ class ORCANEBJob(TSSJob):
         if " " in infile:
             raise RuntimeError("ORCA input files cannot contain spaces")
 
-        if platform == "win32":
-            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
-        else:        
-            self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log)
-
+        try:
+            if platform == "win32":
+                self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+            else:        
+                self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log)
+        except FileNotFoundError:
+            self.session.logger.error(
+                "job could not start because ORCA executable (%s) was not found\n" % executable +
+                "ensure the correct path to executable is specified in the \"SEQCROW Jobs\"\n" +
+                "settings in Favorites/Preferences > Settings..."
+            )
+            return
+            
         self.process.communicate()
         self.process = None
 
@@ -1521,16 +1585,24 @@ class QChemFSMJob(TSSJob):
         log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
         log.write("executing:\n%s\n\n" % " ".join(args))
 
-        if platform == "win32":
-            self.process = subprocess.Popen(
-                args, cwd=self.scratch_dir, stdout=outfile, stderr=log,
-                creationflags=subprocess.CREATE_NO_WINDOW
+        try:
+            if platform == "win32":
+                self.process = subprocess.Popen(
+                    args, cwd=self.scratch_dir, stdout=outfile, stderr=log,
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                )
+            else:
+                self.process = subprocess.Popen(
+                    args, cwd=self.scratch_dir, stdout=outfile, stderr=log
+                )
+        except FileNotFoundError:
+            self.session.logger.error(
+                "job could not start because Q-Chem executable (%s) was not found\n" % executable +
+                "ensure the correct path to executable is specified in the \"SEQCROW Jobs\"\n" +
+                "settings in Favorites/Preferences > Settings..."
             )
-        else:
-            self.process = subprocess.Popen(
-                args, cwd=self.scratch_dir, stdout=outfile, stderr=log
-            )
-
+            return
+            
         self.process.communicate()
         self.process = None
 

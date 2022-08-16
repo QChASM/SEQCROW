@@ -3747,6 +3747,8 @@ class BasisOption(QWidget):
             item.deleteLater()
             item.removeRow(i)
 
+        elements = [ele for ele in elements if ele != "LP"]
+
         for i, ele in enumerate(elements):
             self.elements.insertRow(i)
             ele_button = ElementButton(ele)
@@ -4345,6 +4347,7 @@ class BasisWidget(QWidget):
     def setElements(self, element_list):
         """sets the available elements in all child BasisOptions
         if an element is already available, it will not be removed"""
+        element_list = [ele for ele in element_list if ele != "LP"]
         previous_elements = self.elements
         self.elements = element_list
 
