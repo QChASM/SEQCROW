@@ -443,8 +443,13 @@ class NormalModes(ToolInstance):
         dX = vector * scaling/max_norm
 
         if self.vec_mw_bool and self.display_tabs.currentIndex() == 0:
-            for i, x in enumerate(dX):
+            i = 0
+            while i < len(dX):
+                if geom.atoms[i].is_dummy:
+                    i += 1
+                    continue
                 dX[i] *= geom.atoms[i].mass()
+                i += 1
 
         return dX
 
@@ -497,15 +502,21 @@ class NormalModes(ToolInstance):
         #make a bild file for the model
         s = ".color %f %f %f\n" % tuple(color[:-1])
         s += ".transparency %f\n" % (1. - color[-1])
-        for i in range(0, len(geom.atoms)):
-            n = np.linalg.norm(dX[i])
+        i = 0
+        for i in range(0, geom.num_atoms):
+            if geom.atoms[i].is_dummy and len(dX) != geom.num_atoms:
+                i += 1
+                continue
 
+            n = np.linalg.norm(dX[i])
             info = tuple(t for s in [[x for x in geom.atoms[i].coords], \
                                      [x for x in geom.atoms[i].coords + dX[i]], \
                                      [n/(n + 0.75)]] for t in s)
                                     
             if n > 0.1:
                 s += ".arrow %10.6f %10.6f %10.6f   %10.6f %10.6f %10.6f   0.02 0.05 %5.3f\n" % info
+
+            i += 1
 
         stream = BytesIO(bytes(s, 'utf-8'))
         bild_obj, status = read_bild(self.session, stream, "%.2f cm^-1" % fr.other['frequency'].data[mode].frequency)
@@ -542,10 +553,15 @@ class NormalModes(ToolInstance):
         vector = fr.other['frequency'].data[mode].vector
 
         dX = self._get_coord_change(geom, vector, scale)
+        if len(dX) != geom.num_atoms:
+            dummy_ndx = [i for i in range(0, geom.num_atoms) if geom.atoms[i].is_dummy]
+            for ndx in dummy_ndx[::-1]:
+                dX = np.insert(dX, ndx, np.zeros(3), axis=0)
         
-        Xf = geom.coords + dX
-        X = geom.coords
-        Xr = geom.coords - dX
+        coords = geom.coords
+        Xf = coords + dX
+        X = coords
+        Xr = coords - dX
         
         S = Pathway(np.array([Xf, X, Xr, X, Xf]))
         
