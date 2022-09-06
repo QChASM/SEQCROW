@@ -564,6 +564,7 @@ def vbur_vis(
             diff_mat = d_ep - radius_list
             diff_mat[:,i] = 1
             mask = np.invert(np.any(diff_mat < 0, axis=1))
+
             center_added_points.extend(prev_r_list[mask] + p)
             atom_added_points[i].extend(prev_r_list[mask] + p + center_coords)
 
@@ -607,7 +608,7 @@ def vbur_vis(
                     atom_added_points[i].extend(prev_r_list[mask] + p + coords[i])
                     atom_added_points[j].extend(prev_r_list[mask] + p + coords[i])
 
-    tol = 0.3 * point_spacing
+    tol = 0
     for i in range(0, len(coords)):
         # get a grid of points around each atom
         # remove any points that are close to an intersection
@@ -617,28 +618,33 @@ def vbur_vis(
         # it won't leave a gap
         n_atom_grid = int(radius_list[i]**2 * n_grid / radius**2)
         atom_sphere = fibonacci_sphere(radius=radius_list[i], num=n_atom_grid)
+        
         mask = np.ones(len(atom_sphere), dtype=bool)
         n_atom_grid = len(atom_sphere)
         if len(atom_added_points[i]) > 0:
             remove_ndx = []
-            dist_mat = distance_matrix(atom_sphere, np.array(atom_added_points[i]) - coords[i])
-            mask *= np.any((dist_mat - tol) < 0)
+            dist_mat = distance_matrix(
+                atom_sphere,
+                np.array(atom_added_points[i]) - coords[i]
+            )
+            mask[np.min((dist_mat - tol), axis=1) < 0] = False
 
             atom_sphere = atom_sphere[mask]
 
             atom_sphere = np.array(atom_sphere)
             n_atom_grid = len(atom_sphere)
-            atom_sphere = np.concatenate((atom_sphere, np.array(atom_added_points[i]) - coords[i]))
+            atom_sphere = np.concatenate((
+                atom_sphere,
+                np.array(atom_added_points[i]) - coords[i]
+            ))
 
         if len(atom_sphere) < 4:
             continue
+
         atom_hull = ConvexHull(atom_sphere / radius_list[i])
         tri = atom_hull.simplices
 
         atom_sphere += coords[i]
-        
-        remove_v = []
-        new_ndx = np.zeros(len(atom_sphere), dtype=int)
 
         # remove any points that are covered by another atom
         # only loop over n_atom_grid points so we don't remove
@@ -647,37 +653,39 @@ def vbur_vis(
         del_count = 0
         atom_grid_dist = distance_matrix(atom_sphere, coords)
         center_atom_grid_dist = distance_matrix(atom_sphere, [center_coords])[:,0]
+        keep_v = []
         for j in range(0, n_atom_grid):
             if center_atom_grid_dist[j] > radius:
-                remove_v.append(j)
-                del_count += 1
                 continue
             for k in range(0, len(coords)):
                 if i == k:
                     continue
                 if atom_grid_dist[j,k] < radius_list[k]:
-                    remove_v.append(j)
-                    del_count += 1
                     break
-            
-            new_ndx[j] = j - del_count
+            else:
+                keep_v.append(j)
         
-        for j in range(n_atom_grid, len(atom_sphere)):
-            new_ndx[j] = j - del_count
-    
-        if len(remove_v) == len(atom_sphere):
+        keep_v.extend(
+            np.arange(
+                len(atom_sphere) - len(atom_added_points[i]),
+                len(atom_sphere),
+                dtype=int,
+            )
+        )
+        
+        new_ndx = {old: new for new, old in enumerate(keep_v)}
+
+        if len(keep_v) == 0:
             continue
     
-        atom_sphere = atom_sphere.tolist()
-        for vi in remove_v[::-1]:
-            atom_sphere.pop(vi)
-            tri = tri[np.all(tri != vi, axis=1)]
+        mask = np.min(np.isin(tri, keep_v), axis=1)
+        tri = tri[mask]
+        tri = np.vectorize(new_ndx.get)(tri)
         
-        for j, ti in enumerate(tri):
-            for k, v in enumerate(ti):
-                tri[j][k] = new_ndx[v]
-  
-        atom_sphere = np.array(atom_sphere)
+        mask = np.zeros(len(atom_sphere), dtype=bool)
+        mask[keep_v] = True
+        atom_sphere = atom_sphere[mask]
+
         norms = -(atom_sphere - coords[i]) / radius_list[i]
         
         triangles.extend(tri + len(vertices))

@@ -17,6 +17,7 @@ from Qt.QtWidgets import (
     QLineEdit,
     QLabel,
     QWidget,
+    QPushButton,
 )
 
 from chimerax.core.tools import ToolInstance
@@ -27,7 +28,7 @@ from AaronTools.theory import Theory
 from AaronTools.const import UNIT, PHYSICAL
 
 from SEQCROW.tools.normal_modes import FreqTableWidgetItem
-from SEQCROW.widgets import FakeMenu
+from SEQCROW.widgets import FakeMenu, copy_icon
 
 
 nrg_infos = [
@@ -112,10 +113,11 @@ class Info(ToolInstance):
         tabs.addTab(general_info, "general")
 
         self.table = QTableWidget()
-        self.table.setColumnCount(2)
-        self.table.setHorizontalHeaderLabels(['Data', 'Value'])
+        self.table.setColumnCount(3)
+        self.table.setHorizontalHeaderLabels(['Data', 'Value', ""])
         self.table.horizontalHeader().setStretchLastSection(False)            
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Interactive)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Interactive)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
@@ -498,6 +500,7 @@ class Info(ToolInstance):
         self.table.insertRow(0)
         self.table.setItem(0, 0, item)
         self.table.setItem(0, 1, val)
+        self.add_copy_button(0)
         for info in fr.other.keys():
             if info == "archive" and not self.settings.archive:
                 continue
@@ -565,6 +568,8 @@ class Info(ToolInstance):
                     value.setData(Qt.DisplayRole, val)
                     self.table.setItem(row, 1, value)
 
+                self.add_copy_button(row)
+
             elif isinstance(fr.other[info], Theory):
                 theory = fr.other[info]
                 if theory.method is not None:
@@ -578,7 +583,8 @@ class Info(ToolInstance):
                     value = QTableWidgetItem()
                     value.setData(Qt.DisplayRole, theory.method.name)
                     self.table.setItem(row, 1, value)
-                
+                    self.add_copy_button(row)
+                    
                 if theory.basis is not None:
                     if theory.basis.basis:
                         for basis in theory.basis.basis:
@@ -595,7 +601,8 @@ class Info(ToolInstance):
                             value = QTableWidgetItem()
                             value.setData(Qt.DisplayRole, basis.name)
                             self.table.setItem(row, 1, value)
-
+                            self.add_copy_button(row)
+                        
                     if theory.basis.ecp:
                         for ecp in theory.basis.ecp:
                             row = self.table.rowCount()
@@ -611,6 +618,7 @@ class Info(ToolInstance):
                             value = QTableWidgetItem()
                             value.setData(Qt.DisplayRole, ecp.name)
                             self.table.setItem(row, 1, value)
+                            self.add_copy_button(row)
 
             elif (
                 hasattr(fr.other[info], "__iter__") and
@@ -634,7 +642,8 @@ class Info(ToolInstance):
                 value = QTableWidgetItem()
                 value.setData(Qt.DisplayRole, ", ".join(["%.4f" % x for x in vals]))
                 self.table.setItem(row, 1, value)
-
+                
+                self.add_copy_button(row)
 
         if "frequency" in fr.other:
             self.tabs.setTabEnabled(1, True)
@@ -790,6 +799,7 @@ class Info(ToolInstance):
 
         self.table.resizeColumnToContents(0)
         self.table.resizeColumnToContents(1)
+        self.table.resizeColumnToContents(2)
 
         self.freq_table.resizeColumnToContents(0)
         self.freq_table.resizeColumnToContents(1)
@@ -797,6 +807,30 @@ class Info(ToolInstance):
         
         self.apply_filter()
     
+    def copy_item(self, row_ndx):
+        item = self.table.item(row_ndx, 1)
+        if item is None:
+            item = self.table.cellWidget(row_ndx, 1)
+        text = item.text().replace("<sub>", "").replace("</sub>", "")
+        app = QApplication.instance()
+        clipboard = app.clipboard()
+        clipboard.setText(text)
+        self.session.logger.status("copied to clipboard")
+
+    def add_copy_button(self, row):
+        copy = QPushButton(self.table)
+        copy.setIcon(copy_icon)
+        copy.setMinimumWidth(int(1.6*copy.fontMetrics().boundingRect("Qy").width()))
+        # copy.setMaximumWidth(int(1.6*copy.fontMetrics().boundingRect("Qy").width()))
+        copy.setMinimumHeight(int(1.6*copy.fontMetrics().boundingRect("Qy").height()))
+        # copy.setMaximumHeight(int(1.6*copy.fontMetrics().boundingRect("Qy").height()))
+        copy.setFlat(True)
+        copy.setToolTip("copy this value to your clipboard")
+        copy.clicked.connect(
+            lambda *args, row_ndx=row: self.copy_item(row_ndx)
+        )
+        self.table.setCellWidget(row, 2, copy)
+
     def apply_filter(self, text=None):
         if text is None:
             text = self.filter.text()

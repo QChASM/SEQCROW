@@ -240,9 +240,9 @@ class OrbitalViewer(ToolInstance):
         other_surface_tab = QWidget()
         other_surface_layout = QFormLayout(other_surface_tab)
         
-        e_density_group = QGroupBox("electron density")
-        e_density_layout = QFormLayout(e_density_group)
-        other_surface_layout.addRow(e_density_group)
+        self.e_density_group = QGroupBox("electron density")
+        e_density_layout = QFormLayout(self.e_density_group)
+        other_surface_layout.addRow(self.e_density_group)
         
         self.ed_color = ColorButton(has_alpha_channel=True, max_size=(16, 16))
         self.ed_color.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
@@ -261,9 +261,9 @@ class OrbitalViewer(ToolInstance):
         e_density_layout.addRow(show_e_density)
         
 
-        fukui_group = QGroupBox("Fukui functions")
-        fukui_layout = QFormLayout(fukui_group)
-        other_surface_layout.addRow(fukui_group)
+        self.fukui_group = QGroupBox("Fukui functions")
+        fukui_layout = QFormLayout(self.fukui_group)
+        other_surface_layout.addRow(self.fukui_group)
         
         
         self.fukui_type = QComboBox()
@@ -413,14 +413,104 @@ class OrbitalViewer(ToolInstance):
         
         orbits = fr.other["orbitals"]
 
+        self.fukui_group.setEnabled(True)
+        self.e_density_group.setEnabled(True)
+
         homo_ndx = 0
-        if orbits.beta_nrgs is None or len(orbits.beta_nrgs) == 0:
+        if orbits.alpha_occupancies and not orbits.beta_occupancies:
+            self.fukui_group.setEnabled(False)
+            if "orbit_kinds" not in fr.other:
+                self.mo_table.setColumnCount(3)
+                self.mo_table.setHorizontalHeaderLabels(
+                    ["#", "alpha + beta occ.", "Energy (E\u2095)"]
+                )
+            else:
+                self.mo_table.setColumnCount(2)
+                self.mo_table.setHorizontalHeaderLabels(
+                    ["#", "Type"]
+                )
+            for i, nrg in enumerate(orbits.alpha_nrgs[::-1]):
+                row = self.mo_table.rowCount()
+                self.mo_table.insertRow(row)
+                
+                ndx = OrbitalTableItem()
+                ndx_str = str(orbits.n_mos - i)
+                ndx.setData(Qt.DisplayRole, ndx_str)
+                ndx.setData(Qt.UserRole, orbits.n_mos - i - 1)
+                ndx.setTextAlignment(Qt.AlignCenter)
+                self.mo_table.setItem(row, 0, ndx)
+                
+                occ = 2 * orbits.alpha_occupancies[orbits.n_mos - i - 1]
+
+                occupancy = OrbitalTableItem()
+                occupancy.setData(Qt.DisplayRole, "%.5f" % occ)
+                occupancy.setData(Qt.UserRole, occ)
+                occupancy.setTextAlignment(Qt.AlignCenter)
+                self.mo_table.setItem(row, 1, occupancy)
+                
+                nrg_str = "%.5f" % nrg
+                orbit_nrg = OrbitalTableItem()
+                orbit_nrg.setData(Qt.DisplayRole, nrg_str)
+                orbit_nrg.setData(Qt.UserRole, nrg)
+                orbit_nrg.setTextAlignment(Qt.AlignCenter)
+                self.mo_table.setItem(row, 2, orbit_nrg)
+            if not homo_ndx:
+                homo_ndx = orbits.n_mos - max(orbits.n_alpha, orbits.n_beta)
+        elif orbits.alpha_occupancies and orbits.beta_occupancies:
+            self.fukui_group.setEnabled(False)
+            if "orbit_kinds" not in fr.other:
+                self.mo_table.setColumnCount(3)
+                self.mo_table.setHorizontalHeaderLabels(
+                    ["#", "alpha occ.", "beta occ.", "Energy (E\u2095)"]
+                )
+            else:
+                self.mo_table.setColumnCount(2)
+                self.mo_table.setHorizontalHeaderLabels(
+                    ["#", "Type"]
+                )
+            for i, nrg in enumerate(orbits.alpha_nrgs[::-1]):
+                row = self.mo_table.rowCount()
+                self.mo_table.insertRow(row)
+                
+                ndx = OrbitalTableItem()
+                ndx_str = str(orbits.n_mos - i)
+                ndx.setData(Qt.DisplayRole, ndx_str)
+                ndx.setData(Qt.UserRole, orbits.n_mos - i - 1)
+                ndx.setTextAlignment(Qt.AlignCenter)
+                self.mo_table.setItem(row, 0, ndx)
+                
+                alpha_occ = orbits.alpha_occupancies[orbits.n_mos - i - 1]
+                beta_occ = orbits.beta_occupancies[orbits.n_mos - i - 1]
+
+                a_occupancy = OrbitalTableItem()
+                a_occupancy.setData(Qt.DisplayRole, "%.5f" % alpha_occ)
+                a_occupancy.setData(Qt.UserRole, alpha_occ)
+                a_occupancy.setTextAlignment(Qt.AlignCenter)
+                self.mo_table.setItem(row, 1, a_occupancy)
+                
+                b_occupancy = OrbitalTableItem()
+                b_occupancy.setData(Qt.DisplayRole, "%.5f" % beta_occ)
+                b_occupancy.setData(Qt.UserRole, beta_occ)
+                b_occupancy.setTextAlignment(Qt.AlignCenter)
+                self.mo_table.setItem(row, 1, b_occupancy)
+                
+                nrg_str = "%.5f" % nrg
+                orbit_nrg = OrbitalTableItem()
+                orbit_nrg.setData(Qt.DisplayRole, nrg_str)
+                orbit_nrg.setData(Qt.UserRole, nrg)
+                orbit_nrg.setTextAlignment(Qt.AlignCenter)
+                self.mo_table.setItem(row, 3, orbit_nrg)
+            if not homo_ndx:
+                homo_ndx = orbits.n_mos - max(orbits.n_alpha, orbits.n_beta)
+        elif orbits.beta_nrgs is None or len(orbits.beta_nrgs) == 0:
             if "orbit_kinds" not in fr.other:
                 self.mo_table.setColumnCount(3)
                 self.mo_table.setHorizontalHeaderLabels(
                     ["#", "Ground State Occ.", "Energy (E\u2095)"]
                 )
             else:
+                self.fukui_group.setEnabled(False)
+                self.e_density_group.setEnabled(False)
                 self.mo_table.setColumnCount(2)
                 self.mo_table.setHorizontalHeaderLabels(
                     ["#", "Type"]

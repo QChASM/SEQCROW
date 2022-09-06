@@ -1008,13 +1008,8 @@ class SelectSimilarFragments(MouseMode):
 
             first_selected = None
             
-
             fragments = []
-            previous_frag_lens = []
             frag_ranks = dict()
-            frag_lengths = []
-            frag_elements = []
-            frag_added = []
 
             for m in self.session.models.list(type=AtomicStructure):
                 mdl_atoms = Atoms(m.atoms)
@@ -1032,82 +1027,18 @@ class SelectSimilarFragments(MouseMode):
             frag_elements = [sorted(frag.elements.names) for frag in fragments]
             frag_added = [False for frag in fragments]
 
-            for p in pick:
-                if isinstance(p, PickedAtoms):
-                    for atom in p.atoms:
-                        if atom in atoms:
-                            continue
-                        connected_atoms = get_fragment(atom, max_len=atom.structure.num_atoms)
-                        atoms = atoms.merge(connected_atoms)
-                        if first_selected is None:
-                            first_selected = atoms[0].selected
+            args = [
+                fragments, frag_ranks, frag_lengths, frag_elements, frag_added
+            ]
 
-                elif isinstance(p, PickedAtom):
-                    if p.atom in atoms:
-                        continue
-                    connected_atoms = get_fragment(
-                        p.atom,
-                        max_len=p.atom.structure.num_atoms
-                    )
-                    atoms = atoms.merge(connected_atoms)
-                    if first_selected is None:
-                        first_selected = atoms[0].selected
 
-                elif isinstance(p, PickedBonds):
-                    for bond in p.bonds:
-                        if bond.atoms[0] in atoms:
-                            continue
-                        connected_atoms = get_fragment(
-                            bond.atoms[0],
-                            max_len=bond.structure.num_atoms
-                        )
-                        atoms = atoms.merge(connected_atoms)
-                        if first_selected is None:
-                            first_selected = atoms[0].selected
-
-                elif isinstance(p, PickedBond):
-                    if p.bond.atoms[0] in atoms:
-                        continue
-                    connected_atoms = get_fragment(
-                        p.bond.atoms[0],
-                        max_len=p.bond.structure.num_atoms
-                    )
-                    atoms = atoms.merge(connected_atoms)
-                    if first_selected is None:
-                        first_selected = atoms[0].selected
-
-                elif isinstance(p, PickedResidues):
-                    for res in p.residues:
-                        for atom in res:
-                            if atom in atoms:
-                                continue
-                            connected_atoms = get_fragment(
-                                atom,
-                                max_len=res.structure.num_atoms
-                            )
-                            atoms = atoms.merge(connected_atoms)
-                            if first_selected is None:
-                                first_selected = atoms[0].selected
-
-                elif isinstance(p, PickedResidue):
-                    for atom in p.residue.atoms:
-                        if atoms in atoms:
-                            continue
-                        connected_atoms = get_fragment(
-                            atom,
-                            max_len=p.residue.structure.num_atoms
-                        )
-                        atoms = atoms.merge(connected_atoms)
-                        if first_selected is None:
-                            first_selected = atoms[0].selected
-
-                else:
-                    continue
-
-                ranks = canonical_rank(connected_atoms, break_ties=False)
-                length = len(connected_atoms)
-                elements = sorted(connected_atoms.elements.names)
-                sorted_frag_atoms = [x for _, x in sorted(zip(ranks, connected_atoms), key=lambda pair: pair[0])]
+            def add_similar_fragments(
+                fragment, atoms, fragments, frag_ranks, frag_lengths, frag_elements, frag_added
+            ):
+                ranks = canonical_rank(fragment, break_ties=False)
+                length = len(fragment)
+                elements = sorted(fragment.elements.names)
+                sorted_frag_atoms = [x for _, x in sorted(zip(ranks, fragment), key=lambda pair: pair[0])]
                 for i, other_frag in enumerate(fragments):
                     if frag_added[i]:
                         continue
@@ -1149,6 +1080,87 @@ class SelectSimilarFragments(MouseMode):
                     else:
                         atoms = atoms.merge(other_frag)
                         frag_added[i] = True
+                
+                return atoms
+
+
+            for p in pick:
+                if isinstance(p, PickedAtoms):
+                    for atom in p.atoms:
+                        if atom in atoms:
+                            continue
+                        connected_atoms = get_fragment(atom, max_len=atom.structure.num_atoms)
+                        atoms = atoms.merge(connected_atoms)
+                        atoms = add_similar_fragments(connected_atoms, atoms, *args)
+                        if first_selected is None:
+                            first_selected = atoms[0].selected
+
+                elif isinstance(p, PickedAtom):
+                    if p.atom in atoms:
+                        continue
+                    connected_atoms = get_fragment(
+                        p.atom,
+                        max_len=p.atom.structure.num_atoms
+                    )
+                    atoms = atoms.merge(connected_atoms)
+                    atoms = add_similar_fragments(connected_atoms, atoms, *args)
+                    if first_selected is None:
+                        first_selected = atoms[0].selected
+
+                elif isinstance(p, PickedBonds):
+                    for bond in p.bonds:
+                        if bond.atoms[0] in atoms:
+                            continue
+                        connected_atoms = get_fragment(
+                            bond.atoms[0],
+                            max_len=bond.structure.num_atoms
+                        )
+                        atoms = atoms.merge(connected_atoms)
+                        atoms = add_similar_fragments(connected_atoms, atoms, *args)
+                        if first_selected is None:
+                            first_selected = atoms[0].selected
+
+                elif isinstance(p, PickedBond):
+                    if p.bond.atoms[0] in atoms:
+                        continue
+                    connected_atoms = get_fragment(
+                        p.bond.atoms[0],
+                        max_len=p.bond.structure.num_atoms
+                    )
+                    atoms = atoms.merge(connected_atoms)
+                    atoms = add_similar_fragments(connected_atoms, atoms, *args)
+                    if first_selected is None:
+                        first_selected = atoms[0].selected
+
+                elif isinstance(p, PickedResidues):
+                    for res in p.residues:
+                        for atom in res:
+                            if atom in atoms:
+                                continue
+                            connected_atoms = get_fragment(
+                                atom,
+                                max_len=res.structure.num_atoms
+                            )
+                            atoms = atoms.merge(connected_atoms)
+                            atoms = add_similar_fragments(connected_atoms, atoms, *args)
+                            if first_selected is None:
+                                first_selected = atoms[0].selected
+
+                elif isinstance(p, PickedResidue):
+                    for atom in p.residue.atoms:
+                        if atoms in atoms:
+                            continue
+                        connected_atoms = get_fragment(
+                            atom,
+                            max_len=p.residue.structure.num_atoms
+                        )
+                        atoms = atoms.merge(connected_atoms)
+                        atoms = add_similar_fragments(connected_atoms, atoms, *args)
+                        if first_selected is None:
+                            first_selected = atoms[0].selected
+
+                else:
+                    continue
 
             for atom in atoms:
                 for neighbor, bond in zip(atom.neighbors, atom.bonds):

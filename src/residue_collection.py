@@ -231,6 +231,8 @@ class Residue(Geometry):
                 # print("deleting %s" % atom.atomspec)
                 atom.delete()
         
+        known_atom_names = set([atom_name for chix_atom in known_atoms])
+        starting_name_ndx = dict()
         for (at_atom, atom) in new_atoms:
             # print("starting name:", atom.name)
             if (
@@ -244,17 +246,22 @@ class Residue(Geometry):
             if not atom.name.startswith(atom.element.name):
                 atom.name = atom.element.name
 
-            atom_name = "%s1" % atom.name
-            k = 1
-            while k == 1 or any([chix_atom.name == atom_name for chix_atom in known_atoms]):
-                atom_name = "%s%i" % (atom.name, k)
+            ele = at_atom.element
+            try:
+                k = starting_name_ndx[ele]
+            except KeyError:
+                k = 1
+            atom_name = "%s%i" % (atom.name, k)
+            while atom_name in known_atom_names:
                 k += 1
+                atom_name = "%s%i" % (atom.name, k)
                 if len(atom_name) > 4:
                     if atom.name == atom.element.name:
                         # print("breaking:", k, atom.name)
                         break
                     atom.name = atom.element.name
                     k = 1
+            starting_name_ndx[ele] = k + 1
             
             # print("name:", atom_name)
             
@@ -262,7 +269,9 @@ class Residue(Geometry):
                 atom.name = atom_name
             else:
                 atom.name = atom.element.name
-    
+            
+            known_atom_names.add(atom.name)
+
             at_atom.chix_name = atom.name
             at_atom.chix_atom = atom
             at_atom.serial_number = atom.serial_number
@@ -396,7 +405,7 @@ class ResidueCollection(Geometry):
                 
                 all_atoms.extend(new_res.atoms)
             
-            refresh_ranks = bonds_matter
+            refresh_ranks = False
             if "refresh_ranks" in kwargs:
                 refresh_ranks = kwargs.pop("refresh_ranks")
             
@@ -480,8 +489,8 @@ class ResidueCollection(Geometry):
         if hasattr(self, "components") and self.components is not None and comment is None:
             self.fix_comment()
         if copy_atoms:
-            return ResidueCollection([a.copy() for a in atoms], name, comment=comment)
-        return ResidueCollection(atoms, name, comment=comment)
+            return ResidueCollection([a.copy() for a in atoms], name, comment=comment, refresh_ranks=False)
+        return ResidueCollection(atoms, name, comment=comment, refresh_ranks=False)
 
     def map_ligand(self, *args, **kwargs):
         """map_ligand, then put new atoms in the residue they are closest to"""
@@ -829,10 +838,6 @@ class ResidueCollection(Geometry):
                     known_bonds.append(sorted((aaron_atom1, aaron_atom2,)))
                 else:
                     bond.delete()
-
-        for atom in self.atoms:
-            if not hasattr(atom, "chix_atom"):
-                print(atom, "hasn no chix atom")
 
         for i, aaron_atom1 in enumerate(self.atoms):
             atom1 = [atom for atom in atomic_structure.atoms if aaron_atom1.chix_atom is atom][0]
