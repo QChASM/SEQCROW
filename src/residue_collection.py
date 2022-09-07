@@ -9,7 +9,7 @@ from AaronTools.geometry import Geometry
 from AaronTools.ring import Ring
 from AaronTools.finders import BondedTo
 
-from chimerax.atomic import AtomicStructure, Element
+from chimerax.atomic import AtomicStructure, Element, Atoms
 from chimerax.atomic import Residue as ChimeraResidue
 
 from SEQCROW.finders import AtomSpec
@@ -186,9 +186,12 @@ class Residue(Geometry):
 
         for atom in self.atoms:
             #print(atom, hasattr(atom, "chix_atom"))
-            if not hasattr(atom, "chix_atom") or \
-               atom.chix_atom is None or \
-               atom.chix_atom.deleted or atom.chix_atom not in chix_residue.atoms:
+            if (
+                not hasattr(atom, "chix_atom") or \
+                atom.chix_atom is None or \
+                atom.chix_atom.deleted or
+                atom.chix_atom not in chix_residue.atoms
+            ):
                 # if not hasattr(atom, "chix_atom"):
                 #     print("no chix atom", atom)
                 # elif atom.chix_atom is None:
@@ -231,15 +234,19 @@ class Residue(Geometry):
                 # print("deleting %s" % atom.atomspec)
                 atom.delete()
         
-        known_atom_names = set([atom_name for chix_atom in known_atoms])
+        known_atoms = Atoms(known_atoms)
+        
+        known_atom_names = list(known_atoms.names)
+        known_atom_names_set = set(known_atom_names)
         starting_name_ndx = dict()
         for (at_atom, atom) in new_atoms:
             # print("starting name:", atom.name)
             if (
-                    [a.name for a in known_atoms].count(atom.name) == 1 and
+                    atom.name in known_atom_names_set and
                     atom.name.startswith(atom.element.name) and
                     atom.name != atom.element.name and
-                    "." not in atom.name
+                    "." not in atom.name and
+                    known_atom_names.count(atom.name) == 1 
             ):
                 # print("skipping", atom.name, atom.serial_number, atom.atomspec)
                 continue
@@ -252,7 +259,7 @@ class Residue(Geometry):
             except KeyError:
                 k = 1
             atom_name = "%s%i" % (atom.name, k)
-            while atom_name in known_atom_names:
+            while atom_name in known_atom_names_set:
                 k += 1
                 atom_name = "%s%i" % (atom.name, k)
                 if len(atom_name) > 4:
@@ -270,7 +277,8 @@ class Residue(Geometry):
             else:
                 atom.name = atom.element.name
             
-            known_atom_names.add(atom.name)
+            known_atom_names_set.add(atom.name)
+            known_atom_names.append(atom.name)
 
             at_atom.chix_name = atom.name
             at_atom.chix_atom = atom
@@ -281,9 +289,9 @@ class Residue(Geometry):
         if refresh_connected:
             self.refresh_chix_connected(chix_residue)
 
-        for atom in chix_residue.atoms:
+        for i, atom in enumerate(chix_residue.atoms):
             if atom.serial_number == -1:
-                atom.serial_number = atom.structure.atoms.index(atom) + 1
+                atom.serial_number = i + 1
         
         if apply_preset:
             apply_seqcrow_preset(chix_residue.structure, atoms=[atom[1] for atom in new_atoms])
@@ -448,12 +456,16 @@ class ResidueCollection(Geometry):
             super().__init__(molecule, name=name, **kwargs)
             self.chix_atomicstructure = None
             self.atomspec = None
+            try:
+                kwargs.pop("refresh_connected")
+            except KeyError:
+                pass
             if "comment" in kwargs:
-                self.residues = [Residue(molecule, resnum=1, name="UNK", **kwargs)]
+                self.residues = [Residue(molecule, resnum=1, name="UNK", refresh_connected=False, **kwargs)]
             elif hasattr(molecule, "comment"):
-                self.residues = [Residue(molecule, resnum=1, name="UNK", comment=molecule.comment, **kwargs)]
+                self.residues = [Residue(molecule, resnum=1, name="UNK", comment=molecule.comment, refresh_connected=False, **kwargs)]
             else:
-                self.residues = [Residue(molecule, resnum=1, name="UNK", **kwargs)]
+                self.residues = [Residue(molecule, resnum=1, name="UNK", refresh_connected=False, **kwargs)]
 
             return
 
@@ -485,12 +497,10 @@ class ResidueCollection(Geometry):
             name = self.name
         if comment is None:
             comment = self.comment
-        atoms = self._fix_connectivity(atoms)
+        atoms = self._fix_connectivity(atoms, copy=copy_atoms)
         if hasattr(self, "components") and self.components is not None and comment is None:
             self.fix_comment()
-        if copy_atoms:
-            return ResidueCollection([a.copy() for a in atoms], name, comment=comment, refresh_ranks=False)
-        return ResidueCollection(atoms, name, comment=comment, refresh_ranks=False)
+        return ResidueCollection(atoms, name, comment=comment, refresh_ranks=False, refresh_connected=False)
 
     def map_ligand(self, *args, **kwargs):
         """map_ligand, then put new atoms in the residue they are closest to"""
@@ -784,9 +794,11 @@ class ResidueCollection(Geometry):
         
         else:
             for residue in self.residues:
-                if residue.chix_residue is None or \
-                residue.chix_residue.deleted or \
-                residue.chix_residue not in atomic_structure.residues:
+                if (
+                    residue.chix_residue is None or \
+                    residue.chix_residue.deleted or \
+                    residue.chix_residue not in atomic_structure.residues
+                ):
                     res = atomic_structure.new_residue(residue.name, residue.chain_id, residue.resnum)
                     residue.chix_residue = res
                 else:
@@ -828,44 +840,58 @@ class ResidueCollection(Geometry):
                     raise Exception("ResidueCollection does not correspond to AtomicStructure: \n%s\n\n%s" % \
                         (repr(self), repr(ResidueCollection(atomic_structure))))
                     
-        known_bonds = []
+        known_bonds = set()
         for bond in atomic_structure.bonds:
             if self.convert_residues is None or all(atom.residue in self.convert_residues for atom in bond.atoms):
                 a1, a2 = bond.atoms
                 aaron_atom1 = self.find_exact(AtomSpec(a1.atomspec))[0]
                 aaron_atom2 = self.find_exact(AtomSpec(a2.atomspec))[0]
                 if aaron_atom1 in aaron_atom2.connected:
-                    known_bonds.append(sorted((aaron_atom1, aaron_atom2,)))
+                    known_bonds.add((aaron_atom1, aaron_atom2,))
+                    known_bonds.add((aaron_atom2, aaron_atom1,))
                 else:
                     bond.delete()
 
-        for i, aaron_atom1 in enumerate(self.atoms):
-            atom1 = [atom for atom in atomic_structure.atoms if aaron_atom1.chix_atom is atom][0]
+        remaining_atoms = set(atomic_structure.atoms)
+
+        for aaron_atom1 in self.atoms:
+            atom1 = None
+            for atom in remaining_atoms:
+                if aaron_atom1.chix_atom is atom:
+                    atom1 = atom
+                    break
+            
+            remaining_atoms.remove(atom1)
+            atom1_is_metal = aaron_atom1.element in METAL
 
             for aaron_atom2 in aaron_atom1.connected:
-                if sorted((aaron_atom1, aaron_atom2,)) in known_bonds:
+                if (aaron_atom1, aaron_atom2,) in known_bonds:
                     continue
-                
+
                 # if not hasattr(aaron_atom2, "chix_atom"):
                 #     print(aaron_atom2, "has no chix_atom")
                 
-                known_bonds.append(sorted((aaron_atom1, aaron_atom2,)))
+                known_bonds.add((aaron_atom1, aaron_atom2,))
+                known_bonds.add((aaron_atom2, aaron_atom1,))
 
-                atom2 = [atom for atom in atomic_structure.atoms if atom == aaron_atom2.chix_atom]
-                if len(atom2) > 0:
-                    atom2 = atom2[0]
+                for atom in remaining_atoms:
+                    if atom is aaron_atom2.chix_atom:
+                        atom2 = atom
+                        break
                 else:
                     #we cannot draw a bond to an atom that is not in the residue
                     #this could happen when previewing a substituent or w/e with the libadd tool
                     continue
                 
+                atom2_is_metal = aaron_atom2.element in METAL
+                
                 if atom2 not in atom1.neighbors:
-                    new_bond = atomic_structure.new_bond(atom1, atom2)
-
-                    if any([aaron_atom.element in METAL for aaron_atom in [aaron_atom1, aaron_atom2]]):
+                    if atom1_is_metal or atom2_is_metal:
                         pbg = atomic_structure.pseudobond_group(atomic_structure.PBG_METAL_COORDINATION, create_type='normal') 
                         pbg.new_pseudobond(atom1, atom2)
-                        new_bond.delete()
+                    else:
+                        new_bond = atomic_structure.new_bond(atom1, atom2)
+
 
     def all_geom_coordsets(self, filereader):
         if filereader.all_geom is None:
