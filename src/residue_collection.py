@@ -177,12 +177,12 @@ class Residue(Geometry):
         known_atoms = []
         new_atoms = []
 
-        #print("updating residue", self.name, chix_residue.name)
+        # print("updating residue", self.name, chix_residue.name)
 
         chix_residue.name = self.name
 
-        #print("updating residue:")
-        #print(self.write(outfile=False))
+        # print("updating residue:")
+        # print(self.write(outfile=False))
 
         for atom in self.atoms:
             #print(atom, hasattr(atom, "chix_atom"))
@@ -252,10 +252,11 @@ class Residue(Geometry):
                 continue
             if not atom.name.startswith(atom.element.name):
                 atom.name = atom.element.name
-
-            ele = at_atom.element
+            
+            starting_name = atom.name
+            
             try:
-                k = starting_name_ndx[ele]
+                k = starting_name_ndx[starting_name]
             except KeyError:
                 k = 1
             atom_name = "%s%i" % (atom.name, k)
@@ -264,11 +265,11 @@ class Residue(Geometry):
                 atom_name = "%s%i" % (atom.name, k)
                 if len(atom_name) > 4:
                     if atom.name == atom.element.name:
-                        # print("breaking:", k, atom.name)
+                        print("breaking:", k, atom.name)
                         break
                     atom.name = atom.element.name
                     k = 1
-            starting_name_ndx[ele] = k + 1
+            starting_name_ndx[starting_name] = k + 1
             
             # print("name:", atom_name)
             
