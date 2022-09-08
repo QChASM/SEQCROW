@@ -12,7 +12,7 @@ def contrast_bw(color):
     """
     lumin = [0, 0, 0]
     for i in range(0, 3):
-        if (color[i] / 255.) <= 0.03928:
+        if (color[i] / 255.) <= 0.04045:
             lumin[i] = color[i] / (12.92 * 255)
         else:
             lumin[i] = (((color[i] / 255) + 0.055) / 1.055) ** 2.4

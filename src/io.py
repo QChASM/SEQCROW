@@ -4,6 +4,10 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
     from SEQCROW.residue_collection import ResidueCollection
     from SEQCROW.managers import ADD_FILEREADER
     from warnings import warn
+    
+    # from cProfile import Profile
+    # profile = Profile()
+    # profile.enable()
 
     if format_name == "Gaussian input file":
         fmt = "com"
@@ -42,7 +46,9 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
         format_name = "Q-Chem output file"
 
     try:
-        geom = ResidueCollection(fr, refresh_ranks=False).copy(comment=fr.comment, copy_atoms=True)
+        geom = ResidueCollection(fr, refresh_ranks=False).copy(
+            comment=fr.comment, copy_atoms=True,
+        )
     except Exception as e:
         s = "could not open %s" % file_name
         if "error" in fr.other and fr.other["error"]:
@@ -99,6 +105,9 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
 
     structure.name = get_filename(file_name, include_parent_dir=False)
     structure.filename = file_name
+
+    # profile.disable()
+    # profile.print_stats()
 
     return [structure], status
 

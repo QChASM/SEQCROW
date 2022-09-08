@@ -100,7 +100,7 @@ class EditStructure(ToolInstance):
         self.guess_old = QCheckBox()
         self.guess_old.setToolTip("checked: leave the longest connected fragment in the residue\nunchecked: previous substituent must be selected")
         self.guess_old.setChecked(self.settings.guess)
-        self.guess_old.stateChanged.connect(lambda state, settings=self.settings: settings.__setattr__("guess", True if state == Qt.Checked else False))
+        self.guess_old.stateChanged.connect(lambda state, settings=self.settings: settings.__setattr__("guess", True if Qt.CheckState(state) == Qt.Checked else False))
         substitute_layout.addWidget(self.guess_old, 3, 1, 1, 2, Qt.AlignTop)
         
         substitute_layout.addWidget(QLabel("new residue:"), 5, 0, 1, 1, Qt.AlignVCenter)
@@ -108,7 +108,7 @@ class EditStructure(ToolInstance):
         self.new_residue = QCheckBox()
         self.new_residue.setToolTip("put the new substituent in its own residue instead\nof adding it to the residue of the old substituent")
         self.new_residue.setChecked(self.settings.new_residue)
-        self.new_residue.stateChanged.connect(lambda state, settings=self.settings: settings.__setattr__("new_residue", True if state == Qt.Checked else False))
+        self.new_residue.stateChanged.connect(lambda state, settings=self.settings: settings.__setattr__("new_residue", True if Qt.CheckState(state) == Qt.Checked else False))
         substitute_layout.addWidget(self.new_residue, 5, 1, 1, 2, Qt.AlignTop)
         
         substitute_layout.addWidget(QLabel("use distance names:"), 4, 0, 1, 1, Qt.AlignVCenter)
@@ -349,15 +349,19 @@ class EditStructure(ToolInstance):
         self.tool_window.manage(None)
     
     def close_previous_change(self, state):
-        if state == Qt.Checked:
+        if Qt.CheckState(state) == Qt.Checked:
             self.settings.modify = True
             for checkbox in [self.close_previous_lig, self.close_previous_sub, self.close_previous_ring]:
+                checkbox.blockSignals(True)
                 checkbox.setChecked(True)
+                checkbox.blockSignals(False)
             self.close_previous_bool = True
         else:
             self.settings.modify = False
             for checkbox in [self.close_previous_lig, self.close_previous_sub, self.close_previous_ring]:
+                checkbox.blockSignals(True)
                 checkbox.setChecked(False)
+                checkbox.blockSignals(False)
             self.close_previous_bool = False
     
     def do_substitute(self):
