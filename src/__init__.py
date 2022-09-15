@@ -876,6 +876,10 @@ class _SEQCROW_API(BundleAPI):
         elif command_info.name == "solidAngle":
             from .commands.solid_angle import solid_angle, solid_angle_description
             register("solidAngle", solid_angle_description, solid_angle)
+        
+        elif command_info.name == "force":
+            from .commands.force import force, force_description
+            register("force", force_description, force)
 
     @staticmethod
     def register_selector_menus(session):
