@@ -185,7 +185,7 @@ class LocalJob(QThread):
         if isinstance(self.output_name, str):
             fr = FileReader(self.output_name, just_geom=False, get_all=True)
             rescol = ResidueCollection(fr)
-            residue_collection.update_chix(structure)
+            rescol.update_chix(structure)
             self.session.filereader_manager.triggers.activate_trigger(
                 ADD_FILEREADER, ([structure], [fr])
             )
@@ -198,7 +198,7 @@ class LocalJob(QThread):
                         get_all=True,
                     )
                     rescol = ResidueCollection(fr)
-                    residue_collection.update_chix(structure)
+                    rescol.update_chix(structure)
                     self.session.filereader_manager.triggers.activate_trigger(
                         ADD_FILEREADER, ([structure], [fr])
                     )
@@ -206,7 +206,7 @@ class LocalJob(QThread):
                 for file in self.output_name:
                     fr = FileReader(self.output_name, just_geom=False, get_all=True)
                     rescol = ResidueCollection(fr)
-                    residue_collection.update_chix(structure)
+                    rescol.update_chix(structure)
                     self.session.filereader_manager.triggers.activate_trigger(
                         ADD_FILEREADER, ([structure], [fr])
                     )

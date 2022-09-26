@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="1.5.3">
+            version="1.5.4">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -528,9 +528,9 @@
        </Classifiers>
     
     <AdditionalPackages>
-        <Package name="AaronTools" folder="C:\Users\ajs99778\Documents\GitHub\AaronTools"/>
-        <!--
         <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools"/>
+        <!--
+        <Package name="AaronTools" folder="C:\Users\ajs99778\Documents\GitHub\AaronTools"/>
         <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
         <Package name="AaronTools" folder="/home/tschaefer/QChASM/AaronTools"/>
         <Package name="Raven" folder="C:\Users\normn\Documents\GitHub\Raven"/>
