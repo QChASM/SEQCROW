@@ -329,10 +329,13 @@ def all_connected_selector(session, models, results):
 
     results.add_atoms(atoms)
 
-def get_fragment(start, stop=None, max_len=100000):
+def get_fragment(start, stop=None, max_len=None):
     """
     see AaronTools.geometry.Geometry.get_fragment
     """
+
+    if max_len is None:
+        max_len = start.structure.num_atoms
 
     stack = deque([start])
     frag = deque([start])

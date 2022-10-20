@@ -194,6 +194,7 @@ def percent_vbur(
                         return_basis=True,
                         num_pts=num_pts,
                         shape=shape,
+                        targets=targets,
                     )
 
                 vbur = rescol.percent_buried_volume(
@@ -314,6 +315,7 @@ def percent_vbur(
                     return_basis=True,
                     num_pts=num_pts,
                     shape=shape,
+                    targets=targets,
                 )
 
             vbur = rescol.percent_buried_volume(

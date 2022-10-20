@@ -351,19 +351,26 @@ class Residue(Geometry):
             target = self.find(target)[0]
             target_chix = target.chix_atom
             for bonded_atom in target_chix.neighbors:
-                frags.append(get_fragment(bonded_atom, target_chix, 1000))
+                frags.append(get_fragment(bonded_atom, target_chix))
             
             attached_to = None
             longest_frag = None
             
+            cyclic = np.zeros(len(frags), dtype=bool)
             for test_end, (i, frag1) in zip(target_chix.neighbors, enumerate(frags)):
-                cyclic = False
-                for frag2 in frags[i+1:]:
-                    if frag1.intersects(frag2):
-                        cyclic = True
+                for j, frag2 in enumerate(frags[i + 1:]):
+                    if cyclic[i + j + 1]:
+                        continue
+                    if frag1.intersects(frag2) or test_end in frag2:
+                        cyclic[i] = True
+                        cyclic[i + j + 1] = True
                         break
                 
-                if cyclic:
+                if cyclic[i]:
+                    if target.chix_atom and target.chix_atom.session:
+                        target.chix_atom.session.logger.warning(
+                            "trying to guess a fragment to replace for an atom in a ring"
+                        )
                     continue
                 
                 if attached_to is None or len(longest_frag) < len(frag1):
@@ -372,8 +379,8 @@ class Residue(Geometry):
             
             if attached_to is not None:
                 attached_to = self.find(AtomSpec(attached_to.atomspec))[0]
-            
-        return super().substitute(sub, target, *args, attached_to=attached_to, **kwargs) 
+        
+        return super().substitute(sub, target, *args, attached_to=attached_to, **kwargs)
 
 
 class ResidueCollection(Geometry):
@@ -550,34 +557,44 @@ class ResidueCollection(Geometry):
         
         if attached_to:
             attached_to = self.find_exact(attached_to)[0]        
-        
-        if not new_residue:
 
-            # call substitute on residue so atoms are added to that residue
-            if attached_to and attached_to not in residue.atoms:
-                residue.atoms.append(attached_to)
-                residue.substitute(sub, target, attached_to=attached_to, *args, minimize=False, **kwargs)
-                residue.atoms.remove(attached_to)
-                new_residue = True
-            else:
-                residue.substitute(sub, target, *args, attached_to=attached_to, minimize=False, **kwargs)
-
-            if new_name:
-                residue.name = new_name
-        
+        # call substitute on residue so atoms are added to that residue
+        if attached_to and attached_to not in residue.atoms:
+            residue.atoms.append(attached_to)
+            new_sub = super().substitute(sub, target, attached_to=attached_to, *args, minimize=False, **kwargs)
+            residue -= self.find(
+                residue.atoms,
+                residue.get_fragment(target, stop=sub)
+            )
+            residue += new_sub
         else:
-            super().substitute(sub, target, attached_to=attached_to, *args, minimize=False, **kwargs)
-            frag = self.remove_fragment(target, avoid=attached_to)
-            for atom in frag:
-                if atom is attached_to:
-                    continue
-                if atom in residue:
-                    residue -= atom
-                else:
-                    warn("tried to remove an atom beyond the residues being considered: %s" % atom)
-            resnum = len(self.residues) + 1
+            try:
+                new_sub = residue.substitute(
+                    sub, target, *args, attached_to=attached_to, minimize=False, **kwargs
+                )
+            except LookupError:
+                new_sub = super().substitute(
+                    sub, target, *args, attached_to=attached_to, minimize=False, **kwargs
+                )
+                residue -= self.find(
+                    residue.atoms,
+                    self.get_fragment(target, stop=sub)
+                )
+                residue += new_sub
+
+        if new_name:
+            residue.name = new_name
+
+        if new_residue:
+            residue -= new_sub
+            new_sub.end.connected.add(new_sub.atoms[0])
             self.residues.append(
-                Residue(sub.atoms, name=new_name, resnum=resnum, chain_id=target.chix_atom.residue.chain_id)
+                Residue(
+                    new_sub.atoms,
+                    name=new_name,
+                    resnum=target.chix_atom.structure.num_residues + 1,
+                    chain_id=target.chix_atom.residue.chain_id,
+                )
             )
 
         self._atom_update()
@@ -802,6 +819,8 @@ class ResidueCollection(Geometry):
                 ):
                     res = atomic_structure.new_residue(residue.name, residue.chain_id, residue.resnum)
                     residue.chix_residue = res
+                    if self.convert_residues is not None:
+                        self.convert_residues.append(res)
                 else:
                     res = residue.chix_residue
     
@@ -883,16 +902,24 @@ class ResidueCollection(Geometry):
                     #we cannot draw a bond to an atom that is not in the residue
                     #this could happen when previewing a substituent or w/e with the libadd tool
                     continue
-                
+
                 atom2_is_metal = aaron_atom2.element in METAL
                 
                 if atom2 not in atom1.neighbors:
                     if atom1_is_metal or atom2_is_metal:
-                        pbg = atomic_structure.pseudobond_group(atomic_structure.PBG_METAL_COORDINATION, create_type='normal') 
+                        try:
+                            pbg = atomic_structure.pseudobond_group(
+                                atomic_structure.PBG_METAL_COORDINATION,
+                                create_type=2
+                            ) 
+                        except TypeError:
+                            pbg = atomic_structure.pseudobond_group(
+                                atomic_structure.PBG_METAL_COORDINATION,
+                                create_type=2
+                            ) 
                         pbg.new_pseudobond(atom1, atom2)
                     else:
                         new_bond = atomic_structure.new_bond(atom1, atom2)
-
 
     def all_geom_coordsets(self, filereader):
         if filereader.all_geom is None:

@@ -418,7 +418,8 @@ class OrbitalViewer(ToolInstance):
 
         homo_ndx = 0
         if orbits.alpha_occupancies and not orbits.beta_occupancies:
-            self.fukui_group.setEnabled(False)
+            if not all(np.isclose(occ, 1) or np.isclose(occ, 0) for occ in orbits.alpha_occupancies):
+                self.fukui_group.setEnabled(False)
             if "orbit_kinds" not in fr.other:
                 self.mo_table.setColumnCount(3)
                 self.mo_table.setHorizontalHeaderLabels(
@@ -747,7 +748,7 @@ class OrbitalViewer(ToolInstance):
                 self.mo_table,
                 "Memory Limit Warning",
                 "Estimated peak memory usage (%.1fGB) is above or close to\n" % mem +
-                "the available memory (%.1fGB).\n" % (available_memory * 1e-9) +
+                "the available memory (%.1fGB).\n" % (available_memory() * 1e-9) +
                 "Exceeding available memory might affect the stability of your\n"
                 "computer. You may attempt to continue, but it is recommended\n" +
                 "that you lower your resolution, decrease padding, or use\n" +
