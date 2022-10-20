@@ -3747,7 +3747,7 @@ class BasisOption(QWidget):
         if name is None:
             name = "no"
 
-        ndx = self.aux_type.findData(name, flags=Qt.MatchExactly)
+        ndx = self.aux_type.findText(name, flags=Qt.MatchExactly)
         if ndx >= 0:
             self.aux_type.setCurrentIndex(ndx)
             return True
@@ -4119,9 +4119,8 @@ class BasisWidget(QWidget):
         if basis_set:
             for i, basis in enumerate(basis_set.basis):
                 self.new_basis()
-    
-                self.basis_options[i].setBasis(basis.name, basis_path=basis.user_defined)
                 self.basis_options[i].setAux(basis.aux_type)
+                self.basis_options[i].setBasis(basis.name, basis_path=basis.user_defined)
                 if len(basis_set.basis) == 1:
                     #a preset might have only saved one basis set
                     #we'll use it for all elements

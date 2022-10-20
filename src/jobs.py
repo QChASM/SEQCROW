@@ -183,9 +183,9 @@ class LocalJob(QThread):
         a job if the output file is not parsable by AaronTools
         """
         if isinstance(self.output_name, str):
-            fr = FileReader(self.output_name, just_geom=False, all_geom=True)
+            fr = FileReader(self.output_name, just_geom=False, get_all=True)
             rescol = ResidueCollection(fr)
-            residue_collection.update_chix(structure)
+            rescol.update_chix(structure)
             self.session.filereader_manager.triggers.activate_trigger(
                 ADD_FILEREADER, ([structure], [fr])
             )
@@ -195,18 +195,18 @@ class LocalJob(QThread):
                     fr = FileReader(
                         (self.output_name, fmt),
                         just_geom=False,
-                        all_geom=True,
+                        get_all=True,
                     )
                     rescol = ResidueCollection(fr)
-                    residue_collection.update_chix(structure)
+                    rescol.update_chix(structure)
                     self.session.filereader_manager.triggers.activate_trigger(
                         ADD_FILEREADER, ([structure], [fr])
                     )
             else:
                 for file in self.output_name:
-                    fr = FileReader(self.output_name, just_geom=False, all_geom=True)
+                    fr = FileReader(self.output_name, just_geom=False, get_all=True)
                     rescol = ResidueCollection(fr)
-                    residue_collection.update_chix(structure)
+                    rescol.update_chix(structure)
                     self.session.filereader_manager.triggers.activate_trigger(
                         ADD_FILEREADER, ([structure], [fr])
                     )

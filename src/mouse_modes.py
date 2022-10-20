@@ -161,7 +161,7 @@ class SelectConnectedMouseMode(MouseMode):
 
                 elif isinstance(p, PickedResidues):
                     for res in p.residues:
-                        for atom in res:
+                        for atom in res.atoms:
                             if atom in atoms:
                                 continue
                             connected_atoms = get_fragment(
@@ -320,9 +320,14 @@ class DrawBondMouseMode(MouseMode):
         
         return self.scale * avg
 
+    def vr_press(self, event):
+        self.mouse_up(event)
+
     def mouse_up(self, event):
         atom = False
         super().mouse_up(event)
+        if self._atom1 is not None and self._atom1.deleted:
+            self._atom1 = None
 
         x, y = event.position()
         pick = self.view.picked_object(x, y)
@@ -347,10 +352,9 @@ class DrawBondMouseMode(MouseMode):
             atom = pick.atom
         
         if not atom:
-            self.session.logger.status("not drawing a new bond")
-            self.reset()
+            self.session.logger.status("no atom clicked - not drawing a new bond")
             return
-        
+
         if atom.structure is self._atom1.structure and atom is not self._atom1:
             if atom not in self._atom1.neighbors:
                 avg_radius = self.avg_bond_radius(self._atom1, atom)
@@ -371,6 +375,8 @@ class DrawTSBondMouseMode(DrawBondMouseMode):
     def mouse_up(self, event):
         atom = False
         MouseMode.mouse_up(self, event)
+        if self._atom1 is not None and self._atom1.deleted:
+            self._atom1 = None
 
         x, y = event.position()
         pick = self.view.picked_object(x, y)
@@ -402,10 +408,9 @@ class DrawTSBondMouseMode(DrawBondMouseMode):
             atom = pick.atom
         
         if not atom:
-            self.session.logger.status("not drawing a new TS bond")
-            self.reset()
+            self.session.logger.status("not atom clicked - not drawing a new TS bond")
             return
-        
+
         if atom.structure is self._atom1.structure and atom is not self._atom1:
             avg_radius = self.avg_bond_radius(self._atom1, atom)
             self.session.logger.status(
@@ -422,6 +427,84 @@ class DrawTSBondMouseMode(DrawBondMouseMode):
             )
 
         self.reset()
+
+
+
+class DrawCoordinationBondMouseMode(DrawBondMouseMode):
+    name = "coordinationbond"
+    scale = 1.0
+
+    def mouse_up(self, event):
+        atom = False
+        MouseMode.mouse_up(self, event)
+        if self._atom1 is not None and self._atom1.deleted:
+            self._atom1 = None
+
+        x, y = event.position()
+        pick = self.view.picked_object(x, y)
+        
+        if isinstance(pick, PickedPseudobond):
+            bond = pick.pbond
+            if bond.group.name == bond.atoms[0].structure.PBG_METAL_COORDINATION:
+                # run(self.session, "bond %s %s" % (bond.atoms[0].atomspec, bond.atoms[1].atomspec))
+                bond.delete()
+                self.reset()
+            return
+
+        if isinstance(pick, PickedBond):
+            bond = pick.bond
+            self.draw_new_pbond(*bond.atoms)
+            bond.delete()
+            self.reset()
+            return
+
+        if isinstance(pick, PickedAtom) and not self._atom1:
+            self._atom1 = pick.atom
+            self.session.logger.status("drawing coordination bond between %s and..." % self._atom1.atomspec)
+            return
+
+        if (
+            isinstance(pick, PickedAtom) and
+            pick.atom.structure is self._atom1.structure and
+            pick.atom is not self._atom1
+        ):
+            atom = pick.atom
+        
+        if not atom:
+            self.session.logger.status("not atom clicked - not drawing a new coordination bond")
+            return
+
+        if atom.structure is self._atom1.structure and atom is not self._atom1:
+            self.draw_new_pbond(self._atom1, atom)
+            self.session.logger.status("drew new coordination bond between %s and %s" % (
+                atom.atomspec, self._atom1.atomspec,
+            ))
+            for bond in self._atom1.bonds:
+                if atom in bond.atoms:
+                    bond.delete()
+                    break
+            self.reset()
+
+    def draw_new_pbond(self, atom1, atom2):
+        try:
+            pbg = atom1.structure.pseudobond_group(
+                atom1.structure.PBG_METAL_COORDINATION,
+                create_type=1
+            )
+        except TypeError:
+            pbg = atom1.structure.pseudobond_group(
+                atom1.structure.PBG_METAL_COORDINATION,
+                create_type=2
+            )
+        pbg.new_pseudobond(atom1, atom2)
+        if pbg not in atom1.structure.child_models():
+            atom1.structure.add([pbg])
+        # bug in older versions of ChimeraX where new pseudobonds aren't 
+        # displayed until something else changes
+        # change the number of dashes
+        pbg.dashes += 2
+        pbg.dashes -= 2
+
 
 
 class _ElementPicker(ToolInstance):
@@ -1134,7 +1217,7 @@ class SelectSimilarFragments(MouseMode):
 
                 elif isinstance(p, PickedResidues):
                     for res in p.residues:
-                        for atom in res:
+                        for atom in res.atoms:
                             if atom in atoms:
                                 continue
                             connected_atoms = get_fragment(

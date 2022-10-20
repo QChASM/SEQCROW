@@ -65,6 +65,7 @@ class _SEQCROW_API(BundleAPI):
                 EraserMouseMode,
                 SubstituteMouseMode,
                 SelectSimilarFragments,
+                DrawCoordinationBondMouseMode,
             )
 
             session.ui.mouse_modes.add_mode(SelectConnectedMouseMode(session))
@@ -74,6 +75,7 @@ class _SEQCROW_API(BundleAPI):
             session.ui.mouse_modes.add_mode(EraserMouseMode(session))
             session.ui.mouse_modes.add_mode(SubstituteMouseMode(session))
             session.ui.mouse_modes.add_mode(SelectSimilarFragments(session))
+            session.ui.mouse_modes.add_mode(DrawCoordinationBondMouseMode(session))
             
             session.triggers.add_handler(ADD_MODELS, _SEQCROW_API.open_useful_tools)
 
@@ -876,6 +878,10 @@ class _SEQCROW_API(BundleAPI):
         elif command_info.name == "solidAngle":
             from .commands.solid_angle import solid_angle, solid_angle_description
             register("solidAngle", solid_angle_description, solid_angle)
+        
+        elif command_info.name == "force":
+            from .commands.force import force, force_description
+            register("force", force_description, force)
 
     @staticmethod
     def register_selector_menus(session):

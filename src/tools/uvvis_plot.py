@@ -380,10 +380,9 @@ class UVVisSpectrum(ToolInstance):
         self.x_units.setCurrentIndex(ndx)
         plot_settings_layout.addRow("x-axis units:", self.x_units)
         
-        self.transient = QCheckBox()
-        self.transient.setCheckState(Qt.Checked if self.settings.transient else Qt.Unchecked)
-        self.transient.setToolTip("use transient excitation data")
-        plot_settings_layout.addRow("transient excitations:", self.transient)
+        self.spectra_type = QComboBox()
+        self.spectra_type.addItems(["regular", "transient", "SOC"])
+        plot_settings_layout.addRow("data:", self.spectra_type)
         
         tabs.addTab(plot_settings_widget, "plot settings")
         
@@ -729,20 +728,19 @@ class UVVisSpectrum(ToolInstance):
             plot_type = self.plot_type.currentData(Qt.UserRole)
             voigt_mixing = self.voigt_mix.value()
             shift = self.shift.value()
-            intensity_attr = "dipole_str"
+            intensity_attr = "oscillator_str"
             if plot_type.lower() == "uv-vis-velocity":
-                intensity_attr = "dipole_vel"
+                intensity_attr = "oscillator_str_vel"
             elif plot_type.lower() == "transmittance-velocity":
-                intensity_attr = "dipole_vel"
+                intensity_attr = "oscillator_str_vel"
             elif plot_type.lower() == "transmittance":
-                intensity_attr = "dipole_str"
+                intensity_attr = "oscillator_str"
             elif plot_type.lower() == "uv-vis":
-                intensity_attr = "dipole_str"
+                intensity_attr = "oscillator_str"
             elif plot_type.lower() == "ecd":
-                intensity_attr = "rotatory_str_len"
+                intensity_attr = "delta_abs_len"
             elif plot_type.lower() == "ecd-velocity":
-                intensity_attr = "rotatory_str_vel"
-
+                intensity_attr = "delta_abs_vel"
             change_x_unit_func = None
             if units == "nm":
                 change_x_unit_func = ValenceExcitations.ev_to_nm
@@ -846,8 +844,10 @@ class UVVisSpectrum(ToolInstance):
                     uv_vis = fr.other["uv_vis"]
                     
                     data_attr = "data"
-                    if self.transient.checkState() == Qt.Checked:
+                    if self.spectra_type.currentText() == "transient":
                         data_attr = "transient_data"
+                    elif self.spectra_type.currentText() == "SOC":
+                        data_attr = "spin_orbit_data"
                     
                     excitations = np.array(
                         [data.excitation_energy for data in getattr(uv_vis, data_attr)]
@@ -909,7 +909,12 @@ class UVVisSpectrum(ToolInstance):
 
     def get_mixed_spectrum(self, weights_only=False):
         weight_method = self.weight_method.currentData(Qt.UserRole)
-        transient = self.transient.checkState() == Qt.Checked
+        data_attr = "data"
+        if self.spectra_type.currentText() == "transient":
+            data_attr = "transient_data"
+        elif self.spectra_type.currentText() == "SOC":
+            data_attr = "spin_orbit_data"
+                    
         uv_vis_files = []
         freqs = []
         single_points = []
@@ -1028,7 +1033,7 @@ class UVVisSpectrum(ToolInstance):
             conf_mixed = ValenceExcitations.get_mixed_signals(
                 uv_vis,
                 weights=weights,
-                data_attr="transient_data" if transient else "data",
+                data_attr=data_attr,
             )
             mixed_spectra.append(conf_mixed)
         
@@ -1061,8 +1066,11 @@ class UVVisSpectrum(ToolInstance):
         weight_method = self.weight_method.currentData(Qt.UserRole)
         self.settings.weight_method = weight_method
         plot_type = self.plot_type.currentData(Qt.UserRole)
-        transient = self.transient.checkState() == Qt.Checked
-        self.settings.transient = transient
+        data_attr = "data"
+        if self.spectra_type.currentText() == "transient":
+            data_attr = "transient_data"
+        elif self.spectra_type.currentText() == "SOC":
+            data_attr = "spin_orbit_data"
 
         model = self.plot_type.model()
         uv_vis_vel_item = model.item(2)

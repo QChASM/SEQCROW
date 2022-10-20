@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="1.5.3">
+            version="1.5.5">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -311,7 +311,7 @@
                 -->
                 <Provider tab="More Right Mouse"
                           section="Select"
-                          name="seqcrow_1"
+                          name="select_fragment"
                           mouse_mode="select fragment"
                           display_name="Select Fragment" 
                           description="Select molecular fragment"
@@ -319,7 +319,7 @@
                 />
                 <Provider tab="More Right Mouse"
                           section="Select"
-                          name="seqcrow_7"
+                          name="select_same"
                           mouse_mode="select similar fragments"
                           display_name="Select Same Types" 
                           description="Select molecular fragment of the clicked type"
@@ -327,7 +327,7 @@
                 />
                 <Provider tab="More Right Mouse"
                           section="Structure Modification"
-                          name="seqcrow_2"
+                          name="bond"
                           mouse_mode="bond"
                           display_name="Bond" 
                           description="Draw a new bond"
@@ -335,7 +335,7 @@
                 />
                 <Provider tab="More Right Mouse"
                           section="Structure Modification"
-                          name="seqcrow_3"
+                          name="tsbond"
                           mouse_mode="tsbond"
                           display_name="TS Bond" 
                           description="Draw a forming/breaking bond"
@@ -343,7 +343,15 @@
                 />
                 <Provider tab="More Right Mouse"
                           section="Structure Modification"
-                          name="seqcrow_4"
+                          name="coordinationbond"
+                          mouse_mode="coordinationbond"
+                          display_name="Coordination Bond" 
+                          description="Draw a metal coordination bond"
+                          icon="coordinationbond.png"
+                />
+                <Provider tab="More Right Mouse"
+                          section="Structure Modification"
+                          name="change_element"
                           mouse_mode="change element"
                           display_name="Change Element" 
                           description="Change the element of picked atoms"
@@ -351,7 +359,7 @@
                 />
                 <Provider tab="More Right Mouse"
                           section="Structure Modification"
-                          name="seqcrow_5"
+                          name="structure_eraser"
                           mouse_mode="structure eraser"
                           display_name="Erase Structure" 
                           description="Erase atomic structures"
@@ -359,7 +367,7 @@
                 />
                 <Provider tab="More Right Mouse"
                           section="Structure Modification"
-                          name="seqcrow_6"
+                          name="substitute"
                           mouse_mode="substitute"
                           display_name="Substitute" 
                           description="Add or change substituents"
@@ -521,6 +529,7 @@
                 <ChimeraXClassifier>ChimeraX :: Command :: pointGroup          :: General            :: print the point group of atomic structures to the log</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: ligandSterimol      :: Structure Analysis :: calculate sterimol parameters for ligands on a metal center</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: solidAngle          :: Structure Analysis :: calculate ligand solid angle</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: force               :: Structure Analysis :: display computed force vector</ChimeraXClassifier>
                 <!--
                 <ChimeraXClassifier>ChimeraX :: Command :: duplicate           :: Structure Editing  :: duplicate selected atoms</ChimeraXClassifier>
                 -->
@@ -529,8 +538,8 @@
     <AdditionalPackages>
         <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools"/>
         <!--
-        <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
         <Package name="AaronTools" folder="C:\Users\ajs99778\Documents\GitHub\AaronTools"/>
+        <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
         <Package name="AaronTools" folder="/home/tschaefer/QChASM/AaronTools"/>
         <Package name="Raven" folder="C:\Users\normn\Documents\GitHub\Raven"/>
         <Package name="AaronTools.test" folder="C:\Users\ajs99778\Documents\GitHub\AaronTools\test"/>

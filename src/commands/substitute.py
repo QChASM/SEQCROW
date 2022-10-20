@@ -39,12 +39,12 @@ substitute_description = CmdDesc(
 def guessAttachmentTargets(selection, session, allow_adjacent=True):
     models = {}
     
-    for atom in selection:        
+    for atom in selection:
         if any(bonded_atom in selection for bonded_atom in atom.neighbors):
             if allow_adjacent:
                 try:
                     models, attached = avoidTargets(session.logger, selection)
-                    session.logger.warning("two adjacent atoms are both selected; use \"guessAttachment true\"")
+                    session.logger.warning("two adjacent atoms are both selected; consider splitting this into separate substitutions")
                     return models, attached
                 except:
                     pass
@@ -153,6 +153,10 @@ def substitute(
                 for res in models[model]:
                     if res not in conv_res:
                         conv_res.append(res)
+                        for a in res.atoms:
+                            for a2 in a.neighbors:
+                                if a2.residue not in conv_res:
+                                    conv_res.append(a2.residue)
                 
                     if minimize:
                         for chix_res in model.residues:

@@ -28,15 +28,37 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
 
     max_length = session.seqcrow_settings.settings.MAX_FCHK_ARRAY
 
-    fr = FileReader(
-        (file_name, fmt, stream),
-        just_geom=False,
-        get_all=True,
-        max_length=max_length,
-    )
+    try:
+        fr = FileReader(
+            (file_name, fmt, stream),
+            just_geom=False,
+            get_all=True,
+            max_length=max_length,
+        )
+    except Exception as e:
+        session.logger.error("unable to open %s" % file_name)
+        raise e
+    finally:
+        if hasattr(stream, "close") and callable(stream.close):
+            stream.close()
 
-    if hasattr(stream, "close") and callable(stream.close):
-        stream.close()
+    try:
+        session.logger.warning("error or warning in %s:\n %s" % (
+            file_name, fr["error_msg"]
+        ))
+    except KeyError:
+        pass
+
+    try:
+        freq = fr["frequency"]
+        imag = [data.frequency for data in freq.data if data.frequency < 0]
+        session.logger.info("%s has %i imaginary mode%s" % (
+            file_name, len(imag), "" if len(imag) == 1 else "s"
+        ))
+        for freq in imag:
+            session.logger.info("%.2f<i>i</i>" % -freq, is_html=True)
+    except KeyError:
+        pass
 
     if fr.file_type == "dat":
         format_name = "Psi4 output file"
@@ -45,6 +67,24 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
     elif fr.file_type == "qout":
         format_name = "Q-Chem output file"
 
+    if fr.file_type == "xyz" and fr.all_geom and not all(
+        len(atoms[1]) == len(fr.atoms) for atoms in fr.all_geom
+    ):
+        geoms = []
+        for struc in fr.all_geom:
+            geoms.append(ResidueCollection(struc[1], refresh_ranks=False).copy(
+                comment=struc[0], copy_atoms=True,
+            ))
+        geoms.append(ResidueCollection(fr.atoms, refresh_ranks=False).copy(
+            comment=fr.comment, copy_atoms=True,
+        ))
+        structures = []
+        for rescol in geoms:
+            structures.append(rescol.get_chimera(session, coordsets=False))
+            structures[-1].name = rescol.comment
+        
+        return structures, "opened multi-structure file"
+    
     try:
         geom = ResidueCollection(fr, refresh_ranks=False).copy(
             comment=fr.comment, copy_atoms=True,
