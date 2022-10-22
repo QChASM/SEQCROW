@@ -6,8 +6,9 @@ from chimerax.core.settings import Settings
 from chimerax.core.models import Surface
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 
-from Qt.QtCore import Qt
+from Qt.QtCore import Qt, QSize
 from Qt.QtGui import QKeySequence
+from Qt.QtGui import QIcon, QPixmap
 from Qt.QtWidgets import (
     QPushButton,
     QFormLayout,
@@ -34,11 +35,43 @@ from SEQCROW.widgets import FakeMenu
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.colors import LinearSegmentedColormap, to_hex
 
 import copy
 
 import numpy as np
+
+cmap_names = sorted([
+    'viridis', 'plasma', 'inferno', 'magma', 'cividis',
+    "Greys", "Purples", 'Blues', 'Greens', 'Oranges', 'Reds',
+    'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
+    'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn',
+    'binary', 'gist_yarg', 'gist_gray', 'gray', 'bone',
+    'pink', 'spring', 'summer', 'autumn', 'winter', 'cool',
+    'Wistia', 'hot', 'afmhot', 'gist_heat', 'copper',
+    'PiYG', 'PRGn', 'BrBG', 'PuOr', 'RdGy', 'RdBu', 'RdYlBu',
+    'RdYlGn', 'Spectral', 'coolwarm', 'bwr', 'seismic',
+    'twilight', 'twilight_shifted', 'hsv', 'ocean', 
+    'gist_earth', 'terrain', 'gist_stern', 'gnuplot',
+    'gnuplot2', 'CMRmap', 'cubehelix', 'brg', 'gist_rainbow',
+    'rainbow', 'jet', 'turbo', 'nipy_spectral', 'gist_ncar',
+], key=lambda x: x.casefold())
+
+
+def get_cmap_icon(cmap_name, *size):
+    cmap = plt.cm.get_cmap(cmap_name)
+    pixmap_list = [
+        "%i  %i  %i  3" % (size[0], size[1], size[0])
+    ]
+    pixmap_str = ""
+    for i, x in enumerate(np.linspace(0, 1, num=size[0])):
+        pixmap_list.append("%03i c %s" % (i, to_hex(cmap(x))))
+        pixmap_str += "%03i" % i
+    pixmap_list += size[1] * [pixmap_str]
+    pixmap = QPixmap(pixmap_list)
+    pixmap_icon = QIcon(pixmap)
+    return pixmap_icon
+
 
 class _VburSettings(Settings):
 
@@ -252,26 +285,20 @@ class PercentVolumeBuried(ToolInstance):
         steric_layout.addRow("contour lines:", self.contour_lines)
         
         self.color_map = QComboBox()
-        self.color_map.addItems(sorted([
-            'viridis', 'plasma', 'inferno', 'magma', 'cividis',
-            "Greys", "Purples", 'Blues', 'Greens', 'Oranges', 'Reds',
-            'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
-            'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn',
-            'binary', 'gist_yarg', 'gist_gray', 'gray', 'bone',
-            'pink', 'spring', 'summer', 'autumn', 'winter', 'cool',
-            'Wistia', 'hot', 'afmhot', 'gist_heat', 'copper',
-            'PiYG', 'PRGn', 'BrBG', 'PuOr', 'RdGy', 'RdBu', 'RdYlBu',
-            'RdYlGn', 'Spectral', 'coolwarm', 'bwr', 'seismic',
-            'twilight', 'twilight_shifted', 'hsv',
-            'Pastel1', 'Pastel2', 'Paired', 'Accent', 'Dark2',
-            'Set1', 'Set2', 'Set3', 'tab10', 'tab20', 'tab20b',
-            'tab20c', 'flag', 'prism', 'ocean', 'gist_earth', 'terrain',
-            'gist_stern', 'gnuplot', 'gnuplot2', 'CMRmap',
-            'cubehelix', 'brg', 'gist_rainbow', 'rainbow', 'jet',
-            'turbo', 'nipy_spectral', 'gist_ncar',
-        ]))
-        ndx = self.color_map.findText(self.settings.color_map)
-        self.color_map.setCurrentIndex(ndx)
+        height = self.color_map.fontMetrics().boundingRect("Q").height()
+        width = 10 * self.color_map.fontMetrics().boundingRect("Q").width()
+        for cmap in cmap_names:
+            icon = get_cmap_icon(cmap, width, height)
+            self.color_map.addItem(icon, cmap, cmap)
+            icon = get_cmap_icon(cmap + "_r", width, height)
+            self.color_map.addItem(icon, cmap + "_r", cmap + "_r")
+        self.color_map.setIconSize(QSize(width, height))
+        ndx = self.color_map.findData(
+            self.settings.color_map,
+            role=Qt.UserRole,
+        )
+        if ndx >= 0:
+            self.color_map.setCurrentIndex(ndx)
         steric_layout.addRow("color map:", self.color_map)
         
         self.include_vbur = QCheckBox()
@@ -873,7 +900,7 @@ class StericMap(ChildToolWindow):
         include_vbur,
         color_map, levels, contour_lines,
     ):
-        fig, ax = plt.subplots()
+        self.fig, ax = plt.subplots()
         cmap = copy.copy(plt.cm.get_cmap(color_map))
         cmap.set_under('w')
         steric_map = ax.contourf(
@@ -889,7 +916,7 @@ class StericMap(ChildToolWindow):
                 colors='k',
                 levels=np.linspace(min_alt, max_alt, num=levels)
             )
-        bar = fig.colorbar(steric_map, format="%.1f")
+        bar = self.fig.colorbar(steric_map, format="%.1f")
         bar.set_label("altitude (Å)")
         ax.set_aspect("equal")
         
@@ -909,7 +936,7 @@ class StericMap(ChildToolWindow):
             circle = plt.Circle((0, 0), radius, color="k", fill=False, linewidth=4)
             ax.add_artist(circle)
         
-        canvas = Canvas(fig)
+        canvas = Canvas(self.fig)
         
         self.layout.addWidget(canvas)
         
@@ -929,7 +956,7 @@ class StericMap(ChildToolWindow):
         color_map, levels, contour_lines,
     ):
         vbur = [v1 - v2 for v1, v2 in zip(vbur1, vbur2)]
-        fig, ax = plt.subplots()
+        self.fig, ax = plt.subplots()
         cmap = copy.copy(plt.cm.get_cmap(color_map))
         cmap_a_not_in_b = LinearSegmentedColormap.from_list("a_not_in_b", [(0.5, 0, 0), (0.5, 0, 0)])
         cmap_b_not_in_a = LinearSegmentedColormap.from_list("a_not_in_b", [(0, 0, 0.5), (0, 0, 0.5)])
@@ -990,7 +1017,7 @@ class StericMap(ChildToolWindow):
                 colors="k",
                 levels=[0.99, 1],
             )
-        bar = fig.colorbar(steric_map, format="%.1f")
+        bar = self.fig.colorbar(steric_map, format="%.1f")
         bar.set_label("\u0394altitude (Å)")
         ax.set_aspect("equal")
 
@@ -1010,7 +1037,7 @@ class StericMap(ChildToolWindow):
             circle = plt.Circle((0, 0), radius, color="k", fill=False, linewidth=4)
             ax.add_artist(circle)
         
-        canvas = Canvas(fig)
+        canvas = Canvas(self.fig)
         
         self.layout.addWidget(canvas)
         
@@ -1018,3 +1045,11 @@ class StericMap(ChildToolWindow):
         toolbar = NavigationToolbar(canvas, toolbar_widget)
         toolbar.setMaximumHeight(32)
         self.layout.addWidget(toolbar)
+    
+    def close(self):
+        self.session.logger.info("closing figure")
+        plt.close(self.fig)    
+    
+    def delete(self):
+        self.session.logger.info("closing figure")
+        plt.close(self.fig)
