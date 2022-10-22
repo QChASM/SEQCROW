@@ -66,6 +66,9 @@ class _VburSettings(Settings):
         "map_max": 3.5,
         "map_min": -3.5,
         "cutout_labels": "octants",
+        "color_map": "jet",
+        "contour_lines": True,
+        "levels": 20,
     }
 
 
@@ -232,10 +235,44 @@ class PercentVolumeBuried(ToolInstance):
         steric_layout.addRow("pairwise difference:", self.pair_difference_map)
 
         self.num_pts = QSpinBox()
-        self.num_pts.setRange(25, 250)
+        self.num_pts.setRange(25, 1000)
         self.num_pts.setValue(self.settings.num_pts)
         self.num_pts.setToolTip("number of points along x and y axes")
         steric_layout.addRow("number of points:", self.num_pts)
+        
+        self.levels = QSpinBox()
+        self.levels.setRange(5, 1000)
+        self.levels.setValue(self.settings.levels)
+        self.levels.setToolTip("number of contour levels")
+        steric_layout.addRow("contour levels:", self.levels)
+        
+        self.contour_lines = QCheckBox()
+        self.contour_lines.setChecked(self.settings.contour_lines)
+        self.contour_lines.setToolTip("add black contour lines to the plot")
+        steric_layout.addRow("contour lines:", self.contour_lines)
+        
+        self.color_map = QComboBox()
+        self.color_map.addItems(sorted([
+            'viridis', 'plasma', 'inferno', 'magma', 'cividis',
+            "Greys", "Purples", 'Blues', 'Greens', 'Oranges', 'Reds',
+            'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
+            'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn',
+            'binary', 'gist_yarg', 'gist_gray', 'gray', 'bone',
+            'pink', 'spring', 'summer', 'autumn', 'winter', 'cool',
+            'Wistia', 'hot', 'afmhot', 'gist_heat', 'copper',
+            'PiYG', 'PRGn', 'BrBG', 'PuOr', 'RdGy', 'RdBu', 'RdYlBu',
+            'RdYlGn', 'Spectral', 'coolwarm', 'bwr', 'seismic',
+            'twilight', 'twilight_shifted', 'hsv',
+            'Pastel1', 'Pastel2', 'Paired', 'Accent', 'Dark2',
+            'Set1', 'Set2', 'Set3', 'tab10', 'tab20', 'tab20b',
+            'tab20c', 'flag', 'prism', 'ocean', 'gist_earth', 'terrain',
+            'gist_stern', 'gnuplot', 'gnuplot2', 'CMRmap',
+            'cubehelix', 'brg', 'gist_rainbow', 'rainbow', 'jet',
+            'turbo', 'nipy_spectral', 'gist_ncar',
+        ]))
+        ndx = self.color_map.findText(self.settings.color_map)
+        self.color_map.setCurrentIndex(ndx)
+        steric_layout.addRow("color map:", self.color_map)
         
         self.include_vbur = QCheckBox()
         self.include_vbur.setChecked(self.settings.include_vbur)
@@ -502,6 +539,15 @@ class PercentVolumeBuried(ToolInstance):
         self.settings.steric_map = steric_map
         args["steric_map"] = steric_map
         
+        color_map = self.color_map.currentText()
+        self.settings.color_map = color_map
+        
+        levels = self.levels.value()
+        self.settings.levels = levels
+
+        contour_lines = self.contour_lines.isChecked()
+        self.settings.contour_lines = contour_lines
+        
         use_scene = self.use_scene.checkState() == Qt.Checked
         self.settings.use_scene = use_scene
         args["useScene"] = use_scene
@@ -639,9 +685,19 @@ class PercentVolumeBuried(ToolInstance):
                     "steric map of %s" % mdl.name, window_class=StericMap
                 )
                 if auto_minmax:
-                    plot.set_data(x, y, z, min_alt, max_alt, vbur, radius, include_vbur)
+                    plot.set_data(
+                        x, y, z,
+                        min_alt, max_alt,
+                        vbur, radius, include_vbur,
+                        color_map, levels, contour_lines,
+                    )
                 else:
-                    plot.set_data(x, y, z, map_min, map_max, vbur, radius, include_vbur)
+                    plot.set_data(
+                        x, y, z,
+                        map_min, map_max,
+                        vbur, radius, include_vbur,
+                        color_map, levels, contour_lines,
+                    )
 
         
             if self.pair_difference_map.isChecked():
@@ -678,6 +734,8 @@ class PercentVolumeBuried(ToolInstance):
                                 vbur1, vbur2,
                                 radius,
                                 include_vbur,
+                                color_map,
+                                levels, contour_lines,
                             )
                         else:
                             plot.set_difference_data(
@@ -687,6 +745,8 @@ class PercentVolumeBuried(ToolInstance):
                                 vbur1, vbur2,
                                 radius,
                                 include_vbur,
+                                color_map,
+                                levels, contour_lines,
                             )
 
         else:
@@ -805,22 +865,30 @@ class StericMap(ChildToolWindow):
         self.ui_area.setLayout(self.layout)
         self.manage(None)
     
-    def set_data(self, x, y, z, min_alt, max_alt, vbur, radius, include_vbur):
+    def set_data(
+        self, x, y, z,
+        min_alt, max_alt,
+        vbur,
+        radius,
+        include_vbur,
+        color_map, levels, contour_lines,
+    ):
         fig, ax = plt.subplots()
-        cmap = copy.copy(plt.cm.get_cmap("jet"))
+        cmap = copy.copy(plt.cm.get_cmap(color_map))
         cmap.set_under('w')
         steric_map = ax.contourf(
             x, y, z,
             extend="min",
             cmap=cmap,
-            levels=np.linspace(min_alt, max_alt, num=21)
+            levels=np.linspace(min_alt, max_alt, num=levels)
         )
-        ax.contour(
-            x, y, z,
-            extend="min",
-            colors='k',
-            levels=np.linspace(min_alt, max_alt, num=21)
-        )
+        if contour_lines:
+            ax.contour(
+                x, y, z,
+                extend="min",
+                colors='k',
+                levels=np.linspace(min_alt, max_alt, num=levels)
+            )
         bar = fig.colorbar(steric_map, format="%.1f")
         bar.set_label("altitude (Å)")
         ax.set_aspect("equal")
@@ -857,11 +925,12 @@ class StericMap(ChildToolWindow):
         min_alt, max_alt,
         vbur1, vbur2,
         radius,
-        include_vbur
+        include_vbur,
+        color_map, levels, contour_lines,
     ):
         vbur = [v1 - v2 for v1, v2 in zip(vbur1, vbur2)]
         fig, ax = plt.subplots()
-        cmap = copy.copy(plt.cm.get_cmap("bwr"))
+        cmap = copy.copy(plt.cm.get_cmap(color_map))
         cmap_a_not_in_b = LinearSegmentedColormap.from_list("a_not_in_b", [(0.5, 0, 0), (0.5, 0, 0)])
         cmap_b_not_in_a = LinearSegmentedColormap.from_list("a_not_in_b", [(0, 0, 0.5), (0, 0, 0.5)])
         if abs(min_alt) < abs(max_alt):
@@ -878,7 +947,7 @@ class StericMap(ChildToolWindow):
             z,
             extend="min",
             cmap=cmap,
-            levels=np.linspace(*cmap_range, num=21),
+            levels=np.linspace(*cmap_range, num=levels),
         )
         ax.contourf(
             x,
@@ -896,30 +965,31 @@ class StericMap(ChildToolWindow):
             cmap=cmap_b_not_in_a,
             levels=[0.99, 1],
         )
-        steric_lines = ax.contour(
-            x,
-            y,
-            z,
-            extend="min",
-            colors="k",
-            levels=np.linspace(*cmap_range, num=21),
-        )
-        steric_lines = ax.contour(
-            x,
-            y,
-            a_not_in_b,
-            extend="neither",
-            colors="k",
-            levels=[0.99, 1],
-        )
-        steric_lines = ax.contour(
-            x,
-            y,
-            b_not_in_a,
-            extend="neither",
-            colors="k",
-            levels=[0.99, 1],
-        )
+        if contour_lines:
+            steric_lines = ax.contour(
+                x,
+                y,
+                z,
+                extend="min",
+                colors="k",
+                levels=np.linspace(*cmap_range, num=levels),
+            )
+            steric_lines = ax.contour(
+                x,
+                y,
+                a_not_in_b,
+                extend="neither",
+                colors="k",
+                levels=[0.99, 1],
+            )
+            steric_lines = ax.contour(
+                x,
+                y,
+                b_not_in_a,
+                extend="neither",
+                colors="k",
+                levels=[0.99, 1],
+            )
         bar = fig.colorbar(steric_map, format="%.1f")
         bar.set_label("\u0394altitude (Å)")
         ax.set_aspect("equal")
