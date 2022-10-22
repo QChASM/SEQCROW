@@ -910,7 +910,7 @@ class ResidueCollection(Geometry):
                         try:
                             pbg = atomic_structure.pseudobond_group(
                                 atomic_structure.PBG_METAL_COORDINATION,
-                                create_type=2
+                                create_type=1
                             ) 
                         except TypeError:
                             pbg = atomic_structure.pseudobond_group(
