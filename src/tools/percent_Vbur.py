@@ -51,22 +51,25 @@ cmap_names = sorted([
     'Wistia', 'hot', 'afmhot', 'gist_heat', 'copper',
     'PiYG', 'PRGn', 'BrBG', 'PuOr', 'RdGy', 'RdBu', 'RdYlBu',
     'RdYlGn', 'Spectral', 'coolwarm', 'bwr', 'seismic',
-    'twilight', 'twilight_shifted', 'hsv', 'ocean', 
-    'gist_earth', 'terrain', 'gist_stern', 'gnuplot',
+    'ocean', 'gist_earth', 'terrain', 'gist_stern', 'gnuplot',
     'gnuplot2', 'CMRmap', 'cubehelix', 'brg', 'gist_rainbow',
     'rainbow', 'jet', 'turbo', 'nipy_spectral', 'gist_ncar',
 ], key=lambda x: x.casefold())
 
+skip_cmaps = set()
 
 def get_cmap_icon(cmap_name, *size):
     cmap = plt.cm.get_cmap(cmap_name)
+    d = int(np.ceil(np.log10(size[0])))
     pixmap_list = [
-        "%i  %i  %i  3" % (size[0], size[1], size[0])
+        "%i  %i  %i  %i" % (size[0], size[1], size[0], d)
     ]
     pixmap_str = ""
+    fmt_str_c = "%%0%ii c %%s" % d
+    fmt_str_a = "%%0%ii" % d
     for i, x in enumerate(np.linspace(0, 1, num=size[0])):
-        pixmap_list.append("%03i c %s" % (i, to_hex(cmap(x))))
-        pixmap_str += "%03i" % i
+        pixmap_list.append(fmt_str_c % (i, to_hex(cmap(x))))
+        pixmap_str += fmt_str_a % i
     pixmap_list += size[1] * [pixmap_str]
     pixmap = QPixmap(pixmap_list)
     pixmap_icon = QIcon(pixmap)
@@ -288,10 +291,12 @@ class PercentVolumeBuried(ToolInstance):
         height = self.color_map.fontMetrics().boundingRect("Q").height()
         width = 10 * self.color_map.fontMetrics().boundingRect("Q").width()
         for cmap in cmap_names:
-            icon = get_cmap_icon(cmap, width, height)
-            self.color_map.addItem(icon, cmap, cmap)
-            icon = get_cmap_icon(cmap + "_r", width, height)
-            self.color_map.addItem(icon, cmap + "_r", cmap + "_r")
+            if cmap not in skip_cmaps:
+                icon = get_cmap_icon(cmap, width, height)
+                self.color_map.addItem(icon, cmap, cmap)
+            if cmap + "_r" not in skip_cmaps:
+                icon = get_cmap_icon(cmap + "_r", width, height)
+                self.color_map.addItem(icon, cmap + "_r", cmap + "_r")
         self.color_map.setIconSize(QSize(width, height))
         ndx = self.color_map.findData(
             self.settings.color_map,
