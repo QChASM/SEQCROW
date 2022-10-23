@@ -277,14 +277,18 @@ def solid_angle_vis(
         dv = coord_norms[i] - [0, 0, 1]
         c2 = np.dot(dv, dv)
         theta = np.arccos(-c2 / 2. + 1)
-        rv = np.cross(coord_norms[i], [0, 0, 1])
-        rv /= np.linalg.norm(rv)
-        R = rotation_matrix(theta, rv)
         angles = np.linspace(0, 2 * np.pi, num=n_added)
         circle = np.stack((np.cos(angles), np.sin(angles), np.zeros(n_added)), axis=-1)
-        added_coords = H[i] * np.dot(circle, R) + adjusted_coords[i]
+        if theta >= np.pi or theta <= 0 or np.isnan(theta):
+            added_coords = H[i] * circle + adjusted_coords[i]
+            added_bottom_sides = dx2[i]  * X[i] * (H[i] * circle + adjusted_coords[i]) / radius
+        else:
+            rv = np.cross(coord_norms[i], [0, 0, 1])
+            rv /= np.linalg.norm(rv)
+            R = rotation_matrix(theta, rv)
+            added_coords = H[i] * np.dot(circle, R) + adjusted_coords[i]
+            added_bottom_sides = dx2[i]  * X[i] * (H[i] * np.dot(circle, R) + adjusted_coords[i]) / radius
         added_top_sides = added_coords
-        added_bottom_sides = dx2[i]  * X[i] * (H[i] * np.dot(circle, R) + adjusted_coords[i]) / radius
 
         d_ep = distance_matrix(added_coords, adjusted_coords)
         diff_mat = d_ep - H[np.newaxis, :]
