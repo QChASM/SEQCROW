@@ -52,7 +52,7 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
     try:
         freq = fr["frequency"]
         imag = [data.frequency for data in freq.data if data.frequency < 0]
-        session.logger.info("%s has %i imaginary mode%s" % (
+        session.logger.info("%s has %i imaginary harmonic vibrational mode%s" % (
             file_name, len(imag), "" if len(imag) == 1 else "s"
         ))
         for freq in imag:

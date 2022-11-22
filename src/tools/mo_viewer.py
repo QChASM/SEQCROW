@@ -44,6 +44,16 @@ from SEQCROW.widgets import FilereaderComboBox
 from SEQCROW.utils import iter2str
 
 
+ORBITAL_VOLUME_NAMES = [
+    "MO",
+    "electron density",
+    "spin density", 
+    "fukui donor",
+    "fukui acceptor",
+    "fukui dual",
+]
+
+
 class OrbitalGrid(GridData):
     polar_values = True
     
@@ -88,6 +98,7 @@ class _OrbitalSettings(Settings):
         "iso_val": 0.025,
         "threads": int(cpu_count() // 2),
         "ed_color": Value((1.0, 1.0, 1.0, 0.5), TupleOf(FloatArg, 4), iter2str),
+        "ed_neg_color": Value((0.9, 0.4, 0.7, 0.5), TupleOf(FloatArg, 4), iter2str),
         "ed_iso_val": 0.001,
         "ed_low_mem": False,
         "fd_color": Value((1.0, 0.0, 0.0, 0.5), TupleOf(FloatArg, 4), iter2str),
@@ -243,11 +254,24 @@ class OrbitalViewer(ToolInstance):
         self.e_density_group = QGroupBox("electron density")
         e_density_layout = QFormLayout(self.e_density_group)
         other_surface_layout.addRow(self.e_density_group)
+
+        color_options = QWidget()
+        color_layout = QHBoxLayout(color_options)
+        color_layout.setContentsMargins(5, 0, 5, 0)
         
         self.ed_color = ColorButton(has_alpha_channel=True, max_size=(16, 16))
         self.ed_color.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.ed_color.set_color(self.settings.ed_color)
-        e_density_layout.addRow("color:", self.ed_color)
+        color_layout.insertWidget(0, self.ed_color, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        
+        self.ed_neg_color = ColorButton(has_alpha_channel=True, max_size=(16, 16))
+        self.ed_neg_color.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.ed_neg_color.set_color(self.settings.ed_neg_color)
+        color_layout.insertWidget(1, self.ed_neg_color, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        
+        color_layout.insertWidget(2, QWidget(), 1)
+
+        e_density_layout.addRow("color:", color_options)
         
         self.ed_iso_value = QDoubleSpinBox()
         self.ed_iso_value.setDecimals(4)
@@ -260,7 +284,12 @@ class OrbitalViewer(ToolInstance):
         show_e_density.clicked.connect(self.show_e_density)
         e_density_layout.addRow(show_e_density)
         
-
+        show_spin_density = QPushButton("calculate SCF spin density")
+        show_spin_density.clicked.connect(
+            lambda *args, s=self, spin=True: s.show_e_density(spin=spin)
+        )
+        e_density_layout.addRow(show_spin_density)
+        
         self.fukui_group = QGroupBox("Fukui functions")
         fukui_layout = QFormLayout(self.fukui_group)
         other_surface_layout.addRow(self.fukui_group)
@@ -417,9 +446,10 @@ class OrbitalViewer(ToolInstance):
         self.e_density_group.setEnabled(True)
 
         homo_ndx = 0
-        if orbits.alpha_occupancies and not orbits.beta_occupancies:
-            if not all(np.isclose(occ, 1) or np.isclose(occ, 0) for occ in orbits.alpha_occupancies):
-                self.fukui_group.setEnabled(False)
+        if orbits.alpha_occupancies and not orbits.beta_occupancies and not all(
+            np.isclose(occ, 1) or np.isclose(occ, 0) for occ in orbits.alpha_occupancies
+        ):
+            self.fukui_group.setEnabled(False)
             if "orbit_kinds" not in fr.other:
                 self.mo_table.setColumnCount(3)
                 self.mo_table.setHorizontalHeaderLabels(
@@ -457,13 +487,17 @@ class OrbitalViewer(ToolInstance):
                 self.mo_table.setItem(row, 2, orbit_nrg)
             if not homo_ndx:
                 homo_ndx = orbits.n_mos - max(orbits.n_alpha, orbits.n_beta)
-        elif orbits.alpha_occupancies and orbits.beta_occupancies:
+        elif orbits.alpha_occupancies and orbits.beta_occupancies and not all(
+            np.isclose(occ % 1, 0) or np.isclose(occ % 1, 1)
+                for occ in [*orbits.alpha_occupancies, *orbits.beta_occupancies]
+            ):
             self.fukui_group.setEnabled(False)
             if "orbit_kinds" not in fr.other:
-                self.mo_table.setColumnCount(3)
+                self.mo_table.setColumnCount(5)
                 self.mo_table.setHorizontalHeaderLabels(
-                    ["#", "alpha occ.", "beta occ.", "Energy (E\u2095)"]
+                    ["#", "alpha occ.", "beta occ.", "alpha energy (E\u2095)", "beta energy (E\u2095)"]
                 )
+
             else:
                 self.mo_table.setColumnCount(2)
                 self.mo_table.setHorizontalHeaderLabels(
@@ -482,6 +516,7 @@ class OrbitalViewer(ToolInstance):
                 
                 alpha_occ = orbits.alpha_occupancies[orbits.n_mos - i - 1]
                 beta_occ = orbits.beta_occupancies[orbits.n_mos - i - 1]
+                beta_nrg = orbits.beta_nrgs[orbits.n_mos - i - 1]
 
                 a_occupancy = OrbitalTableItem()
                 a_occupancy.setData(Qt.DisplayRole, "%.5f" % alpha_occ)
@@ -493,14 +528,21 @@ class OrbitalViewer(ToolInstance):
                 b_occupancy.setData(Qt.DisplayRole, "%.5f" % beta_occ)
                 b_occupancy.setData(Qt.UserRole, beta_occ)
                 b_occupancy.setTextAlignment(Qt.AlignCenter)
-                self.mo_table.setItem(row, 1, b_occupancy)
-                
+                self.mo_table.setItem(row, 2, b_occupancy)
+
                 nrg_str = "%.5f" % nrg
                 orbit_nrg = OrbitalTableItem()
                 orbit_nrg.setData(Qt.DisplayRole, nrg_str)
                 orbit_nrg.setData(Qt.UserRole, nrg)
                 orbit_nrg.setTextAlignment(Qt.AlignCenter)
                 self.mo_table.setItem(row, 3, orbit_nrg)
+    
+                nrg_str = "%.5f" % beta_nrg
+                orbit_nrg = OrbitalTableItem()
+                orbit_nrg.setData(Qt.DisplayRole, nrg_str)
+                orbit_nrg.setData(Qt.UserRole, beta_nrg)
+                orbit_nrg.setTextAlignment(Qt.AlignCenter)
+                self.mo_table.setItem(row, 4, orbit_nrg)
             if not homo_ndx:
                 homo_ndx = orbits.n_mos - max(orbits.n_alpha, orbits.n_beta)
         elif orbits.beta_nrgs is None or len(orbits.beta_nrgs) == 0:
@@ -565,6 +607,7 @@ class OrbitalViewer(ToolInstance):
             self.mo_table.setHorizontalHeaderLabels(
                 ["#", "Ground State Occ.", "Energy (E\u2095)"]
             )
+            self.fukui_group.setEnabled(False)
             alpha_ndx = beta_ndx = len(orbits.alpha_nrgs) - 1
             while alpha_ndx >= 0 or beta_ndx >= 0:
                 use_alpha = True
@@ -719,15 +762,9 @@ class OrbitalViewer(ToolInstance):
                         )
                     elif child.name.startswith("MO") and child.visible:
                         hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("MO") and child.visible:
-                    hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("electron density") and child.visible:
-                    hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("fukui donor") and child.visible:
-                    hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("fukui acceptor") and child.visible:
-                    hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("fukui dual") and child.visible:
+                elif isinstance(child, Volume) and any(
+                    child.name.startswith(x) for x in ORBITAL_VOLUME_NAMES
+                ) and child.shown():
                     hide_vols.append(child)
 
             for child in hide_vols:
@@ -798,7 +835,7 @@ class OrbitalViewer(ToolInstance):
                         run(self.session, "close %s" % child.atomspec)
         self.session.models.add([vol], parent=model)
 
-    def show_e_density(self):
+    def show_e_density(self, *, spin=False):
         fr = self.model_selector.currentData()
         if fr is None:
             return
@@ -815,6 +852,8 @@ class OrbitalViewer(ToolInstance):
         self.settings.ed_iso_val = iso_val
         ed_color = tuple(x / 255. for x in self.ed_color.get_color())
         self.settings.ed_color = ed_color
+        ed_neg_color = tuple(x / 255. for x in self.ed_neg_color.get_color())
+        self.settings.ed_neg_color = ed_neg_color
         keep_open = self.keep_open.checkState() == Qt.Checked
         self.settings.keep_open = keep_open
         low_mem_mode = self.low_mem_mode.checkState() == Qt.Checked
@@ -823,6 +862,10 @@ class OrbitalViewer(ToolInstance):
         if cube is False:
             return
         n_pts1, n_pts2, n_pts3, v1, v2, v3, com, u = cube
+        
+        name = "electron density"
+        if spin:
+            name = "spin density"
 
         if keep_open:
             found = False
@@ -830,7 +873,7 @@ class OrbitalViewer(ToolInstance):
             for child in model.child_models():
                 if (
                     isinstance(child, Volume) and 
-                    child.name.startswith("electron density")
+                    child.name.startswith(name)
                 ):
                     if (
                         all(x == y for x, y in zip(com, child.data.origin)) and
@@ -839,30 +882,31 @@ class OrbitalViewer(ToolInstance):
                         found = True
                         run(self.session, "show %s" % child.atomspec)
                         hex_color = "#"
-                        for v in ed_color:
+                        neg_hex_color = "#"
+                        for v, nv in zip(ed_color, ed_neg_color):
                             ch1 = str(hex(int(255 * v)))[2:]
+                            nch1 = str(hex(int(255 * nv)))[2:]
                             if len(ch1) == 1:
                                 ch1 = "0" + ch1
+                            if len(nch1) == 1:
+                                nch1 = "0" + nch1
                             hex_color += ch1
+                            neg_hex_color += nch1
                         run(
                             self.session,
-                            "volume %s level %.4f color %s" % (
+                            "volume %s level %.4f level -%.4f color %s color %s" % (
                                 child.atomspec,
                                 iso_val,
+                                iso_val,
                                 hex_color,
+                                neg_hex_color,
                             )
                         )
                     elif child.shown():
                         hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("MO") and child.shown():
-                    hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("electron density") and child.shown():
-                    hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("fukui donor") and child.shown():
-                    hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("fukui acceptor") and child.shown():
-                    hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("fukui dual") and child.shown():
+                elif isinstance(child, Volume) and any(
+                    child.name.startswith(x) for x in ORBITAL_VOLUME_NAMES
+                ) and child.shown():
                     hide_vols.append(child)
 
             for child in hide_vols:
@@ -900,13 +944,13 @@ class OrbitalViewer(ToolInstance):
         )
         
         val = orbits.density_value(
-            coords, n_jobs=threads, low_mem=low_mem_mode
+            coords, n_jobs=threads, low_mem=low_mem_mode, spin=spin,
         )
         val = np.reshape(val, (n_pts1, n_pts2, n_pts3))
 
         grid = OrbitalGrid(
             (n_pts1, n_pts2, n_pts3),
-            name="electron density",
+            name=name,
             origin=com,
             rotation=u,
             step=[np.linalg.norm(v) for v in [v1, v2, v3]],
@@ -923,8 +967,8 @@ class OrbitalViewer(ToolInstance):
 
         vol = Volume(self.session, grid, rendering_options=opt)
         vol.set_parameters(
-            surface_levels=[iso_val],
-            surface_colors=[ed_color],
+            surface_levels=[iso_val, -iso_val],
+            surface_colors=[ed_color, ed_neg_color],
         )
         vol.matrix_value_statistics(read_matrix=True)
         vol.update_drawings()
@@ -1022,15 +1066,9 @@ class OrbitalViewer(ToolInstance):
                         )
                     elif child.shown():
                         hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("MO") and child.shown():
-                    hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("electron density") and child.shown():
-                    hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("fukui donor") and child.shown():
-                    hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("fukui acceptor") and child.shown():
-                    hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("fukui dual") and child.shown():
+                elif isinstance(child, Volume) and any(
+                    child.name.startswith(x) for x in ORBITAL_VOLUME_NAMES
+                ) and child.shown():
                     hide_vols.append(child)
 
             for child in hide_vols:
@@ -1190,15 +1228,9 @@ class OrbitalViewer(ToolInstance):
                         )
                     elif child.shown():
                         hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("MO") and child.shown():
-                    hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("electron density") and child.shown():
-                    hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("fukui donor") and child.shown():
-                    hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("fukui acceptor") and child.shown():
-                    hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("fukui dual") and child.shown():
+                elif isinstance(child, Volume) and any(
+                    child.name.startswith(x) for x in ORBITAL_VOLUME_NAMES
+                ) and child.shown():
                     hide_vols.append(child)
 
             for child in hide_vols:
@@ -1366,15 +1398,9 @@ class OrbitalViewer(ToolInstance):
                         )
                     elif child.shown():
                         hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("MO") and child.shown():
-                    hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("electron density") and child.shown():
-                    hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("fukui donor") and child.shown():
-                    hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("fukui acceptor") and child.shown():
-                    hide_vols.append(child)
-                elif isinstance(child, Volume) and child.name.startswith("fukui dual") and child.shown():
+                elif isinstance(child, Volume) and any(
+                    child.name.startswith(x) for x in ORBITAL_VOLUME_NAMES
+                ) and child.shown():
                     hide_vols.append(child)
 
             for child in hide_vols:

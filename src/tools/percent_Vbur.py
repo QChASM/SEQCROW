@@ -267,25 +267,31 @@ class PercentVolumeBuried(ToolInstance):
         self.steric_map.setToolTip("produce a 2D projection of steric bulk\ncauses buried volume to be reported for individual quadrants")
         steric_layout.addRow("create steric map:", self.steric_map)
 
+        self.steric_map_options = []
+
         self.pair_difference_map = QCheckBox()
         steric_layout.addRow("pairwise difference:", self.pair_difference_map)
+        self.steric_map_options.append(self.pair_difference_map)
 
         self.num_pts = QSpinBox()
         self.num_pts.setRange(25, 1000)
         self.num_pts.setValue(self.settings.num_pts)
         self.num_pts.setToolTip("number of points along x and y axes")
         steric_layout.addRow("number of points:", self.num_pts)
+        self.steric_map_options.append(self.num_pts)
         
         self.levels = QSpinBox()
         self.levels.setRange(5, 1000)
         self.levels.setValue(self.settings.levels)
         self.levels.setToolTip("number of contour levels")
         steric_layout.addRow("contour levels:", self.levels)
+        self.steric_map_options.append(self.levels)
         
         self.contour_lines = QCheckBox()
         self.contour_lines.setChecked(self.settings.contour_lines)
         self.contour_lines.setToolTip("add black contour lines to the plot")
         steric_layout.addRow("contour lines:", self.contour_lines)
+        self.steric_map_options.append(self.contour_lines)
         
         self.color_map = QComboBox()
         height = self.color_map.fontMetrics().boundingRect("Q").height()
@@ -305,27 +311,31 @@ class PercentVolumeBuried(ToolInstance):
         if ndx >= 0:
             self.color_map.setCurrentIndex(ndx)
         steric_layout.addRow("color map:", self.color_map)
+        self.steric_map_options.append(self.color_map)
         
         self.include_vbur = QCheckBox()
         self.include_vbur.setChecked(self.settings.include_vbur)
         steric_layout.addRow("label quadrants with %V<sub>bur</sub>", self.include_vbur)
+        self.steric_map_options.append(self.include_vbur)
 
         self.map_shape = QComboBox()
         self.map_shape.addItems(["circle", "square"])
         ndx = self.map_shape.findText(self.settings.map_shape, Qt.MatchExactly)
         self.map_shape.setCurrentIndex(ndx)
         steric_layout.addRow("map shape:", self.map_shape)
+        self.steric_map_options.append(self.map_shape)
         
         self.auto_minmax = QCheckBox()
         self.auto_minmax.setChecked(self.settings.auto_minmax)
         steric_layout.addRow("automatic min. and max.:", self.auto_minmax)
+        self.steric_map_options.append(self.auto_minmax)
         
         self.map_min = QDoubleSpinBox()
         self.map_min.setRange(-15., 0.)
         self.map_min.setSuffix(" \u212B")
         self.map_min.setSingleStep(0.1)
         self.map_min.setValue(self.settings.map_min)
-        steric_layout.addRow("minimum value:", self.map_min)    
+        steric_layout.addRow("minimum value:", self.map_min)
         
         self.map_max = QDoubleSpinBox()
         self.map_max.setRange(0., 15.)
@@ -334,30 +344,7 @@ class PercentVolumeBuried(ToolInstance):
         self.map_max.setValue(self.settings.map_max)
         steric_layout.addRow("maximum value:", self.map_max)
 
-        self.num_pts.setEnabled(self.settings.steric_map)
-        self.steric_map.stateChanged.connect(
-            lambda state, widget=self.num_pts: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
-        )
-        
-        self.pair_difference_map.setEnabled(self.settings.steric_map)
-        self.steric_map.stateChanged.connect(
-            lambda state, widget=self.pair_difference_map: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
-        )
-        
-        self.include_vbur.setEnabled(self.settings.steric_map)
-        self.steric_map.stateChanged.connect(
-            lambda state, widget=self.include_vbur: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
-        )
-
-        self.map_shape.setEnabled(self.settings.steric_map)
-        self.steric_map.stateChanged.connect(
-            lambda state, widget=self.map_shape: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
-        )
-        
-        self.auto_minmax.setEnabled(self.settings.steric_map)
-        self.steric_map.stateChanged.connect(
-            lambda state, widget=self.auto_minmax: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
-        )
+        self.steric_map.stateChanged.connect(self.show_steric_map_options)
         
         self.map_min.setEnabled(not self.settings.auto_minmax and self.settings.steric_map)
         self.steric_map.stateChanged.connect(
@@ -522,6 +509,10 @@ class PercentVolumeBuried(ToolInstance):
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(None)
+    
+    def show_steric_map_options(self, is_enabled):
+        for widget in self.steric_map_options:
+            widget.setEnabled(Qt.CheckState(is_enabled) == Qt.Checked)
     
     def clear_table(self):
         are_you_sure = QMessageBox.question(
@@ -883,7 +874,9 @@ class PercentVolumeBuried(ToolInstance):
         """Show the help for this tool in the help viewer."""
         from chimerax.core.commands import run
         run(self.session,
-            'open %s' % self.help if self.help is not None else "")
+            'open %s' % self.help if self.help is not None else ""
+        )
+
 
 class StericMap(ChildToolWindow):
     def __init__(self, tool_instance, title, *args, **kwargs):
