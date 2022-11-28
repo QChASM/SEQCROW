@@ -91,6 +91,11 @@ class FileReaderManager(ProviderManager):
                 
         if len(removed_frs) > 0:
             self.triggers.activate_trigger(FILEREADER_REMOVED, removed_frs)
+        for fr in removed_frs:
+            for (key, attr) in list(fr.__dict__.items()):
+                delattr(fr, key)
+                del attr
+            del fr
 
     def add_provider(self, bundle_info, name, **kw):
         #*buzz lightyear* ah yes, the models are models

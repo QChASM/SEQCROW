@@ -1079,18 +1079,4 @@ class ResidueCollection(Geometry):
                         attr_type=int
                     )
 
-        if filereader is not None:
-            if any(
-                attr[0] == "aarontools_filereader" for attr in struc.custom_attrs
-            ):
-                struc.register_attr(
-                    session,
-                    "filereader",
-                    "SEQCROW",
-                    attr_type=FileReader,
-                )
-
-            struc.filereader = filereader
-            
-
         return struc
