@@ -925,6 +925,8 @@ class ResidueCollection(Geometry):
         if filereader.all_geom is None:
             warn("coordsets requested, but the file contains one or fewer sets of coordinates")
             coordsets = np.array([self.coords])
+        elif isinstance(filereader.all_geom, np.ndarray):
+            return filereader.all_geom
         else:
             coordsets = np.zeros((len(filereader.all_geom) + 1, len(self.atoms), 3))
             for i, all_geom in enumerate(filereader.all_geom):

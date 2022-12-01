@@ -91,6 +91,7 @@ class FileReaderManager(ProviderManager):
                 
         if len(removed_frs) > 0:
             self.triggers.activate_trigger(FILEREADER_REMOVED, removed_frs)
+            self.triggers.activate_trigger(FILEREADER_CHANGE, removed_frs)
         for fr in removed_frs:
             for (key, attr) in list(fr.__dict__.items()):
                 delattr(fr, key)

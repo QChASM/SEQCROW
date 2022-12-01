@@ -152,6 +152,126 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
     return [structure], status
 
 
+def get_structure(session, elements, coordinates, name, bonded_threshold=0.3):
+    from chimerax.atomic import AtomicStructure, Element, Atoms
+    from chimerax.atomic import Residue
+    import numpy as np
+    from AaronTools.const import RADII, TMETAL
+
+    struc = AtomicStructure(session)
+    struc.name = name
+    res = struc.new_residue("UNK", "a", 1)
+    ele_counts = dict()
+    radii = np.vectorize(lambda x: RADII.get(x, 0))(elements)
+    for i, ele, coord in zip(range(0, len(elements)), elements, coordinates):
+        dist = np.zeros(i)
+        max_connected_dist = np.zeros(i)
+        ele_counts.setdefault(ele, 0)
+        ele_counts[ele] += 1
+        name = "%s%i" % (ele, ele_counts[ele])
+        atom = struc.new_atom(name, ele)
+        atom.coord = coord
+        atom.serial_number = i + 1
+        res.add_atom(atom)
+        if i == 0:
+            continue
+        max_connected_dist = (radii[i] + radii[:i] + bonded_threshold) ** 2
+        dist = np.sum((coordinates[:i] - coord) ** 2, axis=1)
+
+        connected = (dist < max_connected_dist).nonzero()[0]
+        for ndx in connected:
+            if ele in TMETAL or elements[ndx] in TMETAL:
+                pbg = struc.pseudobond_group(
+                    struc.PBG_METAL_COORDINATION,
+                    create_type=1
+                )
+                pbg.new_pseudobond(
+                    atom, struc.atoms[ndx]
+                )
+                continue
+            bond = struc.new_bond(
+                atom, struc.atoms[ndx]
+            )
+    return struc
+
+
+def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
+    """
+    open XYZ files
+    """
+    import numpy as np
+    from SEQCROW.managers import ADD_FILEREADER
+
+    coordsets = []
+    ele_sets = []
+    line = stream.readline()
+    structures = []
+    comments = []
+    class DummyFileReader:
+        pass
+    fr = DummyFileReader()
+    fr.name = file_name
+    fr.all_geom = None
+    fr.other = dict()
+    while line.strip():
+        n_atoms = int(line)
+        comment = stream.readline()
+        comments.append(comment)
+        coords = np.zeros((n_atoms, 3))
+        coord_data = ""
+        eles = []
+        for i in range(0, n_atoms):
+            line = stream.readline()
+            info = line.split(maxsplit=1)
+            eles.append(info[0])
+            coord_data += info[1]
+        line = stream.readline()
+        coords = np.reshape(
+            np.fromstring(coord_data, count=3 * n_atoms, sep=" "),
+            (n_atoms, 3),
+        )
+        coordsets.append(coords)
+        ele_sets.append(eles)
+        if maxModels is not None:
+            struc = get_structure(session, eles, coords, comment)
+            structures.append(struc)
+            if len(structures) == maxModels:
+                break
+    
+    fr.comment = comment
+
+    stream.close()
+    if maxModels is not None:
+        session.filereader_manager.triggers.activate_trigger(
+            ADD_FILEREADER, (structures, [fr for s in structures])
+        )
+        return structures, "opened %i structures from %s" % (len(structures), file_name)
+    
+    if not all(len(ele_set) == len(ele_sets[0]) for ele_set in ele_sets):
+        structures = [
+            get_structure(session, eles, coords, name) for (eles, coords, name) in
+            zip(ele_sets, coordsets, comments)
+        ]
+        session.filereader_manager.triggers.activate_trigger(
+            ADD_FILEREADER, (structures, [fr for s in structures])
+        )
+        return structures, "opened %i structures from %s" % (len(structures), file_name)
+    
+    struc = get_structure(session, ele_sets[-1], coordsets[-1], file_name)
+    coordsets = np.array(coordsets)
+    struc.add_coordsets(np.array(coordsets), replace=True)
+    session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([struc], [fr]))
+    status = "opened %s as an XYZ coordinate file" % file_name
+    struc.active_coordset_id = struc.num_coordsets
+    if len(coordsets) > 1 and coordsets is not False:
+        fr.all_geom = coordsets
+        from chimerax.std_commands.coordset_gui import CoordinateSetSlider
+        status += " movie"
+        slider = CoordinateSetSlider(session, struc)
+        slider.set_slider(struc.num_coordsets)
+    return [struc], status
+    
+
 def open_nbo(session, path, file_name, format_name=None, orbitals=None):
     import os.path
     

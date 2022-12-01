@@ -33,7 +33,7 @@ class FileReaderPanel(ToolInstance):
         self.fill_tree()
         
         self._fr_change = self.session.filereader_manager.triggers.add_handler(FILEREADER_CHANGE,
-            lambda *args: self.fill_tree(*args))        
+            lambda *args: self.fill_tree(*args))
         self._add_models = self.session.triggers.add_handler(ADD_MODELS,
             lambda *args: self.fill_tree(*args))
         self._molid_change = self.session.triggers.add_handler(MODEL_ID_CHANGED,
