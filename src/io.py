@@ -214,7 +214,23 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
     fr.all_geom = None
     fr.other = dict()
     while line.strip():
-        n_atoms = int(line)
+        try:
+            n_atoms = int(line)
+        except ValueError:
+            error_msg = get_error_msg(
+                file_name,
+                ele_sets,
+                coordsets,
+                eles,
+                comments,
+                n_atoms,
+                comment,
+                coord_data,
+            )
+            error_msg += "\nlast line read:\n"
+            error_msg += line
+            error_msg += "\n expected number of atoms here"
+            raise RuntimeError(error_msg)
         comment = stream.readline()
         comments.append(comment)
         coords = np.zeros((n_atoms, 3))
@@ -224,7 +240,23 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
             line = stream.readline()
             info = line.split(maxsplit=1)
             eles.append(info[0])
-            coord_data += info[1]
+            try:
+                coord_data += info[1]
+            except IndexError:
+                error_msg = get_error_msg(
+                    file_name,
+                    ele_sets,
+                    coordsets,
+                    eles,
+                    comments,
+                    n_atoms,
+                    comment,
+                    coord_data,
+                )
+                error_msg += "\nlast line read:\n"
+                error_msg += line
+                error_msg += "\n expected atom data here"
+                raise RuntimeError(error_msg)
         line = stream.readline()
         coords = np.reshape(
             np.fromstring(coord_data, count=3 * n_atoms, sep=" "),
@@ -270,7 +302,39 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
         slider = CoordinateSetSlider(session, struc)
         slider.set_slider(struc.num_coordsets)
     return [struc], status
+
+def get_error_msg(
+    file_name,
+    ele_sets,
+    coordsets,
+    eles,
+    comments,
+    n_atoms,
+    comment,
+    coord_data
+):
+    error_msg = "could not parse coordinates while reading %s\n" % file_name
+    if len(coordsets) > 0:
+        error_msg += "last structure read:\n"
+        error_msg += "%i\n%s\n" % (
+            len(coordsets[-1]), comments[-1],
+        )
+        for ele, coord in zip(ele_sets[-1], coordsets[-1]):
+            error_msg += "%-2s     %11.5f   %11.5f   %11.5f\n" % (
+                ele, *coord,
+            )
+    error_msg += "error occured while reading structure %i:\n" % (
+        len(coordsets) + 1
+    )
+    error_msg += "%i\n%s\n" % (n_atoms, comment)
+    error_msg += "\n".join(
+        ["%-2s   %s" % (ele, coord) for ele, coord in zip(
+            eles, coord_data.splitlines(),
+        )]
+    )
     
+    return error_msg
+
 
 def open_nbo(session, path, file_name, format_name=None, orbitals=None):
     import os.path
