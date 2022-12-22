@@ -146,7 +146,7 @@
                 
                 <Provider name="XYZ file" 
                           category="Molecular structure" 
-                          suffixes=".xyz" 
+                          suffixes=".xyz,.allxyz" 
                           encoding="utf-8" 
                           nicknames="xyz" 
                           reference_url="https://en.wikipedia.org/wiki/XYZ_file_format" 

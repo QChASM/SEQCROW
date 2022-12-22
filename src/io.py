@@ -202,7 +202,10 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
     import numpy as np
     from SEQCROW.managers import ADD_FILEREADER
 
-    coordsets = []
+    if file_name.lower().endswith(".allxyz") and coordsets is None:
+        coordsets = True
+
+    all_coordsets = []
     ele_sets = []
     line = stream.readline()
     structures = []
@@ -220,7 +223,7 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
             error_msg = get_error_msg(
                 file_name,
                 ele_sets,
-                coordsets,
+                all_coordsets,
                 eles,
                 comments,
                 n_atoms,
@@ -246,7 +249,7 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
                 error_msg = get_error_msg(
                     file_name,
                     ele_sets,
-                    coordsets,
+                    all_coordsets,
                     eles,
                     comments,
                     n_atoms,
@@ -262,7 +265,7 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
             np.fromstring(coord_data, count=3 * n_atoms, sep=" "),
             (n_atoms, 3),
         )
-        coordsets.append(coords)
+        all_coordsets.append(coords)
         ele_sets.append(eles)
         if maxModels is not None:
             struc = get_structure(session, eles, coords, comment)
@@ -282,21 +285,21 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
     if not all(len(ele_set) == len(ele_sets[0]) for ele_set in ele_sets):
         structures = [
             get_structure(session, eles, coords, name) for (eles, coords, name) in
-            zip(ele_sets, coordsets, comments)
+            zip(ele_sets, all_coordsets, comments)
         ]
         session.filereader_manager.triggers.activate_trigger(
             ADD_FILEREADER, (structures, [fr for s in structures])
         )
         return structures, "opened %i structures from %s" % (len(structures), file_name)
     
-    struc = get_structure(session, ele_sets[-1], coordsets[-1], file_name)
-    coordsets = np.array(coordsets)
-    struc.add_coordsets(np.array(coordsets), replace=True)
+    struc = get_structure(session, ele_sets[-1], all_coordsets[-1], file_name)
+    all_coordsets = np.array(all_coordsets)
+    struc.add_coordsets(np.array(all_coordsets), replace=True)
     session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([struc], [fr]))
     status = "opened %s as an XYZ coordinate file" % file_name
     struc.active_coordset_id = struc.num_coordsets
-    if len(coordsets) > 1 and coordsets is not False:
-        fr.all_geom = coordsets
+    if len(all_coordsets) > 1 and coordsets:
+        fr.all_geom = all_coordsets
         from chimerax.std_commands.coordset_gui import CoordinateSetSlider
         status += " movie"
         slider = CoordinateSetSlider(session, struc)
