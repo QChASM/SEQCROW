@@ -2,6 +2,7 @@ from collections import OrderedDict
 
 import numpy as np
 
+from chimerax.atomic import get_triggers
 from chimerax.core.tools import ToolInstance
 from chimerax.core.models import REMOVE_MODELS
 
@@ -22,6 +23,7 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
 from matplotlib.figure import Figure
 
 from SEQCROW.widgets import FakeMenu
+from AaronTools.const import UNIT
 
 
 keyboardModifiers = QGuiApplication.keyboardModifiers
@@ -78,6 +80,11 @@ class EnergyPlot(ToolInstance):
         self.dragging = False
         
         self._model_closed = self.session.triggers.add_handler(REMOVE_MODELS, self.check_closed_models)
+        self._model_closed = self.session.triggers.add_handler(REMOVE_MODELS, self.check_closed_models)
+        
+        global_triggers = get_triggers()
+        self._changes = global_triggers.add_handler("changes", self.check_changes)
+        self.circle_current_cs()
 
     def _build_ui(self):
         layout = QGridLayout()
@@ -92,7 +99,7 @@ class EnergyPlot(ToolInstance):
         nrg_plot_layout = QGridLayout(nrg_plot)
         tabs.addTab(nrg_plot, "energy")
         
-        ax = self.figure.add_axes((0.15, 0.20, 0.80, 0.70))
+        ax = self.figure.add_axes((0.25, 0.20, 0.6, 0.60))
 
         fr = self.filereader
         if fr.all_geom is None:
@@ -250,6 +257,31 @@ class EnergyPlot(ToolInstance):
 
         self.opened = True
 
+    def check_changes(self, trigger_name=None, changes=None):
+        if changes is not None:
+            if self.structure in changes.modified_atomic_structures():
+                self.circle_current_cs()
+
+    def circle_current_cs(self):
+        ax = self.figure.gca()
+        for line in ax.lines:
+            if line.get_label() == "current_cs":
+                ax.lines.remove(line)
+                break
+        
+        cs_id = self.structure.active_coordset_id
+        ax.plot(
+            cs_id,
+            self.ys[cs_id - 1],
+            marker='o',
+            markersize=5,
+            color='k',
+            zorder=-1,
+            fillstyle='none',
+            label="current_cs",
+        )
+        self.canvas.draw()
+
     def save(self):
         filename, _ = QFileDialog.getSaveFileName(filter="CSV Files (*.csv)")
         if filename:
@@ -346,12 +378,16 @@ class EnergyPlot(ToolInstance):
 
     def update_label(self, cs_id, ndx):
         self.annotation.xy = (cs_id, self.ys[ndx])
+        text = r"%s $E_h$" % repr(self.ys[ndx])
         if self.ys[ndx] == max(self.ys):
-            self.annotation.set_text("%s (maxima)" % repr(self.ys[ndx]))
+            text += " (maxima)" 
         elif self.ys[ndx] == min(self.ys):
-            self.annotation.set_text("%s (minima)" % repr(self.ys[ndx]))
-        else:
-            self.annotation.set_text(repr(self.ys[ndx]))
+            text += " (minima)"
+        text += "\n"
+        text += r"$\Delta E$ = %.1f kcal/mol" % (
+            UNIT.HART_TO_KCAL * (self.ys[ndx] - self.ys[0])
+        )
+        self.annotation.set_text(text)
     
     def update_hover(self, cs_id, ndx):  
         ax = self.figure.gca()
@@ -435,14 +471,20 @@ class EnergyPlot(ToolInstance):
 
     def check_closed_models(self, name, models):
         if self.structure in models:
+            global_triggers = get_triggers()
+            global_triggers.remove_handler(self._changes)
             self.delete()
     
     def delete(self):
         self.session.triggers.remove_handler(self._model_closed)
-        
+        global_triggers = get_triggers()
+        global_triggers.remove_handler(self._changes)
+
         super().delete()    
     
     def close(self):
         self.session.triggers.remove_handler(self._model_closed)
+        global_triggers = get_triggers()
+        global_triggers.remove_handler(self._changes)
         
         super().close()

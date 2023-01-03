@@ -218,6 +218,8 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
     fr.other = dict()
     while line.strip():
         try:
+            if line.strip() == ">":
+                line = stream.readline()
             n_atoms = int(line)
         except ValueError:
             error_msg = get_error_msg(
