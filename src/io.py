@@ -156,7 +156,7 @@ def get_structure(session, elements, coordinates, name, bonded_threshold=0.3):
     from chimerax.atomic import AtomicStructure, Element, Atoms
     from chimerax.atomic import Residue
     import numpy as np
-    from AaronTools.const import RADII, TMETAL
+    from AaronTools.const import RADII, TMETAL, ELEMENTS
 
     struc = AtomicStructure(session)
     struc.name = name
@@ -164,6 +164,14 @@ def get_structure(session, elements, coordinates, name, bonded_threshold=0.3):
     ele_counts = dict()
     radii = np.vectorize(lambda x: RADII.get(x, 0))(elements)
     for i, ele, coord in zip(range(0, len(elements)), elements, coordinates):
+        try:
+            ele = ELEMENTS[int(ele)]
+        except ValueError:
+            pass
+        except IndexError:
+            raise RuntimeError(
+                "error while trying to convert atomic number to symbol: %s" % ele
+            )
         dist = np.zeros(i)
         max_connected_dist = np.zeros(i)
         ele_counts.setdefault(ele, 0)
@@ -205,49 +213,24 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
     if file_name.lower().endswith(".allxyz") and coordsets is None:
         coordsets = True
 
-    all_coordsets = []
-    ele_sets = []
-    line = stream.readline()
-    structures = []
-    comments = []
-    class DummyFileReader:
-        pass
-    fr = DummyFileReader()
-    fr.name = file_name
-    fr.all_geom = None
-    fr.other = dict()
-    while line.strip():
-        try:
-            if line.strip() == ">":
-                line = stream.readline()
-            n_atoms = int(line)
-        except ValueError:
-            error_msg = get_error_msg(
-                file_name,
-                ele_sets,
-                all_coordsets,
-                eles,
-                comments,
-                n_atoms,
-                comment,
-                coord_data,
-            )
-            error_msg += "\nlast line read:\n"
-            error_msg += line
-            error_msg += "\n expected number of atoms here"
-            raise RuntimeError(error_msg)
-        comment = stream.readline()
-        comments.append(comment)
-        coords = np.zeros((n_atoms, 3))
-        coord_data = ""
-        eles = []
-        for i in range(0, n_atoms):
-            line = stream.readline()
-            info = line.split(maxsplit=1)
-            eles.append(info[0])
+    try:
+        all_coordsets = []
+        ele_sets = []
+        line = stream.readline()
+        structures = []
+        comments = []
+        class DummyFileReader:
+            pass
+        fr = DummyFileReader()
+        fr.name = file_name
+        fr.all_geom = None
+        fr.other = dict()
+        while line.strip():
             try:
-                coord_data += info[1]
-            except IndexError:
+                if line.strip() == ">":
+                    line = stream.readline()
+                n_atoms = int(line)
+            except ValueError:
                 error_msg = get_error_msg(
                     file_name,
                     ele_sets,
@@ -260,22 +243,51 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
                 )
                 error_msg += "\nlast line read:\n"
                 error_msg += line
-                error_msg += "\n expected atom data here"
+                error_msg += "\n expected number of atoms here"
                 raise RuntimeError(error_msg)
-        line = stream.readline()
-        coords = np.reshape(
-            np.fromstring(coord_data, count=3 * n_atoms, sep=" "),
-            (n_atoms, 3),
-        )
-        all_coordsets.append(coords)
-        ele_sets.append(eles)
-        if maxModels is not None:
-            struc = get_structure(session, eles, coords, comment)
-            structures.append(struc)
-            if len(structures) == maxModels:
-                break
-    
-    fr.comment = comment
+            comment = stream.readline()
+            comments.append(comment)
+            coords = np.zeros((n_atoms, 3))
+            coord_data = ""
+            eles = []
+            for i in range(0, n_atoms):
+                line = stream.readline()
+                info = line.split(maxsplit=1)
+                eles.append(info[0])
+                try:
+                    coord_data += " ".join(info[1].split()[:3]) + "\n"
+                except IndexError:
+                    error_msg = get_error_msg(
+                        file_name,
+                        ele_sets,
+                        all_coordsets,
+                        eles,
+                        comments,
+                        n_atoms,
+                        comment,
+                        coord_data,
+                    )
+                    error_msg += "\nlast line read:\n"
+                    error_msg += line
+                    error_msg += "\n expected atom data here"
+                    raise RuntimeError(error_msg)
+            line = stream.readline()
+            coords = np.reshape(
+                np.fromstring(coord_data, count=3 * n_atoms, sep=" "),
+                (n_atoms, 3),
+            )
+            all_coordsets.append(coords)
+            ele_sets.append(eles)
+            if maxModels is not None:
+                struc = get_structure(session, eles, coords, comment)
+                structures.append(struc)
+                if len(structures) == maxModels:
+                    break
+        
+        fr.comment = comment
+    except Exception as e:
+        stream.close()
+        raise e
 
     stream.close()
     if maxModels is not None:
