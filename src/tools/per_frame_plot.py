@@ -270,9 +270,12 @@ class EnergyPlot(ToolInstance):
                 break
         
         cs_id = self.structure.active_coordset_id
+        if cs_id not in self.xs:
+            self.canvas.draw()
+            return
         ax.plot(
             cs_id,
-            self.ys[cs_id - 1],
+            self.ys[self.xs.index(cs_id)],
             marker='o',
             markersize=5,
             color='k',

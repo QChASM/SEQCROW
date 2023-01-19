@@ -1,3 +1,7 @@
+class DummyFileReader:
+    pass
+
+
 def open_aarontools(session, stream, file_name, format_name=None, coordsets=None):
     from AaronTools.fileIO import FileReader
     from AaronTools.utils.utils import get_filename
@@ -152,7 +156,7 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
     return [structure], status
 
 
-def get_structure(session, elements, coordinates, name, bonded_threshold=0.3):
+def get_structure(session, elements, coordinates, name, comment, bonded_threshold=0.3):
     from chimerax.atomic import AtomicStructure, Element, Atoms
     from chimerax.atomic import Residue
     import numpy as np
@@ -160,6 +164,7 @@ def get_structure(session, elements, coordinates, name, bonded_threshold=0.3):
 
     struc = AtomicStructure(session)
     struc.name = name
+    struc.comment = comment
     res = struc.new_residue("UNK", "a", 1)
     ele_counts = dict()
     radii = np.vectorize(lambda x: RADII.get(x, 0))(elements)
@@ -207,6 +212,7 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
     """
     open XYZ files
     """
+    import os
     import numpy as np
     from SEQCROW.managers import ADD_FILEREADER
 
@@ -219,12 +225,11 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
         line = stream.readline()
         structures = []
         comments = []
-        class DummyFileReader:
-            pass
         fr = DummyFileReader()
         fr.name = file_name
         fr.all_geom = None
         fr.other = dict()
+        comment = ""
         while line.strip():
             try:
                 if line.strip() == ">":
@@ -245,7 +250,7 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
                 error_msg += line
                 error_msg += "\n expected number of atoms here"
                 raise RuntimeError(error_msg)
-            comment = stream.readline()
+            comment = stream.readline().strip()
             comments.append(comment)
             coords = np.zeros((n_atoms, 3))
             coord_data = ""
@@ -279,7 +284,7 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
             all_coordsets.append(coords)
             ele_sets.append(eles)
             if maxModels is not None:
-                struc = get_structure(session, eles, coords, comment)
+                struc = get_structure(session, eles, coords, comment, comment)
                 structures.append(struc)
                 if len(structures) == maxModels:
                     break
@@ -298,7 +303,7 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
     
     if not all(len(ele_set) == len(ele_sets[0]) for ele_set in ele_sets):
         structures = [
-            get_structure(session, eles, coords, name) for (eles, coords, name) in
+            get_structure(session, eles, coords, name, name) for (eles, coords, name) in
             zip(ele_sets, all_coordsets, comments)
         ]
         session.filereader_manager.triggers.activate_trigger(
@@ -306,7 +311,8 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
         )
         return structures, "opened %i structures from %s" % (len(structures), file_name)
     
-    struc = get_structure(session, ele_sets[-1], all_coordsets[-1], file_name)
+    name, ext = os.path.splitext(file_name)
+    struc = get_structure(session, ele_sets[-1], all_coordsets[-1], name, comment)
     all_coordsets = np.array(all_coordsets)
     struc.add_coordsets(np.array(all_coordsets), replace=True)
     session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([struc], [fr]))
@@ -319,6 +325,7 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
         slider = CoordinateSetSlider(session, struc)
         slider.set_slider(struc.num_coordsets)
     return [struc], status
+
 
 def get_error_msg(
     file_name,
