@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="1.5.5">
+            version="1.5.11">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -66,7 +66,7 @@
             </Description>
             
             <Dependencies>
-                <Dependency name="ChimeraX-Core" version="&gt;=1.2, &lt;=1.5"/>
+                <Dependency name="ChimeraX-Core" version="&gt;=1.2, &lt;=1.6"/>
                 <Dependency name="scipy"/>
                 <Dependency name="Send2Trash"/>
                 <Dependency name="psutil"/>
@@ -146,7 +146,7 @@
                 
                 <Provider name="XYZ file" 
                           category="Molecular structure" 
-                          suffixes=".xyz" 
+                          suffixes=".xyz,.allxyz" 
                           encoding="utf-8" 
                           nicknames="xyz" 
                           reference_url="https://en.wikipedia.org/wiki/XYZ_file_format" 

@@ -11,6 +11,7 @@ More information about SEQCROW features can be found on the [GitHub wiki](https:
 2. find the SEQCROW page and click install
 3. restart ChimeraX
 
+
 ## Citation
 If you use SEQCROW, please cite the following:
 

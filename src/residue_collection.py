@@ -910,7 +910,7 @@ class ResidueCollection(Geometry):
                         try:
                             pbg = atomic_structure.pseudobond_group(
                                 atomic_structure.PBG_METAL_COORDINATION,
-                                create_type=2
+                                create_type=1
                             ) 
                         except TypeError:
                             pbg = atomic_structure.pseudobond_group(
@@ -925,6 +925,8 @@ class ResidueCollection(Geometry):
         if filereader.all_geom is None:
             warn("coordsets requested, but the file contains one or fewer sets of coordinates")
             coordsets = np.array([self.coords])
+        elif isinstance(filereader.all_geom, np.ndarray):
+            return filereader.all_geom
         else:
             coordsets = np.zeros((len(filereader.all_geom) + 1, len(self.atoms), 3))
             for i, all_geom in enumerate(filereader.all_geom):
@@ -1078,19 +1080,5 @@ class ResidueCollection(Geometry):
                         "seqcrow ResidueCollection.get_chimera",
                         attr_type=int
                     )
-
-        if filereader is not None:
-            if any(
-                attr[0] == "aarontools_filereader" for attr in struc.custom_attrs
-            ):
-                struc.register_attr(
-                    session,
-                    "filereader",
-                    "SEQCROW",
-                    attr_type=FileReader,
-                )
-
-            struc.filereader = filereader
-            
 
         return struc

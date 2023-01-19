@@ -6,8 +6,9 @@ from chimerax.core.settings import Settings
 from chimerax.core.models import Surface
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 
-from Qt.QtCore import Qt
+from Qt.QtCore import Qt, QSize
 from Qt.QtGui import QKeySequence
+from Qt.QtGui import QIcon, QPixmap
 from Qt.QtWidgets import (
     QPushButton,
     QFormLayout,
@@ -34,11 +35,46 @@ from SEQCROW.widgets import FakeMenu
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.colors import LinearSegmentedColormap, to_hex
 
 import copy
 
 import numpy as np
+
+cmap_names = sorted([
+    'viridis', 'plasma', 'inferno', 'magma', 'cividis',
+    "Greys", "Purples", 'Blues', 'Greens', 'Oranges', 'Reds',
+    'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
+    'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn',
+    'binary', 'gist_yarg', 'gist_gray', 'gray', 'bone',
+    'pink', 'spring', 'summer', 'autumn', 'winter', 'cool',
+    'Wistia', 'hot', 'afmhot', 'gist_heat', 'copper',
+    'PiYG', 'PRGn', 'BrBG', 'PuOr', 'RdGy', 'RdBu', 'RdYlBu',
+    'RdYlGn', 'Spectral', 'coolwarm', 'bwr', 'seismic',
+    'ocean', 'gist_earth', 'terrain', 'gist_stern', 'gnuplot',
+    'gnuplot2', 'CMRmap', 'cubehelix', 'brg', 'gist_rainbow',
+    'rainbow', 'jet', 'turbo', 'nipy_spectral', 'gist_ncar',
+], key=lambda x: x.casefold())
+
+skip_cmaps = set()
+
+def get_cmap_icon(cmap_name, *size):
+    cmap = plt.cm.get_cmap(cmap_name)
+    d = int(np.ceil(np.log10(size[0])))
+    pixmap_list = [
+        "%i  %i  %i  %i" % (size[0], size[1], size[0], d)
+    ]
+    pixmap_str = ""
+    fmt_str_c = "%%0%ii c %%s" % d
+    fmt_str_a = "%%0%ii" % d
+    for i, x in enumerate(np.linspace(0, 1, num=size[0])):
+        pixmap_list.append(fmt_str_c % (i, to_hex(cmap(x))))
+        pixmap_str += fmt_str_a % i
+    pixmap_list += size[1] * [pixmap_str]
+    pixmap = QPixmap(pixmap_list)
+    pixmap_icon = QIcon(pixmap)
+    return pixmap_icon
+
 
 class _VburSettings(Settings):
 
@@ -66,6 +102,9 @@ class _VburSettings(Settings):
         "map_max": 3.5,
         "map_min": -3.5,
         "cutout_labels": "octants",
+        "color_map": "jet",
+        "contour_lines": True,
+        "levels": 20,
     }
 
 
@@ -228,35 +267,75 @@ class PercentVolumeBuried(ToolInstance):
         self.steric_map.setToolTip("produce a 2D projection of steric bulk\ncauses buried volume to be reported for individual quadrants")
         steric_layout.addRow("create steric map:", self.steric_map)
 
+        self.steric_map_options = []
+
         self.pair_difference_map = QCheckBox()
         steric_layout.addRow("pairwise difference:", self.pair_difference_map)
+        self.steric_map_options.append(self.pair_difference_map)
 
         self.num_pts = QSpinBox()
-        self.num_pts.setRange(25, 250)
+        self.num_pts.setRange(25, 1000)
         self.num_pts.setValue(self.settings.num_pts)
         self.num_pts.setToolTip("number of points along x and y axes")
         steric_layout.addRow("number of points:", self.num_pts)
+        self.steric_map_options.append(self.num_pts)
+        
+        self.levels = QSpinBox()
+        self.levels.setRange(5, 1000)
+        self.levels.setValue(self.settings.levels)
+        self.levels.setToolTip("number of contour levels")
+        steric_layout.addRow("contour levels:", self.levels)
+        self.steric_map_options.append(self.levels)
+        
+        self.contour_lines = QCheckBox()
+        self.contour_lines.setChecked(self.settings.contour_lines)
+        self.contour_lines.setToolTip("add black contour lines to the plot")
+        steric_layout.addRow("contour lines:", self.contour_lines)
+        self.steric_map_options.append(self.contour_lines)
+        
+        self.color_map = QComboBox()
+        height = self.color_map.fontMetrics().boundingRect("Q").height()
+        width = 10 * self.color_map.fontMetrics().boundingRect("Q").width()
+        for cmap in cmap_names:
+            if cmap not in skip_cmaps:
+                icon = get_cmap_icon(cmap, width, height)
+                self.color_map.addItem(icon, cmap, cmap)
+            if cmap + "_r" not in skip_cmaps:
+                icon = get_cmap_icon(cmap + "_r", width, height)
+                self.color_map.addItem(icon, cmap + "_r", cmap + "_r")
+        self.color_map.setIconSize(QSize(width, height))
+        ndx = self.color_map.findData(
+            self.settings.color_map,
+            role=Qt.UserRole,
+        )
+        if ndx >= 0:
+            self.color_map.setCurrentIndex(ndx)
+        steric_layout.addRow("color map:", self.color_map)
+        self.steric_map_options.append(self.color_map)
         
         self.include_vbur = QCheckBox()
         self.include_vbur.setChecked(self.settings.include_vbur)
         steric_layout.addRow("label quadrants with %V<sub>bur</sub>", self.include_vbur)
+        self.steric_map_options.append(self.include_vbur)
 
         self.map_shape = QComboBox()
         self.map_shape.addItems(["circle", "square"])
         ndx = self.map_shape.findText(self.settings.map_shape, Qt.MatchExactly)
         self.map_shape.setCurrentIndex(ndx)
         steric_layout.addRow("map shape:", self.map_shape)
+        self.steric_map_options.append(self.map_shape)
         
         self.auto_minmax = QCheckBox()
         self.auto_minmax.setChecked(self.settings.auto_minmax)
         steric_layout.addRow("automatic min. and max.:", self.auto_minmax)
+        self.steric_map_options.append(self.auto_minmax)
         
         self.map_min = QDoubleSpinBox()
         self.map_min.setRange(-15., 0.)
         self.map_min.setSuffix(" \u212B")
         self.map_min.setSingleStep(0.1)
         self.map_min.setValue(self.settings.map_min)
-        steric_layout.addRow("minimum value:", self.map_min)    
+        steric_layout.addRow("minimum value:", self.map_min)
         
         self.map_max = QDoubleSpinBox()
         self.map_max.setRange(0., 15.)
@@ -265,30 +344,7 @@ class PercentVolumeBuried(ToolInstance):
         self.map_max.setValue(self.settings.map_max)
         steric_layout.addRow("maximum value:", self.map_max)
 
-        self.num_pts.setEnabled(self.settings.steric_map)
-        self.steric_map.stateChanged.connect(
-            lambda state, widget=self.num_pts: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
-        )
-        
-        self.pair_difference_map.setEnabled(self.settings.steric_map)
-        self.steric_map.stateChanged.connect(
-            lambda state, widget=self.pair_difference_map: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
-        )
-        
-        self.include_vbur.setEnabled(self.settings.steric_map)
-        self.steric_map.stateChanged.connect(
-            lambda state, widget=self.include_vbur: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
-        )
-
-        self.map_shape.setEnabled(self.settings.steric_map)
-        self.steric_map.stateChanged.connect(
-            lambda state, widget=self.map_shape: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
-        )
-        
-        self.auto_minmax.setEnabled(self.settings.steric_map)
-        self.steric_map.stateChanged.connect(
-            lambda state, widget=self.auto_minmax: widget.setEnabled(Qt.CheckState(state) == Qt.Checked)
-        )
+        self.steric_map.stateChanged.connect(self.show_steric_map_options)
         
         self.map_min.setEnabled(not self.settings.auto_minmax and self.settings.steric_map)
         self.steric_map.stateChanged.connect(
@@ -454,6 +510,10 @@ class PercentVolumeBuried(ToolInstance):
 
         self.tool_window.manage(None)
     
+    def show_steric_map_options(self, is_enabled):
+        for widget in self.steric_map_options:
+            widget.setEnabled(Qt.CheckState(is_enabled) == Qt.Checked)
+    
     def clear_table(self):
         are_you_sure = QMessageBox.question(
             None,
@@ -501,6 +561,15 @@ class PercentVolumeBuried(ToolInstance):
         steric_map = self.steric_map.checkState() == Qt.Checked
         self.settings.steric_map = steric_map
         args["steric_map"] = steric_map
+        
+        color_map = self.color_map.currentText()
+        self.settings.color_map = color_map
+        
+        levels = self.levels.value()
+        self.settings.levels = levels
+
+        contour_lines = self.contour_lines.isChecked()
+        self.settings.contour_lines = contour_lines
         
         use_scene = self.use_scene.checkState() == Qt.Checked
         self.settings.use_scene = use_scene
@@ -639,9 +708,19 @@ class PercentVolumeBuried(ToolInstance):
                     "steric map of %s" % mdl.name, window_class=StericMap
                 )
                 if auto_minmax:
-                    plot.set_data(x, y, z, min_alt, max_alt, vbur, radius, include_vbur)
+                    plot.set_data(
+                        x, y, z,
+                        min_alt, max_alt,
+                        vbur, radius, include_vbur,
+                        color_map, levels, contour_lines,
+                    )
                 else:
-                    plot.set_data(x, y, z, map_min, map_max, vbur, radius, include_vbur)
+                    plot.set_data(
+                        x, y, z,
+                        map_min, map_max,
+                        vbur, radius, include_vbur,
+                        color_map, levels, contour_lines,
+                    )
 
         
             if self.pair_difference_map.isChecked():
@@ -678,6 +757,8 @@ class PercentVolumeBuried(ToolInstance):
                                 vbur1, vbur2,
                                 radius,
                                 include_vbur,
+                                color_map,
+                                levels, contour_lines,
                             )
                         else:
                             plot.set_difference_data(
@@ -687,6 +768,8 @@ class PercentVolumeBuried(ToolInstance):
                                 vbur1, vbur2,
                                 radius,
                                 include_vbur,
+                                color_map,
+                                levels, contour_lines,
                             )
 
         else:
@@ -791,7 +874,9 @@ class PercentVolumeBuried(ToolInstance):
         """Show the help for this tool in the help viewer."""
         from chimerax.core.commands import run
         run(self.session,
-            'open %s' % self.help if self.help is not None else "")
+            'open %s' % self.help if self.help is not None else ""
+        )
+
 
 class StericMap(ChildToolWindow):
     def __init__(self, tool_instance, title, *args, **kwargs):
@@ -805,23 +890,31 @@ class StericMap(ChildToolWindow):
         self.ui_area.setLayout(self.layout)
         self.manage(None)
     
-    def set_data(self, x, y, z, min_alt, max_alt, vbur, radius, include_vbur):
-        fig, ax = plt.subplots()
-        cmap = copy.copy(plt.cm.get_cmap("jet"))
+    def set_data(
+        self, x, y, z,
+        min_alt, max_alt,
+        vbur,
+        radius,
+        include_vbur,
+        color_map, levels, contour_lines,
+    ):
+        self.fig, ax = plt.subplots()
+        cmap = copy.copy(plt.cm.get_cmap(color_map))
         cmap.set_under('w')
         steric_map = ax.contourf(
             x, y, z,
             extend="min",
             cmap=cmap,
-            levels=np.linspace(min_alt, max_alt, num=21)
+            levels=np.linspace(min_alt, max_alt, num=levels)
         )
-        ax.contour(
-            x, y, z,
-            extend="min",
-            colors='k',
-            levels=np.linspace(min_alt, max_alt, num=21)
-        )
-        bar = fig.colorbar(steric_map, format="%.1f")
+        if contour_lines:
+            ax.contour(
+                x, y, z,
+                extend="min",
+                colors='k',
+                levels=np.linspace(min_alt, max_alt, num=levels)
+            )
+        bar = self.fig.colorbar(steric_map, format="%.1f")
         bar.set_label("altitude (Å)")
         ax.set_aspect("equal")
         
@@ -841,7 +934,7 @@ class StericMap(ChildToolWindow):
             circle = plt.Circle((0, 0), radius, color="k", fill=False, linewidth=4)
             ax.add_artist(circle)
         
-        canvas = Canvas(fig)
+        canvas = Canvas(self.fig)
         
         self.layout.addWidget(canvas)
         
@@ -857,11 +950,12 @@ class StericMap(ChildToolWindow):
         min_alt, max_alt,
         vbur1, vbur2,
         radius,
-        include_vbur
+        include_vbur,
+        color_map, levels, contour_lines,
     ):
         vbur = [v1 - v2 for v1, v2 in zip(vbur1, vbur2)]
-        fig, ax = plt.subplots()
-        cmap = copy.copy(plt.cm.get_cmap("bwr"))
+        self.fig, ax = plt.subplots()
+        cmap = copy.copy(plt.cm.get_cmap(color_map))
         cmap_a_not_in_b = LinearSegmentedColormap.from_list("a_not_in_b", [(0.5, 0, 0), (0.5, 0, 0)])
         cmap_b_not_in_a = LinearSegmentedColormap.from_list("a_not_in_b", [(0, 0, 0.5), (0, 0, 0.5)])
         if abs(min_alt) < abs(max_alt):
@@ -878,7 +972,7 @@ class StericMap(ChildToolWindow):
             z,
             extend="min",
             cmap=cmap,
-            levels=np.linspace(*cmap_range, num=21),
+            levels=np.linspace(*cmap_range, num=levels),
         )
         ax.contourf(
             x,
@@ -896,31 +990,32 @@ class StericMap(ChildToolWindow):
             cmap=cmap_b_not_in_a,
             levels=[0.99, 1],
         )
-        steric_lines = ax.contour(
-            x,
-            y,
-            z,
-            extend="min",
-            colors="k",
-            levels=np.linspace(*cmap_range, num=21),
-        )
-        steric_lines = ax.contour(
-            x,
-            y,
-            a_not_in_b,
-            extend="neither",
-            colors="k",
-            levels=[0.99, 1],
-        )
-        steric_lines = ax.contour(
-            x,
-            y,
-            b_not_in_a,
-            extend="neither",
-            colors="k",
-            levels=[0.99, 1],
-        )
-        bar = fig.colorbar(steric_map, format="%.1f")
+        if contour_lines:
+            steric_lines = ax.contour(
+                x,
+                y,
+                z,
+                extend="min",
+                colors="k",
+                levels=np.linspace(*cmap_range, num=levels),
+            )
+            steric_lines = ax.contour(
+                x,
+                y,
+                a_not_in_b,
+                extend="neither",
+                colors="k",
+                levels=[0.99, 1],
+            )
+            steric_lines = ax.contour(
+                x,
+                y,
+                b_not_in_a,
+                extend="neither",
+                colors="k",
+                levels=[0.99, 1],
+            )
+        bar = self.fig.colorbar(steric_map, format="%.1f")
         bar.set_label("\u0394altitude (Å)")
         ax.set_aspect("equal")
 
@@ -940,7 +1035,7 @@ class StericMap(ChildToolWindow):
             circle = plt.Circle((0, 0), radius, color="k", fill=False, linewidth=4)
             ax.add_artist(circle)
         
-        canvas = Canvas(fig)
+        canvas = Canvas(self.fig)
         
         self.layout.addWidget(canvas)
         
@@ -948,3 +1043,11 @@ class StericMap(ChildToolWindow):
         toolbar = NavigationToolbar(canvas, toolbar_widget)
         toolbar.setMaximumHeight(32)
         self.layout.addWidget(toolbar)
+    
+    def close(self):
+        self.session.logger.info("closing figure")
+        plt.close(self.fig)    
+    
+    def delete(self):
+        self.session.logger.info("closing figure")
+        plt.close(self.fig)

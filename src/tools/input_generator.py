@@ -5710,7 +5710,10 @@ class SavePreset(ChildToolWindow):
         preset["use_other"] = self.additional.checkState() == Qt.Checked
         
         self.tool_instance.update_theory(update_settings=True)
-        preset["theory"] = self.tool_instance.theory
+        preset["theory"] = self.tool_instance.theory.copy()
+        for job_type in preset["theory"].job_type:
+            if isinstance(job_type, OptimizationJob):
+                job_type.constraints = None
         
         basis_elements, ecp_elements = self.basis_elements.getElements()
         if preset["theory"].basis.basis:

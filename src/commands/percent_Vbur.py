@@ -682,6 +682,8 @@ def vbur_vis(
     
         mask = np.min(np.isin(tri, keep_v), axis=1)
         tri = tri[mask]
+        if len(tri) < 1:
+            continue
         tri = np.vectorize(new_ndx.get)(tri)
         
         mask = np.zeros(len(atom_sphere), dtype=bool)

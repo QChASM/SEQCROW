@@ -5,7 +5,7 @@ from chimerax.core.toolshed import BundleAPI
 from chimerax.core.toolshed.info import SelectorInfo
 from chimerax.core.models import ADD_MODELS
 from chimerax.open_command import OpenerInfo
-from chimerax.core.commands import BoolArg, ModelsArg, StringArg, register, OpenFileNameArg
+from chimerax.core.commands import BoolArg, IntArg, ModelsArg, StringArg, register, OpenFileNameArg
 
 class _SEQCROW_API(BundleAPI):
 
@@ -389,7 +389,7 @@ class _SEQCROW_API(BundleAPI):
         test manager
         """
         if mgr is session.open_command:
-            from SEQCROW.io import open_aarontools
+            from SEQCROW.io import open_aarontools, open_xyz
 
             if name == "Gaussian input file":
                 class Info(OpenerInfo):
@@ -479,17 +479,16 @@ class _SEQCROW_API(BundleAPI):
             elif name == "XYZ file":
                 class Info(OpenerInfo):
                     def open(self, session, data, file_name, **kw):
-                        return open_aarontools(
+                        return open_xyz(
                             session,
                             data,
                             file_name,
-                            format_name="XYZ file",
                             **kw
                         )
 
                     @property
                     def open_args(self):
-                        return {'coordsets': BoolArg}
+                        return {'coordsets': BoolArg, 'maxModels': IntArg}
 
                 return Info()
 
