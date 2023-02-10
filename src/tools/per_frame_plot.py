@@ -84,6 +84,10 @@ class EnergyPlot(ToolInstance):
         
         global_triggers = get_triggers()
         self._changes = global_triggers.add_handler("changes", self.check_changes)
+        
+        if not self.opened:
+            self.delete()
+        
         self.circle_current_cs()
 
     def _build_ui(self):

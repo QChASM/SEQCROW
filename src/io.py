@@ -219,6 +219,9 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
     if file_name.lower().endswith(".allxyz") and coordsets is None:
         coordsets = True
 
+    if file_name.lower().startswith("crest_conformers") and coordsets is None:
+        coordsets = True
+
     try:
         all_coordsets = []
         ele_sets = []

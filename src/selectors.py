@@ -19,7 +19,6 @@ Primes()
 BondOrder()
 
 def register_selectors(logger, name):
-    logger.info(name)
     if name == "tm":
         register_selector("tm", tm_selector, logger, desc="transition metals")
 
@@ -78,7 +77,6 @@ def register_selectors(logger, name):
         "octagonal-pyramidal",
         "tricapped-trigonal-prismatic",
     ]):
-        print("vsepr")
         new_name = name
         if name != "hula-hoop":
             new_name = name.replace("-", " ")
@@ -99,7 +97,6 @@ def register_selectors(logger, name):
         "bent",
         "planar",
     ]):
-        print("vsepr")
         name_map = {
             "linear": ["linear 1", "linear 2"],
             "bent": [
