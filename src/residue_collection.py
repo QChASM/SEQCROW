@@ -31,7 +31,7 @@ class Atom(AaronToolsAtom):
         super().__init__(*args, **kwargs)
         self._atomspec = None
         self._chix_atom = None
-        
+
     def __repr__(self):
         s = ""
         s += "{:>3s} ".format(self.element)

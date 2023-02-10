@@ -16,7 +16,7 @@ from chimerax.core.commands import (
     TupleOf,
     run,
 )
-from chimerax.atomic import AtomsArg, AtomicStructure, Atoms
+from chimerax.atomic import AtomsArg, AtomicStructure, Atoms, PseudobondGroup
 from chimerax.label.label3d import ObjectLabel, ObjectLabels
 from chimerax.core.models import Surface
 
@@ -110,14 +110,15 @@ def _vbur(
     labels="none",
     reportComponent="total",
 ):
-    profile = Profile()
-    profile.enable()
+    out = dict()
+    out["model"] = model
+    out["center"] = center
+    # profile = Profile()
+    # profile.enable()
     # get corresponding AaronTools Geometry
     rescol = ResidueCollection(model, bonds_matter=False)
     # get list of AaronTools ligand atoms
-    # print("finding targets")
     targets = rescol.find([AtomSpec(a.atomspec) for a in ligand_atoms])
-    # print("found targets")
     
     basis = None
     if useScene:
@@ -129,10 +130,26 @@ def _vbur(
     center_xyz = center
     if not isinstance(center_xyz, np.ndarray):
         center_xyz = np.mean(center.coords, axis=0)
-
-    elif labels != "none" or reportComponent != "total" or difference:
+    
+    if labels != "none" or reportComponent != "total" or difference:
+        print("determining key atoms")
         if not key_atoms:
-            raise RuntimeError
+            key_atoms = set()
+            for c in center:
+                key_atoms.update(c.neighbors)
+            
+        if not key_atoms:
+            for m in model.child_models():
+                if isinstance(m, PseudobondGroup) and m.name == model.PBG_METAL_COORDINATION:
+                    for pb in m.pseudobonds:
+                        for c in center:
+                            if c in pb.atoms:
+                                other_atom = pb.other_atom(c)
+                                if other_atom not in center:
+                                    key_atoms.add(other_atom)
+        
+        key_atoms = Atoms(key_atoms).intersect(Atoms(ligand_atoms))
+        
         oop_vector = np.zeros(3)
         for atom in key_atoms:
             oop_vector += center_xyz - atom.coord
@@ -152,25 +169,29 @@ def _vbur(
 
         basis = np.array([x_vec, ip_vector, oop_vector]).T
 
-    out = [rescol]
+    out["center_xyz"] = center_xyz
+    out["rescol"] = rescol
 
     if steric_map:
         steric_info = rescol.steric_map(
             center=center_xyz,
-            key_atoms=[AtomSpec(a) for a in key_atoms],
+            key_atoms=[AtomSpec(a.atomspec) for a in key_atoms],
             radii=radii,
             oop_vector=oop_vector,
             ip_vector=ip_vector,
             radius=radius,
-            return_basis=True,
+            return_basis=basis is None,
             num_pts=num_pts,
             shape=shape,
             targets=targets,
         )
-        out.append(steric_info)
+        out["steric_map"] = steric_info
+        if basis is None:
+            basis = steric_info.pop(-1)
+    
+    out["basis"] = basis
 
 
-    # print("calculating buried volume")
     vbur = rescol.percent_buried_volume(
         targets=targets,
         basis=basis,
@@ -183,9 +204,8 @@ def _vbur(
         apoints=int(angularPoints),
         min_iter=minimumIterations,
     )
-    # print("done")
     
-    out.append(vbur)
+    out["vbur"] = vbur
     
     if displaySphere:
         mdls = vbur_vis(
@@ -204,10 +224,10 @@ def _vbur(
             basis=basis,
         )
         
-        out.append(mdls)
+        out["vis"] = mdls
     
-    profile.disable()
-    profile.print_stats()
+    # profile.disable()
+    # profile.print_stats()
     
     return out
 
@@ -259,7 +279,6 @@ def percent_vbur(
         targets = models[model]
         if len(models[model]) == 0:
             targets = None
-        print(center)
         mdl_center = None
         if center is not None:
             if isinstance(center, tuple):
@@ -338,7 +357,49 @@ def percent_vbur(
         ]
         results = [d.result() for d in data]
 
-    print(results)
+    for result in results:
+        model = result["model"]
+        center = result["center"]
+        if isinstance(center, np.ndarray):
+            s += "%s\t(%.3f,%.3f,%.3f)\t" % (model.name, *center)
+        else:
+            s += "%s\t%s\t" % (model.name, ",".join([a.atomspec for a in center]))
+        
+        vbur = result["vbur"]
+        if isinstance(vbur, float):
+            s += "%.1f\n" % vbur
+        elif reportComponent == "total":
+            s += "%.1f\n" % sum(vbur)
+        elif reportComponent == "octants":
+            s += ",".join("%.1f" % v for v in vbur)
+            s += "\n"
+        elif reportComponent == "quadrants":
+            s += ",".join("%.1f" % v for v in [
+                vbur[0] + vbur[7],
+                vbur[1] + vbur[6],
+                vbur[2] + vbur[5],
+                vbur[3] + vbur[4],
+            ])
+            s += "\n"
+        
+        if displaySphere is not None:
+            mdls = result["vis"]
+            model.add(mdls)
+            args = [
+                "color", "radial", mdls[0].atomspec,
+                "center", ",".join("%.4f" % x for x in result["center_xyz"]),
+                "palette", palette,
+                "range", "0,%.2f" % radius,
+                "coordinateSystem", model.atomspec,
+                ";",
+                "transparency", mdls[0].atomspec, "30",
+            ]
+            run(session, " ".join(args))
+
+    s += "</pre>"
+    session.logger.info(s, is_html=True)
+
+    return results
     
     if difference and displaySphere:
         if len(out) < 2:
