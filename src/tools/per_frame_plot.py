@@ -73,6 +73,8 @@ class EnergyPlot(ToolInstance):
         self.xlabel = xlabel
         self.ylabel = ylabel
 
+        self.opened = False
+
         self._build_ui()
 
         self.press = None
@@ -87,7 +89,6 @@ class EnergyPlot(ToolInstance):
         
         if not self.opened:
             self.delete()
-        
         self.circle_current_cs()
 
     def _build_ui(self):
