@@ -72,6 +72,123 @@ vbur_description = CmdDesc(
     url="https://github.com/QChASM/SEQCROW/wiki/Commands#percentVolumeBuried",
 )
 
+
+def _vbur(
+    session,
+    model,
+    ligand_atoms,
+    center,
+    key_atoms,
+    radii="UMN",
+    scale=1.17, 
+    method="Lebedev", 
+    radialPoints=20, 
+    angularPoints=1454, 
+    minimumIterations=25,
+    displaySphere=None,
+    pointSpacing=0.1,
+    intersectionScale=6,
+    palette="rainbow",
+    return_values=False,
+    steric_map=False,
+    useScene=False,
+    num_pts=100,
+    shape="circle",
+    labels="none",
+    reportComponent="total",
+    difference=False,
+):
+    # get corresponding AaronTools Geometry
+    rescol = ResidueCollection(model, bonds_matter=False)
+    # get list of AaronTools ligand atoms
+    targets = ResidueCollection.find([AtomSpec(a) for a in ligand_atoms])
+    
+    basis = None
+    if useScene:
+        oop_vector = session.view.camera.get_position().axes()[2]
+        ip_vector = session.view.camera.get_position().axes()[1]
+        x_vec = session.view.camera.get_position().axes()[0]
+        basis = np.array([x_vec, ip_vector, oop_vector]).T
+
+    elif labels != "none" or reportComponent != "total" or difference:
+        if not key_atoms:
+            # TODO: look for atoms with metal coordination pbonds
+            pass
+        oop_vector = np.zeros(3)
+        for atom in key_atoms:
+            oop_vector += center_xyz - atom.coord
+        
+        if len(key_atoms) == 1:
+            ip_vector = perp_vector(oop_vector)
+            x_vec = np.cross(ip_vector, oop_vector)
+        else:
+            coords = [atom.coord for atom in key_atoms]
+            coords.append(center_xyz)
+            coords = np.array(coords)
+            ip_vector = perp_vector(coords)
+            x_vec = np.cross(ip_vector, oop_vector)
+            x_vec /= np.linalg.norm(x_vec)
+            ip_vector = -np.cross(x_vec, oop_vector)
+        ip_vector /= np.linalg.norm(ip_vector)
+
+        basis = np.array([x_vec, ip_vector, oop_vector]).T
+
+    out = list()
+
+    if steric_map:
+        steric_info = rescol.steric_map(
+            center=center_xyz,
+            key_atoms=[AtomSpec(a) for a in key_atoms],
+            radii=radii,
+            oop_vector=oop_vector,
+            ip_vector=ip_vector,
+            radius=radius,
+            return_basis=True,
+            num_pts=num_pts,
+            shape=shape,
+            targets=targets,
+        )
+        out.append(steric_info)
+
+
+    vbur = rescol.percent_buried_volume(
+        targets=targets,
+        basis=basis,
+        center=c,
+        radius=radius,
+        radii=radii,
+        scale=scale,
+        method=method,
+        rpoints=int(radialPoints),
+        apoints=int(angularPoints),
+        min_iter=minimumIterations,
+    )
+    
+    out = [vbur]
+    
+    if displaySphere:
+        mdls = vbur_vis(
+            session,
+            rescol,
+            targets,
+            radii,
+            scale,
+            radius, 
+            center, 
+            point_spacing, 
+            intersection_scale,
+            volume_type,
+            vbur,
+            labels,
+            basis=None,
+        )
+        
+        out.append(mdls)
+    
+    
+
+
+
 def percent_vbur(
         session, 
         selection, 
