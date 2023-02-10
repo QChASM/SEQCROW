@@ -109,6 +109,7 @@ def _vbur(
     shape="circle",
     labels="none",
     reportComponent="total",
+    difference=False,
 ):
     out = dict()
     out["model"] = model
