@@ -915,6 +915,7 @@ class _SEQCROW_API(BundleAPI):
         structure_menu.addAction(QAction("Chiral centers", mw))
         structure_menu.addAction(QAction("Spiro centers", mw))
         structure_menu.addAction(QAction("Bridgehead", mw))
+        structure_menu.addAction(QAction("Rings", mw))
         
         vsepr_menu = add_submenu(['Che&mistry'], 'Shape')
         for vsepr in [

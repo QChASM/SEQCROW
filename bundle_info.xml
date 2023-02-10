@@ -438,6 +438,7 @@
                 <!--ChimeraXClassifier>ChimeraX :: Tool :: AARON Input Builder :: AARON :: Build AARON input file</ChimeraXClassifier-->
                 
                 <ChimeraXClassifier>ChimeraX :: Selector :: tm             :: Transition metals</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: rings          :: any atoms in rings</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: Ad             :: Adamantyl substituent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: BF2            :: Difluoroboro substituent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: CCH            :: Alkynyl substituent</ChimeraXClassifier>

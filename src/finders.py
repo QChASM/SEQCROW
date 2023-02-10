@@ -12,8 +12,11 @@ class AtomSpec(Finder):
     def get_matching_atoms(self, atoms, geometry=None):
         matching_atoms = []
         for atom in atoms:
-            if hasattr(atom, "atomspec") and atom.atomspec == self.atomspec:
-                matching_atoms.append(atom)
+            try:
+                if atom.atomspec == self.atomspec:
+                    matching_atoms.append(atom)
+            except AttributeError:
+                pass
         
         return matching_atoms
         
