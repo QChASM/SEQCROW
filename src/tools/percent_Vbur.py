@@ -124,6 +124,7 @@ class PercentVolumeBuried(ToolInstance):
         self.ligand_atoms = []
         
         self._build_ui()
+        self.show_steric_map_options(self.steric_map.checkState())
 
     def _build_ui(self):
         layout = QGridLayout()
@@ -345,7 +346,6 @@ class PercentVolumeBuried(ToolInstance):
         steric_layout.addRow("maximum value:", self.map_max)
 
         self.steric_map.stateChanged.connect(self.show_steric_map_options)
-        self.show_steric_map_options(self.steric_map.checkState() == Qt.Checked)
         
         self.map_min.setEnabled(not self.settings.auto_minmax and self.settings.steric_map)
         self.steric_map.stateChanged.connect(
@@ -705,9 +705,7 @@ class PercentVolumeBuried(ToolInstance):
             
             if steric_map:
                 map_info = result["steric_map"]
-                if self.pair_difference_map.isChecked():
-                    continue
-                
+
                 x, y, z, min_alt, max_alt = map_info
                 plot = self.tool_window.create_child_window(
                     "steric map of %s" % mdl.name, window_class=StericMap
@@ -731,6 +729,8 @@ class PercentVolumeBuried(ToolInstance):
                 if self.pair_difference_map.isChecked():
                     x, y, z1, min_alt1, max_alt1 = map_info
                     for result2 in info[:i]:
+                        mdl2 = result2["model"]
+                        vbur2 = result2["vbur"]
                         map_info2 = result2["steric_map"]
                         x, y, z2, min_alt2, max_alt2 = map_info2
                         z = z1 - z2
@@ -751,7 +751,7 @@ class PercentVolumeBuried(ToolInstance):
                         max_alt = np.max(z)
         
                         plot = self.tool_window.create_child_window(
-                            "steric map difference of %s and %s" % (mdl1.name, mdl2.name),
+                            "steric map difference of %s and %s" % (mdl.name, mdl2.name),
                             window_class=StericMap
                         )
                         if auto_minmax:
@@ -759,7 +759,7 @@ class PercentVolumeBuried(ToolInstance):
                                 x, y, z,
                                 a_not_in_b, b_not_in_a,
                                 min_alt, max_alt, 
-                                vbur1, vbur2,
+                                vbur, vbur2,
                                 radius,
                                 include_vbur,
                                 color_map,
@@ -770,7 +770,7 @@ class PercentVolumeBuried(ToolInstance):
                                 x, y, z, 
                                 a_not_in_b, b_not_in_a,
                                 map_min, map_max, 
-                                vbur1, vbur2,
+                                vbur, vbur2,
                                 radius,
                                 include_vbur,
                                 color_map,

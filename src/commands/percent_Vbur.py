@@ -1,5 +1,5 @@
 import concurrent.futures
-from cProfile import Profile
+# from cProfile import Profile
 import os
 
 import numpy as np
@@ -89,7 +89,9 @@ vbur_description = CmdDesc(
 def _vbur(
     session,
     model,
+    rescol,
     ligand_atoms,
+    targets,
     center,
     key_atoms,
     radius=3.5,
@@ -109,18 +111,19 @@ def _vbur(
     shape="circle",
     labels="none",
     reportComponent="total",
-    difference=False,
+    determine_key=False,
 ):
-    out = dict()
-    out["model"] = model
-    out["center"] = center
     # profile = Profile()
     # profile.enable()
-    # get corresponding AaronTools Geometry
-    rescol = ResidueCollection(model, bonds_matter=False)
-    # get list of AaronTools ligand atoms
-    targets = rescol.find([AtomSpec(a.atomspec) for a in ligand_atoms])
     
+    out = dict()
+    out["model"] = model
+    out["at_center"] = center
+    out["center"] = center
+    out["rescol"] = rescol
+    out["targets"] = targets
+
+
     basis = None
     if useScene:
         oop_vector = session.view.camera.get_position().axes()[2]
@@ -131,9 +134,9 @@ def _vbur(
     center_xyz = center
     if not isinstance(center_xyz, np.ndarray):
         center_xyz = np.mean(center.coords, axis=0)
+        out["at_center"] = [AtomSpec(c.atomspec) for c in center]
     
-    if labels != "none" or reportComponent != "total" or difference:
-        print("determining key atoms")
+    if labels != "none" or reportComponent != "total" or determine_key:
         if not key_atoms:
             key_atoms = set()
             for c in center:
@@ -171,7 +174,6 @@ def _vbur(
         basis = np.array([x_vec, ip_vector, oop_vector]).T
 
     out["center_xyz"] = center_xyz
-    out["rescol"] = rescol
 
     if steric_map:
         steric_info = rescol.steric_map(
@@ -191,7 +193,6 @@ def _vbur(
             basis = steric_info.pop(-1)
     
     out["basis"] = basis
-
 
     vbur = rescol.percent_buried_volume(
         targets=targets,
@@ -233,7 +234,6 @@ def _vbur(
     return out
 
 
-
 def percent_vbur(
         session, 
         selection, 
@@ -261,6 +261,9 @@ def percent_vbur(
         difference=False,
 ):
     
+    # profile = Profile()
+    # profile.enable()
+    
     out = []
     args = []
     kwargs = []
@@ -269,23 +272,32 @@ def percent_vbur(
     if center is not None and not isinstance(center, tuple):
         center = Atoms(center)
     
-    models = {
-        model:[atom for atom in model.atoms if onlyAtoms is not None and atom in onlyAtoms]
-        for model in selection if isinstance(model, AtomicStructure)
-    }
+    if onlyAtoms:
+        onlyAtoms = Atoms(onlyAtoms)
+        models = {
+            model: Atoms(model.atoms).intersect(onlyAtoms)
+            for model in selection if isinstance(model, AtomicStructure)
+        }
+    else:
+        models = {
+            model: model.atoms for model in selection if isinstance(model, AtomicStructure)
+        }
     
     s = "<pre>model\tcenter\t%Vbur\n"
     
     for model in models:
-        targets = models[model]
-        if len(models[model]) == 0:
-            targets = None
+        rescol = ResidueCollection(model)
+        ligand_atoms = models[model]
+        if len(ligand_atoms) == 0:
+            ligand_atoms = None
         mdl_center = None
         if center is not None:
             if isinstance(center, tuple):
                 mdl_center = np.array(center)
             elif isinstance(center, Atoms):
                 mdl_center = model.atoms.intersect(center)
+
+        targets = rescol.find([AtomSpec(a.atomspec) for a in ligand_atoms])
 
         if mdl_center is None:
             mdl_center = Atoms([a for a in model.atoms if a.is_metal])
@@ -297,6 +309,8 @@ def percent_vbur(
                 args.append([
                     session,
                     model,
+                    rescol,
+                    ligand_atoms,
                     targets,
                     Atoms([c]),
                     key_atoms,
@@ -320,12 +334,15 @@ def percent_vbur(
                     "shape": shape,
                     "labels": labels,
                     "reportComponent": reportComponent,
+                    "determine_key": difference or steric_map,
                 })
 
         else:
             args.append([
                 session,
                 model,
+                rescol,
+                ligand_atoms,
                 targets,
                 mdl_center,
                 key_atoms,
@@ -351,7 +368,10 @@ def percent_vbur(
                 "reportComponent": reportComponent,
             })
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+    # results = [_vbur(*arg, **kwarg) for arg, kwarg in zip(args, kwargs)]
+
+    n_threads = max(1, int(os.cpu_count() - 2))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=n_threads) as executor:
         data = [
             executor.submit(_vbur, *arg, **kwarg)
             for arg, kwarg in zip(args, kwargs)
@@ -400,20 +420,29 @@ def percent_vbur(
     s += "</pre>"
     session.logger.info(s, is_html=True)
 
-    return results
-    
+    # profile.disable()
+    # profile.print_stats()
+
     if difference and displaySphere:
-        if len(out) < 2:
+        if len(results) < 2:
             session.logger.warning(
                 "difference of %s volume was requested, but only one cutout was drawn; calculate "
                 "the buried volume for multiple centers to visualize the differences between them"
             )
-        for i, data1 in enumerate(out):
-            rescol1 = rescols[i]
-            model1, center1, targets1, basis1, vbur1 = data1[:5]
-            for j, data2 in enumerate(out[i+1:]):
-                rescol2 = rescols[i + j + 1]
-                model2, center2, targets2, basis2, vbur2 = data2[:5]
+        for i, data1 in enumerate(results):
+            model1 = data1["model"]
+            center1 = data1["at_center"]
+            targets1 = data1["targets"]
+            basis1 = data1["basis"]
+            vbur1 = data1["vbur"]
+            rescol1 = data1["rescol"]
+            for j, data2 in enumerate(results[i+1:]):
+                model2 = data2["model"]
+                center2 = data2["at_center"]
+                targets2 = data2["targets"]
+                basis2 = data2["basis"]
+                vbur2 = data2["vbur"]
+                rescol2 = data2["rescol"]
                 mdl = vbur_difference_vis(
                     session,
                     rescol1, rescol2,
@@ -442,9 +471,8 @@ def percent_vbur(
                     "transparency", mdl[1].atomspec, "50", 
                 ]
                 run(session, " ".join(args))
-    
-    s = s.strip()
-    s += "</pre>"
+
+    return results
     
     if not return_values:
         session.logger.info(s, is_html=True)
@@ -917,7 +945,6 @@ def vbur_vis(
     return [model]
     
 
-
 def vbur_difference_vis(
         session,
         geom1, geom2,
@@ -1053,11 +1080,7 @@ def vbur_difference_vis(
     coords1 = geom1.coordinates(atoms_within_radius1)
     coords2 = geom2.coordinates(atoms_within_radius2)
     coords2 -= center_coords2
-    h = np.dot(basis2.T, basis1)
-    u, s, v = np.linalg.svd(h)
-    R = np.matmul(v, u.T)
-    if np.sign(np.linalg.det(R)) < 0:
-        R[:, 2] *= -1
+    R = np.matmul(basis1, np.linalg.inv(basis2))
     coords2 = np.matmul(coords2, R.T)
     coords2 += center_coords1
 
