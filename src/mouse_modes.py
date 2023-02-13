@@ -429,7 +429,6 @@ class DrawTSBondMouseMode(DrawBondMouseMode):
         self.reset()
 
 
-
 class DrawCoordinationBondMouseMode(DrawBondMouseMode):
     name = "coordinationbond"
     scale = 1.0
@@ -497,14 +496,11 @@ class DrawCoordinationBondMouseMode(DrawBondMouseMode):
                 create_type=2
             )
         pbg.new_pseudobond(atom1, atom2)
-        if pbg not in atom1.structure.child_models():
-            atom1.structure.add([pbg])
         # bug in older versions of ChimeraX where new pseudobonds aren't 
         # displayed until something else changes
         # change the number of dashes
         pbg.dashes += 2
         pbg.dashes -= 2
-
 
 
 class _ElementPicker(ToolInstance):

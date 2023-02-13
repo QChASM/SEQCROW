@@ -19,8 +19,15 @@ erase_tsbond_description = CmdDesc(
     url="https://github.com/QChASM/SEQCROW/wiki/Commands#tsbond",
 )
 
-# someone should totally make an acutal bond for this
-def tsbond(session, selection, transparency=50, color=[170, 255, 255, 255], radius=0.16):   
+def tsbond(session, selection, transparency=50, color=[170, 255, 255, 255], radius=0.16):
+    """
+    draw a TS bond
+    selection - any number of bonds and possibly exactly two atoms
+    transparency - transparency of TS bond group
+    color - color of TS bond group
+    radius - radius of TS bond group
+    """
+    # alpha channel of color is ignored - use transparency instead
     if not isinstance(color, list):
         color = color.uint8x4()
     color = [c for c in color][:-1]
@@ -30,6 +37,8 @@ def tsbond(session, selection, transparency=50, color=[170, 255, 255, 255], radi
         session.logger.error("transparency must be between 0 and 100")
         return
     
+    # if a pair of atoms is given, either find a bond
+    # that already exists between them or create a new one
     ts_bond = None
     atoms = selection.atoms
     if len(atoms) != 2 and len(atoms) > 0:
@@ -48,29 +57,32 @@ def tsbond(session, selection, transparency=50, color=[170, 255, 255, 255], radi
             if ts_bond is None:
                 ts_bond = structure.new_bond(*atoms)
 
+    # for all bonds in the selection (plus the bond for
+    # the specified pair of atoms), replace it with
+    # a TS bond
     bonds = [bond for bond in selection.bonds]
     if ts_bond is not None and ts_bond not in bonds:
         bonds.append(ts_bond)
-        
-    for bond in bonds:       
+
+    for bond in bonds:
         atom1, atom2 = bond.atoms
-        
+
         pbg = bond.structure.pseudobond_group("TS bonds", create_type=1)
         if not any(all(atom in pb.atoms for atom in bond.atoms) for pb in pbg.pseudobonds):
             pbg.new_pseudobond(*bond.atoms)
         
         pbg.dashes = 0
         pbg.halfbond = False
-        pbg.radius = radius 
+        pbg.radius = radius
         pbg.color = color
-
-        if pbg not in bond.structure.child_models():
-            bond.structure.add([pbg])
 
         bond.delete()
 
 
 def erase_tsbond(session, selection):
+    """
+    remove a TS bond and possibly replace it with a normal bond
+    """
     atoms = selection.atoms
     pbonds = selection.pseudobonds
     for pbg in session.models.list(type=PseudobondGroup):
