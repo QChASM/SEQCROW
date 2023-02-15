@@ -788,17 +788,22 @@ class RingSelection(ChildToolWindow):
 
 
 class PTable(ChildToolWindow):
-    def __init__(self, tool_instance, title, button, **kwargs):
+    def __init__(self, tool_instance, title, button, show_dummy=False, **kwargs):
         super().__init__(tool_instance, title, **kwargs)
         
         self.button = button
+        self.show_dummy = show_dummy
         
         self._build_ui()
     
     def _build_ui(self):
         layout = QGridLayout()
         
-        self.ptable = PeriodicTable(initial_elements=[self.button.text()], select_multiple=False)
+        self.ptable = PeriodicTable(
+            initial_elements=[self.button.text()],
+            select_multiple=False,
+            show_dummy=self.show_dummy,
+        )
         self.ptable.elementSelectionChanged.connect(self.element_changed)
         layout.addWidget(self.ptable)
         

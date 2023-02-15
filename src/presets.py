@@ -60,10 +60,13 @@ def seqcrow_bse(session, models=None, atoms=None):
             atom.color = color
             atom.display = True
 
-            if ele in RADII:
+            try:
                 #AaronTools has bonding radii, maybe I should use vdw?
                 #check to see how necessary this is
                 atom.radius = RADII[ele]
+            except KeyError:
+                if ele == "LP":
+                    atom.radius = 0.5
 
             if ele != 'H':
                 atom.draw_mode = Atom.BALL_STYLE
@@ -124,10 +127,13 @@ def seqcrow_bse_cartoon(session, models=None, atoms=None):
             atom.color = color
             atom.display = True
 
-            if ele in RADII:
+            try:
                 #AaronTools has bonding radii, maybe I should use vdw?
                 #check to see how necessary this is
                 atom.radius = RADII[ele]
+            except KeyError:
+                if ele == "LP":
+                    atom.radius = 0.5
 
             if ele != 'H':
                 atom.draw_mode = Atom.BALL_STYLE
@@ -250,9 +256,14 @@ def seqcrow_s(session, models=None, atoms=None):
             
             if not atom.neighbors:
                 atom.draw_mode = Atom.BALL_STYLE
-                if ele in RADII:
+                try:
+                    #AaronTools has bonding radii, maybe I should use vdw?
+                    #check to see how necessary this is
                     atom.radius = RADII[ele]
-            
+                except KeyError:
+                    if ele == "LP":
+                        atom.radius = 0.5
+
             else:
                 atom.draw_mode = Atom.STICK_STYLE
             
@@ -363,9 +374,14 @@ def seqcrow_s_cartoon(session, models=None, atoms=None):
             
             if not atom.neighbors:
                 atom.draw_mode = Atom.BALL_STYLE
-                if ele in RADII:
+                try:
+                    #AaronTools has bonding radii, maybe I should use vdw?
+                    #check to see how necessary this is
                     atom.radius = RADII[ele]
-            
+                except KeyError:
+                    if ele == "LP":
+                        atom.radius = 0.5
+
             else:
                 atom.draw_mode = Atom.STICK_STYLE
             

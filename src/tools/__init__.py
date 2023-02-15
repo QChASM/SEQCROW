@@ -23,3 +23,4 @@ from .mol_builder import MolBuilder
 from .raven_setup import BuildRaven
 from .solid_angle import SolidAngle
 from .conformers import ConformerTool
+from .zmat_builder import ZMatrixBuilder

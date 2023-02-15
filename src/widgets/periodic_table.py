@@ -25,7 +25,10 @@ class ElementButton(QPushButton):
         self.setMinimumHeight(int(1.5*self.fontMetrics().boundingRect("Qy").height()))
         self.setMaximumHeight(int(1.5*self.fontMetrics().boundingRect("Qy").height()))
         
-        self.ele_color = tuple(list(element_color(ELEMENTS.index(element)))[:-1])
+        try:
+            self.ele_color = tuple(list(element_color(ELEMENTS.index(element)))[:-1])
+        except ValueError:
+            self.ele_color = tuple(list(element_color(0))[:-1])
         
         if not single_state:
             self.state = 0
@@ -71,7 +74,10 @@ class ElementButton(QPushButton):
         self.stateChanged.emit(self.state)
     
     def changeElement(self, element):
-        self.ele_color = tuple(list(element_color(ELEMENTS.index(element)))[:-1])
+        try:
+            self.ele_color = tuple(list(element_color(ELEMENTS.index(element)))[:-1])
+        except ValueError:
+            self.ele_color = tuple(list(element_color(0))[:-1])
         self.setText(element)
         self._changeState(state=self.state)
     
@@ -81,16 +87,19 @@ class ElementButton(QPushButton):
     def setTristate(self, b):
         self._tristate = b
 
+
 class PeriodicTable(QWidget):
     elementSelectionChanged = Signal()
     
-    def __init__(self, *args, initial_elements=[], select_multiple=True, **kwargs):
+    def __init__(self, *args, initial_elements=[], select_multiple=True, show_dummy=False, **kwargs):
         super().__init__(*args, **kwargs)
         
         layout = QGridLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         
         self._elements = {ele: ElementButton(ele) for ele in ELEMENTS if not any(ele == x for x in ['Bq', 'X'])}
+        if show_dummy:
+            self._elements["LP"] = ElementButton("LP")
         for ele in self._elements.keys():
             self._elements[ele].setTristate(False)
             if select_multiple:
@@ -223,6 +232,9 @@ class PeriodicTable(QWidget):
             elements_layout.addWidget(self._elements['Md'], 8, 14, Qt.AlignLeft | Qt.AlignTop)
             elements_layout.addWidget(self._elements['No'], 8, 15, Qt.AlignLeft | Qt.AlignTop)
             elements_layout.addWidget(self._elements['Lr'], 8, 16, Qt.AlignLeft | Qt.AlignTop)
+        
+        if show_dummy:
+            elements_layout.addWidget(self._elements['LP'], 8,  0, Qt.AlignLeft | Qt.AlignTop)
         
         if select_multiple:
             organic_button = QPushButton("organic chemists'")
