@@ -45,24 +45,24 @@ class ZMatrixBuilder(ToolInstance):
         layout = QFormLayout()
         
         layout.addRow(QLabel("select up to 3 atoms to define coordinates"))
-                
+
         layout.addRow(QLabel("if no atoms are selected, a new structure will be created"))
         
         self.element_button = ElementButton("C", single_state=True)
         self.element_button.clicked.connect(self.open_ptable)
         layout.addRow("element:", self.element_button)
         
-        self.atom1_label = QLabel("atom 1:")
+        self.atom1_label = QLabel("atom 1 <i>d</i>:")
         self.distance = QDoubleSpinBox()
         self.distance.setDecimals(4)
         self.distance.setMinimum(0)
         self.distance.setMaximum(30)
-        self.distance.setValue(1.54)
+        self.distance.setValue(1.51)
         self.distance.setSingleStep(0.05)
         self.distance.setSuffix(" Å")
         layout.addRow(self.atom1_label, self.distance)
         
-        self.atom2_label = QLabel("atom 2:")
+        self.atom2_label = QLabel("atom 2 <i>θ</i>:")
         self.valence_angle = QDoubleSpinBox()
         self.valence_angle.setDecimals(4)
         self.valence_angle.setMinimum(0)
@@ -72,19 +72,14 @@ class ZMatrixBuilder(ToolInstance):
         self.valence_angle.setSuffix("°")
         layout.addRow(self.atom2_label, self.valence_angle)
         
-        self.atom3_label = QLabel("atom 3:")
-        self.third_angle = QDoubleSpinBox()
-        self.third_angle.setDecimals(4)
-        self.third_angle.setMinimum(-180)
-        self.third_angle.setMaximum(180)
-        self.third_angle.setSingleStep(0.5)
-        self.third_angle.setSuffix("°")
-        layout.addRow(self.atom3_label, self.third_angle)
-        
-        self.third_angle_type = QComboBox()
-        self.third_angle_type.addItems(["1-2-3-new dihedral", "new-1-3 valence"])
-        self.third_angle_type.currentTextChanged.connect(self.change_third_angle_type)
-        layout.addRow("atom 3 angle type:", self.third_angle_type)
+        self.atom3_label = QLabel("atom 3 <i>φ</i>:")
+        self.torsion_angle = QDoubleSpinBox()
+        self.torsion_angle.setDecimals(4)
+        self.torsion_angle.setMinimum(-180)
+        self.torsion_angle.setMaximum(180)
+        self.torsion_angle.setSingleStep(0.5)
+        self.torsion_angle.setSuffix("°")
+        layout.addRow(self.atom3_label, self.torsion_angle)
         
         add_atom = QPushButton("add atom")
         add_atom.clicked.connect(self.place_new_atom)
@@ -98,7 +93,7 @@ class ZMatrixBuilder(ToolInstance):
         delete_atoms.clicked.connect(self.delete_selected_atoms)
         layout.addRow(delete_atoms)
         
-        bond_lookup = QGroupBox("bond length lookup:")
+        bond_lookup = QGroupBox("bond length lookup")
         bond_lookup_layout = QGridLayout(bond_lookup)
         
         bond_lookup_layout.addWidget(
@@ -133,6 +128,30 @@ class ZMatrixBuilder(ToolInstance):
         
         layout.addRow(bond_lookup)
         
+        quick_angles = QGroupBox("quick angles")
+        quick_angles_layout = QGridLayout(quick_angles)
+        
+        quick_angles_layout.addWidget(QLabel("<i>θ</i>:"), 0, 0, 1, 1)
+        quick_angles_layout.addWidget(QLabel("<i>φ</i>:"), 1, 0, 1, 1)
+        
+        for i, angle in enumerate([90, 109.4712206, 120, 180]):
+            button = QPushButton("%.1f" % angle)
+            button.clicked.connect(
+                lambda *args, a=angle: self.set_angle_value(a)
+            )
+            button.setMaximumWidth(3.2 * button.fontMetrics().boundingRect("0000").width())
+            quick_angles_layout.addWidget(button, 0, 2 * i + 1, 1, 2, alignment=Qt.AlignHCenter | Qt.AlignTop)
+        
+        for i, angle in enumerate([-120, -90, -60, 0, 60, 90, 120, 180]):
+            button = QPushButton("%i" % angle)
+            button.clicked.connect(
+                lambda *args, a=angle: self.set_torsion_value(a)
+            )
+            button.setMaximumWidth(1.6 * button.fontMetrics().boundingRect("0000").width())
+            quick_angles_layout.addWidget(button, 1, i + 1, 1, 1, alignment=Qt.AlignHCenter | Qt.AlignTop)
+        
+        layout.addRow(quick_angles)
+        
         self.status = QStatusBar()
         self.status.setSizeGripEnabled(False)
         layout.addRow(self.status)
@@ -141,13 +160,19 @@ class ZMatrixBuilder(ToolInstance):
 
         self.tool_window.manage(None)
     
+    def set_angle_value(self, angle):
+        self.valence_angle.setValue(angle)
+    
+    def set_torsion_value(self, angle):
+        self.torsion_angle.setValue(angle)
+    
     def draw_new_bond(self):
         run(self.session, "bond sel reasonable false")
 
     def update_atom_labels(self, *args, **kwargs):
-        self.atom1_label.setText("atom 1:")
-        self.atom2_label.setText("atom 2:")
-        self.atom3_label.setText("atom 3:")
+        self.atom1_label.setText("atom 1 <i>d</i>:")
+        self.atom2_label.setText("atom 2 <i>θ</i>:")
+        self.atom3_label.setText("atom 3 <i>φ</i>:")
         sel = selected_atoms(self.session)
         if len(sel) == 0 or len(sel) > 3:
             return
@@ -194,21 +219,19 @@ class ZMatrixBuilder(ToolInstance):
         else:
             self.status.showMessage("no bond data for %s-%s %sx bonds" % (ele1, ele2, order))
 
-    def change_third_angle_type(self, text):
-        if text == "1-2-3-new dihedral":
-            self.third_angle.setMinimum(-180)
-        else:
-            self.third_angle.setMinimum(0)
-    
     def get_atom_name(self, element, residue):
         i = 1
-        for atom in residue.atoms:
-            if atom.element.name != element:
-                continue
-            if atom.element.name == element and atom.name == "%s%i" % (element, i):
-                i += 1
-                continue
-            break
+        name_found = False
+        while not name_found:
+            for atom in residue.atoms:
+                if atom.element.name != element:
+                    continue
+                if atom.element.name == element and atom.name == "%s%i" % (element, i):
+                    i += 1
+                    break
+            else:
+                name_found = True
+            
         return "%s%i" % (element, i)
     
     def set_angle(self, coord1, coord2, coord3, target_angle):
@@ -318,27 +341,17 @@ class ZMatrixBuilder(ToolInstance):
             return
         
         atom3 = sel[-3]
-        angle = np.deg2rad(self.third_angle.value())
-        if self.third_angle_type.currentText() == "1-2-3-new dihedral":
-            angle_set = False
-            i = 0
-            while not angle_set and i < 10:
-                angle_set, coords = self.set_torsion(
-                    atom3.coord,
-                    atom2.coord,
-                    atom1.coord,
-                    coords,
-                    angle,
-                )
-                i += 1
-            atom.coord = coords
+        angle = np.deg2rad(self.torsion_angle.value())
+        angle_set = False
+        i = 0
+        while not angle_set and i < 10:
+            angle_set, coords = self.set_torsion(
+                atom3.coord,
+                atom2.coord,
+                atom1.coord,
+                coords,
+                angle,
+            )
+            i += 1
+        atom.coord = coords
 
-        else:
-            angle_set = False
-            i = 0
-            while not angle_set and i < 10:
-                angle_set, coords = self.set_angle(
-                    atom3.coord, atom1.coord, coords, angle,
-                )
-                i += 1
-            atom.coord = coords
