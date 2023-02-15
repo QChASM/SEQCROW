@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="1.6a3">
+            version="1.6">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -539,8 +539,8 @@
     
     <AdditionalPackages>
         <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools"/>
-        <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
         <!--
+        <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
         <Package name="AaronTools" folder="C:\Users\ajs99778\Documents\GitHub\AaronTools"/>
         <Package name="AaronTools.test" folder="C:\Users\ajs99778\Documents\GitHub\AaronTools\test"/>
         <Package name="AaronTools" folder="/home/tschaefer/QChASM/AaronTools"/>
@@ -568,12 +568,12 @@
         <DataFile>LICENSE</DataFile>
     </DataFiles>
 
+    <!--
     <DataFiles package="AaronTools.test">
         <DataDir>test_files</DataDir>
         <DataDir>ref_files</DataDir>
     </DataFiles>
 
-    <!--
     <DataFiles package="Raven">
 		<DataFile>LICENSE</DataFile>
         <DataDir>bin</DataDir>
