@@ -480,7 +480,7 @@ class _SEQCROW_API(BundleAPI):
 
                 return Info()
 
-            elif name == "XYZ file":
+            elif name == "XYZ file" or name == "XYZ trajectory file":
                 class Info(OpenerInfo):
                     def open(self, session, data, file_name, **kw):
                         return open_xyz(

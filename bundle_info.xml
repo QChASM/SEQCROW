@@ -146,7 +146,16 @@
                 
                 <Provider name="XYZ file" 
                           category="Molecular structure" 
-                          suffixes=".xyz,.allxyz" 
+                          suffixes=".xyz" 
+                          encoding="utf-8" 
+                          nicknames="xyz" 
+                          reference_url="https://en.wikipedia.org/wiki/XYZ_file_format" 
+                          synopsis="XYZ coordinate file"
+                />                
+
+				<Provider name="XYZ trajectory file" 
+                          category="Molecular structure" 
+                          suffixes=".allxyz" 
                           encoding="utf-8" 
                           nicknames="xyz" 
                           reference_url="https://en.wikipedia.org/wiki/XYZ_file_format" 
@@ -193,6 +202,7 @@
                 <Provider name="ORCA output file" want_path="false"/>
                 <Provider name="Psi4 output file" want_path="false"/>
                 <Provider name="XYZ file" want_path="false"/>
+                <Provider name="XYZ trajectory file" want_path="false"/>
                 <Provider name="FCHK file" want_path="false"/>
                 <Provider name="sqm output file" want_path="false"/>
                 <Provider name="NBO input file" want_path="true"/>
