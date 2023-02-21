@@ -538,10 +538,10 @@
        </Classifiers>
     
     <AdditionalPackages>
-        <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools"/>
-        <!--
-        <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
         <Package name="AaronTools" folder="C:\Users\ajs99778\Documents\GitHub\AaronTools"/>
+        <!--
+        <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools"/>
+        <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
         <Package name="AaronTools.test" folder="C:\Users\ajs99778\Documents\GitHub\AaronTools\test"/>
         <Package name="AaronTools" folder="/home/tschaefer/QChASM/AaronTools"/>
         <Package name="Raven" folder="C:\Users\normn\Documents\GitHub\Raven"/>

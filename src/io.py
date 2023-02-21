@@ -312,6 +312,8 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
         session.filereader_manager.triggers.activate_trigger(
             ADD_FILEREADER, (structures, [fr for s in structures])
         )
+        for struc in structures:
+            struc.filename = file_name
         return structures, "opened %i structures from %s" % (len(structures), file_name)
     
     name, ext = os.path.splitext(file_name)
@@ -327,6 +329,7 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
         status += " movie"
         slider = CoordinateSetSlider(session, struc)
         slider.set_slider(struc.num_coordsets)
+    struc.filename = file_name
     return [struc], status
 
 
