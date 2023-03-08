@@ -435,7 +435,7 @@ class NormalModes(ToolInstance):
         for i, displacement in enumerate(vector):
             n = np.linalg.norm(displacement)
             if self.vec_mw_bool and self.display_tabs.currentIndex() == 0:
-                n *= geom.atoms[i].mass()
+                n *= geom.atoms[i].mass
 
             if max_norm is None or n > max_norm:
                 max_norm = n
@@ -448,7 +448,7 @@ class NormalModes(ToolInstance):
                 if geom.atoms[i].is_dummy:
                     i += 1
                     continue
-                dX[i] *= geom.atoms[i].mass()
+                dX[i] *= geom.atoms[i].mass
                 i += 1
 
         return dX

@@ -11,9 +11,9 @@ def apply_seqcrow_bse_lighting(session):
     lighting_profile.multishadow = 0
     lighting_profile.fill_light_intensity = 0.5
     lighting_profile.ambient_light_intensity = 0.4
-    lighting_profile.key_light_color = [1., 1., 1., 0]
-    lighting_profile.fill_light_color = [1., 1., 1., 0]
-    lighting_profile.ambient_light_color = [1., 1., 1., 0]
+    lighting_profile.key_light_color = [1., 1., 1.]
+    lighting_profile.fill_light_color = [1., 1., 1.]
+    lighting_profile.ambient_light_color = [1., 1., 1.]
     lighting_profile.depth_cue_color = [1., 1., 1.]
     
     run(session, "graphics silhouettes true", log=False)
@@ -201,9 +201,9 @@ def apply_seqcrow_s_lighting(session):
     lighting_profile.multishadow_depth_bias = 0.01
     lighting_profile.fill_light_intensity = 0.5
     lighting_profile.ambient_light_intensity = 0.4
-    lighting_profile.key_light_color = [1., 1., 1., 0]
-    lighting_profile.fill_light_color = [1., 1., 1., 0]
-    lighting_profile.ambient_light_color = [1., 1., 1., 0]
+    lighting_profile.key_light_color = [1., 1., 1.]
+    lighting_profile.fill_light_color = [1., 1., 1.]
+    lighting_profile.ambient_light_color = [1., 1., 1.]
     lighting_profile.depth_cue_color = [1., 1., 1.]
    
     run(session, "graphics silhouettes true", log=False)

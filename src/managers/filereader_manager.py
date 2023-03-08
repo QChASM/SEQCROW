@@ -191,9 +191,15 @@ def apply_non_seqcrow_preset(model):
                 if any(fmt.lower() == s for s in file_types):
                     cmd = fmt_only.match(line).group(2)
                     cmd = cmd.replace("<model>", atomspec)
+                    model.session.logger.warning(
+                        "running commands after opening files will be removed from SEQCROW in the near future. Please switch to using the OpenCommands bundle, which is available now on the toolshed."
+                    )
                     run(model.session, cmd)
             
         else:
             cmd = line.replace("<model>", atomspec)
+            model.session.logger.warning(
+                "running commands after opening files will be removed from SEQCROW in the near future. Please switch to using the OpenCommands bundle, which is available now on the toolshed."
+            )
             run(model.session, cmd)
     

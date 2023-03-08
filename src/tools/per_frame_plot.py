@@ -76,6 +76,9 @@ class EnergyPlot(ToolInstance):
         self.opened = False
 
         self._build_ui()
+        if not self.opened:
+            self.delete()
+            return
 
         self.press = None
         self.drag_prev = None
@@ -87,8 +90,6 @@ class EnergyPlot(ToolInstance):
         global_triggers = get_triggers()
         self._changes = global_triggers.add_handler("changes", self.check_changes)
         
-        if not self.opened:
-            self.delete()
         self.circle_current_cs()
 
     def _build_ui(self):
@@ -484,9 +485,10 @@ class EnergyPlot(ToolInstance):
             self.delete()
     
     def delete(self):
-        self.session.triggers.remove_handler(self._model_closed)
-        global_triggers = get_triggers()
-        global_triggers.remove_handler(self._changes)
+        if self.opened:
+            self.session.triggers.remove_handler(self._model_closed)
+            global_triggers = get_triggers()
+            global_triggers.remove_handler(self._changes)
 
         super().delete()    
     
