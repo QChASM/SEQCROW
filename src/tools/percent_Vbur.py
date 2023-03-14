@@ -124,6 +124,7 @@ class PercentVolumeBuried(ToolInstance):
         self.ligand_atoms = []
         
         self._build_ui()
+        self.show_steric_map_options(self.steric_map.checkState())
 
     def _build_ui(self):
         layout = QGridLayout()
@@ -657,52 +658,54 @@ class PercentVolumeBuried(ToolInstance):
         
         # self.table.setRowCount(0)
         
-        if steric_map:
-            for mdl, cent, _, _, vbur, map_info in info:
-                row = self.table.rowCount()
-                self.table.insertRow(row)
-                
-                m = QTableWidgetItem()
-                m.setData(Qt.DisplayRole, mdl.name)
-                self.table.setItem(row, 0, m)
-                
-                c = QTableWidgetItem()
-                if hasattr(cent, "__iter__"):
-                    c.setData(Qt.DisplayRole, ", ".join([a.atomspec for a in cent]))
-                else:
-                    c.setData(Qt.DisplayRole, cent.atomspec)
+        for i, result in enumerate(info):
+            mdl = result["model"]
+            vbur = result["vbur"]
+            cent = result["center"]
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            
+            m = QTableWidgetItem()
+            m.setData(Qt.DisplayRole, mdl.name)
+            self.table.setItem(row, 0, m)
+            
+            c = QTableWidgetItem()
+            if hasattr(cent, "__iter__"):
+                c.setData(Qt.DisplayRole, ", ".join([a.atomspec for a in cent]))
+            else:
+                c.setData(Qt.DisplayRole, cent.atomspec)
 
-                self.table.setItem(row, 1, c)
-                
-                v = QTableWidgetItem()
-                if report_component == "octants":
-                    v.setData(
-                        Qt.DisplayRole,
-                        ",".join(["%.1f" % x for x in vbur])
+            self.table.setItem(row, 1, c)
+            
+            v = QTableWidgetItem()
+            if report_component == "octants":
+                v.setData(
+                    Qt.DisplayRole,
+                    ",".join(["%.1f" % x for x in vbur])
+                )
+            elif report_component == "quadrants":
+                v.setData(
+                    Qt.DisplayRole,
+                    ",".join("%.1f" % x for x in
+                        [
+                            vbur[0] + vbur[7],
+                            vbur[1] + vbur[6],
+                            vbur[2] + vbur[5],
+                            vbur[3] + vbur[4],
+                        ]
                     )
-                elif report_component == "quadrants":
-                    v.setData(
-                        Qt.DisplayRole,
-                        ",".join("%.1f" % x for x in
-                            [
-                                vbur[0] + vbur[7],
-                                vbur[1] + vbur[6],
-                                vbur[2] + vbur[5],
-                                vbur[3] + vbur[4],
-                            ]
-                        )
-                    )
+                )
+            else:
+                if hasattr(vbur, "__iter__"):
+                    v.setData(Qt.DisplayRole, "%.1f" % sum(vbur))
                 else:
-                    if hasattr(vbur, "__iter__"):
-                        v.setData(Qt.DisplayRole, "%.1f" % sum(vbur))
-                    else:
-                        v.setData(Qt.DisplayRole, "%.1f" % vbur)
-                v.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-                self.table.setItem(row, 2, v)
-                
-                if self.pair_difference_map.isChecked():
-                    continue
-                
+                    v.setData(Qt.DisplayRole, "%.1f" % vbur)
+            v.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+            self.table.setItem(row, 2, v)
+            
+            if steric_map:
+                map_info = result["steric_map"]
+
                 x, y, z, min_alt, max_alt = map_info
                 plot = self.tool_window.create_child_window(
                     "steric map of %s" % mdl.name, window_class=StericMap
@@ -721,12 +724,14 @@ class PercentVolumeBuried(ToolInstance):
                         vbur, radius, include_vbur,
                         color_map, levels, contour_lines,
                     )
-
-        
-            if self.pair_difference_map.isChecked():
-                for i, (mdl1, cent1, _, _, vbur1, map_info1) in enumerate(info):
-                    x, y, z1, min_alt1, max_alt1 = map_info1
-                    for mdl2, cent2, _, _, vbur2, map_info2 in info[i + 1:]:
+    
+            
+                if self.pair_difference_map.isChecked():
+                    x, y, z1, min_alt1, max_alt1 = map_info
+                    for result2 in info[:i]:
+                        mdl2 = result2["model"]
+                        vbur2 = result2["vbur"]
+                        map_info2 = result2["steric_map"]
                         x, y, z2, min_alt2, max_alt2 = map_info2
                         z = z1 - z2
                         a_not_in_b = np.zeros(z.shape)
@@ -744,9 +749,9 @@ class PercentVolumeBuried(ToolInstance):
                         
                         min_alt = np.min(z[z > (min_alt1 - max_alt2)])
                         max_alt = np.max(z)
-    
+        
                         plot = self.tool_window.create_child_window(
-                            "steric map difference of %s and %s" % (mdl1.name, mdl2.name),
+                            "steric map difference of %s and %s" % (mdl.name, mdl2.name),
                             window_class=StericMap
                         )
                         if auto_minmax:
@@ -754,7 +759,7 @@ class PercentVolumeBuried(ToolInstance):
                                 x, y, z,
                                 a_not_in_b, b_not_in_a,
                                 min_alt, max_alt, 
-                                vbur1, vbur2,
+                                vbur, vbur2,
                                 radius,
                                 include_vbur,
                                 color_map,
@@ -765,55 +770,12 @@ class PercentVolumeBuried(ToolInstance):
                                 x, y, z, 
                                 a_not_in_b, b_not_in_a,
                                 map_min, map_max, 
-                                vbur1, vbur2,
+                                vbur, vbur2,
                                 radius,
                                 include_vbur,
                                 color_map,
                                 levels, contour_lines,
                             )
-
-        else:
-            for mdl, cent, _, _, vbur in info:
-                row = self.table.rowCount()
-                self.table.insertRow(row)
-                
-                m = QTableWidgetItem()
-                m.setData(Qt.DisplayRole, mdl.name)
-                self.table.setItem(row, 0, m)
-                
-                c = QTableWidgetItem()
-                c.setData(Qt.DisplayRole, cent)
-                if hasattr(cent, "__iter__"):
-                    c.setData(Qt.DisplayRole, ", ".join([a.atomspec for a in cent]))
-                else:
-                    c.setData(Qt.DisplayRole, cent.atomspec)
-                self.table.setItem(row, 1, c)
-                
-                v = QTableWidgetItem()
-                if report_component == "octants":
-                    v.setData(
-                        Qt.DisplayRole,
-                        ",".join(["%.1f" % x for x in vbur])
-                    )
-                elif report_component == "quadrants":
-                    v.setData(
-                        Qt.DisplayRole,
-                        ",".join("%.1f" % x for x in
-                            [
-                                vbur[0] + vbur[7],
-                                vbur[1] + vbur[6],
-                                vbur[2] + vbur[5],
-                                vbur[3] + vbur[4],
-                            ]
-                        )
-                    )
-                else:
-                    if hasattr(vbur, "__iter__"):
-                        v.setData(Qt.DisplayRole, "%.1f" % sum(vbur))
-                    else:
-                        v.setData(Qt.DisplayRole, "%.1f" % vbur)
-                v.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-                self.table.setItem(row, 2, v)
         
         self.table.resizeColumnToContents(1)
         self.table.resizeColumnToContents(2)

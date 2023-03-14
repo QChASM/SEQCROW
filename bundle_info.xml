@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="1.5.11">
+            version="1.6.1">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -146,7 +146,16 @@
                 
                 <Provider name="XYZ file" 
                           category="Molecular structure" 
-                          suffixes=".xyz,.allxyz" 
+                          suffixes=".xyz" 
+                          encoding="utf-8" 
+                          nicknames="xyz" 
+                          reference_url="https://en.wikipedia.org/wiki/XYZ_file_format" 
+                          synopsis="XYZ coordinate file"
+                />                
+
+				<Provider name="XYZ trajectory file" 
+                          category="Molecular structure" 
+                          suffixes=".allxyz" 
                           encoding="utf-8" 
                           nicknames="xyz" 
                           reference_url="https://en.wikipedia.org/wiki/XYZ_file_format" 
@@ -193,6 +202,7 @@
                 <Provider name="ORCA output file" want_path="false"/>
                 <Provider name="Psi4 output file" want_path="false"/>
                 <Provider name="XYZ file" want_path="false"/>
+                <Provider name="XYZ trajectory file" want_path="false"/>
                 <Provider name="FCHK file" want_path="false"/>
                 <Provider name="sqm output file" want_path="false"/>
                 <Provider name="NBO input file" want_path="true"/>
@@ -434,10 +444,12 @@
                 <ChimeraXClassifier>ChimeraX :: Tool :: Transition State Structures    :: Structure Prediction :: locate transition state structures using the growing string method</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Ligand Solid Angle             :: Structure Analysis   :: Calculate ligand solid angles</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Conformer Search               :: Structure Prediction :: automated conformer search</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: Z-Matrix Builder               :: Structure Editing    :: build structure using internal coordinates</ChimeraXClassifier>
                 <!--<ChimeraXClassifier>ChimeraX :: Tool :: AaronJr Input Builder          :: AaronJr            :: Create input files for AaronJr</ChimeraXClassifier>-->
                 <!--ChimeraXClassifier>ChimeraX :: Tool :: AARON Input Builder :: AARON :: Build AARON input file</ChimeraXClassifier-->
                 
                 <ChimeraXClassifier>ChimeraX :: Selector :: tm             :: Transition metals</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Selector :: rings          :: any atoms in rings</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: Ad             :: Adamantyl substituent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: BF2            :: Difluoroboro substituent</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Selector :: CCH            :: Alkynyl substituent</ChimeraXClassifier>
@@ -540,9 +552,9 @@
         <!--
         <Package name="AaronTools" folder="C:\Users\ajs99778\Documents\GitHub\AaronTools"/>
         <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
+        <Package name="AaronTools.test" folder="C:\Users\ajs99778\Documents\GitHub\AaronTools\test"/>
         <Package name="AaronTools" folder="/home/tschaefer/QChASM/AaronTools"/>
         <Package name="Raven" folder="C:\Users\normn\Documents\GitHub\Raven"/>
-        <Package name="AaronTools.test" folder="C:\Users\ajs99778\Documents\GitHub\AaronTools\test"/>
         <Package name="Raven" folder="/home/ajs99778/pyQCHASM/Raven"/>
         <Package name="AaronTools" folder="/home/ajs99778/pyQCHASM/AaronTools"/>
         <Package name="AaronTools.test" folder="/home/ajs99778/pyQCHASM/AaronTools/test"/>

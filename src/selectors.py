@@ -8,6 +8,7 @@ from AaronTools.finders import ChiralCenters, VSEPR, Bridgehead, SpiroCenters
 from AaronTools.substituent import Substituent
 from AaronTools.const import TMETAL
 from AaronTools.utils.prime_numbers import Primes
+from AaronTools.utils.utils import shortest_path
 
 from SEQCROW.residue_collection import ResidueCollection
 
@@ -19,9 +20,16 @@ Primes()
 BondOrder()
 
 def register_selectors(logger, name):
-    logger.info(name)
     if name == "tm":
         register_selector("tm", tm_selector, logger, desc="transition metals")
+
+    elif name == "rings":
+        register_selector(
+            name,
+            select_rings,
+            logger,
+            desc="select atoms in rings",
+        )
 
     elif any(name == sub for sub in Substituent.list()):
         register_selector(
@@ -78,7 +86,6 @@ def register_selectors(logger, name):
         "octagonal-pyramidal",
         "tricapped-trigonal-prismatic",
     ]):
-        print("vsepr")
         new_name = name
         if name != "hula-hoop":
             new_name = name.replace("-", " ")
@@ -99,7 +106,6 @@ def register_selectors(logger, name):
         "bent",
         "planar",
     ]):
-        print("vsepr")
         name_map = {
             "linear": ["linear 1", "linear 2"],
             "bent": [
@@ -329,6 +335,63 @@ def all_connected_selector(session, models, results):
 
     results.add_atoms(atoms)
 
+def select_rings(session, models, results):
+    """
+    select atoms in rings
+    does not check the size of the ring
+    """
+    for model in models:
+        if not isinstance(model, AtomicStructure):
+            continue
+        
+        ring_atoms = set()
+
+        # index map to quickly get indices of atoms
+        ndx = {a: i for i, a in enumerate(model.atoms)}
+        # we use a connectivity path to look for rings
+        graph = [[ndx[n] for n in a.neighbors] for a in ndx]
+        # remove nodes that only have 1 neighbor, as it is not
+        # possible for these to be in a ring
+        prune_branches(graph)
+
+        # for each atom, we look for a path from one of its neighbors
+        # to another that does not include the atom itself
+        # if we can find such a path, the atom is in a ring
+        for a in range(0, len(graph)):
+            # skip atoms with no valid neighbors
+            if not graph[a]:
+                continue
+            
+            # skip atoms we've already found
+            if a in ring_atoms:
+                continue
+            
+            found_ring = False
+            # look for a path to each pair of neighbors
+            for a2 in graph[a]:
+                # copy the graph, but remove the node for this atom
+                graph[a].remove(a2)
+                path = shortest_path(graph, a, a2)
+                if path is not None:
+                    ring_atoms.update(path)
+                    found_ring = True
+                    graph[a].append(a2)
+                else:
+                    # this pair of atoms is not in a ring
+                    # we will not need to revisit
+                    graph[a2].remove(a)
+            
+            # if this atom is not in a ring, we will not
+            # need to visit it again - remove it's connections
+            # from the graph
+            if not found_ring:
+                for a2 in graph[a]:
+                    graph[a2].remove(a)
+                graph[a] = []
+                prune_branches(graph)
+        
+        results.add_atoms(Atoms([model.atoms[i] for i in ring_atoms]))
+
 def get_fragment(start, stop=None, max_len=None):
     """
     see AaronTools.geometry.Geometry.get_fragment
@@ -534,3 +597,15 @@ def canonical_rank(structure, heavy_only=False, break_ties=True):
             warn("Max cycles reached in canonical sorting (tie-breaking)")
 
     return ranks
+    
+def prune_branches(graph):
+    trimmed_leaves = True
+    while trimmed_leaves:
+        trimmed_leaves = False
+        for i in range(0, len(graph)):
+            if len(graph[i]) == 1:
+                for n in graph[i]:
+                    graph[n].remove(i)
+                graph[i] = []
+                trimmed_leaves = True
+    

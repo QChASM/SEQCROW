@@ -11,9 +11,9 @@ def apply_seqcrow_bse_lighting(session):
     lighting_profile.multishadow = 0
     lighting_profile.fill_light_intensity = 0.5
     lighting_profile.ambient_light_intensity = 0.4
-    lighting_profile.key_light_color = [1., 1., 1., 0]
-    lighting_profile.fill_light_color = [1., 1., 1., 0]
-    lighting_profile.ambient_light_color = [1., 1., 1., 0]
+    lighting_profile.key_light_color = [1., 1., 1.]
+    lighting_profile.fill_light_color = [1., 1., 1.]
+    lighting_profile.ambient_light_color = [1., 1., 1.]
     lighting_profile.depth_cue_color = [1., 1., 1.]
     
     run(session, "graphics silhouettes true", log=False)
@@ -60,10 +60,13 @@ def seqcrow_bse(session, models=None, atoms=None):
             atom.color = color
             atom.display = True
 
-            if ele in RADII:
+            try:
                 #AaronTools has bonding radii, maybe I should use vdw?
                 #check to see how necessary this is
                 atom.radius = RADII[ele]
+            except KeyError:
+                if ele == "LP":
+                    atom.radius = 0.5
 
             if ele != 'H':
                 atom.draw_mode = Atom.BALL_STYLE
@@ -124,10 +127,13 @@ def seqcrow_bse_cartoon(session, models=None, atoms=None):
             atom.color = color
             atom.display = True
 
-            if ele in RADII:
+            try:
                 #AaronTools has bonding radii, maybe I should use vdw?
                 #check to see how necessary this is
                 atom.radius = RADII[ele]
+            except KeyError:
+                if ele == "LP":
+                    atom.radius = 0.5
 
             if ele != 'H':
                 atom.draw_mode = Atom.BALL_STYLE
@@ -195,9 +201,9 @@ def apply_seqcrow_s_lighting(session):
     lighting_profile.multishadow_depth_bias = 0.01
     lighting_profile.fill_light_intensity = 0.5
     lighting_profile.ambient_light_intensity = 0.4
-    lighting_profile.key_light_color = [1., 1., 1., 0]
-    lighting_profile.fill_light_color = [1., 1., 1., 0]
-    lighting_profile.ambient_light_color = [1., 1., 1., 0]
+    lighting_profile.key_light_color = [1., 1., 1.]
+    lighting_profile.fill_light_color = [1., 1., 1.]
+    lighting_profile.ambient_light_color = [1., 1., 1.]
     lighting_profile.depth_cue_color = [1., 1., 1.]
    
     run(session, "graphics silhouettes true", log=False)
@@ -250,9 +256,14 @@ def seqcrow_s(session, models=None, atoms=None):
             
             if not atom.neighbors:
                 atom.draw_mode = Atom.BALL_STYLE
-                if ele in RADII:
+                try:
+                    #AaronTools has bonding radii, maybe I should use vdw?
+                    #check to see how necessary this is
                     atom.radius = RADII[ele]
-            
+                except KeyError:
+                    if ele == "LP":
+                        atom.radius = 0.5
+
             else:
                 atom.draw_mode = Atom.STICK_STYLE
             
@@ -363,9 +374,14 @@ def seqcrow_s_cartoon(session, models=None, atoms=None):
             
             if not atom.neighbors:
                 atom.draw_mode = Atom.BALL_STYLE
-                if ele in RADII:
+                try:
+                    #AaronTools has bonding radii, maybe I should use vdw?
+                    #check to see how necessary this is
                     atom.radius = RADII[ele]
-            
+                except KeyError:
+                    if ele == "LP":
+                        atom.radius = 0.5
+
             else:
                 atom.draw_mode = Atom.STICK_STYLE
             

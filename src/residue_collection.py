@@ -27,6 +27,11 @@ class _FauxAtomSelection:
 
 
 class Atom(AaronToolsAtom):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._atomspec = None
+        self._chix_atom = None
+
     def __repr__(self):
         s = ""
         s += "{:>3s} ".format(self.element)
@@ -38,10 +43,24 @@ class Atom(AaronToolsAtom):
         return s
 
     @property
+    def chix_atom(self):
+        return self._chix_atom
+
+    @chix_atom.setter
+    def chix_atom(self, atom):
+        self._chix_atom = atom
+        try:
+            self._atomspec = atom.atomspec
+        except AttributeError:
+            pass
+
+    @property
     def atomspec(self):
-        if not self.chix_atom:
-            return None
-        return self.chix_atom.atomspec
+        return self._atomspec
+
+    @atomspec.setter
+    def atomspec(self, spec):
+        self._atomspec = spec
 
     def copy(self):
         rv = Atom()

@@ -73,7 +73,12 @@ class EnergyPlot(ToolInstance):
         self.xlabel = xlabel
         self.ylabel = ylabel
 
+        self.opened = False
+
         self._build_ui()
+        if not self.opened:
+            self.delete()
+            return
 
         self.press = None
         self.drag_prev = None
@@ -84,6 +89,7 @@ class EnergyPlot(ToolInstance):
         
         global_triggers = get_triggers()
         self._changes = global_triggers.add_handler("changes", self.check_changes)
+        
         self.circle_current_cs()
 
     def _build_ui(self):
@@ -270,9 +276,12 @@ class EnergyPlot(ToolInstance):
                 break
         
         cs_id = self.structure.active_coordset_id
+        if cs_id not in self.xs:
+            self.canvas.draw()
+            return
         ax.plot(
             cs_id,
-            self.ys[cs_id - 1],
+            self.ys[self.xs.index(cs_id)],
             marker='o',
             markersize=5,
             color='k',
@@ -476,9 +485,10 @@ class EnergyPlot(ToolInstance):
             self.delete()
     
     def delete(self):
-        self.session.triggers.remove_handler(self._model_closed)
-        global_triggers = get_triggers()
-        global_triggers.remove_handler(self._changes)
+        if self.opened:
+            self.session.triggers.remove_handler(self._model_closed)
+            global_triggers = get_triggers()
+            global_triggers.remove_handler(self._changes)
 
         super().delete()    
     

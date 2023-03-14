@@ -1,11 +1,27 @@
+import concurrent.futures
+# from cProfile import Profile
+import os
+
 import numpy as np
 
-from chimerax.core.commands import BoolArg, StringArg, CmdDesc, EnumOf, FloatArg, IntArg, ModelsArg, Or, TupleOf, run
-from chimerax.atomic import AtomsArg, AtomicStructure
+from chimerax.core.commands import (
+    BoolArg,
+    StringArg,
+    CmdDesc,
+    EnumOf,
+    FloatArg,
+    IntArg,
+    ModelsArg,
+    Or,
+    TupleOf,
+    run,
+)
+from chimerax.atomic import AtomsArg, AtomicStructure, Atoms, PseudobondGroup
 from chimerax.label.label3d import ObjectLabel, ObjectLabels
 from chimerax.core.models import Surface
 
 from AaronTools.const import VDW_RADII, BONDI_RADII
+from AaronTools.finders import AnyTransitionMetal
 from AaronTools.utils.utils import rotation_matrix, fibonacci_sphere, perp_vector
 
 from SEQCROW.residue_collection import ResidueCollection
@@ -13,9 +29,6 @@ from SEQCROW.finders import AtomSpec
 
 from scipy.spatial import distance_matrix, ConvexHull
 
-
-# TODO: improve %Vbur visuals by adding vertices on planes
-# parallel to intersections of vdw radii
 
 class VoidLabel(ObjectLabel):
     def __init__(self, text, location, view):
@@ -72,6 +85,155 @@ vbur_description = CmdDesc(
     url="https://github.com/QChASM/SEQCROW/wiki/Commands#percentVolumeBuried",
 )
 
+
+def _vbur(
+    session,
+    model,
+    rescol,
+    ligand_atoms,
+    targets,
+    center,
+    key_atoms,
+    radius=3.5,
+    radii="UMN",
+    scale=1.17, 
+    method="Lebedev", 
+    radialPoints=20, 
+    angularPoints=1454, 
+    minimumIterations=25,
+    displaySphere=None,
+    pointSpacing=0.1,
+    intersectionScale=6,
+    palette="rainbow",
+    steric_map=False,
+    useScene=False,
+    num_pts=100,
+    shape="circle",
+    labels="none",
+    reportComponent="total",
+    determine_key=False,
+):
+    # profile = Profile()
+    # profile.enable()
+    
+    out = dict()
+    out["model"] = model
+    out["at_center"] = center
+    out["center"] = center
+    out["rescol"] = rescol
+    out["targets"] = targets
+
+
+    basis = None
+    if useScene:
+        oop_vector = session.view.camera.get_position().axes()[2]
+        ip_vector = session.view.camera.get_position().axes()[1]
+        x_vec = session.view.camera.get_position().axes()[0]
+        basis = np.array([x_vec, ip_vector, oop_vector]).T
+
+    center_xyz = center
+    if not isinstance(center_xyz, np.ndarray):
+        center_xyz = np.mean(center.coords, axis=0)
+        out["at_center"] = [AtomSpec(c.atomspec) for c in center]
+    
+    if labels != "none" or reportComponent != "total" or determine_key:
+        if not key_atoms:
+            key_atoms = set()
+            for c in center:
+                key_atoms.update(c.neighbors)
+            
+        if not key_atoms:
+            for m in model.child_models():
+                if isinstance(m, PseudobondGroup) and m.name == model.PBG_METAL_COORDINATION:
+                    for pb in m.pseudobonds:
+                        for c in center:
+                            if c in pb.atoms:
+                                other_atom = pb.other_atom(c)
+                                if other_atom not in center:
+                                    key_atoms.add(other_atom)
+        
+        key_atoms = Atoms(key_atoms).intersect(Atoms(ligand_atoms))
+        
+        oop_vector = np.zeros(3)
+        for atom in key_atoms:
+            oop_vector += center_xyz - atom.coord
+        
+        if len(key_atoms) == 1:
+            ip_vector = perp_vector(oop_vector)
+            x_vec = np.cross(ip_vector, oop_vector)
+        else:
+            coords = [atom.coord for atom in key_atoms]
+            coords.append(center_xyz)
+            coords = np.array(coords)
+            ip_vector = perp_vector(coords)
+            x_vec = np.cross(ip_vector, oop_vector)
+            x_vec /= np.linalg.norm(x_vec)
+            ip_vector = -np.cross(x_vec, oop_vector)
+        ip_vector /= np.linalg.norm(ip_vector)
+
+        basis = np.array([x_vec, ip_vector, oop_vector]).T
+
+    out["center_xyz"] = center_xyz
+
+    if steric_map:
+        steric_info = rescol.steric_map(
+            center=center_xyz,
+            key_atoms=[AtomSpec(a.atomspec) for a in key_atoms],
+            radii=radii,
+            oop_vector=oop_vector,
+            ip_vector=ip_vector,
+            radius=radius,
+            return_basis=basis is None,
+            num_pts=num_pts,
+            shape=shape,
+            targets=targets,
+        )
+        out["steric_map"] = steric_info
+        if basis is None:
+            basis = steric_info.pop(-1)
+    
+    out["basis"] = basis
+
+    vbur = rescol.percent_buried_volume(
+        targets=targets,
+        basis=basis,
+        center=center_xyz,
+        radius=radius,
+        radii=radii,
+        scale=scale,
+        method=method,
+        rpoints=int(radialPoints),
+        apoints=int(angularPoints),
+        min_iter=minimumIterations,
+    )
+    
+    out["vbur"] = vbur
+    
+    if displaySphere:
+        mdls = vbur_vis(
+            session,
+            rescol,
+            targets,
+            radii,
+            scale,
+            radius, 
+            center_xyz, 
+            pointSpacing, 
+            intersectionScale,
+            displaySphere,
+            vbur,
+            labels,
+            basis=basis,
+        )
+        
+        out["vis"] = mdls
+    
+    # profile.disable()
+    # profile.print_stats()
+    
+    return out
+
+
 def percent_vbur(
         session, 
         selection, 
@@ -99,316 +261,188 @@ def percent_vbur(
         difference=False,
 ):
     
+    # profile = Profile()
+    # profile.enable()
+    
     out = []
+    args = []
+    kwargs = []
     rescols = []
     
-    models = {
-        model:[atom for atom in model.atoms if onlyAtoms is not None and atom in onlyAtoms]
-        for model in selection if isinstance(model, AtomicStructure)
-    }
+    if center is not None and not isinstance(center, tuple):
+        center = Atoms(center)
+    
+    if onlyAtoms:
+        onlyAtoms = Atoms(onlyAtoms)
+        models = {
+            model: Atoms(model.atoms).intersect(onlyAtoms)
+            for model in selection if isinstance(model, AtomicStructure)
+        }
+    else:
+        models = {
+            model: model.atoms for model in selection if isinstance(model, AtomicStructure)
+        }
     
     s = "<pre>model\tcenter\t%Vbur\n"
     
     for model in models:
-        if len(models[model]) == 0:
-            targets = None
-        else:
-            targets = [AtomSpec(atom.atomspec) for atom in models[model]]
-        
+        rescol = ResidueCollection(model)
+        ligand_atoms = models[model]
+        if len(ligand_atoms) == 0:
+            ligand_atoms = None
+        mdl_center = None
         if center is not None:
             if isinstance(center, tuple):
                 mdl_center = np.array(center)
-            else:
-                mdl_center = [AtomSpec(atom.atomspec) for atom in model.atoms if atom in center]
+            elif isinstance(center, Atoms):
+                mdl_center = model.atoms.intersect(center)
 
-        else:
-            mdl_center = []
-        
-        rescol = ResidueCollection(model)
-        rescols.append(rescol)
-        
-        if useScene:
-            oop_vector = session.view.camera.get_position().axes()[2]
-            ip_vector = session.view.camera.get_position().axes()[1]
-            x_vec = session.view.camera.get_position().axes()[0]
-            basis = np.array([x_vec, ip_vector, oop_vector]).T
-        
-        else:
-            oop_vector = None
-            ip_vector = None
-            basis = None
+        targets = rescol.find([AtomSpec(a.atomspec) for a in ligand_atoms])
 
-        
-        if len(mdl_center) == 0:
-            rescol.detect_components()
-            mdl_center = rescol.center
-        elif not isinstance(center, np.ndarray):
-            mdl_center = rescol.find([AtomSpec(c.atomspec) for c in center])
+        if mdl_center is None:
+            mdl_center = Atoms([a for a in model.atoms if a.is_metal])
 
         key_atoms = None
 
         if not useCentroid and not isinstance(center, np.ndarray):
             for c in mdl_center:
-                if targets is not None:
-                    key_atoms = []
-                    targets = rescol.find(targets)
-                    for atom in targets:
-                        if c in atom.connected or atom in c.connected:
-                            key_atoms.append(atom)
-                else:
-                    key_atoms = None
+                args.append([
+                    session,
+                    model,
+                    rescol,
+                    ligand_atoms,
+                    targets,
+                    Atoms([c]),
+                    key_atoms,
+                ])
                 
-                if (labels != "none" or reportComponent != "total" or difference) and not useScene:
-                    if not key_atoms:
-                        session.logger.warning(
-                            "bonds between center and coordinating atoms is required to"
-                            " properly orient octants"
-                        )
-                    oop_vector = np.zeros(3)
-                    for atom in key_atoms:
-                        oop_vector += c.coords - atom.coords
-                    
-                    if len(key_atoms) == 1:
-                        ip_vector = perp_vector(oop_vector)
-                        x_vec = np.cross(ip_vector, oop_vector)
-                    else:
-                        coords = [atom.coords for atom in key_atoms]
-                        coords.append(c.coords)
-                        coords = np.array(coords)
-                        ip_vector = perp_vector(coords)
-                        x_vec = np.cross(ip_vector, oop_vector)
-                        x_vec /= np.linalg.norm(x_vec)
-                        ip_vector = -np.cross(x_vec, oop_vector)
-                    ip_vector /= np.linalg.norm(ip_vector)
-                    
-                    basis = np.array([x_vec, ip_vector, oop_vector]).T
-                
-                if steric_map:
-                    x, y, z, min_alt, max_alt, basis, _ = rescol.steric_map(
-                        center=c,
-                        key_atoms=key_atoms,
-                        radii=radii,
-                        oop_vector=oop_vector,
-                        ip_vector=ip_vector,
-                        radius=radius,
-                        return_basis=True,
-                        num_pts=num_pts,
-                        shape=shape,
-                        targets=targets,
-                    )
+                kwargs.append({
+                    "radii": radii,
+                    "radius": radius,
+                    "scale": scale,
+                    "method": method,
+                    "radialPoints": radialPoints,
+                    "angularPoints": angularPoints,
+                    "minimumIterations": minimumIterations,
+                    "displaySphere": displaySphere,
+                    "pointSpacing": pointSpacing,
+                    "intersectionScale": intersectionScale,
+                    "palette": palette,
+                    "steric_map": steric_map,
+                    "useScene": useScene,
+                    "num_pts": num_pts,
+                    "shape": shape,
+                    "labels": labels,
+                    "reportComponent": reportComponent,
+                    "determine_key": difference or steric_map,
+                })
 
-                vbur = rescol.percent_buried_volume(
-                    targets=targets,
-                    basis=basis,
-                    center=c,
-                    radius=radius,
-                    radii=radii,
-                    scale=scale,
-                    method=method,
-                    rpoints=int(radialPoints),
-                    apoints=int(angularPoints),
-                    min_iter=minimumIterations,
-                )
-                
-                if steric_map:
-                    out.append((model, c, targets, basis, vbur, (x, y, z, min_alt, max_alt)))
-                else:
-                    out.append((model, c, targets, basis, vbur))
-                s += "%s\t%s\t" % (model.name, c.atomspec)
-                if hasattr(vbur, "__iter__"):
-                    if reportComponent == "octants":
-                        s += "%s\n" % ",".join(["%.1f%%" % v for v in vbur])
-                    elif reportComponent == "quadrants":
-                        s += "%s\n" % ",".join([
-                            "%.1f%%" % v for v in[
-                                vbur[0] + vbur[7],
-                                vbur[1] + vbur[6],
-                                vbur[2] + vbur[5],
-                                vbur[3] + vbur[4],
-                            ]
-                        ])
-                    else:
-                        s += "%.1f%%\n" % sum(vbur)
-                else:
-                    s += "%.1f%%\n" % vbur
-        
-                if displaySphere is not None and not difference:
-                    mdl = vbur_vis(
-                        session,
-                        rescol,
-                        targets,
-                        radii,
-                        scale,
-                        radius,
-                        c,
-                        pointSpacing,
-                        intersectionScale,
-                        displaySphere,
-                        vbur,
-                        labels,
-                        basis=basis,
-                    )
-                    model.add(mdl)
-                    atomspec = mdl[0].atomspec
-                    center_coords = rescol.COM(c)
-                    args = [
-                        "color", "radial", atomspec,
-                        "center", ",".join(["%.4f" % x for x in center_coords]),
-                        "palette", palette,
-                        "range", "0,%.2f" % radius,
-                        "coordinateSystem", model.atomspec,
-                        ";",
-                        "transparency", atomspec, "30", 
-                    ]
-                    
-                    run(session, " ".join(args))
         else:
-            if targets is not None:
-                key_atoms = []
-                targets = rescol.find(targets)
-                for atom in targets:
-                    if any(c in atom.connected for c in mdl_center):
-                        key_atoms.append(atom)
-            else:
-                key_atoms = None
-
-            if (labels != "none" or reportComponent != "total" or difference) and not useScene:
-                if not key_atoms:
-                    session.logger.warning(
-                        "bonds between center and coordinating atoms is required to"
-                        " properly orient octants"
-                    )
-                oop_vector = np.zeros(3)
-                for atom in key_atoms:
-                    if isinstance(mdl_center, np.ndarray):
-                        oop_vector += mdl_center - atom.coords
-                    else:
-                        for c in mdl_center:
-                            oop_vector += c.coords - atom.coords
-                
-                if len(key_atoms) == 1:
-                    ip_vector = perp_vector(oop_vector)
-                    x_vec = np.cross(ip_vector, oop_vector)
-                else:
-                    coords = [atom.coords for atom in key_atoms]
-                    if isinstance(mdl_center, np.ndarray):
-                        coords.append(mdl_center)
-                    else:
-                        coords.extend([c.coords for c in mdl_center])
-                    coords = np.array(coords)
-                    ip_vector = perp_vector(coords)
-                    x_vec = np.cross(ip_vector, oop_vector)
-                    x_vec /= np.linalg.norm(x_vec)
-                    ip_vector = -np.cross(x_vec, oop_vector)
-                ip_vector /= np.linalg.norm(ip_vector)
-
-                basis = np.array([x_vec, ip_vector, oop_vector]).T
-
-            if steric_map:
-                x, y, z, min_alt, max_alt, basis, _ = rescol.steric_map(
-                    center=mdl_center,
-                    key_atoms=key_atoms,
-                    radius=radius,
-                    radii=radii,
-                    oop_vector=oop_vector,
-                    ip_vector=ip_vector,
-                    return_basis=True,
-                    num_pts=num_pts,
-                    shape=shape,
-                    targets=targets,
-                )
-
-            vbur = rescol.percent_buried_volume(
-                targets=targets,
-                basis=basis,
-                center=mdl_center,
-                radius=radius,
-                radii=radii,
-                scale=scale,
-                method=method,
-                rpoints=int(radialPoints),
-                apoints=int(angularPoints),
-                min_iter=minimumIterations,
-            )
+            args.append([
+                session,
+                model,
+                rescol,
+                ligand_atoms,
+                targets,
+                mdl_center,
+                key_atoms,
+            ])
             
-            if steric_map:
-                if not isinstance(mdl_center, np.ndarray):
-                    out.append((model, mdl_center, targets, basis, vbur, (x, y, z, min_alt, max_alt)))
-                else:
-                    out.append((model, mdl_center, targets, basis, vbur, (x, y, z, min_alt, max_alt)))
-            else:
-                if not isinstance(mdl_center, np.ndarray):
-                    s += "%s\t%s\t" % (model.name, ", ".join([c.atomspec for c in mdl_center]))
-                    out.append((model, mdl_center, targets, basis, vbur))
-                else:
-                    s += "%s\t%s\t" % (model.name, ",".join(["%.3f" % c for c in mdl_center]))
-                    out.append((model, mdl_center, targets, basis, vbur))
-                
-            if hasattr(vbur, "__iter__"):
-                if reportComponent == "octants":
-                    s += "%s\n" % ",".join(["%.1f%%" % v for v in vbur])
-                elif reportComponent == "quadrants":
-                    s += "%s\n" % ",".join([
-                        "%.1f%%" % v for v in[
-                            vbur[0] + vbur[7],
-                            vbur[1] + vbur[6],
-                            vbur[2] + vbur[5],
-                            vbur[3] + vbur[4],
-                        ]
-                    ])
-                else:
-                    s += "%.1f%%\n" % sum(vbur)
-            else:
-                s += "%.1f%%\n" % vbur
+            kwargs.append({
+                "radii": radii,
+                "radius": radius,
+                "scale": scale,
+                "method": method,
+                "radialPoints": radialPoints,
+                "angularPoints": angularPoints,
+                "minimumIterations": minimumIterations,
+                "displaySphere": displaySphere,
+                "pointSpacing": pointSpacing,
+                "intersectionScale": intersectionScale,
+                "palette": palette,
+                "steric_map": steric_map,
+                "useScene": useScene,
+                "num_pts": num_pts,
+                "shape": shape,
+                "labels": labels,
+                "reportComponent": reportComponent,
+            })
 
-            if displaySphere is not None and not difference:
-                mdl = vbur_vis(
-                        session,
-                        rescol,
-                        targets,
-                        radii,
-                        scale,
-                        radius,
-                        mdl_center,
-                        pointSpacing,
-                        intersectionScale,
-                        displaySphere,
-                        vbur,
-                        labels,
-                        basis=basis,
-                )
-                model.add(mdl)
-                atomspec = mdl[0].atomspec
-                if not isinstance(mdl_center, np.ndarray):
-                    center_coords = rescol.COM(mdl_center)
-                else:
-                    center_coords = mdl_center
-                #XXX: the center will be wrong if the models are tiled
-                args = [
-                    "color", "radial", atomspec,
-                    "center", ",".join(["%.4f" % x for x in center_coords]),
-                    "palette", palette,
-                    "range", "0,%.2f" % radius,
-                    "coordinateSystem", model.atomspec,
-                    ";",
-                    "transparency", atomspec, "30", 
-                ]
-                
-                run(session, " ".join(args))
-    
-    
+    # results = [_vbur(*arg, **kwarg) for arg, kwarg in zip(args, kwargs)]
+
+    n_threads = max(1, int(os.cpu_count() - 2))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=n_threads) as executor:
+        data = [
+            executor.submit(_vbur, *arg, **kwarg)
+            for arg, kwarg in zip(args, kwargs)
+        ]
+        results = [d.result() for d in data]
+
+    for result in results:
+        model = result["model"]
+        center = result["center"]
+        if isinstance(center, np.ndarray):
+            s += "%s\t(%.3f,%.3f,%.3f)\t" % (model.name, *center)
+        else:
+            s += "%s\t%s\t" % (model.name, ",".join([a.atomspec for a in center]))
+        
+        vbur = result["vbur"]
+        if isinstance(vbur, float):
+            s += "%.1f\n" % vbur
+        elif reportComponent == "total":
+            s += "%.1f\n" % sum(vbur)
+        elif reportComponent == "octants":
+            s += ",".join("%.1f" % v for v in vbur)
+            s += "\n"
+        elif reportComponent == "quadrants":
+            s += ",".join("%.1f" % v for v in [
+                vbur[0] + vbur[7],
+                vbur[1] + vbur[6],
+                vbur[2] + vbur[5],
+                vbur[3] + vbur[4],
+            ])
+            s += "\n"
+        
+        if displaySphere is not None:
+            mdls = result["vis"]
+            model.add(mdls)
+            args = [
+                "color", "radial", mdls[0].atomspec,
+                "center", ",".join("%.4f" % x for x in result["center_xyz"]),
+                "palette", palette,
+                "range", "0,%.2f" % radius,
+                "coordinateSystem", model.atomspec,
+                ";",
+                "transparency", mdls[0].atomspec, "30",
+            ]
+            run(session, " ".join(args))
+
+    s += "</pre>"
+    session.logger.info(s, is_html=True)
+
+    # profile.disable()
+    # profile.print_stats()
+
     if difference and displaySphere:
-        if len(out) < 2:
+        if len(results) < 2:
             session.logger.warning(
                 "difference of %s volume was requested, but only one cutout was drawn; calculate "
                 "the buried volume for multiple centers to visualize the differences between them"
             )
-        for i, data1 in enumerate(out):
-            rescol1 = rescols[i]
-            model1, center1, targets1, basis1, vbur1 = data1[:5]
-            for j, data2 in enumerate(out[i+1:]):
-                rescol2 = rescols[i + j + 1]
-                model2, center2, targets2, basis2, vbur2 = data2[:5]
+        for i, data1 in enumerate(results):
+            model1 = data1["model"]
+            center1 = data1["at_center"]
+            targets1 = data1["targets"]
+            basis1 = data1["basis"]
+            vbur1 = data1["vbur"]
+            rescol1 = data1["rescol"]
+            for j, data2 in enumerate(results[i+1:]):
+                model2 = data2["model"]
+                center2 = data2["at_center"]
+                targets2 = data2["targets"]
+                basis2 = data2["basis"]
+                vbur2 = data2["vbur"]
+                rescol2 = data2["rescol"]
                 mdl = vbur_difference_vis(
                     session,
                     rescol1, rescol2,
@@ -437,9 +471,8 @@ def percent_vbur(
                     "transparency", mdl[1].atomspec, "50", 
                 ]
                 run(session, " ".join(args))
-    
-    s = s.strip()
-    s += "</pre>"
+
+    return results
     
     if not return_values:
         session.logger.info(s, is_html=True)
@@ -468,7 +501,7 @@ def vbur_vis(
     # profile.enable()
 
     # number of points is based on surface area
-    n_grid = int(4 * np.pi * radius**2 / point_spacing)
+    n_grid = int(4 * np.pi * radius ** 2 / point_spacing)
     if volume_type == "buried":
         model = Surface("%%Vbur for %s" % geom.name, session)
     else:
@@ -552,7 +585,7 @@ def vbur_vis(
             r0 = np.cross(r_t, v_n)
             r0 *= h / np.linalg.norm(r0)
             
-            rot_angle = 2*np.pi / n_added
+            rot_angle = 2 * np.pi / n_added
             R = rotation_matrix(rot_angle, v_n)
             prev_r = r0
             prev_r_list = []
@@ -912,7 +945,6 @@ def vbur_vis(
     return [model]
     
 
-
 def vbur_difference_vis(
         session,
         geom1, geom2,
@@ -1048,11 +1080,7 @@ def vbur_difference_vis(
     coords1 = geom1.coordinates(atoms_within_radius1)
     coords2 = geom2.coordinates(atoms_within_radius2)
     coords2 -= center_coords2
-    h = np.dot(basis2.T, basis1)
-    u, s, v = np.linalg.svd(h)
-    R = np.matmul(v, u.T)
-    if np.sign(np.linalg.det(R)) < 0:
-        R[:, 2] *= -1
+    R = np.matmul(basis1, np.linalg.inv(basis2))
     coords2 = np.matmul(coords2, R.T)
     coords2 += center_coords1
 

@@ -376,6 +376,10 @@ class _SEQCROW_API(BundleAPI):
         elif ti.name == "Conformer Search":
             from .tools import ConformerTool
             return ConformerTool(session, ti.name)
+        
+        elif ti.name == "Z-Matrix Builder":
+            from .tools import ZMatrixBuilder
+            return ZMatrixBuilder(session, ti.name)
 
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)
@@ -476,7 +480,7 @@ class _SEQCROW_API(BundleAPI):
 
                 return Info()
 
-            elif name == "XYZ file":
+            elif name == "XYZ file" or name == "XYZ trajectory file":
                 class Info(OpenerInfo):
                     def open(self, session, data, file_name, **kw):
                         return open_xyz(
@@ -915,6 +919,7 @@ class _SEQCROW_API(BundleAPI):
         structure_menu.addAction(QAction("Chiral centers", mw))
         structure_menu.addAction(QAction("Spiro centers", mw))
         structure_menu.addAction(QAction("Bridgehead", mw))
+        structure_menu.addAction(QAction("Rings", mw))
         
         vsepr_menu = add_submenu(['Che&mistry'], 'Shape')
         for vsepr in [
@@ -1037,10 +1042,16 @@ class _SEQCROW_API(BundleAPI):
                     model.session.seqcrow_settings.settings.ORBIT_OPEN != "do nothing"
                 ):
                     run(model.session, "ui tool show \"Orbital Viewer\"")
+                    model.session.logger.info(
+                        "automaticly opening the orbital tool can be disabled in the settings"
+                    )
                 if (
                     "frequency" in fr.other and
                     model.session.seqcrow_settings.settings.FREQ_OPEN != "do nothing"
                 ):
                     run(model.session, "ui tool show \"Visualize Normal Modes\"")
+                    model.session.logger.info(
+                        "automaticly opening the vibrations tool can be disabled in the settings"
+                    )
 
 bundle_api = _SEQCROW_API()
