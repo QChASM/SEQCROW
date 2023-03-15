@@ -1,6 +1,4 @@
-<p align="center>
-![SEQCROW](SEQCROW.png)
-</p>
+<img src="https://github.com/QChASM/SEQCROW/blob/master/SEQCROW.png?raw=true">
 
 <a href="https://pubmed.ncbi.nlm.nih.gov/34109660/"><img src="https://img.shields.io/badge/PMID-34109660-blue?style=flat-square&logo=appveyor"></a>
 <a href="https://doi.org/10.1002/jcc.26700"><img src="https://img.shields.io/badge/DOI-10.1002/jcc.26700-blue?style=flat-square&logo=appveyor"></a>
