@@ -15,6 +15,8 @@ from Qt.QtWidgets import (
     QTabWidget, 
     QTableWidget,
     QTableWidgetItem,
+    QLabel,
+    QPushButton,
 )
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
@@ -55,7 +57,15 @@ class EnergyPlot(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False         
     
-    def __init__(self, session, model, filereader, xlabel="iteration", ylabel=r"energy ($E_h$)"):
+    def __init__(
+        self,
+        session,
+        model,
+        filereader,
+        xlabel="iteration",
+        ylabel=r"energy ($E_h$)",
+        y_data=None,
+    ):
         super().__init__(session, model.name)
         
         from chimerax.ui import MainToolWindow
@@ -75,7 +85,7 @@ class EnergyPlot(ToolInstance):
 
         self.opened = False
 
-        self._build_ui()
+        self._build_ui(y_data)
         if not self.opened:
             self.delete()
             return
@@ -92,7 +102,7 @@ class EnergyPlot(ToolInstance):
         
         self.circle_current_cs()
 
-    def _build_ui(self):
+    def _build_ui(self, y_data):
         layout = QGridLayout()
         
         tabs = QTabWidget()
@@ -112,40 +122,46 @@ class EnergyPlot(ToolInstance):
             self.opened = False
             return
 
-        self.data = OrderedDict()
-        info = []
-        for i, (step, cs_id) in enumerate(zip(fr.all_geom, self.structure.coordset_ids)):
-            info = [item for item in step if isinstance(item, dict) and "energy" in item]
-            if len(info) < 1:
-                continue
-
-            else:
-                info = info[0]
-                self.data[cs_id] = {"energy": {"value": info["energy"]}}
-                if "gradient" in info:
-                    self.data[cs_id].update(info["gradient"])
-        
-        if len(self.data) < len(self.structure.coordset_ids):
-            if "energy" in info and "energy" in fr and info["energy"] != fr["energy"]:
-                self.data[self.structure.coordset_ids[-1]] = {"energy": {"value": fr["energy"]}}
+        if y_data is None:
+            self.data = OrderedDict()
+            info = []
+            for i, (step, cs_id) in enumerate(zip(fr.all_geom, self.structure.coordset_ids)):
+                info = [item for item in step if isinstance(item, dict) and "energy" in item]
+                if len(info) < 1:
+                    continue
+    
+                else:
+                    info = info[0]
+                    self.data[cs_id] = {"energy": {"value": info["energy"]}}
+                    if "gradient" in info:
+                        self.data[cs_id].update(info["gradient"])
             
-                if (
-                    "gradient" in info and
-                    "gradient" in fr and
-                    info["gradient"] != fr["gradient"]
-                ) or (
-                    "gradient" in fr and
-                    not "gradient" in info
-                ):
-                    self.data[self.structure.coordset_ids[-1]].update(fr["gradient"])
+            if len(self.data) < len(self.structure.coordset_ids):
+                if "energy" in info and "energy" in fr and info["energy"] != fr["energy"]:
+                    self.data[self.structure.coordset_ids[-1]] = {"energy": {"value": fr["energy"]}}
+                
+                    if (
+                        "gradient" in info and
+                        "gradient" in fr and
+                        info["gradient"] != fr["gradient"]
+                    ) or (
+                        "gradient" in fr and
+                        not "gradient" in info
+                    ):
+                        self.data[self.structure.coordset_ids[-1]].update(fr["gradient"])
+    
+            if len(self.data) <= 1:
+                self.opened = False
+                # self.session.logger.error("not enough iterations to plot - %i found" % len(data))
+                return
+    
+            self.xs = [x for x, y in self.data.items() if "energy" in y]
+            self.ys = [y["energy"]["value"] for y in self.data.values()]
 
-        if len(self.data) <= 1:
-            self.opened = False
-            # self.session.logger.error("not enough iterations to plot - %i found" % len(data))
-            return
-
-        self.xs = [x for x, y in self.data.items() if "energy" in y]
-        self.ys = [y["energy"]["value"] for y in self.data.values()]
+        else:
+            self.ys = y_data
+            self.xs = list(range(1, len(y_data) + 1))
+            self.data = {i + 1: {} for i in range(0, len(y_data))}
 
         se = np.ptp(self.ys)
     
@@ -181,15 +197,30 @@ class EnergyPlot(ToolInstance):
         self.canvas.draw()
         self.canvas.setMinimumWidth(400)
         self.canvas.setMinimumHeight(200)
-        nrg_plot_layout.addWidget(self.canvas)
+        nrg_plot_layout.addWidget(self.canvas, 0, 0, 1, 3)
         
         toolbar_widget = QWidget()
         toolbar = NavigationToolbar(self.canvas, toolbar_widget)
 
         toolbar.setMaximumHeight(32)
         self.toolbar = toolbar
-        nrg_plot_layout.addWidget(toolbar)
+        nrg_plot_layout.addWidget(toolbar, 1, 0, 1, 3)
         
+        self.energy_widgets = []
+        if y_data is not None:
+            nrg_type_widget = QLabel("values are energies:")
+            self.energy_widgets.append(nrg_type_widget)
+            nrg_plot_layout.addWidget(nrg_type_widget, 2, 0, 1, 1)
+            
+            hartree_button = QPushButton("Hartrees")
+            self.energy_widgets.append(hartree_button)
+            hartree_button.clicked.connect(self.switch_to_hartrees)
+            nrg_plot_layout.addWidget(hartree_button, 2, 1, 1, 1)
+
+            kcal_button = QPushButton("kcal/mol")
+            self.energy_widgets.append(kcal_button)
+            kcal_button.clicked.connect(self.switch_to_kcal)
+            nrg_plot_layout.addWidget(kcal_button, 2, 2, 1, 1)
         
         conv_widget = QWidget()
         conv_layout = QGridLayout(conv_widget)
@@ -262,6 +293,22 @@ class EnergyPlot(ToolInstance):
         conv_table.scrollToBottom()
 
         self.opened = True
+
+    def switch_to_hartrees(self):
+        self.ylabel = r"energy ($E_h$)"
+        for widget in self.energy_widgets:
+            widget.deleteLater()
+        ax = self.figure.gca()
+        ax.set_ylabel(self.ylabel)
+        self.canvas.draw()
+
+    def switch_to_kcal(self):
+        self.ylabel = "energy (kcal/mol)"
+        for widget in self.energy_widgets:
+            widget.deleteLater()
+        ax = self.figure.gca()
+        ax.set_ylabel(self.ylabel)
+        self.canvas.draw()
 
     def check_changes(self, trigger_name=None, changes=None):
         if changes is not None:
@@ -387,15 +434,31 @@ class EnergyPlot(ToolInstance):
 
     def update_label(self, cs_id, ndx):
         self.annotation.xy = (cs_id, self.ys[ndx])
-        text = r"%s $E_h$" % repr(self.ys[ndx])
-        if self.ys[ndx] == max(self.ys):
-            text += " (maxima)" 
-        elif self.ys[ndx] == min(self.ys):
-            text += " (minima)"
-        text += "\n"
-        text += r"$\Delta E$ = %.1f kcal/mol" % (
-            UNIT.HART_TO_KCAL * (self.ys[ndx] - self.ys[0])
-        )
+        if self.ylabel == r"energy ($E_h$)":
+            text = r"%s $E_h$" % repr(self.ys[ndx])
+            if self.ys[ndx] == max(self.ys):
+                text += " (maxima)" 
+            elif self.ys[ndx] == min(self.ys):
+                text += " (minima)"
+            text += "\n"
+            text += r"$\Delta E$ = %.1f kcal/mol" % (
+                UNIT.HART_TO_KCAL * (self.ys[ndx] - self.ys[0])
+            )
+        
+        elif self.ylabel == "energy (kcal/mol)":
+            text = "%s kcal/mol" % repr(self.ys[ndx])
+            if self.ys[ndx] == max(self.ys):
+                text += " (maxima)" 
+            elif self.ys[ndx] == min(self.ys):
+                text += " (minima)"
+            text += "\n"
+            text += r"$\Delta E$ = %.1f kcal/mol" % (
+                (self.ys[ndx] - self.ys[0])
+            )
+        
+        else:
+            text = "%s\n" % repr(self.ys[ndx])
+            text += r"$\Delta$ = %f" % (self.ys[ndx] - self.ys[0])
         self.annotation.set_text(text)
     
     def update_hover(self, cs_id, ndx):  
