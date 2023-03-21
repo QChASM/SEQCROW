@@ -17,6 +17,7 @@ from Qt.QtWidgets import (
     QTableWidgetItem,
     QLabel,
     QPushButton,
+    QComboBox,
 )
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
@@ -67,6 +68,11 @@ class EnergyPlot(ToolInstance):
         y_data=None,
     ):
         super().__init__(session, model.name)
+        
+        self.major_unit = None
+        self.minor_unit = None
+        self.minor_conversion = 1
+        self.unit_type = "E"
         
         from chimerax.ui import MainToolWindow
         self.tool_window = MainToolWindow(self)    
@@ -123,6 +129,11 @@ class EnergyPlot(ToolInstance):
             return
 
         if y_data is None:
+            self.major_unit = "$E_h$"
+            self.minor_unit = "kcal/mol"
+            self.minor_conversion = UNIT.HART_TO_KCAL
+            self.unit_type = "E"
+            
             self.data = OrderedDict()
             info = []
             for i, (step, cs_id) in enumerate(zip(fr.all_geom, self.structure.coordset_ids)):
@@ -165,7 +176,7 @@ class EnergyPlot(ToolInstance):
 
         se = np.ptp(self.ys)
     
-        self.nrg_plot = ax.plot(self.xs, self.ys, marker='o', c='gray', markersize=3)
+        self.nrg_plot = ax.plot(self.xs, self.ys, marker='o', c="#898989", markersize=3)
         self.nrg_plot = self.nrg_plot[0]
         ax.set_xlabel(self.xlabel)
         ax.set_ylabel(self.ylabel)
@@ -208,20 +219,27 @@ class EnergyPlot(ToolInstance):
         
         self.energy_widgets = []
         if y_data is not None:
-            nrg_type_widget = QLabel("values are energies:")
+            nrg_type_widget = QLabel("unit type:")
             self.energy_widgets.append(nrg_type_widget)
             nrg_plot_layout.addWidget(nrg_type_widget, 2, 0, 1, 1)
             
-            hartree_button = QPushButton("Hartrees")
-            self.energy_widgets.append(hartree_button)
-            hartree_button.clicked.connect(self.switch_to_hartrees)
-            nrg_plot_layout.addWidget(hartree_button, 2, 1, 1, 1)
+            unit_types = QComboBox()
+            self.energy_widgets.append(unit_types)
+            unit_types.addItem("Energy (Hartree)")
+            unit_types.setItemData(0, ["$E_h$", "kcal/mol", UNIT.HART_TO_KCAL, "E"])
+            unit_types.addItem("Energy (kcal/mol)")
+            unit_types.setItemData(1, ["kcal/mol", None, 1, "E"])
+            unit_types.addItem("Energy (kJ/mol)")
+            unit_types.setItemData(2, ["kJ/mol", "kcal/mol", 1. / 4.184, "E"])
+            unit_types.addItem("RMSD (Å)")
+            unit_types.setItemData(3, ["Å", None, 1, "RMSD"])
+            nrg_plot_layout.addWidget(unit_types, 2, 1, 1, 1)
+            
+            set_units = QPushButton("set")
+            self.energy_widgets.append(set_units)
+            set_units.clicked.connect(self.switch_units)
+            nrg_plot_layout.addWidget(set_units, 2, 2, 1, 1)
 
-            kcal_button = QPushButton("kcal/mol")
-            self.energy_widgets.append(kcal_button)
-            kcal_button.clicked.connect(self.switch_to_kcal)
-            nrg_plot_layout.addWidget(kcal_button, 2, 2, 1, 1)
-        
         conv_widget = QWidget()
         conv_layout = QGridLayout(conv_widget)
         tabs.addTab(conv_widget, "convergence")
@@ -294,16 +312,13 @@ class EnergyPlot(ToolInstance):
 
         self.opened = True
 
-    def switch_to_hartrees(self):
-        self.ylabel = r"energy ($E_h$)"
-        for widget in self.energy_widgets:
-            widget.deleteLater()
-        ax = self.figure.gca()
-        ax.set_ylabel(self.ylabel)
-        self.canvas.draw()
-
-    def switch_to_kcal(self):
-        self.ylabel = "energy (kcal/mol)"
+    def switch_units(self):
+        major, minor, conversion, data_type = self.energy_widgets[1].currentData(role=Qt.UserRole)
+        self.major_unit = major
+        self.minor_unit = minor
+        self.minor_conversion = conversion
+        self.unit_type = data_type
+        self.ylabel = "%s (%s)" % (self.unit_type, self.major_unit)
         for widget in self.energy_widgets:
             widget.deleteLater()
         ax = self.figure.gca()
@@ -341,7 +356,7 @@ class EnergyPlot(ToolInstance):
     def save(self):
         filename, _ = QFileDialog.getSaveFileName(filter="CSV Files (*.csv)")
         if filename:
-            s = "iteration,energy\n"
+            s = "iteration,data\n"
             for cs_id, nrg in zip(self.xs, self.ys):
                 s += "%i,%f\n" % (cs_id, nrg)
                 
@@ -432,34 +447,35 @@ class EnergyPlot(ToolInstance):
             else:
                 self.structure.active_coordset_id = x
 
-    def update_label(self, cs_id, ndx):
+    def update_label(self, cs_id, ndx, align_left, align_bottom):
         self.annotation.xy = (cs_id, self.ys[ndx])
-        if self.ylabel == r"energy ($E_h$)":
-            text = r"%s $E_h$" % repr(self.ys[ndx])
+        if self.major_unit:
+            text = "%s=%s %s" % (self.unit_type, repr(self.ys[ndx]), self.major_unit)
             if self.ys[ndx] == max(self.ys):
                 text += " (maxima)" 
             elif self.ys[ndx] == min(self.ys):
                 text += " (minima)"
-            text += "\n"
-            text += r"$\Delta E$ = %.1f kcal/mol" % (
-                UNIT.HART_TO_KCAL * (self.ys[ndx] - self.ys[0])
-            )
-        
-        elif self.ylabel == "energy (kcal/mol)":
-            text = "%s kcal/mol" % repr(self.ys[ndx])
-            if self.ys[ndx] == max(self.ys):
-                text += " (maxima)" 
-            elif self.ys[ndx] == min(self.ys):
-                text += " (minima)"
-            text += "\n"
-            text += r"$\Delta E$ = %.1f kcal/mol" % (
-                (self.ys[ndx] - self.ys[0])
-            )
+            if self.minor_unit:
+                text += "\n"
+                text += "$\Delta %s$ = %.1f kcal/mol" % (
+                    self.unit_type,
+                    self.minor_conversion * (self.ys[ndx] - self.ys[0]),
+                )
         
         else:
             text = "%s\n" % repr(self.ys[ndx])
             text += r"$\Delta$ = %f" % (self.ys[ndx] - self.ys[0])
+        
         self.annotation.set_text(text)
+        if align_left:
+            self.annotation.set_ha("left")
+        else:
+            self.annotation.set_ha("right")
+    
+        if align_bottom:
+            self.annotation.set_va("bottom")
+        else:
+            self.annotation.set_va("top")
     
     def update_hover(self, cs_id, ndx):  
         ax = self.figure.gca()
@@ -494,7 +510,10 @@ class EnergyPlot(ToolInstance):
                 cs_id = min(self.xs[-1], cs_id)
                 ndx = self.xs.index(cs_id)
                 self.update_hover(cs_id, ndx)
-                self.update_label(cs_id, ndx)
+                w, h = self.canvas.get_width_height()
+                self.update_label(
+                    cs_id, ndx, event.x < w / 2, event.y < h / 2
+                )
                 self.annotation.set_visible(True)
                 self.canvas.draw()
             return self.change_coordset(event)
@@ -504,7 +523,10 @@ class EnergyPlot(ToolInstance):
             if on_item:
                 ndx = ndx['ind'][0]
                 cs_id = self.xs[ndx]
-                self.update_label(cs_id, ndx)
+                w, h = self.canvas.get_width_height()
+                self.update_label(
+                    cs_id, ndx, event.x < w / 2, event.y < h / 2
+                )
                 self.update_hover(cs_id, ndx)
                 self.annotation.set_visible(True)
                 self.canvas.draw()

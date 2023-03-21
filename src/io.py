@@ -109,7 +109,7 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
 
     if fr.all_geom and "energy" in fr.other and coordsets is not False:
         try:
-            from SEQCROW.tools import EnergyPlot
+            from SEQCROW.tools.per_frame_plot import EnergyPlot
             nrg_plot = EnergyPlot(session, structure, fr)
             if not nrg_plot.opened:
                 warn("energy plot could not be opened\n" + \
@@ -334,12 +334,10 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
             if value:
                 data.append(float(value.group(0)))
             else:
-                print("not making energy plot", comment)
                 break
         else:
-            print("making energy plot")
             try:
-                from SEQCROW.tools import EnergyPlot
+                from SEQCROW.tools.per_frame_plot import EnergyPlot
                 nrg_plot = EnergyPlot(
                     session,
                     struc,

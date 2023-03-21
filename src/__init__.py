@@ -240,24 +240,19 @@ class _SEQCROW_API(BundleAPI):
         start tools
         """
         if ti.name == "AaronTools Fragment Library":
-            from .tools import AaronTools_Library
+            from .tools.browse_aarontools import AaronTools_Library
             tool = AaronTools_Library(session, ti.name)
             return tool
 
         elif ti.name == "Visualize Normal Modes":
-            from .tools import NormalModes
+            from .tools.normal_modes import NormalModes
             tool = NormalModes(session, ti.name)
             return tool
 
         elif ti.name == "Substituent Sterimol":
-            from .tools import Sterimol
-            for tool in session.tools.list():
-                if isinstance(tool, Sterimol):
-                    tool.display(True)
-                    break
-            else:
-                tool = Sterimol(session, ti.name)
-                return tool
+            from .tools.sterimol import Sterimol
+            tool = Sterimol(session, ti.name)
+            return tool
 
         elif any(ti.name == name for name in [
                 "Structure Modification",
@@ -266,7 +261,7 @@ class _SEQCROW_API(BundleAPI):
                 "Fuse Ring",
                 "Change Element",
         ]):
-            from .tools import EditStructure
+            from .tools.structure_editing import EditStructure
             for tool in session.tools.list():
                 if isinstance(tool, EditStructure):
                     tool.display(True)
@@ -294,63 +289,63 @@ class _SEQCROW_API(BundleAPI):
                 return tool
 
         elif ti.name == "Add to Personal Library":
-            from .tools import LibAdd
+            from .tools.libadd import LibAdd
             tool = LibAdd(session, ti.name)
             return tool
 
         elif ti.name == "Managed Models":
-            from .tools import FileReaderPanel
+            from .tools.filereader_panel import FileReaderPanel
             tool = FileReaderPanel(session, ti.name)
             return tool
 
         elif ti.name == "Thermochemistry":
-            from .tools import Thermochem
+            from .tools.compute_thermo import Thermochem
             tool = Thermochem(session, ti.name)
             return tool
 
         elif ti.name == "Build QM Input":
-            from .tools import BuildQM
+            from .tools.input_generator import BuildQM
             tool = BuildQM(session, ti.name)
             return tool
 
         elif ti.name == "Job Queue":
-            from .tools import JobQueue
+            from .tools.job_manager_tool import JobQueue
             return JobQueue(session, ti.name)
 
         elif ti.name == "AaronJr Input Builder":
-            from .tools import AARONInputBuilder
+            from .tools.aaronjr_input_builder import AARONInputBuilder
             return AARONInputBuilder(session, ti.name)
 
         elif ti.name == "Bond Editor":
-            from .tools import BondEditor
+            from .tools.bond_editor import BondEditor
             return BondEditor(session, ti.name)
 
         elif ti.name == "Rotate Atoms":
-            from .tools import PrecisionRotate
+            from .tools.precision_rotate import PrecisionRotate
             return PrecisionRotate(session, ti.name)
 
         elif ti.name == "Buried Volume":
-            from .tools import PercentVolumeBuried
+            from .tools.percent_Vbur import PercentVolumeBuried
             return PercentVolumeBuried(session, ti.name)
 
         elif ti.name == "File Info":
-            from .tools import Info
+            from .tools.info import Info
             return Info(session, ti.name)
 
         elif ti.name == "Cone Angle":
-            from .tools import ConeAngle
+            from .tools.cone_angle import ConeAngle
             return ConeAngle(session, ti.name)
 
         elif ti.name == "Coordination Complex Generator":
-            from .tools import CoordinationComplexVomit
+            from .tools.coordination_complexes import CoordinationComplexVomit
             return CoordinationComplexVomit(session, ti.name)
 
         elif ti.name == "Orbital Viewer":
-            from .tools import OrbitalViewer
+            from .tools.mo_viewer import OrbitalViewer
             return OrbitalViewer(session, ti.name)
 
         elif ti.name == "Ligand Sterimol":
-            from .tools import LigandSterimol
+            from .tools.ligand_sterimol import LigandSterimol
             return LigandSterimol(session, ti.name)
 
         elif ti.name == "IR Spectrum":
@@ -358,27 +353,27 @@ class _SEQCROW_API(BundleAPI):
             return IRSpectrum(session, ti.name)
 
         elif ti.name == "UV/Vis Spectrum":
-            from .tools import UVVisSpectrum
+            from .tools.uvvis_plot import UVVisSpectrum
             return UVVisSpectrum(session, ti.name)
 
         elif ti.name == "2D Builder":
-            from .tools import MolBuilder
+            from .tools.mol_builder import MolBuilder
             return MolBuilder(session, ti.name)
 
         elif ti.name == "Transition State Structures":
-            from .tools import BuildRaven
+            from .tools.raven_setup import BuildRaven
             return BuildRaven(session, ti.name)
         
         elif ti.name == "Ligand Solid Angle":
-            from .tools import SolidAngle
+            from .tools.solid_angle import SolidAngle
             return SolidAngle(session, ti.name)
         
         elif ti.name == "Conformer Search":
-            from .tools import ConformerTool
+            from .tools.conformers import ConformerTool
             return ConformerTool(session, ti.name)
         
         elif ti.name == "Z-Matrix Builder":
-            from .tools import ZMatrixBuilder
+            from .tools.zmat_builder import ZMatrixBuilder
             return ZMatrixBuilder(session, ti.name)
 
         else:
