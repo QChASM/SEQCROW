@@ -71,6 +71,7 @@
                 <Dependency name="Send2Trash"/>
                 <Dependency name="psutil"/>
                 <Dependency name="jinja2"/>
+                <Dependency name="basis_set_exchange"/>
                 <!-- wait for numpy to fix fortran stuff in python 3.8
                 I've tried installing this with just gfortran on windows, but no luck
                 <Dependency name="stripy"/>
@@ -548,9 +549,9 @@
        </Classifiers>
     
     <AdditionalPackages>
-        <Package name="AaronTools" folder="C:\Users\ajs99778\Documents\GitHub\AaronTools"/>
-        <!--
         <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools"/>
+        <!--
+        <Package name="AaronTools" folder="C:\Users\ajs99778\Documents\GitHub\AaronTools"/>
         <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
         <Package name="AaronTools.test" folder="C:\Users\ajs99778\Documents\GitHub\AaronTools\test"/>
         <Package name="AaronTools" folder="/home/tschaefer/QChASM/AaronTools"/>

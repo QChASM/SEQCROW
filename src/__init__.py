@@ -349,7 +349,7 @@ class _SEQCROW_API(BundleAPI):
             return LigandSterimol(session, ti.name)
 
         elif ti.name == "IR Spectrum":
-            from .tools import IRSpectrum
+            from .tools.ir_plot import IRSpectrum
             return IRSpectrum(session, ti.name)
 
         elif ti.name == "UV/Vis Spectrum":

@@ -14,7 +14,11 @@ from AaronTools.substituent import Substituent
 from AaronTools.const import AARONLIB, ELEMENTS
 
 from SEQCROW.residue_collection import ResidueCollection
-from SEQCROW.tools import key_atom_highlight, ghost_connection_highlight, show_walk_highlight
+from SEQCROW.tools.browse_aarontools import (
+    key_atom_highlight,
+    ghost_connection_highlight,
+    show_walk_highlight,
+)
 from SEQCROW.selectors import register_selectors
 from SEQCROW.finders import AtomSpec
 

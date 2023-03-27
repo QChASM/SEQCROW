@@ -72,7 +72,7 @@ class EnergyPlot(ToolInstance):
         self.major_unit = None
         self.minor_unit = None
         self.minor_conversion = 1
-        self.unit_type = "E"
+        self.unit_type = "Energy"
         
         from chimerax.ui import MainToolWindow
         self.tool_window = MainToolWindow(self)    
@@ -132,7 +132,8 @@ class EnergyPlot(ToolInstance):
             self.major_unit = "$E_h$"
             self.minor_unit = "kcal/mol"
             self.minor_conversion = UNIT.HART_TO_KCAL
-            self.unit_type = "E"
+            self.unit_type = "Energy"
+            self.abbreviated_type = "E"
             
             self.data = OrderedDict()
             info = []
@@ -226,13 +227,18 @@ class EnergyPlot(ToolInstance):
             unit_types = QComboBox()
             self.energy_widgets.append(unit_types)
             unit_types.addItem("Energy (Hartree)")
-            unit_types.setItemData(0, ["$E_h$", "kcal/mol", UNIT.HART_TO_KCAL, "E"])
+            unit_types.setItemData(0, ["Eₕ", "kcal/mol", UNIT.HART_TO_KCAL, "E", "Energy"])
             unit_types.addItem("Energy (kcal/mol)")
-            unit_types.setItemData(1, ["kcal/mol", None, 1, "E"])
+            unit_types.setItemData(1, ["kcal/mol", None, 1, "E", "Energy"])
             unit_types.addItem("Energy (kJ/mol)")
-            unit_types.setItemData(2, ["kJ/mol", "kcal/mol", 1. / 4.184, "E"])
+            unit_types.setItemData(2, ["kJ/mol", "kcal/mol", 1. / 4.184, "E", "Energy"])
             unit_types.addItem("RMSD (Å)")
-            unit_types.setItemData(3, ["Å", None, 1, "RMSD"])
+            unit_types.setItemData(3, ["Å", None, 1, "RMSD", "RMSD"])
+            unit_types.addItem("time (fs)")
+            unit_types.setItemData(4, ["fs", None, 1, "t", "time"])
+            unit_types.addItem("time (ns)")
+            unit_types.setItemData(5, ["ns", None, 1, "t", "time"])
+            
             nrg_plot_layout.addWidget(unit_types, 2, 1, 1, 1)
             
             set_units = QPushButton("set")
@@ -309,21 +315,46 @@ class EnergyPlot(ToolInstance):
         self.tool_window.manage(None)
         
         conv_table.scrollToBottom()
+        self.tabs = tabs
 
         self.opened = True
 
     def switch_units(self):
-        major, minor, conversion, data_type = self.energy_widgets[1].currentData(role=Qt.UserRole)
+        major, minor, conversion, abbr_type, data_type = self.energy_widgets[1].currentData(role=Qt.UserRole)
         self.major_unit = major
         self.minor_unit = minor
         self.minor_conversion = conversion
         self.unit_type = data_type
+        self.abbreviated_type = abbr_type
         self.ylabel = "%s (%s)" % (self.unit_type, self.major_unit)
         for widget in self.energy_widgets:
             widget.deleteLater()
         ax = self.figure.gca()
         ax.set_ylabel(self.ylabel)
         self.canvas.draw()
+        
+        self.tabs.setTabText(1, self.unit_type)
+        self.conv_table.setRowCount(0)
+        if self.minor_unit:
+            self.conv_table.setColumnCount(2)
+            self.conv_table.setHorizontalHeaderLabels(
+                [self.major_unit, self.minor_unit]
+            )
+        else:
+            self.conv_table.setColumnCount(1)
+            self.conv_table.setHorizontalHeaderLabels([self.major_unit])
+        
+        min_y = min(self.ys)
+        for val in self.ys:
+            row = self.conv_table.rowCount()
+            self.conv_table.insertRow(row)
+            major_item = QTableWidgetItem(repr(val))
+            major_item.setData(Qt.UserRole, row + 1)
+            self.conv_table.setItem(row, 0, major_item)
+            if self.minor_unit:
+                minor_item = QTableWidgetItem("%.2f" % (self.minor_conversion * (val - min_y)))
+                self.conv_table.setItem(row, 1, minor_item)
+        
 
     def check_changes(self, trigger_name=None, changes=None):
         if changes is not None:
@@ -450,7 +481,7 @@ class EnergyPlot(ToolInstance):
     def update_label(self, cs_id, ndx, align_left, align_bottom):
         self.annotation.xy = (cs_id, self.ys[ndx])
         if self.major_unit:
-            text = "%s=%s %s" % (self.unit_type, repr(self.ys[ndx]), self.major_unit)
+            text = "%s=%s %s" % (self.abbreviated_type, repr(self.ys[ndx]), self.major_unit)
             if self.ys[ndx] == max(self.ys):
                 text += " (maxima)" 
             elif self.ys[ndx] == min(self.ys):
@@ -458,7 +489,7 @@ class EnergyPlot(ToolInstance):
             if self.minor_unit:
                 text += "\n"
                 text += "$\Delta %s$ = %.1f kcal/mol" % (
-                    self.unit_type,
+                    self.abbreviated_type,
                     self.minor_conversion * (self.ys[ndx] - self.ys[0]),
                 )
         

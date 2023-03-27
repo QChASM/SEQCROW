@@ -57,3 +57,6 @@ November 4. 2021
     removed the following functions:
      - SaveFileDialog
      - ColorPicker
+
+March 3. 2023
+    Updated to v9.5.0

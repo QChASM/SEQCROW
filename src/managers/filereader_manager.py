@@ -51,8 +51,6 @@ class FileReaderManager(ProviderManager):
                     continue
                 if model.session.ui.is_gui:
                     apply_seqcrow_preset(model)
-            
-            apply_non_seqcrow_preset(model)
 
     def add_filereader(self, trigger_name, models_and_filereaders):
         """add models with filereader data to our list"""
@@ -155,51 +153,3 @@ def apply_seqcrow_preset(model, atoms=None, fallback=None):
 
 fmt_only = re.compile("(\S*):(.*)")
 
-def apply_non_seqcrow_preset(model):
-    if not model.session:
-        return
-    preset = model.session.seqcrow_settings.settings.NON_SEQCROW_IO_PRESET
-    atomspec = model.atomspec
-    file_types = []
-    if hasattr(model, "opened_data_format"):
-        if model.opened_data_format:
-            file_types = [suffix[1:] for suffix in model.opened_data_format.suffixes]
-            file_types.extend([nick for nick in model.opened_data_format.nicknames])
-    
-    else:
-        if (
-            hasattr(model, "filename") and
-            isinstance(model.filename, str) and
-            "." in model.filename
-        ):
-            root, ext = path.splitext(model.filename)
-            file_types.append(ext[1:])
-        
-        if ":" in model.name:
-            file_types.append(model.name.split(":")[0])
-        
-        if "." in model.name:
-            root, ext = path.splitext(model.name)
-            file_types.append(ext[1:])
-        
-    file_types = [s.lower() for s in file_types]
-    
-    for line in preset:
-        if fmt_only.match(line):
-            formats = [fmt.strip() for fmt in fmt_only.match(line).group(1).split(",")]
-            for fmt in formats:
-                if any(fmt.lower() == s for s in file_types):
-                    cmd = fmt_only.match(line).group(2)
-                    cmd = cmd.replace("<model>", atomspec)
-                    model.session.logger.warning(
-                        "running commands after opening files will be removed from SEQCROW in the near future. Please switch to using the OpenCommands bundle, which is available now on the toolshed."
-                    )
-                    run(model.session, cmd)
-            
-        else:
-            cmd = line.replace("<model>", atomspec)
-            model.session.logger.warning(
-                "running commands after opening files will be removed from SEQCROW in the near future. Please switch to using the OpenCommands bundle, which is available now on the toolshed."
-            )
-            run(model.session, cmd)
-    
