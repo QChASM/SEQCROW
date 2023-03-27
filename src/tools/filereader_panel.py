@@ -8,7 +8,7 @@ from Qt.QtWidgets import QGridLayout, QPushButton, QTreeWidget, QTreeWidgetItem
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.managers.filereader_manager import FILEREADER_CHANGE 
-from SEQCROW.tools import EnergyPlot
+from SEQCROW.tools.per_frame_plot import EnergyPlot
 
 
 class FileReaderPanel(ToolInstance):

@@ -109,7 +109,7 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
 
     if fr.all_geom and "energy" in fr.other and coordsets is not False:
         try:
-            from SEQCROW.tools import EnergyPlot
+            from SEQCROW.tools.per_frame_plot import EnergyPlot
             nrg_plot = EnergyPlot(session, structure, fr)
             if not nrg_plot.opened:
                 warn("energy plot could not be opened\n" + \
@@ -215,6 +215,7 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
     import os
     import numpy as np
     from SEQCROW.managers import ADD_FILEREADER
+    from AaronTools.utils import utils
 
     if file_name.lower().endswith(".allxyz") and coordsets is None:
         coordsets = True
@@ -320,12 +321,35 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
     session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([struc], [fr]))
     status = "opened %s as an XYZ coordinate file" % file_name
     struc.active_coordset_id = struc.num_coordsets
-    if len(all_coordsets) > 1 and coordsets:
+    if len(all_coordsets) > 1:
         fr.all_geom = all_coordsets
-        from chimerax.std_commands.coordset_gui import CoordinateSetSlider
-        status += " movie"
-        slider = CoordinateSetSlider(session, struc)
-        slider.set_slider(struc.num_coordsets)
+        if coordsets:
+            from chimerax.std_commands.coordset_gui import CoordinateSetSlider
+            status += " movie"
+            slider = CoordinateSetSlider(session, struc)
+            slider.set_slider(struc.num_coordsets)
+        data = []
+        for comment in comments:
+            value = utils.float_num.search(comment)
+            if value:
+                data.append(float(value.group(0)))
+            else:
+                break
+        else:
+            try:
+                from SEQCROW.tools.per_frame_plot import EnergyPlot
+                nrg_plot = EnergyPlot(
+                    session,
+                    struc,
+                    fr,
+                    ylabel="comment value",
+                    y_data=data,
+                )
+                if not nrg_plot.opened:
+                    nrg_plot.delete()
+            except Exception as e:
+                session.logger.warning(repr(e))
+
     struc.filename = file_name
     return [struc], status
 
