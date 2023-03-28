@@ -77,6 +77,8 @@ class Atom(AaronToolsAtom):
                 rv.__dict__[key] = val.copy()
             except AttributeError:
                 rv.__dict__[key] = val
+                if re.search("chimerax", val.__class__.__module__):
+                    continue
                 if val.__class__.__module__ != "builtins":
                     self.LOG.warning(
                         "No copy method for {}: in-place changes may occur".format(
@@ -347,7 +349,16 @@ class Residue(Geometry):
                     new_bond = chix_residue.structure.new_bond(atom1, atom2)
 
                     if any([aaron_atom.element in METAL for aaron_atom in [aaron_atom1, aaron_atom2]]):
-                        pbg = chix_residue.structure.pseudobond_group(chix_residue.structure.PBG_METAL_COORDINATION, create_type='normal') 
+                        try:
+                            pbg = chix_residue.structure.pseudobond_group(
+                                chix_residue.structure.PBG_METAL_COORDINATION,
+                                create_type=1,
+                            )
+                        except TypeError:
+                            pbg = chix_residue.structure.pseudobond_group(
+                                chix_residue.structure.PBG_METAL_COORDINATION,
+                                create_type=2,
+                            )
                         pbg.new_pseudobond(atom1, atom2)
                         new_bond.delete()
                     else:

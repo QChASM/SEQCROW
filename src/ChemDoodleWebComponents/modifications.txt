@@ -60,3 +60,6 @@ November 4. 2021
 
 March 3. 2023
     Updated to v9.5.0
+    
+later in the day, March 3. 2023
+    Reverted to the old version of ChemDoodle
