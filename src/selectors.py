@@ -369,6 +369,8 @@ def select_rings(session, models, results):
             found_ring = False
             # look for a path to each pair of neighbors
             for a2 in graph[a]:
+                if found_ring and a2 in ring_atoms:
+                    continue
                 # copy the graph, but remove the node for this atom
                 graph[a].remove(a2)
                 path = shortest_path(graph, a, a2)
