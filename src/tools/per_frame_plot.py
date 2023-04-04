@@ -138,12 +138,11 @@ class EnergyPlot(ToolInstance):
             self.data = OrderedDict()
             info = []
             for i, (step, cs_id) in enumerate(zip(fr.all_geom, self.structure.coordset_ids)):
-                info = [item for item in step if isinstance(item, dict) and "energy" in item]
-                if len(info) < 1:
+                info = step["data"]
+                if "energy" not in info:
                     continue
-    
+
                 else:
-                    info = info[0]
                     self.data[cs_id] = {"energy": {"value": info["energy"]}}
                     if "gradient" in info:
                         self.data[cs_id].update(info["gradient"])
