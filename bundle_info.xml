@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="1.7a0">
+            version="1.7a1">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -71,7 +71,9 @@
                 <Dependency name="Send2Trash"/>
                 <Dependency name="psutil"/>
                 <Dependency name="jinja2"/>
+                <!--
                 <Dependency name="basis-set-exchange"/>
+                -->
                 <!-- wait for numpy to fix fortran stuff in python 3.8
                 I've tried installing this with just gfortran on windows, but no luck
                 <Dependency name="stripy"/>
