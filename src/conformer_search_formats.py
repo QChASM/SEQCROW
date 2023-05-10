@@ -1,3 +1,7 @@
+from glob import glob
+import os
+
+from AaronTools.const import AARONLIB, AARONTOOLS
 from AaronTools.theory import *
 from AaronTools.fileIO import FileWriter
 from AaronTools.theory.implicit_solvent import KNOWN_XTB_SOLVENTS
@@ -135,6 +139,28 @@ class ProtomersOption(EnumOption):
     values = ("deprotonate", "protonate", "tautomerize", "none")
 
 
+class QCGOption(EnumOption):
+    values = ("grow", "ensemble", "solvation free energy")
+
+solvent_libs = [
+    os.path.join(AARONTOOLS, "Solvents"),
+    os.path.join(AARONLIB, "Solvents"),
+]
+solvents = []
+for solvent_lib in solvent_libs:
+    if not os.path.exists(solvent_lib):
+        continue
+    print(os.path.join(solvent_lib, "*.xyz"))
+    print(glob(os.path.join(solvent_lib, "*.xyz")))
+    solvent_files = glob(os.path.join(solvent_lib, "*.xyz"))
+    solvents.extend([os.path.basename(x[:-4]) for x in solvent_files])
+
+
+class SolventOption(EnumOption):
+    values = tuple(solvents)
+
+
+
 class CREST(ConformerSearchInfo):
     # name of program
     name = "CREST"
@@ -224,10 +250,104 @@ class CREST(ConformerSearchInfo):
     ):
         """
         get a keyword dictionary given the settings on the 'job details' tab
-        optimize - bool, geometry optimization is checked
-        frequencies - bool, frequency calculation is checked
-        raman - bool, Raman intensities is checked
-        hpmodes - bool, high-precision modes is checked
+        read_checkpoint - bool, read checkpoint is checked
+        checkpoint_file - str, path to checkpoint file
+        """
+        return dict()
+
+
+class CRESTQCG(ConformerSearchInfo):
+    # name of program
+    name = "CREST QCG"
+    options = {
+        "number_of_solvents": (
+            IntOption, {
+                "min": 1,
+                "max": 300,
+                "default": 10,
+                "name": "number of solvent mols",
+            }
+        ),
+        "algorithm": (
+            QCGOption, {
+                "default": "grow",
+                "name": "solvation algorithm",
+            }
+        ),
+        "solvent": (
+            SolventOption, {
+                "default": "water",
+                "name": "solvent",
+            }
+        ),
+    }
+
+    parallel = True
+    memory = False
+    save_file_filter = "xTB input file (*.xc)"
+    solvents = KNOWN_XTB_SOLVENTS
+    keyword_options = XTBKeywordOptions
+    methods = [
+        "GFN-FF",
+        "GFN1-xTB",
+        "GFN2-xTB",
+    ]
+    basis_sets = None
+
+    def get_file_contents(self, theory):
+        contents, warnings = FileWriter.write_crest(
+            theory.geometry, theory, outfile=False, return_warnings=True,
+        )
+        solvent_name = theory.kwargs["command_line"]["qcg"][0]
+        for solvent_lib in solvent_libs:
+            if not os.path.exists(solvent_lib):
+                continue
+            
+            solvent_files = glob(os.path.join(solvent_lib, "*.xyz"))
+            for sol_file in solvent_files:
+                fname = os.path.basename(sol_file)
+                if fname == solvent_name:
+                    with open(sol_file, "r") as f:
+                        solvent_xyz = f.read()
+                    contents[solvent_name] = solvent_xyz
+                    break
+        
+        return contents, warnings   
+
+    def fixup_theory(
+        self,
+        theory,
+        algorithm="grow",
+        number_of_solvents=10,
+        solvent="water",
+        restart_file=None,
+    ):
+        new_dict = {"command_line": {}}
+        
+        algo_name = {
+            "grow": "grow",
+            "ensemble": "ensemble",
+            "solvation free energy": "gsolv",
+        }[algorithm]
+        
+        new_dict["command_line"][algo_name] = []
+        new_dict["command_line"]["nsolv"] = [str(number_of_solvents)]
+        new_dict["command_line"]["qcg"] = [solvent + ".xyz"]
+
+        theory.kwargs = combine_dicts(
+            new_dict, theory.kwargs,
+        )
+        theory.job_type = []
+        
+        return theory
+
+    def get_job_kw_dict(
+        self,
+        read_checkpoint,
+        checkpoint_file,
+    ):
+        """
+        get a keyword dictionary given the settings on the 'job details' tab
         read_checkpoint - bool, read checkpoint is checked
         checkpoint_file - str, path to checkpoint file
         """

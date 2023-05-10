@@ -400,6 +400,7 @@
 			
 			<Providers manager="conformer_search_manager">
 				<Provider name="CREST"/>
+				<Provider name="CREST QCG"/>
 			</Providers>
 			
             <Classifiers>
@@ -567,6 +568,7 @@
 
     <DataFiles package="AaronTools">
         <DataDir>Ligands</DataDir>
+        <DataDir>Solvents</DataDir>
         <DataDir>Substituents</DataDir>
         <DataDir>Rings</DataDir>
         <DataDir>coordination_complex</DataDir>

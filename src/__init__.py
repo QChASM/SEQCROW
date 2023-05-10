@@ -786,6 +786,10 @@ class _SEQCROW_API(BundleAPI):
             if name == "CREST":
                 from .conformer_search_formats import CREST
                 return CREST()
+            
+            if name == "CREST QCG":
+                from .conformer_search_formats import CRESTQCG
+                return CRESTQCG()
  
         elif mgr is session.test_manager:
             if name == "fuseRing_command":
