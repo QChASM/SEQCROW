@@ -308,13 +308,13 @@ class ConeAngle(ToolInstance):
             rescol = ResidueCollection(center_atom.structure)
             at_center = rescol.find_exact(AtomSpec(center_atom.atomspec))[0]
             if center_atom.structure in self.ligands:
-                lig_atoms = [AtomSpec(atom.atomspec) for atom in self.ligands[center_atom.structure]]
+                lig_atoms = rescol.find([AtomSpec(atom.atomspec) for atom in self.ligands[center_atom.structure]])
                 comp = Component(
                     rescol.find(
                         lig_atoms,
                     ),
                     to_center=rescol.find_exact(AtomSpec(center_atom.atomspec)),
-                    key_atoms=rescol.find(BondedTo(at_center), lig_atoms),
+                    key_atoms=(list(at_center.connected), lig_atoms),
                 )
             else:
                 comp = Component(
@@ -322,19 +322,7 @@ class ConeAngle(ToolInstance):
                     to_center=rescol.find_exact(AtomSpec(center_atom.atomspec)),
                     key_atoms=rescol.find(BondedTo(at_center)),
                 )
-            
-            if method == "tolman":
-                if not comp.key_atoms or len(comp.key_atoms) > 2:
-                    self.session.logger.error(
-                        "Tolman cone angles only implemented for mono- or bidentate ligands\n"
-                        "ligand on %s has %i coordinating atoms: %s" % (
-                            center_atom.structure.name,
-                            len(comp.key_atoms),
-                            ", ".join([key.chix_atom.atomspec for key in comp.key_atoms])
-                        )
-                    )
-                    continue
-            
+
             cone_angle = comp.cone_angle(
                 center=rescol.find(AtomSpec(center_atom.atomspec)),
                 method=method,
