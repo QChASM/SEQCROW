@@ -83,6 +83,7 @@ sterimol_description = CmdDesc(
         ("showRadii", BoolArg), 
         ("bisect_L", BoolArg),
         ("at_L", FloatArg), 
+        ("buried", FloatArg), 
     ],
     synopsis="calculate Sterimol B1-B5, and L for a ligand on a metal center",
     url="https://github.com/QChASM/SEQCROW/wiki/Commands#ligandSterimol",
@@ -96,6 +97,7 @@ def ligandSterimol(
         showRadii=True,
         at_L=None,
         bisect_L=False,
+        buried=False,
         return_values=False
     ):
     models, center, key_atoms = avoidTargets(session.logger, selection)
@@ -106,7 +108,22 @@ def ligandSterimol(
     coord_atoms = []
     datas = []
     
-    info = "<pre>model\tcoord. atoms\tB1\tB2\tB3\tB4\tB5\tL\n"
+    info = "<pre>"
+    info += "\t".join([
+        "model",
+        "coord. atoms",
+        "B1",
+        "B2",
+        "B3",
+        "B4",
+        "B5",
+        "L",
+        "Bperp_big",
+        "Bperp_small",
+        "Bpar",
+    ])
+    
+    info += "\n"
     
     # if return_values:
         # if len(models.keys()) > 1:
@@ -139,6 +156,7 @@ def ligandSterimol(
             return_vector=True,
             radii=radii,
             at_L=at_L,
+            buried=buried,
             to_center=rescol.find(center_atomspec),
             bisect_L=bisect_L,
         )
@@ -148,6 +166,9 @@ def ligandSterimol(
         b3 = np.linalg.norm(data["B3"][1] - data["B3"][0])
         b4 = np.linalg.norm(data["B4"][1] - data["B4"][0])
         b5 = np.linalg.norm(data["B5"][1] - data["B5"][0])
+        bperp_big = np.linalg.norm(data["Bperp_big"][1] - data["Bperp_big"][0])
+        bperp_small = np.linalg.norm(data["Bperp_small"][1] - data["Bperp_small"][0])
+        bpar = np.linalg.norm(data["Bpar"][1] - data["Bpar"][0])
         
         if showVectors:
             for key, color in zip(
@@ -191,10 +212,10 @@ def ligandSterimol(
         
         name = get_filename(model.name, include_parent_dir=False)
         
-        info += "%-16s\t%-11s\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\n" % (
+        info += "%-16s\t%-11s\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\n" % (
             name,
             ", ".join(at.atomspec for at in key_atoms[model]),
-            b1, b2, b3, b4, b5, l
+            b1, b2, b3, b4, b5, l, bperp_big, bperp_small, bpar,
         )
         targets.append(name)
         coord_atoms.append([at.atomspec for at in key_atoms[model]])
