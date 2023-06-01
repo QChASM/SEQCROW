@@ -66,6 +66,7 @@ class _SEQCROW_API(BundleAPI):
                 SubstituteMouseMode,
                 SelectSimilarFragments,
                 DrawCoordinationBondMouseMode,
+                DrawHydrogenBondMouseMode,
             )
 
             session.ui.mouse_modes.add_mode(SelectConnectedMouseMode(session))
@@ -76,6 +77,7 @@ class _SEQCROW_API(BundleAPI):
             session.ui.mouse_modes.add_mode(SubstituteMouseMode(session))
             session.ui.mouse_modes.add_mode(SelectSimilarFragments(session))
             session.ui.mouse_modes.add_mode(DrawCoordinationBondMouseMode(session))
+            session.ui.mouse_modes.add_mode(DrawHydrogenBondMouseMode(session))
             
             session.triggers.add_handler(ADD_MODELS, _SEQCROW_API.open_useful_tools)
 

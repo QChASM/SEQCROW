@@ -1262,9 +1262,7 @@ class SelectSimilarFragments(MouseMode):
             run(self.session, "select clear")
 
 
-
-
-class DrawCoordinationBondMouseMode(DrawBondMouseMode):
+class DrawHydrogenBondMouseMode(DrawBondMouseMode):
     name = "hbonds"
     scale = 1.0
 
