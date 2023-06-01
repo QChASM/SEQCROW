@@ -2,7 +2,7 @@ import numpy as np
 
 from io import BytesIO
 
-from chimerax.core.commands import BoolArg, CmdDesc, EnumOf
+from chimerax.core.commands import BoolArg, CmdDesc, EnumOf, FloatArg
 from chimerax.atomic import AtomsArg
 from chimerax.bild.bild import read_bild
 
@@ -21,6 +21,7 @@ sterimol_description = CmdDesc(
         ("showVectors", BoolArg),
         ("showRadii", BoolArg), 
         ("LCorrection", EnumOf(["FORTRAN", "AaronTools"], case_sensitive=False)), 
+        ("at_L", FloatArg), 
     ],
     synopsis="calculate Sterimol B1-B5, and L",
     url="https://github.com/QChASM/SEQCROW/wiki/Commands#sterimol",
@@ -33,7 +34,8 @@ def sterimol(
         showVectors=True,
         showRadii=True,
         LCorrection="FORTRAN",
-        return_values=False
+        at_L=None,
+        return_values=False,
     ):
     models, attached = avoidTargets(session.logger, selection)
     
@@ -47,7 +49,18 @@ def sterimol(
     targets = []
     datas = []
     
-    info = "<pre>model\tsubstituent atom\tB1\tB2\tB3\tB4\tB5\tL\n"
+    info = "<pre>%s\n" % "\t".join([
+        "model",
+        "substituent atom",
+        "B<sub>1</sub>",
+        "B<sub>2</sub>",
+        "B<sub>3</sub>",
+        "B<sub>4</sub>",
+        "B<sub>5</sub>",
+        "L",
+        "B<sub>perp_big</sub>",
+        "B<sub>perp_small</sub>",
+    ])
     
     # if return_values:
         # if len(models.keys()) > 1:
@@ -74,6 +87,7 @@ def sterimol(
                     return_vector=True,
                     radii=radii,
                     old_L=old_L,
+                    at_L=at_L,
                 )
                 l = np.linalg.norm(data["L"][1] - data["L"][0])
                 b1 = np.linalg.norm(data["B1"][1] - data["B1"][0])
@@ -81,6 +95,8 @@ def sterimol(
                 b3 = np.linalg.norm(data["B3"][1] - data["B3"][0])
                 b4 = np.linalg.norm(data["B4"][1] - data["B4"][0])
                 b5 = np.linalg.norm(data["B5"][1] - data["B5"][0])
+                bperp_big = np.linalg.norm(data["Bperp_big"][1] - data["Bperp_big"][0])
+                bperp_small = np.linalg.norm(data["Bperp_small"][1] - data["Bperp_small"][0])
                 
                 if showVectors:
                     for key, color in zip(
@@ -124,10 +140,10 @@ def sterimol(
                 
                 model_name = get_filename(model.name, include_parent_dir=False)
                 
-                info += "%-16s\t%-11s\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\n" % (
+                info += "%-16s\t%-11s\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\n" % (
                     model_name,
                     target.atomspec,
-                    b1, b2, b3, b4, b5, l
+                    b1, b2, b3, b4, b5, l, bperp_big, bperp_small
                 )
                 model_names.append(model_name)
                 targets.append(target.atomspec)
