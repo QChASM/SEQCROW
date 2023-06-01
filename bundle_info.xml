@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="1.6.6">
+            version="1.6.7">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -362,6 +362,14 @@
                           display_name="Coordination Bond" 
                           description="Draw a metal coordination bond"
                           icon="coordinationbond.png"
+                />
+                <Provider tab="More Right Mouse"
+                          section="Structure Modification"
+                          name="hbonds"
+                          mouse_mode="hbonds"
+                          display_name="Hydrogen Bond" 
+                          description="Draw a hydrogen bond"
+                          icon="hbonds_icon.png"
                 />
                 <Provider tab="More Right Mouse"
                           section="Structure Modification"

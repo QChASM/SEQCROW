@@ -231,6 +231,10 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
     import numpy as np
     from SEQCROW.managers import ADD_FILEREADER
     from AaronTools.utils import utils
+    
+    # from cProfile import Profile
+    # profile = Profile()
+    # profile.enable()
 
     if file_name.lower().endswith(".allxyz") and coordsets is None:
         coordsets = True
@@ -276,8 +280,9 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
                 info = line.split(maxsplit=1)
                 eles.append(info[0])
                 try:
-                    coord_data += " ".join(info[1].split()[:3]) + "\n"
+                    coord_data += "%s %s %s\n" % tuple(info[1].split()[:3])
                 except IndexError:
+                    coord_data += line
                     error_msg = get_error_msg(
                         file_name,
                         ele_sets,
@@ -366,6 +371,10 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
                 session.logger.warning(repr(e))
 
     struc.filename = file_name
+    
+    # profile.disable()
+    # profile.print_stats()
+    
     return [struc], status
 
 
