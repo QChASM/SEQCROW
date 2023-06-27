@@ -1003,28 +1003,45 @@ class _SEQCROW_API(BundleAPI):
         """AaronTools/SEQCROW classes for saving things"""
         if name == "FileReader":
             from AaronTools.fileIO import FileReader
+            print("yes")
             return FileReader
         elif name == "Orbitals":
             from AaronTools.fileIO import Orbitals
+            print("yes")
             return Orbitals
         elif name == "Frequency":
             from AaronTools.spectra import Frequency
+            print("yes")
             return Frequency
         elif name == "ValenceExcitations":
             from AaronTools.spectra import ValenceExcitations
+            print("yes")
             return ValenceExcitations
         elif name == "HarmonicVibration":
             from AaronTools.spectra import HarmonicVibration
+            print("yes")
             return HarmonicVibration
         elif name == "AnharmonicVibration":
             from AaronTools.spectra import AnharmonicVibration
+            print("yes")
             return AnharmonicVibration
         elif name == "ValenceExcitation":
             from AaronTools.spectra import ValenceExcitation
+            print("yes")
             return ValenceExcitation
         elif name == "Atom":
             from AaronTools.atoms import Atom
+            print("yes")
             return Atom
+        elif name == "Highlight":
+            from SEQCROW.commands.highlight import Highlight
+            print("yes")
+            return Highlight
+        elif name == "Theory":
+            from AaronTools.theory import Theory
+            print("yes")
+            return Theory
+            
 
     @staticmethod
     def finish(session, bundle_info):
@@ -1038,21 +1055,24 @@ class _SEQCROW_API(BundleAPI):
         for model in models:
             if hasattr(model, "filereader") and model.filereader is not None:
                 fr = model.filereader
-                if (
-                    "orbitals" in fr.other and
-                    model.session.seqcrow_settings.settings.ORBIT_OPEN != "do nothing"
-                ):
-                    run(model.session, "ui tool show \"Orbital Viewer\"")
-                    model.session.logger.info(
-                        "automaticly opening the orbital tool can be disabled in the settings"
-                    )
-                if (
-                    "frequency" in fr.other and
-                    model.session.seqcrow_settings.settings.FREQ_OPEN != "do nothing"
-                ):
-                    run(model.session, "ui tool show \"Visualize Normal Modes\"")
-                    model.session.logger.info(
-                        "automaticly opening the vibrations tool can be disabled in the settings"
-                    )
+                if model.session.seqcrow_settings.settings.ORBIT_OPEN != "do nothing":
+                    try:
+                        fr["orbitals"]
+                        run(model.session, "ui tool show \"Orbital Viewer\"")
+                        model.session.logger.info(
+                            "automaticly opening the orbital tool can be disabled in the settings"
+                        )
+                    except Exception:
+                        pass
+
+                if model.session.seqcrow_settings.settings.FREQ_OPEN != "do nothing":
+                    try:
+                        fr["frequency"]
+                        run(model.session, "ui tool show \"Visualize Normal Modes\"")
+                        model.session.logger.info(
+                            "automaticly opening the vibrations tool can be disabled in the settings"
+                        )
+                    except Exception:
+                        pass
 
 bundle_api = _SEQCROW_API()

@@ -57,35 +57,23 @@ ORBITAL_VOLUME_NAMES = [
 class OrbitalGrid(GridData):
     polar_values = True
     
-    def read_matrix(self,
-        ijk_origin=(0,0,0),
-        ijk_size=None,
-        ijk_step=(1,1,1),
-        progress=None,
-    ):
-        if ijk_size is None:
-            ijk_size = self.data.shape
-        return self._data[
-            ijk_origin[2]:ijk_size[2] + ijk_origin[2]:ijk_step[2],
-            ijk_origin[1]:ijk_size[1] + ijk_origin[1]:ijk_step[1],
-            ijk_origin[0]:ijk_size[0] + ijk_origin[0]:ijk_step[0]
-        ]
+    @property
+    def size(self):
+        try:
+            return self._shape
+        except AttributeError:
+            return self._data.shape
     
-    def matrix(
-        self,
-        ijk_origin=(0,0,0),
-        ijk_size=None,
-        ijk_step=(1,1,1),
-        progress=None,
-        from_cache_only=False
-    ):
-        if ijk_size is None:
-            ijk_size = self.data.shape
-        return self._data[
-            ijk_origin[2]:ijk_size[2] + ijk_origin[2]:ijk_step[2],
-            ijk_origin[1]:ijk_size[1] + ijk_origin[1]:ijk_step[1],
-            ijk_origin[0]:ijk_size[0] + ijk_origin[0]:ijk_step[0]
-        ]
+    @size.setter
+    def size(self, val):
+        self._shape = val
+
+    def read_matrix(self, ijk_origin, ijk_size, ijk_step, progress):
+        self._size = self._data.shape
+        if ijk_size != self.size:
+            self.cache_data(self._data, (0,0,0), self.size, (1,1,1)) # Cache full data.
+        m = self.matrix_slice(self._data, ijk_origin, ijk_size, ijk_step)
+        return m
 
 
 class _OrbitalSettings(Settings):
@@ -810,6 +798,7 @@ class OrbitalViewer(ToolInstance):
             origin=com,
             rotation=u,
             step=[np.linalg.norm(v) for v in [v1, v2, v3]],
+            value_type=val.dtype,
         )
         grid._data = np.swapaxes(val, 0, 2)
         
@@ -954,6 +943,7 @@ class OrbitalViewer(ToolInstance):
             origin=com,
             rotation=u,
             step=[np.linalg.norm(v) for v in [v1, v2, v3]],
+            value_type=val.dtype,
         )
         grid._data = np.swapaxes(val, 0, 2)
         
@@ -1116,6 +1106,7 @@ class OrbitalViewer(ToolInstance):
             origin=com,
             rotation=u,
             step=[np.linalg.norm(v) for v in [v1, v2, v3]],
+            value_type=val.dtype,
         )
         grid._data = np.swapaxes(val, 0, 2)
         
@@ -1278,6 +1269,7 @@ class OrbitalViewer(ToolInstance):
             origin=com,
             rotation=u,
             step=[np.linalg.norm(v) for v in [v1, v2, v3]],
+            value_type=val.dtype,
         )
         grid._data = np.swapaxes(val, 0, 2)
         
@@ -1448,6 +1440,7 @@ class OrbitalViewer(ToolInstance):
             origin=com,
             rotation=u,
             step=[np.linalg.norm(v) for v in [v1, v2, v3]],
+            value_type=val.dtype,
         )
         grid._data = np.swapaxes(val, 0, 2)
         

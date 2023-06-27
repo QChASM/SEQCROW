@@ -972,6 +972,15 @@ class ResidueCollection(Geometry):
     def get_chimera(self, session, coordsets=False, filereader=None, discard_residues=False):
         """returns a chimerax equivalent of self"""
         struc = AtomicStructure(session, name=self.name)
+        if not any(attr[0] == "filereader" for attr in struc.custom_attrs):
+            struc.register_attr(
+                session,
+                "filereader",
+                "FileReader",
+                attr_type=dict,
+            )
+        if filereader is not None:
+            struc.filereader = {key: filereader[key] for key in filereader.keys()}
         struc.comment = self.comment
 
         self.update_chix(struc, discard_residues=discard_residues)

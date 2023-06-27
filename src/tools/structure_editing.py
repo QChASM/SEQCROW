@@ -647,10 +647,10 @@ class EditStructure(ToolInstance):
             vsepr = "bent 3 tetrahedral"
         
         if vsepr:
-            atoms = Atom.get_shape(vsepr)
-            atoms[0].element = element
-            for atom in atoms[1:]:
-                atom.element = "H"
+            coords = Atom.get_shape(vsepr)
+            atoms = [Atom(element, coords=coords[0])]
+            for i, atom in enumerate(atoms[1:]):
+                atoms.append(Atom("H", coords=coords[i + 1]))
             if adjust_bonds:
                 # this works b/c all atoms are 1 angstrom from the center
                 # just multiply by the distance we want
