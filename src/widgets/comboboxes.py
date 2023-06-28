@@ -107,51 +107,65 @@ class FilereaderComboBox(QComboBox):
         self._session = session
         self._other = otherItems
         
-        self._add_handler = session.filereader_manager.triggers.add_handler(FILEREADER_ADDED, self._add_filereaders)
-        self._del_handler = session.filereader_manager.triggers.add_handler(FILEREADER_REMOVED, self._del_filereaders)
+        self._add_handler = session.triggers.add_handler(ADD_MODELS, self._add_filereaders)
+        self._del_handler = session.triggers.add_handler(REMOVE_MODELS, self._del_filereaders)
         
         self.setSizeAdjustPolicy(self.AdjustToMinimumContentsLengthWithIcon)
         
         self._refresh_models()
 
     def _refresh_models(self):
-        filereaders = self._session.filereader_manager.list(other=self._other)
-        for i in range(self.count(), -1, -1):
-            if self.itemData(i) not in filereaders:
-                self.removeItem(i)
-        
-        for fr in filereaders:
-            ndx = self.findData(fr)
-            if ndx == -1:
-                mdl = self._session.filereader_manager.get_model(fr)
-                self.addItem("%s (%s)" % (basename(fr.name), mdl.atomspec), fr)
-
-    def _add_filereaders(self, trigger_name, filereaders):
-        for fr in filereaders:
-            if self._other is None or all(x in fr.other for x in self._other):
-                mdl = self._session.filereader_manager.get_model(fr)
-                self.addItem("%s (%s)" % (basename(fr.name), mdl.atomspec), fr)
+        filereaders = []
+        for mdl in self._session.models.list():
+            try:
+                filereaders = mdl.filereaders
+            except AttributeError:
+                continue
             
-    def _del_filereaders(self, trigger_name, filereaders):
-        for fr in filereaders:
-            ndx = self.findData(fr)
-            if ndx != -1:
-                self.removeItem(ndx)
+            for fr in filereaders:
+                if self._other and not all(x in fr for x in self._other):
+                    continue
+                ndx = self.findData((fr, mdl))
+                if ndx == -1:
+                    self.addItem(
+                        "%s (%s)" % (basename(fr["name"]), mdl.atomspec),
+                        (fr, mdl),
+                    )
+
+    def _add_filereaders(self, trigger_name, models):
+        for mdl in models:
+            try:
+                for fr in mdl.filereaders:
+                    if self._other and not all(x in fr for x in self._other):
+                        print("skipping", self._other)
+                        continue
+                    if self._other is None or all(x in fr for x in self._other):
+                        self.addItem(
+                            "%s (%s)" % (basename(fr["name"]), mdl.atomspec),
+                            (fr, mdl),
+                        )
+            
+            except AttributeError as e:
+                print("skipping", e)
+                pass
+
+    def _del_filereaders(self, trigger_name, models):
+        removed = True
+        last_i = 0
+        while removed:
+            removed = False
+            for i in range(last_i, self.count()):
+                fr, mdl = self.itemData(i)
+                last_i = i
+                if mdl in models:
+                    self.removeItem(i)
+                    removed = True
+                    break
+
 
     def deleteLater(self, *args, **kwargs):
-        self._session.filereader_manager.triggers.remove_handler(self._add_handler)
-        self._session.filereader_manager.triggers.remove_handler(self._del_handler)
+        self._session.triggers.remove_handler(self._add_handler)
+        self._session.triggers.remove_handler(self._del_handler)
         
         return super().deleteLater(*args, **kwargs)
- 
-    def destroy(self, *args, **kwargs):
-        self._session.filereader_manager.triggers.remove_handler(self._add_handler)
-        self._session.filereader_manager.triggers.remove_handler(self._del_handler)
-        
-        return super().destroy(*args, **kwargs)
-
-    def close(self, *args, **kwargs):
-        self._session.filereader_manager.triggers.remove_handler(self._add_handler)
-        self._session.filereader_manager.triggers.remove_handler(self._del_handler)
-        
-        return super().close(*args, **kwargs)       
+    

@@ -228,6 +228,7 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
     open XYZ files
     """
     import os
+    import re
     import numpy as np
     from SEQCROW.managers import ADD_FILEREADER
     from AaronTools.utils import utils
@@ -350,7 +351,7 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
             slider.set_slider(struc.num_coordsets)
         data = []
         for comment in comments:
-            value = utils.float_num.search(comment)
+            value = re.search("-?\d+(?:(?:\.\d+)|(?:[Ee]-?\d+))", comment)
             if value:
                 data.append(float(value.group(0)))
             else:

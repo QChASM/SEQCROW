@@ -143,6 +143,118 @@ class _SEQCROW_API(BundleAPI):
         for hdlr in FileReader.LOG.handlers:
             hdlr.setStream(log)
 
+        _SEQCROW_API.register_class_snapshot_map(session)
+
+    @staticmethod
+    def register_class_snapshot_map(session):
+        import json
+    
+        from chimerax.core.state import State
+        
+        from AaronTools.atoms import Atom
+        from AaronTools.const import UNIT
+        from AaronTools.orbitals import Orbitals
+        from AaronTools.theory import Theory
+        from AaronTools.json_extension import ATEncoder, ATDecoder
+        from AaronTools.spectra import Frequency, ValenceExcitations
+        
+        class _ATState:
+            @staticmethod
+            def take_snapshot(obj, session, flags):
+                return {"aarontools object": json.dumps(obj, cls=ATEncoder)}
+            
+            @staticmethod
+            def restore_snapshot(session, data):
+                return json.loads(data["aarontools object"], cls=ATDecoder)
+        
+        class _Orbitals:
+            @staticmethod
+            def take_snapshot(obj, session, flags):
+                data = dict()
+                if obj.fmt == "fchk":
+                    data = {
+                        "file_type": "fchk",
+                        "Coordinates of each shell": obj.shell_coords / UNIT.A0_TO_BOHR,
+                        "Shell types": [
+                            _Orbitals.fchk_shell_map(x) for x in obj.shell_types
+                        ],
+                        "Contraction coefficients": obj.contraction_coeff,
+                        "P(S=P) Contraction coefficients": obj.sp_contraction_coeff,
+                        "Primitive exponents": obj.exponents,
+                        "Number of primitives per shell": obj.n_prim_per_shell,
+                        "Alpha Orbital Energies": obj.alpha_nrgs,
+                        "Beta Orbital Energies": obj.beta_nrgs,
+                        "Alpha MO coefficients": obj.alpha_coefficients,
+                        "Number of alpha electrons": obj.n_alpha,
+                    }
+                    if obj.beta_coefficients:
+                        data["Beta MO coefficients"] = obj.beta_coefficients
+
+                    try:
+                        data["Number of beta electrons"] = obj.n_beta
+                    except AttributeError:
+                        pass
+
+                elif obj.fmt == "nbo":
+                    data = {
+                        "file_type": "47",
+                        "exponents": obj.exponents,
+                        "alpha_coefficients": obj.alpha_coefficients,
+                        "n_prim_per_shell": obj.n_shell,
+                        "funcs_per_shell": obj.funcs_per_shell,
+                        "start_ndx": obj.start_ndx,
+                        "momentum_label": obj.momentum_label,
+                        **obj.coeffs_by_type,
+                    }
+                
+                elif obj.fmt == "orca":
+                    data = {
+                        "file_type": "out",
+                        "atoms": obj.atoms,
+                        "basis_set_by_ele": obj.basis_set_by_ele,
+                        "alpha_nrgs": obj.alpha_nrgs,
+                        "beta_nrgs": obj.beta_nrgs,
+                        "alpha_coefficients": obj.alpha_coefficients,
+                        "beta_coefficients": obj.beta_coefficients,
+                        "n_alpha": obj.n_alpha,
+                        "n_beta": obj.n_beta,
+                    }
+                    if obj.alpha_occupancies is not None:
+                        alpha_occ = data["alpha_occupancies"] = obj.alpha_occupancies
+                    if obj.beta_occupancies is not None:
+                        data["beta_occupancies"] = obj.beta_occupancies
+                
+                return data
+            
+            @staticmethod
+            def fchk_shell_map(x):
+                return {
+                    "s": 0,
+                    "p": 1,
+                    "sp": -1,
+                    "6d": 2,
+                    "5d": -2,
+                    "10f": 3,
+                    "7f": -3,
+                    "9g": -4,
+                    "11h": -5,
+                    "13i": -6,
+                }[x]
+            
+            @staticmethod
+            def restore_snapshot(session, data):
+                return Orbitals(data)
+
+        methods = {
+            Orbitals: _Orbitals,
+            Atom: _ATState,
+            Theory: _ATState,
+            Frequency: _ATState,
+            ValenceExcitations: _ATState,
+        }
+        
+        session.register_snapshot_methods(methods)
+
     @staticmethod
     def open_file(session, path, format_name, coordsets=False):
         """
@@ -313,10 +425,6 @@ class _SEQCROW_API(BundleAPI):
         elif ti.name == "Job Queue":
             from .tools.job_manager_tool import JobQueue
             return JobQueue(session, ti.name)
-
-        elif ti.name == "AaronJr Input Builder":
-            from .tools.aaronjr_input_builder import AARONInputBuilder
-            return AARONInputBuilder(session, ti.name)
 
         elif ti.name == "Bond Editor":
             from .tools.bond_editor import BondEditor
@@ -1003,28 +1111,44 @@ class _SEQCROW_API(BundleAPI):
         """AaronTools/SEQCROW classes for saving things"""
         if name == "FileReader":
             from AaronTools.fileIO import FileReader
+            print("yes")
             return FileReader
         elif name == "Orbitals":
             from AaronTools.fileIO import Orbitals
+            print("yes")
             return Orbitals
         elif name == "Frequency":
             from AaronTools.spectra import Frequency
+            print("yes")
             return Frequency
         elif name == "ValenceExcitations":
             from AaronTools.spectra import ValenceExcitations
+            print("yes")
             return ValenceExcitations
         elif name == "HarmonicVibration":
             from AaronTools.spectra import HarmonicVibration
+            print("yes")
             return HarmonicVibration
         elif name == "AnharmonicVibration":
             from AaronTools.spectra import AnharmonicVibration
+            print("yes")
             return AnharmonicVibration
         elif name == "ValenceExcitation":
             from AaronTools.spectra import ValenceExcitation
+            print("yes")
             return ValenceExcitation
         elif name == "Atom":
             from AaronTools.atoms import Atom
+            print("yes")
             return Atom
+        elif name == "Highlight":
+            from SEQCROW.commands.highlight import Highlight
+            print("yes")
+            return Highlight
+        elif name == "Theory":
+            from AaronTools.theory import Theory
+            print("yes")
+            return Theory
 
     @staticmethod
     def finish(session, bundle_info):
@@ -1038,21 +1162,24 @@ class _SEQCROW_API(BundleAPI):
         for model in models:
             if hasattr(model, "filereader") and model.filereader is not None:
                 fr = model.filereader
-                if (
-                    "orbitals" in fr.other and
-                    model.session.seqcrow_settings.settings.ORBIT_OPEN != "do nothing"
-                ):
-                    run(model.session, "ui tool show \"Orbital Viewer\"")
-                    model.session.logger.info(
-                        "automaticly opening the orbital tool can be disabled in the settings"
-                    )
-                if (
-                    "frequency" in fr.other and
-                    model.session.seqcrow_settings.settings.FREQ_OPEN != "do nothing"
-                ):
-                    run(model.session, "ui tool show \"Visualize Normal Modes\"")
-                    model.session.logger.info(
-                        "automaticly opening the vibrations tool can be disabled in the settings"
-                    )
+                if model.session.seqcrow_settings.settings.ORBIT_OPEN != "do nothing":
+                    try:
+                        fr["orbitals"]
+                        run(model.session, "ui tool show \"Orbital Viewer\"")
+                        model.session.logger.info(
+                            "automaticly opening the orbital tool can be disabled in the settings"
+                        )
+                    except Exception:
+                        pass
+
+                if model.session.seqcrow_settings.settings.FREQ_OPEN != "do nothing":
+                    try:
+                        fr["frequency"]
+                        run(model.session, "ui tool show \"Visualize Normal Modes\"")
+                        model.session.logger.info(
+                            "automaticly opening the vibrations tool can be disabled in the settings"
+                        )
+                    except Exception:
+                        pass
 
 bundle_api = _SEQCROW_API()
