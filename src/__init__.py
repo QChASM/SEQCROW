@@ -215,18 +215,14 @@ class _SEQCROW_API(BundleAPI):
                         "alpha_nrgs": obj.alpha_nrgs,
                         "beta_nrgs": obj.beta_nrgs,
                         "alpha_coefficients": obj.alpha_coefficients,
-                        "beta_coefficients": obj.beta_coefficientsbeta_nrgs,
+                        "beta_coefficients": obj.beta_coefficients,
                         "n_alpha": obj.n_alpha,
                         "n_beta": obj.n_beta,
                     }
-                    try:
-                        data["alpha_occupancies"] = obj.alpha_occupancies
-                    except AttributeError:
-                        pass
-                    try:
+                    if obj.alpha_occupancies is not None:
+                        alpha_occ = data["alpha_occupancies"] = obj.alpha_occupancies
+                    if obj.beta_occupancies is not None:
                         data["beta_occupancies"] = obj.beta_occupancies
-                    except AttributeError:
-                        pass
                 
                 return data
             
