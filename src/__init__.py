@@ -143,6 +143,122 @@ class _SEQCROW_API(BundleAPI):
         for hdlr in FileReader.LOG.handlers:
             hdlr.setStream(log)
 
+        _SEQCROW_API.register_class_snapshot_map(session)
+
+    @staticmethod
+    def register_class_snapshot_map(session):
+        import json
+    
+        from chimerax.core.state import State
+        
+        from AaronTools.atoms import Atom
+        from AaronTools.const import UNIT
+        from AaronTools.orbitals import Orbitals
+        from AaronTools.theory import Theory
+        from AaronTools.json_extension import ATEncoder, ATDecoder
+        from AaronTools.spectra import Frequency, ValenceExcitations
+        
+        class _ATState:
+            @staticmethod
+            def take_snapshot(obj, session, flags):
+                return {"aarontools object": json.dumps(obj, cls=ATEncoder)}
+            
+            @staticmethod
+            def restore_snapshot(session, data):
+                return json.loads(data["aarontools object"], cls=ATDecoder)
+        
+        class _Orbitals:
+            @staticmethod
+            def take_snapshot(obj, session, flags):
+                data = dict()
+                if obj.fmt == "fchk":
+                    data = {
+                        "file_type": "fchk",
+                        "Coordinates of each shell": obj.shell_coords / UNIT.A0_TO_BOHR,
+                        "Shell types": [
+                            _Orbitals.fchk_shell_map(x) for x in obj.shell_types
+                        ],
+                        "Contraction coefficients": obj.contraction_coeff,
+                        "P(S=P) Contraction coefficients": obj.sp_contraction_coeff,
+                        "Primitive exponents": obj.exponents,
+                        "Number of primitives per shell": obj.n_prim_per_shell,
+                        "Alpha Orbital Energies": obj.alpha_nrgs,
+                        "Beta Orbital Energies": obj.beta_nrgs,
+                        "Alpha MO coefficients": obj.alpha_coefficients,
+                        "Number of alpha electrons": obj.n_alpha,
+                    }
+                    if obj.beta_coefficients:
+                        data["Beta MO coefficients"] = obj.beta_coefficients
+
+                    try:
+                        data["Number of beta electrons"] = obj.n_beta
+                    except AttributeError:
+                        pass
+
+                elif obj.fmt == "nbo":
+                    data = {
+                        "file_type": "47",
+                        "exponents": obj.exponents,
+                        "alpha_coefficients": obj.alpha_coefficients,
+                        "n_prim_per_shell": obj.n_shell,
+                        "funcs_per_shell": obj.funcs_per_shell,
+                        "start_ndx": obj.start_ndx,
+                        "momentum_label": obj.momentum_label,
+                        **obj.coeffs_by_type,
+                    }
+                
+                elif obj.fmt == "orca":
+                    data = {
+                        "file_type": "out",
+                        "atoms": obj.atoms,
+                        "basis_set_by_ele": obj.basis_set_by_ele,
+                        "alpha_nrgs": obj.alpha_nrgs,
+                        "beta_nrgs": obj.beta_nrgs,
+                        "alpha_coefficients": obj.alpha_coefficients,
+                        "beta_coefficients": obj.beta_coefficientsbeta_nrgs,
+                        "n_alpha": obj.n_alpha,
+                        "n_beta": obj.n_beta,
+                    }
+                    try:
+                        data["alpha_occupancies"] = obj.alpha_occupancies
+                    except AttributeError:
+                        pass
+                    try:
+                        data["beta_occupancies"] = obj.beta_occupancies
+                    except AttributeError:
+                        pass
+                
+                return data
+            
+            @staticmethod
+            def fchk_shell_map(x):
+                return {
+                    "s": 0,
+                    "p": 1,
+                    "sp": -1,
+                    "6d": 2,
+                    "5d": -2,
+                    "10f": 3,
+                    "7f": -3,
+                    "9g": -4,
+                    "11h": -5,
+                    "13i": -6,
+                }[x]
+            
+            @staticmethod
+            def restore_snapshot(session, data):
+                return Orbitals(data)
+
+        methods = {
+            Orbitals: _Orbitals,
+            Atom: _ATState,
+            Theory: _ATState,
+            Frequency: _ATState,
+            ValenceExcitations: _ATState,
+        }
+        
+        session.register_snapshot_methods(methods)
+
     @staticmethod
     def open_file(session, path, format_name, coordsets=False):
         """
@@ -313,10 +429,6 @@ class _SEQCROW_API(BundleAPI):
         elif ti.name == "Job Queue":
             from .tools.job_manager_tool import JobQueue
             return JobQueue(session, ti.name)
-
-        elif ti.name == "AaronJr Input Builder":
-            from .tools.aaronjr_input_builder import AARONInputBuilder
-            return AARONInputBuilder(session, ti.name)
 
         elif ti.name == "Bond Editor":
             from .tools.bond_editor import BondEditor
@@ -1041,7 +1153,6 @@ class _SEQCROW_API(BundleAPI):
             from AaronTools.theory import Theory
             print("yes")
             return Theory
-            
 
     @staticmethod
     def finish(session, bundle_info):

@@ -975,12 +975,12 @@ class ResidueCollection(Geometry):
         if not any(attr[0] == "filereader" for attr in struc.custom_attrs):
             struc.register_attr(
                 session,
-                "filereader",
+                "filereaders",
                 "FileReader",
-                attr_type=dict,
+                attr_type=list,
             )
         if filereader is not None:
-            struc.filereader = {key: filereader[key] for key in filereader.keys()}
+            struc.filereaders = [{key: filereader[key] for key in filereader.keys()}]
         struc.comment = self.comment
 
         self.update_chix(struc, discard_residues=discard_residues)
