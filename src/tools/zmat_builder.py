@@ -139,7 +139,7 @@ class ZMatrixBuilder(ToolInstance):
             button.clicked.connect(
                 lambda *args, a=angle: self.set_angle_value(a)
             )
-            button.setMaximumWidth(3.2 * button.fontMetrics().boundingRect("0000").width())
+            button.setMaximumWidth(int(3.2 * button.fontMetrics().boundingRect("0000").width()))
             quick_angles_layout.addWidget(button, 0, 2 * i + 1, 1, 2, alignment=Qt.AlignHCenter | Qt.AlignTop)
         
         for i, angle in enumerate([-120, -90, -60, 0, 60, 90, 120, 180]):
@@ -147,7 +147,7 @@ class ZMatrixBuilder(ToolInstance):
             button.clicked.connect(
                 lambda *args, a=angle: self.set_torsion_value(a)
             )
-            button.setMaximumWidth(1.6 * button.fontMetrics().boundingRect("0000").width())
+            button.setMaximumWidth(int(1.6 * button.fontMetrics().boundingRect("0000").width()))
             quick_angles_layout.addWidget(button, 1, i + 1, 1, 1, alignment=Qt.AlignHCenter | Qt.AlignTop)
         
         layout.addRow(quick_angles)
