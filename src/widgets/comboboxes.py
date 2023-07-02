@@ -137,7 +137,6 @@ class FilereaderComboBox(QComboBox):
             try:
                 for fr in mdl.filereaders:
                     if self._other and not all(x in fr for x in self._other):
-                        print("skipping", self._other)
                         continue
                     if self._other is None or all(x in fr for x in self._other):
                         self.addItem(
@@ -146,7 +145,6 @@ class FilereaderComboBox(QComboBox):
                         )
             
             except AttributeError as e:
-                print("skipping", e)
                 pass
 
     def _del_filereaders(self, trigger_name, models):

@@ -40,7 +40,7 @@ from AaronTools.fileIO import Orbitals
 from AaronTools.utils.utils import available_memory
 
 from SEQCROW.residue_collection import ResidueCollection
-from SEQCROW.widgets import FilereaderComboBox
+from SEQCROW.widgets import FilereaderComboBox, ScientificSpinBox
 from SEQCROW.utils import iter2str
 
 
@@ -201,10 +201,12 @@ class OrbitalViewer(ToolInstance):
         
         options_layout.addRow("colors:", color_options)
         
-        self.iso_value = QDoubleSpinBox()
-        self.iso_value.setDecimals(4)
-        self.iso_value.setRange(1e-4, 1)
-        self.iso_value.setSingleStep(0.001)
+        self.iso_value = ScientificSpinBox(
+            minimum=1e-8,
+            maximum=1,
+            decimals=4,
+            maxAbsoluteCharacteristic=8,
+        )
         self.iso_value.setValue(self.settings.iso_val)
         options_layout.addRow("isosurface:", self.iso_value)
 
@@ -261,10 +263,12 @@ class OrbitalViewer(ToolInstance):
 
         e_density_layout.addRow("color:", color_options)
         
-        self.ed_iso_value = QDoubleSpinBox()
-        self.ed_iso_value.setDecimals(4)
-        self.ed_iso_value.setRange(1e-4, 5)
-        self.ed_iso_value.setSingleStep(1e-3)
+        self.ed_iso_value =ScientificSpinBox(
+            minimum=1e-8,
+            maximum=5,
+            decimals=4,
+            maxAbsoluteCharacteristic=8,
+        )
         self.ed_iso_value.setValue(self.settings.ed_iso_val)
         e_density_layout.addRow("isosurface:", self.ed_iso_value)
 
@@ -330,10 +334,12 @@ class OrbitalViewer(ToolInstance):
         
         fukui_volume_layout.addRow("colors:", fukui_color_options)
 
-        self.fd_iso_value = QDoubleSpinBox()
-        self.fd_iso_value.setDecimals(4)
-        self.fd_iso_value.setRange(1e-4, 5)
-        self.fd_iso_value.setSingleStep(1e-3)
+        self.fd_iso_value = ScientificSpinBox(
+            minimum=1e-8,
+            maximum=1,
+            decimals=4,
+            maxAbsoluteCharacteristic=8,
+        )
         self.fd_iso_value.setValue(self.settings.fd_iso_val)
         fukui_volume_layout.addRow("isosurface:", self.fd_iso_value)
 
