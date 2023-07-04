@@ -124,7 +124,7 @@ class EnergyPlot(ToolInstance):
         ax = self.figure.add_axes((0.25, 0.20, 0.6, 0.60))
 
         fr = self.filereader
-        if fr.all_geom is None:
+        if fr["all_geom"] is None:
             self.opened = False
             return
 
@@ -137,7 +137,7 @@ class EnergyPlot(ToolInstance):
             
             self.data = OrderedDict()
             info = []
-            for i, (step, cs_id) in enumerate(zip(fr.all_geom, self.structure.coordset_ids)):
+            for i, (step, cs_id) in enumerate(zip(fr["all_geom"], self.structure.coordset_ids)):
                 info = step["data"]
                 if "energy" not in info:
                     continue

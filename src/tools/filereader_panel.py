@@ -93,9 +93,9 @@ class FileReaderPanel(ToolInstance):
             
             item.setData(self.NAME_COL, Qt.UserRole, model)
             item.setText(self.NAME_COL, name)
-            item.setText(self.ID_COL, ".".join([str(x) for x in id]))
+            item.setText(self.ID_COL, model.atomspec)
             
-            if any(fr["all_geom"] and len(fr["all_geom"]) > 1 for fr in filereaders):
+            if any(fr["all_geom"] and len(fr["all_geom"]) > 2 for fr in filereaders):
                 item.setText(self.COORDSETS_COL, "yes")
             else:
                 item.setText(self.COORDSETS_COL, "no")
@@ -113,8 +113,8 @@ class FileReaderPanel(ToolInstance):
             for fr in filereaders:
                 child = QTreeWidgetItem(item)
                 child.setData(self.NAME_COL, Qt.UserRole, fr)
-                child.setText(self.NAME_COL, fr.name)
-                if fr["all_geom"] is not None and len(fr["all_geom"]) > 1:
+                child.setText(self.NAME_COL, fr["name"])
+                if fr["all_geom"] is not None and len(fr["all_geom"]) > 2:
                     child.setText(self.COORDSETS_COL, "yes")
                 else:
                     child.setText(self.COORDSETS_COL, "no")
@@ -167,7 +167,7 @@ class FileReaderPanel(ToolInstance):
             parent = item.parent()
             if parent is None:
                 mdl = item.data(self.NAME_COL, Qt.UserRole)
-                fr = mdl.filereaderes[-1]
+                fr = mdl.filereaders[-1]
             else:
                 mdl = parent.data(self.NAME_COL, Qt.UserRole)
                 fr = item.data(self.NAME_COL, Qt.UserRole)

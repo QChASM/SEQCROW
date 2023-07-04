@@ -970,16 +970,17 @@ class IRSpectrum(ToolInstance):
             j = 0
             for conf_ndx in range(2, mol.childCount(), 2):
                 conf = mol.child(conf_ndx)
-                uv_vis_file = self.tree.itemWidget(conf, 0).currentData()
-                if uv_vis_file is None:
+                data = self.tree.itemWidget(conf, 0).currentData()
+                if data is None:
                     continue
+                fr, _ = data
                 conf_style = mol.child(conf_ndx + 1)
                 show_button = self.tree.itemWidget(conf_style, 0).layout().itemAt(1).widget()
                 if w[j] > min_pop:
                     show_button.setCheckState(Qt.Checked)
                     self.session.logger.info(
                         "Boltzmann population of %s: %.1f%%" % (
-                            uv_vis_file.name,
+                            fr["name"],
                             100 * w[j],
                         )
                     )
