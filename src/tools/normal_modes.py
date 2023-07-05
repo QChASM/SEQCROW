@@ -299,8 +299,7 @@ class NormalModes(ToolInstance):
         
         self.tool_window.ui_area.setLayout(layout)
 
-        if len(self.session.filereader_manager.frequency_models) > 0:
-            self.create_freq_table(0)
+        self.create_freq_table(0)
 
         self.tool_window.manage(None)
 

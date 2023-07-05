@@ -159,9 +159,14 @@ class _SEQCROW_API(BundleAPI):
         from AaronTools.spectra import Frequency, ValenceExcitations
         
         class _ATState:
+            version = 1
+            
             @staticmethod
             def take_snapshot(obj, session, flags):
-                return {"aarontools object": json.dumps(obj, cls=ATEncoder)}
+                return {
+                    "aarontools object": json.dumps(obj, cls=ATEncoder),
+                    "version": _ATState.version,
+                }
             
             @staticmethod
             def restore_snapshot(session, data):
@@ -1107,47 +1112,24 @@ class _SEQCROW_API(BundleAPI):
 
     @staticmethod
     def get_class(name):
-        print(name)
         """AaronTools/SEQCROW classes for saving things"""
-        if name == "FileReader":
-            from AaronTools.fileIO import FileReader
-            print("yes")
-            return FileReader
-        elif name == "Orbitals":
+        if name == "Orbitals":
             from AaronTools.fileIO import Orbitals
-            print("yes")
             return Orbitals
         elif name == "Frequency":
             from AaronTools.spectra import Frequency
-            print("yes")
             return Frequency
         elif name == "ValenceExcitations":
             from AaronTools.spectra import ValenceExcitations
-            print("yes")
             return ValenceExcitations
-        elif name == "HarmonicVibration":
-            from AaronTools.spectra import HarmonicVibration
-            print("yes")
-            return HarmonicVibration
-        elif name == "AnharmonicVibration":
-            from AaronTools.spectra import AnharmonicVibration
-            print("yes")
-            return AnharmonicVibration
-        elif name == "ValenceExcitation":
-            from AaronTools.spectra import ValenceExcitation
-            print("yes")
-            return ValenceExcitation
         elif name == "Atom":
             from AaronTools.atoms import Atom
-            print("yes")
             return Atom
         elif name == "Highlight":
             from SEQCROW.commands.highlight import Highlight
-            print("yes")
             return Highlight
         elif name == "Theory":
             from AaronTools.theory import Theory
-            print("yes")
             return Theory
 
     @staticmethod
