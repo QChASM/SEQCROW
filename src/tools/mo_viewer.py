@@ -40,7 +40,7 @@ from AaronTools.fileIO import Orbitals
 from AaronTools.utils.utils import available_memory
 
 from SEQCROW.residue_collection import ResidueCollection
-from SEQCROW.widgets import FilereaderComboBox
+from SEQCROW.widgets import FilereaderComboBox, ScientificSpinBox
 from SEQCROW.utils import iter2str
 
 
@@ -57,35 +57,23 @@ ORBITAL_VOLUME_NAMES = [
 class OrbitalGrid(GridData):
     polar_values = True
     
-    def read_matrix(self,
-        ijk_origin=(0,0,0),
-        ijk_size=None,
-        ijk_step=(1,1,1),
-        progress=None,
-    ):
-        if ijk_size is None:
-            ijk_size = self.data.shape
-        return self._data[
-            ijk_origin[2]:ijk_size[2] + ijk_origin[2]:ijk_step[2],
-            ijk_origin[1]:ijk_size[1] + ijk_origin[1]:ijk_step[1],
-            ijk_origin[0]:ijk_size[0] + ijk_origin[0]:ijk_step[0]
-        ]
+    @property
+    def size(self):
+        try:
+            return self._shape
+        except AttributeError:
+            return self._data.shape
     
-    def matrix(
-        self,
-        ijk_origin=(0,0,0),
-        ijk_size=None,
-        ijk_step=(1,1,1),
-        progress=None,
-        from_cache_only=False
-    ):
-        if ijk_size is None:
-            ijk_size = self.data.shape
-        return self._data[
-            ijk_origin[2]:ijk_size[2] + ijk_origin[2]:ijk_step[2],
-            ijk_origin[1]:ijk_size[1] + ijk_origin[1]:ijk_step[1],
-            ijk_origin[0]:ijk_size[0] + ijk_origin[0]:ijk_step[0]
-        ]
+    @size.setter
+    def size(self, val):
+        self._shape = val
+
+    def read_matrix(self, ijk_origin, ijk_size, ijk_step, progress):
+        self._size = self._data.shape
+        if ijk_size != self.size:
+            self.cache_data(self._data, (0,0,0), self.size, (1,1,1)) # Cache full data.
+        m = self.matrix_slice(self._data, ijk_origin, ijk_size, ijk_step)
+        return m
 
 
 class _OrbitalSettings(Settings):
@@ -213,10 +201,12 @@ class OrbitalViewer(ToolInstance):
         
         options_layout.addRow("colors:", color_options)
         
-        self.iso_value = QDoubleSpinBox()
-        self.iso_value.setDecimals(4)
-        self.iso_value.setRange(1e-4, 1)
-        self.iso_value.setSingleStep(0.001)
+        self.iso_value = ScientificSpinBox(
+            minimum=1e-8,
+            maximum=1,
+            decimals=4,
+            maxAbsoluteCharacteristic=8,
+        )
         self.iso_value.setValue(self.settings.iso_val)
         options_layout.addRow("isosurface:", self.iso_value)
 
@@ -273,10 +263,12 @@ class OrbitalViewer(ToolInstance):
 
         e_density_layout.addRow("color:", color_options)
         
-        self.ed_iso_value = QDoubleSpinBox()
-        self.ed_iso_value.setDecimals(4)
-        self.ed_iso_value.setRange(1e-4, 5)
-        self.ed_iso_value.setSingleStep(1e-3)
+        self.ed_iso_value =ScientificSpinBox(
+            minimum=1e-8,
+            maximum=5,
+            decimals=4,
+            maxAbsoluteCharacteristic=8,
+        )
         self.ed_iso_value.setValue(self.settings.ed_iso_val)
         e_density_layout.addRow("isosurface:", self.ed_iso_value)
 
@@ -342,10 +334,12 @@ class OrbitalViewer(ToolInstance):
         
         fukui_volume_layout.addRow("colors:", fukui_color_options)
 
-        self.fd_iso_value = QDoubleSpinBox()
-        self.fd_iso_value.setDecimals(4)
-        self.fd_iso_value.setRange(1e-4, 5)
-        self.fd_iso_value.setSingleStep(1e-3)
+        self.fd_iso_value = ScientificSpinBox(
+            minimum=1e-8,
+            maximum=1,
+            decimals=4,
+            maxAbsoluteCharacteristic=8,
+        )
         self.fd_iso_value.setValue(self.settings.fd_iso_val)
         fukui_volume_layout.addRow("isosurface:", self.fd_iso_value)
 
@@ -436,11 +430,12 @@ class OrbitalViewer(ToolInstance):
         if ndx == -1:
             return
         
-        fr = self.model_selector.currentData()
-        if fr is None:
+        data = self.model_selector.currentData()
+        if data is None:
             return
+        fr, model = data
         
-        orbits = fr.other["orbitals"]
+        orbits = fr["orbitals"]
 
         self.fukui_group.setEnabled(True)
         self.e_density_group.setEnabled(True)
@@ -450,7 +445,7 @@ class OrbitalViewer(ToolInstance):
             np.isclose(occ, 1) or np.isclose(occ, 0) for occ in orbits.alpha_occupancies
         ):
             self.fukui_group.setEnabled(False)
-            if "orbit_kinds" not in fr.other:
+            if "orbit_kinds" not in fr:
                 self.mo_table.setColumnCount(3)
                 self.mo_table.setHorizontalHeaderLabels(
                     ["#", "alpha + beta occ.", "Energy (E\u2095)"]
@@ -492,7 +487,7 @@ class OrbitalViewer(ToolInstance):
                 for occ in [*orbits.alpha_occupancies, *orbits.beta_occupancies]
             ):
             self.fukui_group.setEnabled(False)
-            if "orbit_kinds" not in fr.other:
+            if "orbit_kinds" not in fr:
                 self.mo_table.setColumnCount(5)
                 self.mo_table.setHorizontalHeaderLabels(
                     ["#", "alpha occ.", "beta occ.", "alpha energy (E\u2095)", "beta energy (E\u2095)"]
@@ -546,7 +541,7 @@ class OrbitalViewer(ToolInstance):
             if not homo_ndx:
                 homo_ndx = orbits.n_mos - max(orbits.n_alpha, orbits.n_beta)
         elif orbits.beta_nrgs is None or len(orbits.beta_nrgs) == 0:
-            if "orbit_kinds" not in fr.other:
+            if "orbit_kinds" not in fr:
                 self.mo_table.setColumnCount(3)
                 self.mo_table.setHorizontalHeaderLabels(
                     ["#", "Ground State Occ.", "Energy (E\u2095)"]
@@ -576,9 +571,9 @@ class OrbitalViewer(ToolInstance):
                 if i >= (orbits.n_mos - orbits.n_beta):
                     occ += "\u21c2"
 
-                if "orbit_kinds" in fr.other:
+                if "orbit_kinds" in fr:
                     change_font = False
-                    occ = fr.other["orbit_kinds"][-i - 1]
+                    occ = fr["orbit_kinds"][-i - 1]
                     if not homo_ndx and "ry" not in occ and "*" not in occ:
                         homo_ndx = i
 
@@ -676,23 +671,25 @@ class OrbitalViewer(ToolInstance):
         run(self.session, "open https://doi.org/%s" % doi)
 
     def get_coords(self):
-        fr = self.model_selector.currentData()
-        if fr is None:
+        data = self.model_selector.currentData()
+        if data is None:
             return
+        fr, model = data
         spacing = self.spacing.value()
         padding = self.padding.value()
 
         return Orbitals.get_cube_array(
-            ResidueCollection(fr, refresh_connected=False, refresh_ranks=False),
+            ResidueCollection(fr["atoms"], refresh_connected=False, refresh_ranks=False),
             padding=padding,
             spacing=spacing,
         )
 
     def show_orbit(self):
-        fr = self.model_selector.currentData()
-        if fr is None:
+        data = self.model_selector.currentData()
+        if data is None:
             return
-        model = self.session.filereader_manager.get_model(fr)
+        fr, model = data
+        orbits = fr["orbitals"]
 
         table_items = self.mo_table.selectedItems()
         if len(table_items) == 0:
@@ -705,8 +702,6 @@ class OrbitalViewer(ToolInstance):
         if isinstance(mo, tuple):
             mo, alpha_or_beta = mo
             alpha = alpha_or_beta == "alpha"
-
-        orbits = fr.other["orbitals"]
 
         padding = self.padding.value()
         self.settings.padding = padding
@@ -777,7 +772,7 @@ class OrbitalViewer(ToolInstance):
         mem = orbits.memory_estimate(
             "mo_value",
             n_points=n_val,
-            n_atoms=len(fr.atoms),
+            n_atoms=len(fr["atoms"]),
             n_jobs=threads,
         )
         if mem * 1e9 > (0.9 * available_memory()):
@@ -810,6 +805,7 @@ class OrbitalViewer(ToolInstance):
             origin=com,
             rotation=u,
             step=[np.linalg.norm(v) for v in [v1, v2, v3]],
+            value_type=val.dtype,
         )
         grid._data = np.swapaxes(val, 0, 2)
         
@@ -836,11 +832,11 @@ class OrbitalViewer(ToolInstance):
         self.session.models.add([vol], parent=model)
 
     def show_e_density(self, *, spin=False):
-        fr = self.model_selector.currentData()
-        if fr is None:
+        data = self.model_selector.currentData()
+        if data is None:
             return
-        model = self.session.filereader_manager.get_model(fr)
-        orbits = fr.other["orbitals"]
+        fr, model = data
+        orbits = fr["orbitals"]
 
         padding = self.padding.value()
         self.settings.padding = padding
@@ -919,7 +915,7 @@ class OrbitalViewer(ToolInstance):
         mem = orbits.memory_estimate(
             "density_value",
             n_points=n_val,
-            n_atoms=len(fr.atoms),
+            n_atoms=len(fr["atoms"]),
             n_jobs=threads,
         )
         if mem * 1e9 > (0.9 * available_memory()):
@@ -954,6 +950,7 @@ class OrbitalViewer(ToolInstance):
             origin=com,
             rotation=u,
             step=[np.linalg.norm(v) for v in [v1, v2, v3]],
+            value_type=val.dtype,
         )
         grid._data = np.swapaxes(val, 0, 2)
         
@@ -979,12 +976,12 @@ class OrbitalViewer(ToolInstance):
         self.session.models.add([vol], parent=model)
 
     def show_fukui_donor(self):
-        fr = self.model_selector.currentData()
-        if fr is None:
+        data = self.model_selector.currentData()
+        if data is None:
             return
-        model = self.session.filereader_manager.get_model(fr)
-        orbits = fr.other["orbitals"]
- 
+        fr, model = data
+        orbits = fr["orbitals"]
+
         padding = self.padding.value()
         self.settings.padding = padding
         spacing = self.spacing.value()
@@ -1081,7 +1078,7 @@ class OrbitalViewer(ToolInstance):
         mem = orbits.memory_estimate(
             "fukui_donor_value",
             n_points=n_val,
-            n_atoms=len(fr.atoms),
+            n_atoms=len(fr["atoms"]),
             n_jobs=threads,
         )
         if mem * 1e9 > (0.9 * available_memory()):
@@ -1116,6 +1113,7 @@ class OrbitalViewer(ToolInstance):
             origin=com,
             rotation=u,
             step=[np.linalg.norm(v) for v in [v1, v2, v3]],
+            value_type=val.dtype,
         )
         grid._data = np.swapaxes(val, 0, 2)
         
@@ -1141,11 +1139,11 @@ class OrbitalViewer(ToolInstance):
         self.session.models.add([vol], parent=model)
 
     def show_fukui_acceptor(self):
-        fr = self.model_selector.currentData()
-        if fr is None:
+        data = self.model_selector.currentData()
+        if data is None:
             return
-        model = self.session.filereader_manager.get_model(fr)
-        orbits = fr.other["orbitals"]
+        fr, model = data
+        orbits = fr["orbitals"]
 
         padding = self.padding.value()
         self.settings.padding = padding
@@ -1243,7 +1241,7 @@ class OrbitalViewer(ToolInstance):
         mem = orbits.memory_estimate(
             "fukui_acceptor_value",
             n_points=n_val,
-            n_atoms=len(fr.atoms),
+            n_atoms=len(fr["atoms"]),
             n_jobs=threads,
         )
         if mem * 1e9 > (0.9 * available_memory()):
@@ -1278,6 +1276,7 @@ class OrbitalViewer(ToolInstance):
             origin=com,
             rotation=u,
             step=[np.linalg.norm(v) for v in [v1, v2, v3]],
+            value_type=val.dtype,
         )
         grid._data = np.swapaxes(val, 0, 2)
         
@@ -1303,11 +1302,11 @@ class OrbitalViewer(ToolInstance):
         self.session.models.add([vol], parent=model)
 
     def show_fukui_dual(self):
-        fr = self.model_selector.currentData()
-        if fr is None:
+        data = self.model_selector.currentData()
+        if data is None:
             return
-        model = self.session.filereader_manager.get_model(fr)
-        orbits = fr.other["orbitals"]
+        fr, model = data
+        orbits = fr["orbitals"]
 
         padding = self.padding.value()
         self.settings.padding = padding
@@ -1413,7 +1412,7 @@ class OrbitalViewer(ToolInstance):
         mem = orbits.memory_estimate(
             "fukui_dual_value",
             n_points=n_val,
-            n_atoms=len(fr.atoms),
+            n_atoms=len(fr["atoms"]),
             n_jobs=threads,
         )
         if mem * 1e9 > (0.9 * available_memory()):
@@ -1448,6 +1447,7 @@ class OrbitalViewer(ToolInstance):
             origin=com,
             rotation=u,
             step=[np.linalg.norm(v) for v in [v1, v2, v3]],
+            value_type=val.dtype,
         )
         grid._data = np.swapaxes(val, 0, 2)
         

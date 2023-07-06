@@ -286,7 +286,7 @@ def percent_vbur(
     s = "<pre>model\tcenter\t%Vbur\n"
     
     for model in models:
-        rescol = ResidueCollection(model)
+        rescol = ResidueCollection(model, use_scene=useScene)
         ligand_atoms = models[model]
         if len(ligand_atoms) == 0:
             ligand_atoms = None

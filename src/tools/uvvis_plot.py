@@ -14,6 +14,7 @@ from AaronTools.spectra import ValenceExcitations
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
 from matplotlib import rcParams
+import matplotlib.patheffects as pe
 
 from Qt.QtCore import Qt, QSize
 from Qt.QtGui import QIcon, QPixmap
@@ -640,10 +641,10 @@ class UVVisSpectrum(ToolInstance):
             
             self.figure.set_size_inches(w, h)
             
-            self.canvas.setMinimumHeight(96 * h)
-            self.canvas.setMaximumHeight(96 * h)
-            self.canvas.setMinimumWidth(96 * w)
-            self.canvas.setMaximumWidth(96 * w)
+            self.canvas.setMinimumHeight(int(96 * h))
+            self.canvas.setMaximumHeight(int(96 * h))
+            self.canvas.setMinimumWidth(int(96 * w))
+            self.canvas.setMaximumWidth(int(96 * w))
         else:
             self.canvas.setMinimumHeight(1)
             self.canvas.setMaximumHeight(100000)
@@ -838,10 +839,11 @@ class UVVisSpectrum(ToolInstance):
                 mol = self.tree.topLevelItem(mol_ndx)
                 for conf_ndx in range(2, mol.childCount(), 2):
                     conf = mol.child(conf_ndx)
-                    fr = self.tree.itemWidget(conf, 0).currentData()
-                    if fr is None:
+                    data = self.tree.itemWidget(conf, 0).currentData()
+                    if data is None:
                         continue
-                    uv_vis = fr.other["uv_vis"]
+                    fr, _ = data
+                    uv_vis = fr["uv_vis"]
                     
                     data_attr = "data"
                     if self.spectra_type.currentText() == "transient":
@@ -914,7 +916,7 @@ class UVVisSpectrum(ToolInstance):
             data_attr = "transient_data"
         elif self.spectra_type.currentText() == "SOC":
             data_attr = "spin_orbit_data"
-                    
+
         uv_vis_files = []
         freqs = []
         single_points = []
@@ -929,14 +931,20 @@ class UVVisSpectrum(ToolInstance):
             mol_fracs.append(mol_fracs_widget.value())
 
             for conf_ndx in range(2, mol.childCount(), 2):
-
                 conf = mol.child(conf_ndx)
-                uv_vis_file = self.tree.itemWidget(conf, 0).currentData()
-                if uv_vis_file is None:
+                data = self.tree.itemWidget(conf, 0).currentData()
+                if data is None:
                     continue
-                uv_vis_files[-1].append(uv_vis_file.other["uv_vis"])
+                fr, mdl = data
+                uv_vis = fr["uv_vis"]
+                if getattr(uv_vis, data_attr) is None:
+                    self.session.logger.warning("%s does not have %s data - skipping" % (
+                        fr["name"], self.spectra_type.currentText(),
+                    ))
+                    continue
+                uv_vis_files[-1].append(uv_vis)
 
-                sp_file = self.tree.itemWidget(conf, 2).currentData()
+                sp_file, _ = self.tree.itemWidget(conf, 2).currentData()
                 single_points[-1].append(CompOutput(sp_file))
 
                 if weight_method != CompOutput.ELECTRONIC_ENERGY:
@@ -947,6 +955,7 @@ class UVVisSpectrum(ToolInstance):
                             " based on electronic energy"
                         )
                         return
+                    freq_file, _ = freq_file
                     freqs[-1].append(CompOutput(freq_file))
                 
                     rmsd = freqs[-1][-1].geometry.RMSD(
@@ -960,7 +969,7 @@ class UVVisSpectrum(ToolInstance):
                 else:
                     freqs[-1].append(None)
                 
-                geom = Geometry(uv_vis_file)
+                geom = Geometry(fr["atoms"])
                 rmsd = single_points[-1][-1].geometry.RMSD(
                     geom,
                     sort=True,
@@ -981,7 +990,7 @@ class UVVisSpectrum(ToolInstance):
                         (start_ndx, stop_ndx),
                         [c / 255. for c in color],
                         line_style,
-                        uv_vis_file.name,
+                        fr["name"],
                     ])
 
             if not uv_vis_files[-1]:
@@ -1211,8 +1220,7 @@ class UVVisSpectrum(ToolInstance):
             elif plot_type == "ECD (dipole velocity)":
                 y_rel = excit.rotatory_str_vel / item.rotatory_str_vel
        
-            mdl = self.session.filereader_manager.get_model(fr)
-            label = "%s" % mdl.name
+            label = "%s" % fr["name"]
             label += "\n%.2f %s" % (nrg, "nm" if use_nm else "eV")
             if shift:
                 if use_nm:
@@ -1239,6 +1247,7 @@ class UVVisSpectrum(ToolInstance):
                     label,
                     va="bottom" if y_vals[1] > 0 else "top",
                     ha="left" if x_mid else "right",
+                    path_effects=[pe.withStroke(linewidth=2, foreground="white")],
                 )
             )
             

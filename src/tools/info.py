@@ -246,8 +246,7 @@ class Info(ToolInstance):
         self._menu = menu
         layout.setMenuBar(menu)
 
-        if len(self.session.filereader_manager.list()) > 0:
-            self.fill_table(0)
+        self.fill_table(0)
 
         self.tool_window.ui_area.setLayout(layout)
 
@@ -343,25 +342,28 @@ class Info(ToolInstance):
             return
         
         fr = self.file_selector.currentData()
+        if fr is None:
+            return
+        fr, _ = fr
         item = QTableWidgetItem()
         item.setData(Qt.DisplayRole, "name")
         val = QTableWidgetItem()
-        val.setData(Qt.DisplayRole, fr.name)
+        val.setData(Qt.DisplayRole, fr["name"])
         self.table.insertRow(0)
         self.table.setItem(0, 0, item)
         self.table.setItem(0, 1, val)
         self.add_copy_button(0)
-        for info in fr.other.keys():
+        for info in fr.keys():
             if info == "archive" and not self.settings.archive:
                 continue
 
-            if any(isinstance(fr.other[info], obj) for obj in [str, float, int]):
+            if any(isinstance(fr[info], obj) for obj in [str, float, int]):
                 row = self.table.rowCount()
                 self.table.insertRow(row)
                 
                 item = QTableWidgetItem()
                 info_name = info.replace("_", " ")
-                val = fr.other[info]
+                val = fr[info]
                 if info == "mass":
                     info_name += " (%s)" % self.settings.mass
                     if self.settings.mass == "Da":
@@ -420,8 +422,8 @@ class Info(ToolInstance):
 
                 self.add_copy_button(row)
 
-            elif isinstance(fr.other[info], Theory):
-                theory = fr.other[info]
+            elif isinstance(fr[info], Theory):
+                theory = fr[info]
                 if theory.method is not None:
                     row = self.table.rowCount()
                     self.table.insertRow(row)
@@ -471,16 +473,16 @@ class Info(ToolInstance):
                             self.add_copy_button(row)
 
             elif (
-                hasattr(fr.other[info], "__iter__") and
-                all(isinstance(x, float) for x in fr.other[info]) and
-                len(fr.other[info]) > 1
+                hasattr(fr[info], "__iter__") and
+                all(isinstance(x, float) for x in fr[info]) and
+                len(fr[info]) > 1
             ):
                 row = self.table.rowCount()
                 self.table.insertRow(row)
                 
                 item = QTableWidgetItem()
                 info_name = info.replace("_", " ")
-                vals = fr.other[info]
+                vals = fr[info]
                 if "rotational_temperature" in info:
                     info_name = info_name.replace("temperature", "constants (%s)" % self.settings.rot_const)
                     if self.settings.rot_const == "GHz":
@@ -497,7 +499,7 @@ class Info(ToolInstance):
 
         # show spectra data
         for signal_data in ["frequency", "uv_vis"]:
-            if signal_data not in fr.other:
+            if signal_data not in fr.keys():
                 continue
             for data_type in fr[signal_data].__dict__.keys():
                 data = getattr(fr[signal_data], data_type)

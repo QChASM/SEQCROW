@@ -38,6 +38,8 @@ class _SterimolSettings(Settings):
         "include_header": Value(True, BoolArg),
         "sterimol2vec": Value(False, BoolArg),
         "at_L": 3.0,
+        "buried_sterimol": Value(False, BoolArg),
+        "buried_radius": 5.5,
         "delimiter": "comma",
         "L_option": "to centroid of coordinating atoms",
     }
@@ -76,6 +78,7 @@ class LigandSterimol(ToolInstance):
         self.L_option.setCurrentIndex(ndx)
         layout.addRow("L axis:", self.L_option)
 
+        # Sterimol2Vec options
         self.sterimol2vec = QGroupBox("Sterimol2Vec")
         sterimol2vec_layout = QFormLayout(self.sterimol2vec)
         
@@ -88,9 +91,28 @@ class LigandSterimol(ToolInstance):
         
         layout.addRow(self.sterimol2vec)
         
+        # buried sterimol options
+        self.buried_sterimol = QGroupBox("Buried Sterimol")
+        buried_sterimol_layout = QFormLayout(self.buried_sterimol)
+        
+        self.buried_radius = QDoubleSpinBox()
+        self.buried_radius.setRange(1, 20)
+        self.buried_radius.setDecimals(2)
+        self.buried_radius.setSingleStep(0.25)
+        self.buried_radius.setValue(self.settings.buried_radius)
+        buried_sterimol_layout.addRow("buried radius:", self.buried_radius)
+        
+        layout.addRow(self.buried_sterimol)
+        
         self.sterimol2vec.setCheckable(True)
         self.sterimol2vec.toggled.connect(lambda x: self.at_L.setEnabled(x))
+        self.sterimol2vec.toggled.connect(lambda x: self.buried_sterimol.setChecked(not x) if x else None)
         self.sterimol2vec.setChecked(self.settings.sterimol2vec)
+
+        self.buried_sterimol.setCheckable(True)
+        self.buried_sterimol.toggled.connect(lambda x: self.buried_radius.setEnabled(x))
+        self.buried_sterimol.toggled.connect(lambda x: self.sterimol2vec.setChecked(not x) if x else None)
+        self.buried_sterimol.setChecked(self.settings.buried_sterimol)
         
         self.display_vectors = QCheckBox()
         self.display_vectors.setChecked(self.settings.display_vectors)
@@ -232,6 +254,8 @@ class LigandSterimol(ToolInstance):
         self.settings.display_vectors = self.display_vectors.checkState() == Qt.Checked
         self.settings.at_L = self.at_L.value()
         self.settings.sterimol2vec = self.sterimol2vec.isChecked()
+        self.settings.buried_radius = self.buried_radius.value()
+        self.settings.buried_sterimol = self.buried_sterimol.isChecked()
         self.settings.L_option = self.L_option.currentText()
 
         targets, neighbors, datas = sterimol_cmd(
@@ -242,6 +266,7 @@ class LigandSterimol(ToolInstance):
             showRadii=self.display_radii.checkState() == Qt.Checked,
             return_values=True,
             at_L=self.at_L.value() if self.sterimol2vec.isChecked() else None,
+            buried=self.buried_radius.value() if self.buried_sterimol.isChecked() else False,
             bisect_L=self.L_option.currentText() == "bisect angle between coordinating atoms",
         )
         

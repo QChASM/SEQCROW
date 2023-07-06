@@ -834,7 +834,7 @@ class CRESTJob(LocalJob):
             ADD_FILEREADER, ([structure], [fr])
         )
         try:
-            from SEQCROW.tools import EnergyPlot
+            from SEQCROW.tools.per_frame_plot import EnergyPlot
             nrg_plot = EnergyPlot(self.session, structure, fr, xlabel="conformer")
             if not nrg_plot.opened:
                 nrg_plot.delete()

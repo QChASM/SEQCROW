@@ -39,6 +39,21 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
             get_all=True,
             max_length=max_length,
         )
+    except UnicodeDecodeError:
+        try:
+            with open(file_name, "r") as f:
+                fr = FileReader(
+                    (file_name, fmt, f),
+                    just_geom=False,
+                    get_all=True,
+                    max_length=max_length,
+                )
+        except Exception as e:
+            session.logger.error("unable to open %s" % file_name)
+            raise e
+        finally:
+            if hasattr(f, "close") and callable(f.close):
+                f.close()
     except Exception as e:
         session.logger.error("unable to open %s" % file_name)
         raise e
@@ -213,9 +228,14 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
     open XYZ files
     """
     import os
+    import re
     import numpy as np
     from SEQCROW.managers import ADD_FILEREADER
     from AaronTools.utils import utils
+    
+    # from cProfile import Profile
+    # profile = Profile()
+    # profile.enable()
 
     if file_name.lower().endswith(".allxyz") and coordsets is None:
         coordsets = True
@@ -261,8 +281,9 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
                 info = line.split(maxsplit=1)
                 eles.append(info[0])
                 try:
-                    coord_data += " ".join(info[1].split()[:3]) + "\n"
+                    coord_data += "%s %s %s\n" % tuple(info[1].split()[:3])
                 except IndexError:
+                    coord_data += line
                     error_msg = get_error_msg(
                         file_name,
                         ele_sets,
@@ -330,7 +351,7 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
             slider.set_slider(struc.num_coordsets)
         data = []
         for comment in comments:
-            value = utils.float_num.search(comment)
+            value = re.search("-?\d+(?:(?:\.\d+)|(?:[Ee]-?\d+))", comment)
             if value:
                 data.append(float(value.group(0)))
             else:
@@ -351,6 +372,10 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
                 session.logger.warning(repr(e))
 
     struc.filename = file_name
+    
+    # profile.disable()
+    # profile.print_stats()
+    
     return [struc], status
 
 

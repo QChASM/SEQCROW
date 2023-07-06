@@ -18,6 +18,7 @@ from AaronTools.spectra import Frequency
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
 from matplotlib import rcParams
+import matplotlib.patheffects as pe
 
 from Qt.QtCore import Qt, QSize
 from Qt.QtGui import QIcon
@@ -53,7 +54,7 @@ from SEQCROW.tools.uvvis_plot import (
 )
     
 from SEQCROW.utils import iter2str
-from SEQCROW.widgets import FilereaderComboBox, FakeMenu
+from SEQCROW.widgets import FilereaderComboBox, FakeMenu, ScientificSpinBox
 
 
 rcParams["savefig.dpi"] = 300
@@ -359,18 +360,20 @@ class IRSpectrum(ToolInstance):
         desc.setToolTip("Crittenden and Sibaev's quadratic scaling for harmonic frequencies\nDOI 10.1021/acs.jpca.5b11386")
         scaling_layout.addRow(desc)
 
-        self.linear = QDoubleSpinBox()
-        self.linear.setDecimals(6)
-        self.linear.setRange(-.2, .2)
-        self.linear.setSingleStep(0.001)
-        self.linear.setValue(0.)
+        self.linear = ScientificSpinBox(
+            minimum=-0.2,
+            maximum=0.2,
+            decimals=4,
+            maxAbsoluteCharacteristic=10,
+        )
         scaling_layout.addRow("c<sub>1</sub> =", self.linear)
 
-        self.quadratic = QDoubleSpinBox()
-        self.quadratic.setDecimals(9)
-        self.quadratic.setRange(-.2, .2)
-        self.quadratic.setSingleStep(0.000001)
-        self.quadratic.setValue(0.)
+        self.quadratic = ScientificSpinBox(
+            minimum=-0.2,
+            maximum=0.2,
+            decimals=6,
+            maxAbsoluteCharacteristic=10,
+        )
         scaling_layout.addRow("c<sub>2</sub> =", self.quadratic)
         
         save_scales = QPushButton("save current scale factors...")
@@ -678,10 +681,10 @@ class IRSpectrum(ToolInstance):
             
             self.figure.set_size_inches(w, h)
             
-            self.canvas.setMinimumHeight(96 * h)
-            self.canvas.setMaximumHeight(96 * h)
-            self.canvas.setMinimumWidth(96 * w)
-            self.canvas.setMaximumWidth(96 * w)
+            self.canvas.setMinimumHeight(int(96 * h))
+            self.canvas.setMaximumHeight(int(96 * h))
+            self.canvas.setMinimumWidth(int(96 * w))
+            self.canvas.setMaximumWidth(int(96 * w))
         else:
             self.canvas.setMinimumHeight(1)
             self.canvas.setMaximumHeight(100000)
@@ -917,14 +920,15 @@ class IRSpectrum(ToolInstance):
                 mol = self.tree.topLevelItem(mol_ndx)
                 for conf_ndx in range(2, mol.childCount(), 2):
                     conf = mol.child(conf_ndx)
-                    fr = self.tree.itemWidget(conf, 0).currentData()
-                    if fr is None:
+                    data = self.tree.itemWidget(conf, 0).currentData()
+                    if data is None:
                         continue
-                    freq = fr.other["frequency"]
+                    fr, _ = data
+                    freq = fr["frequency"]
                     if anharmonic and not freq.anharm_data:
                         self.session.logger.error(
                             "anharmonic frequencies requested on the 'plot settings' "
-                            "tab, but anharmonic data was not parsed from %s" % fr.name
+                            "tab, but anharmonic data was not parsed from %s" % fr["name"]
                         )
                         return
                     
@@ -966,16 +970,17 @@ class IRSpectrum(ToolInstance):
             j = 0
             for conf_ndx in range(2, mol.childCount(), 2):
                 conf = mol.child(conf_ndx)
-                uv_vis_file = self.tree.itemWidget(conf, 0).currentData()
-                if uv_vis_file is None:
+                data = self.tree.itemWidget(conf, 0).currentData()
+                if data is None:
                     continue
+                fr, _ = data
                 conf_style = mol.child(conf_ndx + 1)
                 show_button = self.tree.itemWidget(conf_style, 0).layout().itemAt(1).widget()
                 if w[j] > min_pop:
                     show_button.setCheckState(Qt.Checked)
                     self.session.logger.info(
                         "Boltzmann population of %s: %.1f%%" % (
-                            uv_vis_file.name,
+                            fr["name"],
                             100 * w[j],
                         )
                     )
@@ -1004,9 +1009,10 @@ class IRSpectrum(ToolInstance):
             
             for conf_ndx in range(2, mol.childCount(), 2):
                 conf = mol.child(conf_ndx)
-                fr = self.tree.itemWidget(conf, 0).currentData()
-                if fr is None:
+                data = self.tree.itemWidget(conf, 0).currentData()
+                if data is None:
                     continue
+                fr, mdl = data
                 freqs[-1].append(CompOutput(fr))
                 if anharmonic and not freqs[-1][-1].frequency.anharm_data:
                     self.session.logger.error(
@@ -1015,7 +1021,7 @@ class IRSpectrum(ToolInstance):
                     )
                     return
                 
-                sp_file = self.tree.itemWidget(conf, 1).currentData()
+                sp_file, _ = self.tree.itemWidget(conf, 1).currentData()
                 single_points[-1].append(CompOutput(sp_file))
                 
                 rmsd = freqs[-1][-1].geometry.RMSD(
@@ -1038,7 +1044,7 @@ class IRSpectrum(ToolInstance):
                         (start_ndx, stop_ndx),
                         [c / 255. for c in color],
                         line_style,
-                        fr.name,
+                        fr["name"],
                     ])
 
             if not freqs[-1]:
@@ -1240,8 +1246,7 @@ class IRSpectrum(ToolInstance):
             else:
                 y_rel = freq.intensity / item.intensity
             
-            mdl = self.session.filereader_manager.get_model(fr)
-            label = "%s" % mdl.name
+            label = "%s" % fr["name"]
             label += "\n%.2f cm$^{-1}$" % frequency
             if c1 or c2:
                 label += "\n$\Delta_{corr}$ = %.2f cm$^{-1}$" % (frequency - item.frequency)
@@ -1283,6 +1288,7 @@ class IRSpectrum(ToolInstance):
                     label,
                     va="bottom" if y_vals[1] > 0 else "top",
                     ha="left" if x_mid else "right",
+                    path_effects=[pe.withStroke(linewidth=2, foreground="white")],
                 )
             )
             

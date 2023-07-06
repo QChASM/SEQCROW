@@ -4,6 +4,7 @@ from json import loads, dumps
 
 import numpy as np
 
+from chimerax.atomic import selected_atoms
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.ui.widgets import ColorButton
@@ -13,9 +14,11 @@ from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
 from chimerax.core.commands.cli import FloatArg, TupleOf, IntArg
 from chimerax.core.commands import run
+from chimerax.core.selection import SELECTION_CHANGED
 
 from AaronTools.const import FREQUENCY_SCALE_LIBS
 from AaronTools.geometry import Geometry
+from AaronTools.internal_coordinates import Bond, Angle, LinearAngle, Torsion
 from AaronTools.spectra import HarmonicVibration
 from AaronTools.pathway import Pathway
 
@@ -49,7 +52,12 @@ from Qt.QtWidgets import (
 
 from SEQCROW.tools.per_frame_plot import NavigationToolbar
 from SEQCROW.utils import iter2str
-from SEQCROW.widgets import FilereaderComboBox, FakeMenu
+from SEQCROW.widgets import (
+    FilereaderComboBox,
+    FakeMenu,
+    FPSSpinBox,
+    ScientificSpinBox,
+)
 
 #TODO:
 #make double clicking something in the table visualize it
@@ -77,66 +85,13 @@ class _NormalModeSettings(Settings):
     }
 
 
-class FPSSpinBox(QSpinBox):
-    """spinbox that makes sure the value goes evenly into 60"""
-    def validate(self, text, pos):
-        if pos < len(text) or pos == 0:
-            return (QValidator.Intermediate, text, pos)
-        
-        try:
-            value = int(text)
-        except:
-            return (QValidator.Invalid, text, pos)
-        
-        if 60 % value != 0:
-            if pos == 1:
-                return (QValidator.Intermediate, text, pos)
-            else:
-                return (QValidator.Invalid, text, pos)
-        elif value > self.maximum():
-            return (QValidator.Invalid, text, pos)
-        elif value < self.minimum():
-            return (QValidator.Invalid, text, pos)
-        else:
-            return (QValidator.Acceptable, text, pos)
-    
-    def fixUp(self, text):
-        try:
-            value = int(text)
-            new_value = 1
-            for i in range(1, value+1):
-                if 60 % i == 0:
-                    new_value = i
-            
-            self.setValue(new_value)
-        
-        except:
-            pass
-    
-    def stepBy(self, step):
-        val = self.value()
-        while step > 0:
-            val += 1
-            while 60 % val != 0:
-                val += 1
-            step -= 1
-        
-        while step < 0:
-            val -= 1
-            while 60 % val != 0:
-                val -= 1
-            step += 1
-        
-        self.setValue(val)
-
-
 class FreqTableWidgetItem(QTableWidgetItem):
     def setData(self, role, value):
         super().setData(role, value)
         
         if role == Qt.DisplayRole:
             font = QFont()
-            if "i" in value:
+            if isinstance(value, str) and "i" in value:
                 font.setItalic(True)
             else:
                 font.setItalic(False)
@@ -144,6 +99,8 @@ class FreqTableWidgetItem(QTableWidgetItem):
             self.setFont(font)
 
     def __lt__(self, other):
+        if self.data(Qt.UserRole) is None:
+            return self.data(Qt.DisplayRole) < other.data(Qt.DisplayRole)
         return self.data(Qt.UserRole) < other.data(Qt.UserRole)
 
 
@@ -164,6 +121,11 @@ class NormalModes(ToolInstance):
         self.settings = _NormalModeSettings(session, name)
         
         self._build_ui()
+        
+        self._update_atom_labels = self.session.triggers.add_handler(
+            SELECTION_CHANGED,
+            self.update_atom_labels,
+        )
 
     def _build_ui(self):
         layout = QGridLayout()
@@ -299,10 +261,34 @@ class NormalModes(ToolInstance):
         show_plot.clicked.connect(self.show_ir_plot)
         ir_layout.addRow(show_plot)
         
+        # mode lookup
+        mode_lookup = QWidget()
+        self.mode_layout = QFormLayout(mode_lookup)
+        self.coordinate_type = QComboBox()
+        self.coordinate_type.addItems([
+            "bond stretch",
+            "angle bend",
+            "torsional rotation",
+            "out-of-plane bend",
+        ])
+        self.mode_layout.addRow("mode motion:", self.coordinate_type)
+        self.coordinate_type.currentTextChanged.connect(self.update_coordinate_type)
+        self.coordinate_widgets = []
+        self.update_coordinate_type(self.coordinate_type.currentText())
+        
+        sort_mode = QPushButton("sort modes")
+        sort_mode.clicked.connect(self.sort_modes_by_motion)
+        self.mode_layout.addRow(sort_mode)
+
+        reset_mode = QPushButton("reset sorting")
+        reset_mode.clicked.connect(self.reset_mode_sorting)
+        self.mode_layout.addRow(reset_mode)
+        
         
         self.display_tabs.addTab(vector_tab, "vectors")
         self.display_tabs.addTab(animate_tab, "animate")
         self.display_tabs.addTab(ir_tab, "IR spectrum")
+        self.display_tabs.addTab(mode_lookup, "motion lookup")
 
         layout.addWidget(self.display_tabs)
 
@@ -313,8 +299,7 @@ class NormalModes(ToolInstance):
         
         self.tool_window.ui_area.setLayout(layout)
 
-        if len(self.session.filereader_manager.frequency_models) > 0:
-            self.create_freq_table(0)
+        self.create_freq_table(0)
 
         self.tool_window.manage(None)
 
@@ -327,11 +312,13 @@ class NormalModes(ToolInstance):
             # early return if no frequency models
             return
             
-        fr = self.model_selector.currentData()
-        if fr is None:
+        data = self.model_selector.currentData()
+        if data is None:
             return 
 
-        freq = fr.other['frequency']
+        fr, mdl = data
+
+        freq = fr['frequency']
         
         model = self.plot_type.model()
         vcd_item = model.item(2)
@@ -401,7 +388,7 @@ class NormalModes(ToolInstance):
                 label.setAlignment(Qt.AlignCenter)
                 self.table.setCellWidget(row, 1 + offset, label)
 
-            intensity = QTableWidgetItem()
+            intensity = FreqTableWidgetItem()
             if mode.intensity is not None:
                 intensity.setData(Qt.DisplayRole, round(mode.intensity, 2))
             self.table.setItem(row, 2 + offset, intensity)
@@ -422,6 +409,138 @@ class NormalModes(ToolInstance):
         # elif freq.data[0].rotation is not None:
         #     self.plot_type.setCurrentIndex(2)
 
+    def reset_mode_sorting(self):
+        self.table.sortItems(0, Qt.AscendingOrder)
+        for i in range(0, self.table.rowCount()):
+            item = self.table.item(i, self.table.columnCount() - 1)
+            item.setData(Qt.UserRole, None)
+
+    def sort_modes_by_motion(self):
+        atoms = selected_atoms(self.session)
+        data = self.model_selector.currentData()
+        if data is None:
+            return
+        fr, mdl = data
+        geom = Geometry(fr["atoms"], refresh_connected=False, refresh_ranks=False)
+        atoms = atoms.intersect(mdl.atoms)
+        n_atoms = len(self.coordinate_widgets)
+        if n_atoms < len(atoms):
+            self.session.logger.error("%i atoms must be selected for %s" % (
+                n_atoms, self.coordinate_type.currentText(),
+            ))
+            return
+        atoms = atoms[-n_atoms:]
+        coord_type = self.coordinate_type.currentText()
+        if coord_type == "bond stretch":
+            coord = Bond(
+                mdl.atoms.index(atoms[-2]),
+                mdl.atoms.index(atoms[-1]),
+            )
+        elif coord_type == "angle bend":
+            a1 = mdl.atoms.index(atoms[-3])
+            a2 = mdl.atoms.index(atoms[-2])
+            a3 = mdl.atoms.index(atoms[-1])
+            v1 = geom.atoms[a1].bond(geom.atoms[a2])
+            v1 /= np.linalg.norm(v1)
+            v2 = geom.atoms[a3].bond(geom.atoms[a2])
+            v2 /= np.linalg.norm(v2)
+            if np.isclose(np.dot(v1, v2), 1) or np.isclose(np.dot(v1, v2), 0):
+                coord = LinearAngle(a1, a2, a3)
+            else:
+                coord = Angle(a1, a2, a3)
+        elif coord_type == "torsional rotation":
+            central_atom1 = atoms[-2]
+            central_atom2 = atoms[-1]
+            group1 = [mdl.atoms.index(a) for a in central_atom1.neighbors if a is not central_atom2]
+            group2 = [mdl.atoms.index(a) for a in central_atom2.neighbors if a is not central_atom1]
+            coord = Torsion(
+                group1,
+                mdl.atoms.index(central_atom1),
+                mdl.atoms.index(central_atom2),
+                group2,
+            )
+        elif coord_type == "out-of-plane bend":
+            coord = Torsion(
+                [mdl.atoms.index(atoms[-4])],
+                mdl.atoms.index(atoms[-3]),
+                mdl.atoms.index(atoms[-2]),
+                [mdl.atoms.index(atoms[-1])],
+            )
+        s_vec = coord.s_vector(geom.coords)
+        # masses = np.sqrt(np.array([a.mass for a in geom.atoms]))
+        self.table.sortItems(0, Qt.AscendingOrder)
+        for i, mode in enumerate(fr["frequency"].data):
+            vec = mode.vector
+            # vec *= masses[:, np.newaxis]
+            vec = np.reshape(vec, -1)
+            item = self.table.item(i, self.table.columnCount() - 1)
+            if len(s_vec) == 2:
+                ovl1 = np.dot(s_vec[0], vec)
+                ovl2 = np.dot(s_vec[1], vec)
+                ovl = (ovl1 + ovl2) ** 2
+            else:
+                ovl = np.dot(s_vec, vec) ** 2
+            item.setData(Qt.UserRole, ovl)
+        
+        self.table.sortItems(self.table.columnCount() - 1, Qt.DescendingOrder)
+
+    def update_coordinate_type(self, coord):
+        for widget in self.coordinate_widgets:
+            self.mode_layout.removeRow(widget)
+        
+        self.coordinate_widgets = []
+
+        if coord == "bond stretch":
+            atom1_label = QLabel()
+            self.mode_layout.insertRow(1, "atom 1:", atom1_label)
+            self.coordinate_widgets.append(atom1_label)
+            atom2_label = QLabel()
+            self.mode_layout.insertRow(2, "atom 2:", atom2_label)
+            self.coordinate_widgets.append(atom2_label)
+        if coord == "angle bend":
+            atom1_label = QLabel()
+            self.mode_layout.insertRow(1, "atom 1:", atom1_label)
+            self.coordinate_widgets.append(atom1_label)
+            atom2_label = QLabel()
+            self.mode_layout.insertRow(2, "central atom:", atom2_label)
+            self.coordinate_widgets.append(atom2_label)
+            atom3_label = QLabel()
+            self.mode_layout.insertRow(3, "atom 2:", atom3_label)
+            self.coordinate_widgets.append(atom3_label)
+        if coord == "torsional rotation":
+            atom1_label = QLabel()
+            self.mode_layout.insertRow(1, "atom 1:", atom1_label)
+            self.coordinate_widgets.append(atom1_label)
+            atom2_label = QLabel()
+            self.mode_layout.insertRow(2, "atom 2:", atom2_label)
+            self.coordinate_widgets.append(atom2_label)
+        if coord == "out-of-plane bend":
+            atom1_label = QLabel()
+            self.mode_layout.insertRow(1, "central atom:", atom1_label)
+            self.coordinate_widgets.append(atom1_label)
+            atom2_label = QLabel()
+            self.mode_layout.insertRow(2, "plane atom 1:", atom2_label)
+            self.coordinate_widgets.append(atom2_label)
+            atom3_label = QLabel()
+            self.mode_layout.insertRow(3, "plane atom 2:", atom3_label)
+            self.coordinate_widgets.append(atom3_label)
+            atom4_label = QLabel()
+            self.mode_layout.insertRow(4, "plane atom 3:", atom4_label)
+            self.coordinate_widgets.append(atom4_label)
+
+        self.update_atom_labels()
+
+    def update_atom_labels(self, *args, **kwargs):
+        atoms = selected_atoms(self.session)
+        data = self.model_selector.currentData()
+        if data is None:
+            return
+        fr, mdl = data
+        atoms = atoms.intersect(mdl.atoms)
+        n_atoms = len(self.coordinate_widgets)
+        for widget, atom in zip(self.coordinate_widgets, atoms[-n_atoms:]):
+            widget.setText(atom.atomspec)
+
     def change_mw_option(self, state):
         """toggle bool associated with mass-weighting option"""
         if Qt.CheckState(state) == Qt.Checked:
@@ -440,7 +559,7 @@ class NormalModes(ToolInstance):
             if max_norm is None or n > max_norm:
                 max_norm = n
 
-        dX = vector * scaling/max_norm
+        dX = vector * scaling / max_norm
 
         if self.vec_mw_bool and self.display_tabs.currentIndex() == 0:
             i = 0
@@ -448,7 +567,7 @@ class NormalModes(ToolInstance):
                 if geom.atoms[i].is_dummy:
                     i += 1
                     continue
-                dX[i] *= geom.atoms[i].mass
+                dX[i] *= np.sqrt(geom.atoms[i].mass)
                 i += 1
 
         return dX
@@ -458,13 +577,12 @@ class NormalModes(ToolInstance):
         if len([mode for mode in modes if mode.column() == 0]) != 1:
             return 
             
-        fr = self.model_selector.currentData()
-        model = self.session.filereader_manager.get_model(fr)
+        fr, model = self.model_selector.currentData()
         for m in modes:
             if m.column() == 0:
                 mode = m.data(Qt.UserRole)
         
-        name = "%.2f cm^-1" % fr.other['frequency'].data[mode].frequency
+        name = "%.2f cm^-1" % fr['frequency'].data[mode].frequency
         
         for child in model.child_models():
             if child.name == name:
@@ -472,8 +590,7 @@ class NormalModes(ToolInstance):
 
     def show_vec(self):
         """display normal mode displacement vector"""
-        fr = self.model_selector.currentData()
-        model = self.session.filereader_manager.get_model(fr)
+        fr, model = self.model_selector.currentData()
         modes = self.table.selectedItems()
         if len([mode for mode in modes if mode.column() == 0]) != 1:
             raise RuntimeError("one mode must be selected")
@@ -493,9 +610,9 @@ class NormalModes(ToolInstance):
         self.settings.arrow_color = tuple(color)
 
         #reset coordinates if movie isn't playing
-        geom = Geometry(fr)
+        geom = Geometry(fr["atoms"], refresh_connected=False, refresh_ranks=False)
 
-        vector = fr.other['frequency'].data[mode].vector
+        vector = fr['frequency'].data[mode].vector
 
         dX = self._get_coord_change(geom, vector, scale)
         
@@ -519,14 +636,13 @@ class NormalModes(ToolInstance):
             i += 1
 
         stream = BytesIO(bytes(s, 'utf-8'))
-        bild_obj, status = read_bild(self.session, stream, "%.2f cm^-1" % fr.other['frequency'].data[mode].frequency)
+        bild_obj, status = read_bild(self.session, stream, "%.2f cm^-1" % fr['frequency'].data[mode].frequency)
 
         self.session.models.add(bild_obj, parent=model)
     
     def show_anim(self):
         """play selected modes as an animation"""
-        fr = self.model_selector.currentData()
-        model = self.session.filereader_manager.get_model(fr)
+        fr, model = self.model_selector.currentData()
         modes = self.table.selectedItems()
         if len([mode for mode in modes if mode.column() == 0]) != 1:
             raise RuntimeError("one mode must be selected")
@@ -543,14 +659,9 @@ class NormalModes(ToolInstance):
         self.settings.anim_duration = frames
         self.settings.anim_fps = anim_fps
 
-        geom = Geometry(fr)
-        #if the filereader has been processed somewhere else, the atoms might
-        #have a chimerax atom associated with them that prevents them from being pickled 
-        for atom in geom.atoms:
-            if hasattr(atom, "chix_atom"):
-                atom.chix_atom = None
+        geom = Geometry(fr["atoms"], refresh_connected=False, refresh_ranks=False)
 
-        vector = fr.other['frequency'].data[mode].vector
+        vector = fr['frequency'].data[mode].vector
 
         dX = self._get_coord_change(geom, vector, scale)
         if len(dX) != geom.num_atoms:
@@ -595,14 +706,13 @@ class NormalModes(ToolInstance):
         slider.play_cb()
 
     def stop_anim(self):
-        fr = self.model_selector.currentData()
-        model = self.session.filereader_manager.get_model(fr)
+        fr, model = self.model_selector.currentData()
         for tool in self.session.tools.list():
             if isinstance(tool, CoordinateSetSlider):
                 if tool.structure is model:
                     tool.delete()
-                    
-        geom = Geometry(fr)
+
+        geom = Geometry(fr["atoms"], refresh_connected=False, refresh_ranks=False)
         for atom, coord in zip(model.atoms, geom.coords):
             atom.coord = coord
     
@@ -624,17 +734,10 @@ class NormalModes(ToolInstance):
 
     def delete(self):
         self.model_selector.deleteLater()
+        self.session.triggers.remove_handler(self._update_atom_labels)
 
         return super().delete()
-    
-    def close(self):
-        self.model_selector.deleteLater()
-    
-    def cleanup(self):
-        self.model_selector.deleteLater()
 
-        return super().cleanup()
-    
 
 class IRPlot(ChildToolWindow):
     def __init__(self, tool_instance, title, **kwargs):
@@ -794,17 +897,21 @@ class IRPlot(ChildToolWindow):
         desc.setToolTip("Crittenden and Sibaev's quadratic scaling for harmonic frequencies\nDOI 10.1021/acs.jpca.5b11386")
         scaling_layout.addRow(desc)
 
-        self.linear = QDoubleSpinBox()
-        self.linear.setDecimals(6)
-        self.linear.setRange(-.2, .2)
-        self.linear.setSingleStep(0.001)
+        self.linear = ScientificSpinBox(
+            minimum=-0.2,
+            maximum=0.2,
+            decimals=4,
+            maxAbsoluteCharacteristic=10,
+        )
         self.linear.setValue(0.)
         scaling_layout.addRow("c<sub>1</sub> =", self.linear)
 
-        self.quadratic = QDoubleSpinBox()
-        self.quadratic.setDecimals(9)
-        self.quadratic.setRange(-.2, .2)
-        self.quadratic.setSingleStep(0.000001)
+        self.quadratic = ScientificSpinBox(
+            minimum=-0.2,
+            maximum=0.2,
+            decimals=6,
+            maxAbsoluteCharacteristic=10,
+        )
         self.quadratic.setValue(0.)
         scaling_layout.addRow("c<sub>2</sub> =", self.quadratic)
         
@@ -903,12 +1010,13 @@ class IRPlot(ChildToolWindow):
         self.manage(None)
 
     def auto_breaks(self):
-        fr = self.tool_instance.model_selector.currentData()
-        if fr is None:
+        data = self.tool_instance.model_selector.currentData()
+        if data is None:
             return
+        fr, mdl = data
         linear_scale = self.linear.value()
         quadratic_scale = self.quadratic.value()
-        freq = fr.other["frequency"]
+        freq = fr["frequency"]
         frequencies = np.array(
             [mode.frequency for mode in freq.data if mode.frequency > 0]
         )
@@ -995,7 +1103,8 @@ class IRPlot(ChildToolWindow):
         data = self.tool_instance.model_selector.currentData()
         if not data:
             return
-        freq = data.other["frequency"]
+        fr, _ = data
+        freq = fr["frequency"]
         self.anharm.setEnabled(bool(freq.anharm_data))
     
     # def check_vcd(self):
@@ -1015,10 +1124,10 @@ class IRPlot(ChildToolWindow):
             
             self.figure.set_size_inches(w, h)
             
-            self.canvas.setMinimumHeight(96 * h)
-            self.canvas.setMaximumHeight(96 * h)
-            self.canvas.setMinimumWidth(96 * w)
-            self.canvas.setMaximumWidth(96 * w)
+            self.canvas.setMinimumHeight(int(96 * h))
+            self.canvas.setMaximumHeight(int(96 * h))
+            self.canvas.setMinimumWidth(int(96 * w))
+            self.canvas.setMaximumWidth(int(96 * w))
         else:
             self.canvas.setMinimumHeight(1)
             self.canvas.setMaximumHeight(100000)
@@ -1076,11 +1185,12 @@ class IRPlot(ChildToolWindow):
             s = "frequency (cm^-1),IR intensity\n"
 
         
-            fr = self.tool_instance.model_selector.currentData()
-            if fr is None:
+            data = self.tool_instance.model_selector.currentData()
+            if data is None:
                 return
+            fr, _ = data
     
-            freq = fr.other["frequency"]
+            freq = fr["frequency"]
         
             fwhm = self.fwhm.value()
             peak_type = self.peak_type.currentText()
@@ -1248,12 +1358,13 @@ class IRPlot(ChildToolWindow):
 
     def refresh_plot(self):
         
-        fr = self.tool_instance.model_selector.currentData()
-        if fr is None:
+        data = self.tool_instance.model_selector.currentData()
+        if data is None:
             return
+        fr, _ = data
         self.figure.clear()
 
-        freq = fr.other["frequency"]
+        freq = fr["frequency"]
         
         fwhm = self.fwhm.value()
         self.tool_instance.settings.fwhm = fwhm
@@ -1308,15 +1419,17 @@ class IRPlot(ChildToolWindow):
             if len(items) == 0:
                 continue
             
-            fr = self.tool_instance.model_selector.currentData()
-            if fr is None:
+            data = self.tool_instance.model_selector.currentData()
+            if data is None:
                 return 
+    
+            fr, _ = data
     
             for item in items:
                 if item.column() == 0:
                     row = item.data(Qt.UserRole)
             
-            freq = fr.other['frequency']
+            freq = fr['frequency']
             if freq.anharm_data and self.anharm.checkState() == Qt.Checked:
                 frequencies = sorted(freq.anharm_data, key=lambda x: x.harmonic_frequency)
             elif freq.anharm_data:
@@ -1410,9 +1523,10 @@ class MatchPeaks(ChildToolWindow):
         table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
         table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)        
         
-        fr = self.tool_instance.model_selector.currentData()
-        if fr:
-            freq_data = fr.other['frequency'].data
+        data = self.tool_instance.model_selector.currentData()
+        if data:
+            fr, _ = data
+            freq_data = fr['frequency'].data
             
             for i, mode in enumerate(freq_data):
                 if mode.frequency < 0:

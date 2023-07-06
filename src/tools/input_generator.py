@@ -1348,7 +1348,14 @@ class JobTypeOption(QWidget):
         self.layout = QGridLayout(self)
 
         job_form = QWidget()
-        job_type_layout = QFormLayout(job_form)
+        job_type_layout = QGridLayout(job_form)
+        margins = job_type_layout.contentsMargins()
+        job_type_layout.setContentsMargins(
+            margins.left(),
+            0,
+            margins.right(),
+            0,
+        )
 
         self.charge = QSpinBox()
         self.charge.setRange(-5, 5)
@@ -1359,28 +1366,30 @@ class JobTypeOption(QWidget):
         )
         self.charge.valueChanged.connect(self.something_changed)
 
-        job_type_layout.addRow("charge:", self.charge)
+        job_type_layout.addWidget(QLabel("charge:"), 0, 0, 1, 1, Qt.AlignRight)
+        job_type_layout.addWidget(self.charge, 0, 1, 1, 1, Qt.AlignLeft)
 
         self.multiplicity = QSpinBox()
         self.multiplicity.setRange(1, 10)
         self.multiplicity.setSingleStep(1)
         self.multiplicity.setValue(self.settings.previous_mult)
         self.multiplicity.setToolTip(
-            "one plus the number of unpaired electrons\n"
+            "one plus the number of unpaired electrons with the same spin\n"
             "e.g. a methylene radical would have a multiplicity of 2"
         )
         self.multiplicity.valueChanged.connect(self.something_changed)
 
-        job_type_layout.addRow("multiplicity:", self.multiplicity)
+        job_type_layout.addWidget(QLabel("multiplicity:"), 0, 2, 1, 1, Qt.AlignRight)
+        job_type_layout.addWidget(self.multiplicity, 0, 3, 1, 1, Qt.AlignLeft)
 
         job_choice_widget = QWidget()
         checkbox_layout = QHBoxLayout(job_choice_widget)
         margins = checkbox_layout.contentsMargins()
         checkbox_layout.setContentsMargins(
             margins.left(),
-            margins.top(),
-            margins.right(),
             0,
+            margins.right(),
+            int(margins.bottom() / 2),
         )
         
         checkbox_layout.insertWidget(
@@ -1399,7 +1408,7 @@ class JobTypeOption(QWidget):
             3, self.do_freq, stretch=0, alignment=Qt.AlignLeft | Qt.AlignVCenter,
         )
         
-        job_type_layout.addRow(job_choice_widget)
+        job_type_layout.addWidget(job_choice_widget, 1, 0, 1, 4)
 
         self.job_type_opts = QTabWidget()
 
@@ -1502,13 +1511,10 @@ class JobTypeOption(QWidget):
         geom_opt_form_widget = QWidget()
         geom_opt_form = QFormLayout(geom_opt_form_widget)
 
-        self.ts_opt = QCheckBox()
-        self.ts_opt.stateChanged.connect(self.something_changed)
-        geom_opt_form.addRow("transition state structure:", self.ts_opt)
-
-        self.use_contraints = QCheckBox()
-        self.use_contraints.stateChanged.connect(self.show_contraints)
-        geom_opt_form.addRow("constrained:", self.use_contraints)
+        self.opt_type = QComboBox()
+        self.opt_type.addItems(["local minimum", "constrained", "transition state"])
+        self.opt_type.currentIndexChanged.connect(self.something_changed)
+        geom_opt_form.addRow("optimization type:", self.opt_type)
 
         self.constraints_widget = QWidget()
         constraints_layout = QGridLayout(self.constraints_widget)
@@ -1594,7 +1600,10 @@ class JobTypeOption(QWidget):
         constraints_layout.setRowStretch(1, 1)
         constraints_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.constraints_widget.setEnabled(self.use_contraints.checkState() == Qt.Checked)
+        self.constraints_widget.setEnabled(self.opt_type.currentText() == "constrained")
+        self.opt_type.currentTextChanged.connect(
+            lambda text: self.constraints_widget.setEnabled(text == "constrained")
+        )
 
         geom_opt_layout.addWidget(self.constraints_widget, 1, 0, Qt.AlignTop)
         geom_opt_layout.setRowStretch(0, 0)
@@ -1657,7 +1666,10 @@ class JobTypeOption(QWidget):
         self.do_freq.stateChanged.connect(self.change_job_type)
 
         self.do_geom_opt.setCheckState(Qt.Checked if self.settings.last_opt else Qt.Unchecked)
-        self.ts_opt.setCheckState(Qt.Checked if self.settings.last_ts else Qt.Unchecked)
+        if self.settings.last_ts:
+            ndx = self.opt_type.findText("transition state")
+            if ndx >= 0:
+                self.opt_type.setCurrentIndex(ndx)
         self.do_freq.setCheckState(Qt.Checked if self.settings.last_freq else Qt.Unchecked)
         self.job_type_opts.setCurrentIndex(0)
 
@@ -1757,18 +1769,23 @@ class JobTypeOption(QWidget):
         self.solvent_option.addItems(["None"])
         self.nprocs.setEnabled(file_info.parallel)
         self.mem.setEnabled(file_info.memory)
+        current_opt_type = self.opt_type.currentText()
+        self.opt_type.clear()
         if not file_info.frequency:
             self.do_freq.setCheckState(Qt.Unchecked)
         self.do_freq.setEnabled(file_info.frequency)
         if not file_info.optimization:
             self.do_geom_opt.setCheckState(Qt.Unchecked)
+        else:
+            self.opt_type.addItem("local minimum")
         self.do_geom_opt.setEnabled(file_info.optimization)
-        if not file_info.ts_optimization:
-            self.ts_opt.setCheckState(Qt.Unchecked)
-        self.ts_opt.setEnabled(file_info.ts_optimization)
-        if not file_info.const_optimization:
-            self.use_contraints.setCheckState(Qt.Unchecked)
-        self.use_contraints.setEnabled(file_info.const_optimization)
+        if file_info.ts_optimization:
+            self.opt_type.addItem("transition state")
+        if file_info.const_optimization:
+            self.opt_type.addItem("constrained")
+        ndx = self.opt_type.findText(current_opt_type)
+        if ndx >= 0:
+            self.opt_type.setCurrentIndex(ndx)
         
         if file_info.solvents is not None:
             self.solvent_option.addItems(list(file_info.solvents.keys()))
@@ -1868,19 +1885,21 @@ class JobTypeOption(QWidget):
 
     def set_jobs(self, jobs):
         self.do_geom_opt.setChecked(False)
-        self.ts_opt.setChecked(False)
-        self.use_contraints.setChecked(False)
         self.do_freq.setChecked(False)
         self.raman.setChecked(False)
         if not jobs:
             return
         for job in jobs:
             if isinstance(job, OptimizationJob):
+                self.opt_type.setCurrentIndex(0)
                 self.do_geom_opt.setChecked(True)
-                self.ts_opt.setChecked(job.transition_state)
-                if not job.constraints:
+                if job.transition_state:
+                    ndx = self.opt_type.findText("transition state")
+                    self.opt_type.setCurrentIndex(ndx)
+                elif not job.constraints:
                     continue
-                self.use_contraints.setChecked(True)
+                ndx = self.opt_type.findText("constrained")
+                self.opt_type.setCurrentIndex(ndx)
                 for key, frozen in job.constraints.keys():
                     if key == "atoms":
                         for atom in frozen:
@@ -2018,7 +2037,8 @@ class JobTypeOption(QWidget):
 
     def setTSOptimization(self, value):
         """sets job type to ts opt"""
-        self.ts_opt.setChecked(value)
+        ndx = self.opt_type.findText("transition state")
+        self.opt_type.setCurrentIndex(ndx)
 
     def setFrequencyCalculation(self, value):
         """sets job type to freq"""
@@ -2044,7 +2064,7 @@ class JobTypeOption(QWidget):
 
     def getTSOptimization(self):
         """returns whether the job is opt ts"""
-        return self.ts_opt.checkState() == Qt.Checked
+        return self.opt_type.currentText() == "transition state"
 
     def getFrequencyCalculation(self):
         """returns whether the job is freq"""
@@ -2054,7 +2074,8 @@ class JobTypeOption(QWidget):
         """returns list(JobType) for the current jobs"""
         job_types = []
         if self.do_geom_opt.checkState() == Qt.Checked:
-            if self.use_contraints.checkState() == Qt.Checked:
+            opt_type = self.opt_type.currentText()
+            if opt_type == "constrained":
                 constraints = self.getConstraints()
                 new_constraints = {}
                 if "atoms" in constraints:
@@ -2083,7 +2104,7 @@ class JobTypeOption(QWidget):
 
             job_types.append(
                 OptimizationJob(
-                    transition_state=self.ts_opt.checkState() == Qt.Checked,
+                    transition_state=opt_type == "transition state",
                     constraints=constraints,
                 )
             )
@@ -2466,7 +2487,7 @@ class JobTypeOption(QWidget):
         if self.do_geom_opt.checkState() != Qt.Checked:
             return None
 
-        elif self.use_contraints.checkState() == Qt.Unchecked:
+        elif self.opt_type.currentText() != "constrained":
             return None
 
         else:
@@ -2503,7 +2524,7 @@ class JobTypeOption(QWidget):
             self.settings.last_nproc = self.nprocs.value()
             self.settings.last_mem = self.mem.value()
             self.settings.last_opt = self.do_geom_opt.checkState() == Qt.Checked
-            self.settings.last_ts = self.ts_opt.checkState() == Qt.Checked
+            self.settings.last_ts = self.opt_type.currentText() == "transition state"
             self.settings.last_freq = self.do_freq.checkState() == Qt.Checked
             self.settings.last_num_freq = self.num_freq.checkState() == Qt.Checked
             self.settings.last_raman = self.raman.checkState() == Qt.Checked

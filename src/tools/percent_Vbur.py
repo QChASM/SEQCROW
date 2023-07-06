@@ -36,10 +36,13 @@ from SEQCROW.widgets import FakeMenu
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap, to_hex
+from matplotlib import rcParams
 
 import copy
 
 import numpy as np
+
+rcParams["savefig.dpi"] = 300
 
 cmap_names = sorted([
     'viridis', 'plasma', 'inferno', 'magma', 'cividis',

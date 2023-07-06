@@ -580,9 +580,9 @@ class Thermochem(ToolInstance):
                     item = table.cellWidget(row, 1)
                     s += "%s%s" % (item.text(), delim)
 
-            sp_mdl = self.sp_selector.currentData()
+            sp_fr, sp_mdl = self.sp_selector.currentData()
             sp_name = sp_mdl.name
-            therm_mdl = self.thermo_selector.currentData()
+            therm_fr, therm_mdl = self.thermo_selector.currentData()
 
             s += "%s" % sp_name
             if therm_mdl:
@@ -623,7 +623,7 @@ class Thermochem(ToolInstance):
         """set energy entry for when sp model changes"""
         self.sp_table.setRowCount(0)
         if self.sp_selector.currentIndex() >= 0:
-            fr = self.sp_selector.currentData()
+            fr, mdl = self.sp_selector.currentData()
 
             self.check_geometry_rmsd("SP")
 
@@ -638,7 +638,7 @@ class Thermochem(ToolInstance):
             unit_label.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
             self.sp_table.setItem(0, 2, unit_label)
 
-            sp_nrg = SmallLineEdit("%.6f" % fr.other['energy'])
+            sp_nrg = SmallLineEdit("%.6f" % fr['energy'])
             sp_nrg.setReadOnly(True)
             sp_nrg.setFrame(False)
             self.sp_table.setCellWidget(0, 1, sp_nrg)
@@ -656,12 +656,12 @@ class Thermochem(ToolInstance):
         also changes the temperature option (on the absolute tab only)
         """
         if self.thermo_selector.currentIndex() >= 0:
-            fr = self.thermo_selector.currentData()
+            fr, mdl = self.thermo_selector.currentData()
             
             self.check_geometry_rmsd("THERM")
 
-            if 'temperature' in fr.other:
-                self.temperature_line.setValue(fr.other['temperature'])
+            if 'temperature' in fr:
+                self.temperature_line.setValue(fr['temperature'])
 
         self.set_thermo()
 
@@ -670,15 +670,15 @@ class Thermochem(ToolInstance):
         if the RMSD is > 10^-5 or the number of atoms is different, put a warning in the
         status bar"""
         if self.thermo_selector.currentIndex() >= 0 and self.sp_selector.currentIndex() >= 0:
-            fr = self.sp_selector.currentData()
-            fr2 = self.thermo_selector.currentData()
+            fr, mdl = self.sp_selector.currentData()
+            fr2, mdl = self.thermo_selector.currentData()
 
-            if len(fr.atoms) != len(fr2.atoms):
+            if len(fr["atoms"]) != len(fr2["atoms"]):
                 self.status.showMessage("structures are not the same: different number of atoms")
                 return
 
-            geom = Geometry(fr)
-            geom2 = Geometry(fr2)
+            geom = Geometry(fr["atoms"])
+            geom2 = Geometry(fr2["atoms"])
             rmsd = geom.RMSD(geom2)
             if not isclose(rmsd, 0, atol=10**-5):
                 rmsd = geom.RMSD(geom2, sort=True)
@@ -693,10 +693,8 @@ class Thermochem(ToolInstance):
         #index of combobox is -1 when combobox has no entries
         self.thermo_table.setRowCount(0)
         if self.thermo_selector.currentIndex() >= 0:
-            fr = self.thermo_selector.currentData()
-            if fr not in self.thermo_co:
-                self.thermo_co[fr] = CompOutput(fr)
-            co = self.thermo_co[fr]
+            fr, mdl = self.thermo_selector.currentData()
+            co = CompOutput(fr)
 
             v0 = self.v0_edit.value()
 
@@ -725,7 +723,7 @@ class Thermochem(ToolInstance):
                 "equal to enthalpy at 0 K",
             )]
 
-            if fr.other["frequency"].anharm_data:
+            if fr["frequency"].anharm_data:
                 dZPE_anh = co.calc_zpe(anharmonic=True)
                 items.append((
                     "δZPE<sub>anh</sub> =",
@@ -1006,13 +1004,12 @@ class ThermoGroup(QWidget):
             mol = self.tree.topLevelItem(mol_index)
             for conf_ndx in range(1, mol.childCount()):
                 conf = mol.child(conf_ndx)
-                fr = self.tree.itemWidget(conf, 1).currentData()
-                if fr is None:
+                data = self.tree.itemWidget(conf, 1).currentData()
+                if data is None:
                     continue
+                fr, mdl = data
                 
-                if fr not in self.thermo_co:
-                    self.thermo_co[fr] = CompOutput(fr)
-                out[-1].append(self.thermo_co[fr])
+                out[-1].append(CompOutput(fr))
         
         return out
     
@@ -1023,11 +1020,12 @@ class ThermoGroup(QWidget):
             mol = self.tree.topLevelItem(mol_index)
             for conf_ndx in range(1, mol.childCount()):
                 conf = mol.child(conf_ndx)
-                fr = self.tree.itemWidget(conf, 0).currentData()
-                if fr is None:
+                data = self.tree.itemWidget(conf, 0).currentData()
+                if data is None:
                     continue
+                fr, mdl = data
 
-                out[-1].append(fr.other['energy'])
+                out[-1].append(fr['energy'])
         
         return out
     

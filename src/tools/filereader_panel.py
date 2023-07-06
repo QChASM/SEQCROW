@@ -78,11 +78,10 @@ class FileReaderPanel(ToolInstance):
         self.tree.clear()
         self._items = []
 
-        fr_dict = self.session.filereader_manager.filereader_dict
-
-        for model in fr_dict.keys():
-            id = model.id
-            if id is None:
+        for model in self.session.models.list():
+            try:
+                filereaders = model.filereaders
+            except AttributeError:
                 continue
             
             name = model.name
@@ -92,40 +91,40 @@ class FileReaderPanel(ToolInstance):
             item_stack.append(item)
             self._items.append(item)
             
-            item.setData(self.NAME_COL, Qt.DisplayRole, model)
+            item.setData(self.NAME_COL, Qt.UserRole, model)
             item.setText(self.NAME_COL, name)
-            item.setText(self.ID_COL, ".".join([str(x) for x in id]))
+            item.setText(self.ID_COL, model.atomspec)
             
-            if any(x.all_geom is not None and len(x.all_geom) > 1 for x in fr_dict[model]):
+            if any(fr["all_geom"] and len(fr["all_geom"]) > 2 for fr in filereaders):
                 item.setText(self.COORDSETS_COL, "yes")
             else:
                 item.setText(self.COORDSETS_COL, "no")
                 
-            if any("energy" in x.other for x in fr_dict[model]):
+            if any("energy" in fr for fr in filereaders):
                 item.setText(self.NRG_COL, "yes")
             else:
                 item.setText(self.NRG_COL, "no")
                 
-            if any("frequency" in x.other for x in fr_dict[model]):
+            if any("frequency" in fr for fr in filereaders):
                 item.setText(self.FREQ_COL, "yes")
             else:
                 item.setText(self.FREQ_COL, "no")
         
-            for fr in fr_dict[model]:
+            for fr in filereaders:
                 child = QTreeWidgetItem(item)
-                child.setData(self.NAME_COL, Qt.DisplayRole, fr)
-                child.setText(self.NAME_COL, fr.name)
-                if fr.all_geom is not None and len(fr.all_geom) > 1:
+                child.setData(self.NAME_COL, Qt.UserRole, fr)
+                child.setText(self.NAME_COL, fr["name"])
+                if fr["all_geom"] is not None and len(fr["all_geom"]) > 2:
                     child.setText(self.COORDSETS_COL, "yes")
                 else:
                     child.setText(self.COORDSETS_COL, "no")
                     
-                if "energy" in fr.other:
-                    child.setText(self.NRG_COL, "%.6f" % fr.other["energy"])
+                if "energy" in fr:
+                    child.setText(self.NRG_COL, "%.6f" % fr["energy"])
                 else:
                     child.setText(self.NRG_COL, "")
                     
-                if "frequency" in fr.other:
+                if "frequency" in fr:
                     child.setText(self.FREQ_COL, "yes")
                 else:
                     child.setText(self.FREQ_COL, "no")    
@@ -137,19 +136,18 @@ class FileReaderPanel(ToolInstance):
    
     def restore_selected(self):
         items = [item for item in self.tree.selectedItems()]
-        model_dict = self.session.filereader_manager.filereader_dict
-        models = list(model_dict.keys())
         for item in items:
             parent = item.parent()
-            mdl = models[self.tree.indexOfTopLevelItem(parent)]
             if parent is None:
-                fr = model_dict[mdl][-1]
+                mdl = item.data(self.NAME_COL, Qt.UserRole)
+                fr = mdl.filereaderes[-1]
             else:
-                fr = model_dict[mdl][parent.indexOfChild(item)]
+                mdl = parent.data(self.NAME_COL, Qt.UserRole)
+                fr = item.data(self.NAME_COL, Qt.UserRole)
 
-            fr_rescol = ResidueCollection(fr)
+            fr_rescol = ResidueCollection(fr["atoms"])
             fr_rescol.update_chix(mdl)
-            if fr.all_geom is not None and len(fr.all_geom) > 1:
+            if "all_geom" in fr is not None and len(fr["all_geom"]) > 1:
                 coordsets = fr_rescol.all_geom_coordsets(fr)
 
                 mdl.remove_coordsets()
@@ -165,25 +163,25 @@ class FileReaderPanel(ToolInstance):
 
     def open_nrg_plot(self):
         items = [item for item in self.tree.selectedItems()]
-        model_dict = self.session.filereader_manager.filereader_dict
-        models = list(model_dict.keys())
         for item in items:
             parent = item.parent()
-            mdl = models[self.tree.indexOfTopLevelItem(parent)]
             if parent is None:
-                fr = model_dict[mdl][-1]
+                mdl = item.data(self.NAME_COL, Qt.UserRole)
+                fr = mdl.filereaders[-1]
             else:
-                fr = model_dict[mdl][parent.indexOfChild(item)]
+                mdl = parent.data(self.NAME_COL, Qt.UserRole)
+                fr = item.data(self.NAME_COL, Qt.UserRole)
 
             EnergyPlot(self.session, mdl, fr)
     
     def open_movie_slider(self):
         items = [item for item in self.tree.selectedItems()]
-        model_dict = self.session.filereader_manager.filereader_dict
-        models = list(model_dict.keys())
         for item in items:
             parent = item.parent()
-            mdl = models[self.tree.indexOfTopLevelItem(parent)]
+            if parent is None:
+                mdl = item.data(self.NAME_COL, Qt.UserRole)
+            else:
+                mdl = parent.data(self.NAME_COL, Qt.UserRole)
             #coordset doesn't start out with the current coordset id
             #it looks like it should, but it doesn't
             #it starts at 1 instead

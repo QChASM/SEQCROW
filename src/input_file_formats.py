@@ -900,7 +900,7 @@ class ORCAFileInfo(QMInputFileInfo):
             "SARC-ZORA-TZVP",
             "DKH-def2-TZVP",
             "SARC-DKH-TZVP",
-            "SDD",
+            "D95",
             "LANL2DZ",
         ],
         "C": [

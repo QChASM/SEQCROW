@@ -42,6 +42,7 @@ class _ConeAngleSettings(Settings):
         "display_radii": True,
         "delimiter": "comma",
         "include_header": True,
+        "split_cones": False,
     }
 
 
@@ -109,6 +110,15 @@ class ConeAngle(ToolInstance):
         self.display_radii.setChecked(self.settings.display_radii)
         settings_layout.addRow("show radii:", self.display_radii)
 
+        self.split_cones = QCheckBox()
+        self.split_cones.setChecked(self.settings.split_cones)
+        self.split_cones.setToolTip("cones from L-M-L angles will not be included")
+        settings_layout.addRow("split cones:", self.split_cones)
+        self.split_cones.setEnabled(self.cone_option.currentIndex() == 0)
+        self.cone_option.currentIndexChanged.connect(
+            lambda ndx: self.split_cones.setEnabled(ndx == 0)
+        )
+
         remove_cone_button = QPushButton("remove cone visualizations")
         remove_cone_button.clicked.connect(self.del_cone)
         settings_layout.addRow(remove_cone_button)
@@ -132,7 +142,7 @@ class ConeAngle(ToolInstance):
         self.table.resizeColumnToContents(1)
         self.table.resizeColumnToContents(2)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-        layout.addRow(self.table)
+        cone_layout.addRow(self.table)
 
 
         menu = FakeMenu()
@@ -301,6 +311,8 @@ class ConeAngle(ToolInstance):
         radii = self.radii_option.currentText()
         return_cones = self.display_cone.checkState() == Qt.Checked
         display_radii = self.display_radii.checkState() == Qt.Checked
+        split_cones = self.split_cones.checkState() == Qt.Checked and method == "tolman"
+        self.settings.split_cones = split_cones
         
         # self.table.setRowCount(0)
 
@@ -308,13 +320,13 @@ class ConeAngle(ToolInstance):
             rescol = ResidueCollection(center_atom.structure)
             at_center = rescol.find_exact(AtomSpec(center_atom.atomspec))[0]
             if center_atom.structure in self.ligands:
-                lig_atoms = [AtomSpec(atom.atomspec) for atom in self.ligands[center_atom.structure]]
+                lig_atoms = rescol.find([AtomSpec(atom.atomspec) for atom in self.ligands[center_atom.structure]])
                 comp = Component(
                     rescol.find(
                         lig_atoms,
                     ),
                     to_center=rescol.find_exact(AtomSpec(center_atom.atomspec)),
-                    key_atoms=rescol.find(BondedTo(at_center), lig_atoms),
+                    key_atoms=(list(at_center.connected), lig_atoms),
                 )
             else:
                 comp = Component(
@@ -322,45 +334,39 @@ class ConeAngle(ToolInstance):
                     to_center=rescol.find_exact(AtomSpec(center_atom.atomspec)),
                     key_atoms=rescol.find(BondedTo(at_center)),
                 )
-            
-            if method == "tolman":
-                if not comp.key_atoms or len(comp.key_atoms) > 2:
-                    self.session.logger.error(
-                        "Tolman cone angles only implemented for mono- or bidentate ligands\n"
-                        "ligand on %s has %i coordinating atoms: %s" % (
-                            center_atom.structure.name,
-                            len(comp.key_atoms),
-                            ", ".join([key.chix_atom.atomspec for key in comp.key_atoms])
-                        )
-                    )
-                    continue
-            
+
             cone_angle = comp.cone_angle(
                 center=rescol.find(AtomSpec(center_atom.atomspec)),
                 method=method,
                 radii=radii,
+                return_individual=split_cones,
                 return_cones=return_cones,
             )
+            if split_cones and return_cones:
+                _, cones, cone_angle = cone_angle
+            elif return_cones:
+                cone_angle, cones = cone_angle
+            elif split_cones:
+                _, cone_angle = cone_angle
             
             if return_cones:
-                cone_angle, cones = cone_angle
-                s = ".transparency 0.5\n"
                 for cone in cones:
                     apex, base, radius = cone
+                    s = ".transparency 0.5\n"
                     s += ".cone   %6.3f %6.3f %6.3f   %6.3f %6.3f %6.3f   %.3f open\n" % (
                         *apex, *base, radius
                     )
                 
-                stream = BytesIO(bytes(s, "utf-8"))
-                bild_obj, status = read_bild(
-                    self.session,
-                    stream,
-                    "Cone angle %s" % center_atom
-                )
-                
-                self.session.models.add(bild_obj, parent=center_atom.structure)
+                    stream = BytesIO(bytes(s, "utf-8"))
+                    bild_obj, status = read_bild(
+                        self.session,
+                        stream,
+                        "Cone angle %s" % center_atom
+                    )
                     
-                    
+                    self.session.models.add(bild_obj, parent=center_atom.structure)
+
+
             if display_radii:
                 s = ".note radii\n"
                 s += ".transparency 75\n"
@@ -398,7 +404,15 @@ class ConeAngle(ToolInstance):
             self.table.setItem(row, 1, center)
             
             ca = QTableWidgetItem()
-            ca.setData(Qt.DisplayRole, "%.2f" % cone_angle)
+            if split_cones:
+                ca.setData(
+                    Qt.DisplayRole,
+                    ", ".join([
+                        "%.2f" % ca for ca in sorted(cone_angle["substituents"], reverse=True)
+                    ])
+                )
+            else:
+                ca.setData(Qt.DisplayRole, "%.2f" % cone_angle)
             self.table.setItem(row, 2, ca)
     
             self.table.resizeColumnToContents(0)

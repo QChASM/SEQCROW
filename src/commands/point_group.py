@@ -2,7 +2,7 @@ from io import BytesIO
 
 from chimerax.atomic import AtomicStructuresArg
 from chimerax.bild.bild import read_bild
-from chimerax.core.commands import CmdDesc, FloatArg, BoolArg, IntArg
+from chimerax.core.commands import CmdDesc, FloatArg, BoolArg, IntArg, run
 
 from SEQCROW.residue_collection import ResidueCollection
 
@@ -67,6 +67,7 @@ def pointGroup(
                 session.logger.info(repr(ele))
         
         if displayElements:
+            models = []
             for ele in sorted(pg.elements, reverse=True):
                 if isinstance(ele, InversionCenter):
                     inv = ".note %s\n" % repr(ele)
@@ -76,6 +77,7 @@ def pointGroup(
                     stream = BytesIO(bytes(inv, "utf-8"))
                     bild_obj, status = read_bild(session, stream, repr(ele))
                     session.models.add(bild_obj, parent=model)
+                    models.extend(bild_obj)
 
                 elif isinstance(ele, ProperRotation):
                     prots = ".note %s\n" % repr(ele)
@@ -87,6 +89,7 @@ def pointGroup(
                     stream = BytesIO(bytes(prots, "utf-8"))
                     bild_obj, status = read_bild(session, stream, repr(ele))
                     session.models.add(bild_obj, parent=model)
+                    models.extend(bild_obj)
 
                 elif isinstance(ele, ImproperRotation):
                     irots = ".note %s\n" % repr(ele)
@@ -112,6 +115,7 @@ def pointGroup(
                     stream = BytesIO(bytes(irots, "utf-8"))
                     bild_obj, status = read_bild(session, stream, repr(ele))
                     session.models.add(bild_obj, parent=model)
+                    models.extend(bild_obj)
     
                 elif isinstance(ele, MirrorPlane):
                     mirror = ".note %s\n" % repr(ele)
@@ -141,5 +145,9 @@ def pointGroup(
                     stream = BytesIO(bytes(mirror, "utf-8"))
                     bild_obj, status = read_bild(session, stream, repr(ele))
                     session.models.add(bild_obj, parent=model)
+                    models.extend(bild_obj)
+    
+            if models:
+                run(session, "mseries slider %s" % " ".join(m.atomspec for m in models), log=False)
     
     return out
