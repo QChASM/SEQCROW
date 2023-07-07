@@ -228,6 +228,8 @@ class _SEQCROW_API(BundleAPI):
                         alpha_occ = data["alpha_occupancies"] = obj.alpha_occupancies
                     if obj.beta_occupancies is not None:
                         data["beta_occupancies"] = obj.beta_occupancies
+                    else:
+                        data["alpha_occupancies"] = [2 * x for x in data["alpha_occupancies"]]
                 
                 return data
             
