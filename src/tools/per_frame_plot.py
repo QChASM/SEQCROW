@@ -605,11 +605,4 @@ class EnergyPlot(ToolInstance):
             global_triggers = get_triggers()
             global_triggers.remove_handler(self._changes)
 
-        super().delete()    
-    
-    def close(self):
-        self.session.triggers.remove_handler(self._model_closed)
-        global_triggers = get_triggers()
-        global_triggers.remove_handler(self._changes)
-        
-        super().close()
+        super().delete()
