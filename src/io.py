@@ -1,6 +1,3 @@
-class DummyFileReader:
-    pass
-
 
 def open_aarontools(session, stream, file_name, format_name=None, coordsets=None):
     from AaronTools.fileIO import FileReader
@@ -246,10 +243,10 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
         line = stream.readline()
         structures = []
         comments = []
-        fr = DummyFileReader()
-        fr.name = file_name
-        fr.all_geom = None
-        fr.other = dict()
+        fr = {}
+        fr["name"] = file_name
+        fr["all_geom"] = None
+        fr["other"] = dict()
         comment = ""
         while line.strip():
             try:
@@ -279,7 +276,24 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
             for i in range(0, n_atoms):
                 line = stream.readline()
                 info = line.split(maxsplit=1)
-                eles.append(info[0])
+                try:
+                    eles.append(info[0])
+                except IndexError:
+                    coord_data += line
+                    error_msg = get_error_msg(
+                        file_name,
+                        ele_sets,
+                        all_coordsets,
+                        eles,
+                        comments,
+                        n_atoms,
+                        comment,
+                        coord_data,
+                    )
+                    error_msg += "\nlast line read:\n"
+                    error_msg += line
+                    error_msg += "\n expected element symbol/number and coordinates here"
+                    raise RuntimeError(error_msg)
                 try:
                     coord_data += "%s %s %s\n" % tuple(info[1].split()[:3])
                 except IndexError:
@@ -311,12 +325,20 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
                 if len(structures) == maxModels:
                     break
         
-        fr.comment = comment
+        fr["comment"] = comment
     except Exception as e:
         stream.close()
         raise e
 
     stream.close()
+    
+    if not all_coordsets or not ele_sets:
+        session.logger.error(
+            "no structures found in %s\nlast line read:\n%s" % 
+            (file_name, line)
+        )
+        return [], "failed"
+    
     if maxModels is not None:
         session.filereader_manager.triggers.activate_trigger(
             ADD_FILEREADER, (structures, [fr for s in structures])
@@ -343,7 +365,7 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
     status = "opened %s as an XYZ coordinate file" % file_name
     struc.active_coordset_id = struc.num_coordsets
     if len(all_coordsets) > 1:
-        fr.all_geom = all_coordsets
+        fr["all_geom"] = all_coordsets
         if coordsets:
             from chimerax.std_commands.coordset_gui import CoordinateSetSlider
             status += " movie"
