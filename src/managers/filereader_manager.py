@@ -88,7 +88,13 @@ class FileReaderManager(ProviderManager):
                 ndx = self.models.index(model)
                 removed_frs.append(self.filereaders.pop(ndx))
                 self.models.remove(model)
-                
+            if hasattr(model, "filereaders") and model.filereaders:
+                for fr in model.filereaders:
+                    for (key, attr) in list(fr.items()):
+                        del fr[key]
+                        del attr
+                    del fr
+        
         if len(removed_frs) > 0:
             self.triggers.activate_trigger(FILEREADER_REMOVED, removed_frs)
             self.triggers.activate_trigger(FILEREADER_CHANGE, removed_frs)
@@ -105,12 +111,7 @@ class FileReaderManager(ProviderManager):
                     pass
                 del attr
             del fr
-        if hasattr(model, "filereaders") and model.filereaders:
-            for fr in model.filereaders:
-                for (key, attr) in list(d.items()):
-                    del fr[key]
-                    del attr
-                del fr
+
 
     def add_provider(self, bundle_info, name, **kw):
         #*buzz lightyear* ah yes, the models are models

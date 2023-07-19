@@ -11,6 +11,21 @@ These tools enable users to rapidly modify several structures simultaneously, pr
 More information about SEQCROW features can be found on the [GitHub wiki](https://github.com/QChASM/SEQCROW/wiki).
 Several tutorials for SEQCROW's tools can be found under ChimeraX's Help menu
 
+## Installation
+### Toolshed (recommended)
+1. On the ChimeraX menu, go to Tools &rarr; More Tools...
+2. find the SEQCROW page and click install
+3. restart ChimeraX
+
+### GitHub
+1. Download <a href="https://github.com/QChASM/SEQCROW/raw/dev/dist/SEQCROW-1.7.3-py3-none-any.whl">SEQCROW-1.7.3-py3-none-any.whl</a>
+2. Open ChimeraX
+3. (if updating SEQCROW) On the ChimeraX command line, enter `toolshed uninstall SEQCROW` and restart ChimeraX
+4. On the ChimeraX command line, enter `toolshed install /path/to/SEQCROW-1.7.3-py3-none-any.whl`
+5. Restart ChimeraX
+6. If you have a personal AaronTools library already, you can specify the path to it in the SEQCROW settings. Open ChimeraX and go Favorites &rarr; Settings... &rarr; SEQCROW. You will have to restart ChimeraX if you change this setting. 
+
+
 ### File Types
 * Open
    * XYZ files
@@ -105,12 +120,6 @@ In SEQCROW's settings (Favorites/Preferences &rarr; Settings... &rarr; SEQCROW),
 
 ### Running jobs through SEQCROW
 QM computations can be run through SEQCROW if the appropriate QM software is installed. If you are running computations on the same computer running ChimeraX, specify the executable for the software in the "SEQCROW Jobs" section of the ChimeraX settings/preferences. If you are running ChimeraX on a computing cluster, jobs can be submitted to run on the cluster. The cluster's queuing software needs to be specified in the "SEQCROW Jobs" section of the ChimeraX settings/preferences. To run the computations, go to the "run" menu on either the QM Input Builder, Transition State Structure, or Conformer Search tool. When running jobs on a cluster, ensure the job submission template is appropriate for how the QM software is installed on the cluster.
-
-## Installation
-1. On the ChimeraX menu, go to Tools &rarr; More Tools...
-2. find the SEQCROW page and click install
-3. restart ChimeraX
-
 
 
 ## Citation
