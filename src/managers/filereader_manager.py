@@ -7,6 +7,8 @@ from os import path
 
 import re
 
+from AaronTools.fileIO import FileReader
+
 FILEREADER_CHANGE = "AaronTools file opened or closed"
 FILEREADER_REMOVED = "AaronTools file closed"
 FILEREADER_ADDED = "AaronTools file opened"
@@ -90,11 +92,25 @@ class FileReaderManager(ProviderManager):
         if len(removed_frs) > 0:
             self.triggers.activate_trigger(FILEREADER_REMOVED, removed_frs)
             self.triggers.activate_trigger(FILEREADER_CHANGE, removed_frs)
+        
+        # try to remove references to parsed data
         for fr in removed_frs:
-            for (key, attr) in list(fr.__dict__.items()):
-                delattr(fr, key)
+            d = fr
+            if isinstance(fr, FileReader):
+                d = fr.__dict__
+            for (key, attr) in list(d.items()):
+                try:
+                    delattr(fr, key)
+                except AttributeError:
+                    pass
                 del attr
             del fr
+        if hasattr(model, "filereaders") and model.filereaders:
+            for fr in model.filereaders:
+                for (key, attr) in list(d.items()):
+                    del fr[key]
+                    del attr
+                del fr
 
     def add_provider(self, bundle_info, name, **kw):
         #*buzz lightyear* ah yes, the models are models

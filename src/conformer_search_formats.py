@@ -150,8 +150,6 @@ solvents = []
 for solvent_lib in solvent_libs:
     if not os.path.exists(solvent_lib):
         continue
-    print(os.path.join(solvent_lib, "*.xyz"))
-    print(glob(os.path.join(solvent_lib, "*.xyz")))
     solvent_files = glob(os.path.join(solvent_lib, "*.xyz"))
     solvents.extend([os.path.basename(x[:-4]) for x in solvent_files])
 
