@@ -60,6 +60,9 @@ class QMInputFileInfo:
     # whether frequency jobs are available
     frequency = True
     
+    # whether NMR jobs are available
+    nmr = False
+    
     # only one job type per input file
     single_job_type = False
     
@@ -685,6 +688,8 @@ class XTBKeywordOptions(KeywordOptions):
 class GaussianFileInfo(QMInputFileInfo):
     name = "Gaussian"
 
+    nmr = True
+
     initial_options = {
         GAUSSIAN_ROUTE: {
             'opt': ['NoEigenTest', 'Tight', 'VeryTight'],
@@ -817,6 +822,8 @@ class GaussianFileInfo(QMInputFileInfo):
 
 class ORCAFileInfo(QMInputFileInfo):
     name = "ORCA"
+
+    nmr = True
 
     initial_presets = {
         "quick optimize":{

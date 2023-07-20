@@ -59,7 +59,7 @@ from SEQCROW.widgets.icons import pencil_icon, plus_icon
 from SEQCROW.finders import AtomSpec
 
 from AaronTools.config import Config
-from AaronTools.const import TMETAL, ELEMENTS
+from AaronTools.const import TMETAL, ELEMENTS, COMMONLY_ODD_ISOTOPES
 from AaronTools.theory import *
 from AaronTools.theory.method import KNOWN_SEMI_EMPIRICAL
 from AaronTools.utils.utils import combine_dicts
@@ -118,6 +118,8 @@ class _InputGeneratorSettings(Settings):
         'last_template': Value(dumps(dict()), StringArg),
         'last_walltime': 4,
         'last_submit_memory': 4,
+        'last_spin_coupling': True,
+        'last_nmr': False,
     }
 
     AUTO_SAVE = {
@@ -1004,22 +1006,24 @@ class BuildQM(ToolInstance):
             self.basis_widget.setElements([])
             return
 
-        mdl = self.model_selector.currentData()
+        model = self.model_selector.currentData()
 
-        self.job_widget.setStructure(mdl)
-        self.method_widget.sapt_layers.setStructure(mdl)
+        self.job_widget.setStructure(model)
+        self.method_widget.sapt_layers.setStructure(model)
         self.check_elements()
 
-        if mdl in self.session.filereader_manager.filereader_dict:
-            for fr in self.session.filereader_manager.filereader_dict[mdl]:
-                if 'charge' in fr.other:
-                    self.job_widget.setCharge(fr.other['charge'])
+        try:
+            for fr in model.filereaders:
+                if 'charge' in fr:
+                    self.job_widget.setCharge(fr['charge'])
 
-                if 'multiplicity' in fr.other:
-                    self.job_widget.setMultiplicity(fr.other['multiplicity'])
+                if 'multiplicity' in fr:
+                    self.job_widget.setMultiplicity(fr['multiplicity'])
 
-                if 'temperature' in fr.other:
-                    self.job_widget.setTemperature(fr.other['temperature'])
+                if 'temperature' in fr:
+                    self.job_widget.setTemperature(fr['temperature'])
+        except AttributeError:
+            pass
 
     def check_elements(self, *args, **kw):
         """ask self.basis_widget to check the elements"""
@@ -1330,7 +1334,8 @@ class JobTypeOption(QWidget):
             - frequencies
                 - temperature
                 - raman?
-            - solvent"""
+            - nmr
+        """
         super().__init__(parent)
 
         self.settings = settings
@@ -1367,7 +1372,7 @@ class JobTypeOption(QWidget):
         self.charge.valueChanged.connect(self.something_changed)
 
         job_type_layout.addWidget(QLabel("charge:"), 0, 0, 1, 1, Qt.AlignRight)
-        job_type_layout.addWidget(self.charge, 0, 1, 1, 1, Qt.AlignLeft)
+        job_type_layout.addWidget(self.charge, 0, 1, 1, 2, Qt.AlignLeft)
 
         self.multiplicity = QSpinBox()
         self.multiplicity.setRange(1, 10)
@@ -1379,8 +1384,8 @@ class JobTypeOption(QWidget):
         )
         self.multiplicity.valueChanged.connect(self.something_changed)
 
-        job_type_layout.addWidget(QLabel("multiplicity:"), 0, 2, 1, 1, Qt.AlignRight)
-        job_type_layout.addWidget(self.multiplicity, 0, 3, 1, 1, Qt.AlignLeft)
+        job_type_layout.addWidget(QLabel("multiplicity:"), 0, 3, 1, 2, Qt.AlignRight)
+        job_type_layout.addWidget(self.multiplicity, 0, 5, 1, 1, Qt.AlignLeft)
 
         job_choice_widget = QWidget()
         checkbox_layout = QHBoxLayout(job_choice_widget)
@@ -1407,8 +1412,16 @@ class JobTypeOption(QWidget):
         checkbox_layout.insertWidget(
             3, self.do_freq, stretch=0, alignment=Qt.AlignLeft | Qt.AlignVCenter,
         )
+
+        checkbox_layout.insertWidget(
+            4, QLabel("nmr:"), stretch=1, alignment=Qt.AlignRight | Qt.AlignVCenter
+        )
+        self.do_nmr = QCheckBox()
+        checkbox_layout.insertWidget(
+            5, self.do_nmr, stretch=0, alignment=Qt.AlignLeft | Qt.AlignVCenter,
+        )
         
-        job_type_layout.addWidget(job_choice_widget, 1, 0, 1, 4)
+        job_type_layout.addWidget(job_choice_widget, 1, 0, 1, 6)
 
         self.job_type_opts = QTabWidget()
 
@@ -1642,6 +1655,18 @@ class JobTypeOption(QWidget):
 
         self.job_type_opts.addTab(self.freq_opt, "frequency settings")
 
+        
+        self.nmr_opt = QWidget()
+        nmr_layout = QFormLayout(self.nmr_opt)
+        
+        self.spin_coupling = QCheckBox()
+        self.spin_coupling.setChecked(self.settings.last_spin_coupling)
+        nmr_layout.addRow("spin-spin coupling:", self.spin_coupling)
+
+        self.nmr_elements = HorizontalCompactElementList()
+        nmr_layout.addRow("select elements:", self.nmr_elements)
+
+        self.job_type_opts.addTab(self.nmr_opt, "nmr settings")
 
         self.job_type_opts.tabBarDoubleClicked.connect(self.tab_dble_click)
 
@@ -1662,8 +1687,10 @@ class JobTypeOption(QWidget):
 
         self.do_geom_opt.stateChanged.connect(self.opt_checked)
         self.do_freq.stateChanged.connect(self.freq_checked)
+        self.do_nmr.stateChanged.connect(self.freq_checked)
         self.do_geom_opt.stateChanged.connect(self.change_job_type)
         self.do_freq.stateChanged.connect(self.change_job_type)
+        self.do_nmr.stateChanged.connect(self.change_job_type)
 
         self.do_geom_opt.setCheckState(Qt.Checked if self.settings.last_opt else Qt.Unchecked)
         if self.settings.last_ts:
@@ -1671,6 +1698,7 @@ class JobTypeOption(QWidget):
             if ndx >= 0:
                 self.opt_type.setCurrentIndex(ndx)
         self.do_freq.setCheckState(Qt.Checked if self.settings.last_freq else Qt.Unchecked)
+        self.do_nmr.setCheckState(Qt.Checked if self.settings.last_nmr else Qt.Unchecked)
         self.job_type_opts.setCurrentIndex(0)
 
         self.constrained_atom_table.resizeColumnToContents(1)
@@ -1708,6 +1736,9 @@ class JobTypeOption(QWidget):
         elif ndx == 3 and self.form.frequency:
             self.do_freq.setChecked(not self.do_freq.checkState() == Qt.Checked)
 
+        elif ndx == 4 and self.form.nmr:
+            self.do_nmr.setChecked(not self.do_nmr.checkState() == Qt.Checked)
+
     def open_chk_save(self):
         """open file dialog to locate chk/gbs/hess file"""
         if self.use_checkpoint.checkState() == Qt.Unchecked and not self.form.save_checkpoint_filter and self.form.read_checkpoint_filter:
@@ -1736,9 +1767,10 @@ class JobTypeOption(QWidget):
         if Qt.CheckState(state) == Qt.Checked:
             self.job_type_opts.setCurrentIndex(2)
             if self.form.single_job_type:
-                self.do_freq.blockSignals(True)
-                self.do_freq.setCheckState(Qt.Unchecked)
-                self.do_freq.blockSignals(False)
+                for x in [self.do_freq, self.do_nmr]:
+                    x.blockSignals(True)
+                    x.setCheckState(Qt.Unchecked)
+                    x.blockSignals(False)
         elif self.job_type_opts.currentIndex() == 2:
             self.job_type_opts.setCurrentIndex(0)
 
@@ -1747,10 +1779,23 @@ class JobTypeOption(QWidget):
         if Qt.CheckState(state) == Qt.Checked:
             self.job_type_opts.setCurrentIndex(3)
             if self.form.single_job_type:
-                self.do_geom_opt.blockSignals(True)
-                self.do_geom_opt.setCheckState(Qt.Unchecked)
-                self.do_geom_opt.blockSignals(False)
+                for x in [self.do_opt, self.do_nmr]:
+                    x.blockSignals(True)
+                    x.setCheckState(Qt.Unchecked)
+                    x.blockSignals(False)
         elif self.job_type_opts.currentIndex() == 3:
+            self.job_type_opts.setCurrentIndex(0) 
+
+    def nmr_checked(self, state):
+        """when frequency is checked, switch the tab widget to show freq settings"""
+        if Qt.CheckState(state) == Qt.Checked:
+            self.job_type_opts.setCurrentIndex(4)
+            if self.form.single_job_type:
+                for x in [self.do_freq, self.do_opt]:
+                    x.blockSignals(True)
+                    x.setCheckState(Qt.Unchecked)
+                    x.blockSignals(False)
+        elif self.job_type_opts.currentIndex() == 4:
             self.job_type_opts.setCurrentIndex(0) 
 
     def chk_state_changed(self, state):
@@ -1774,6 +1819,9 @@ class JobTypeOption(QWidget):
         if not file_info.frequency:
             self.do_freq.setCheckState(Qt.Unchecked)
         self.do_freq.setEnabled(file_info.frequency)
+        if not file_info.nmr:
+            self.do_nmr.setCheckState(Qt.Unchecked)
+        self.do_nmr.setEnabled(file_info.nmr)
         if not file_info.optimization:
             self.do_geom_opt.setCheckState(Qt.Unchecked)
         else:
@@ -2014,6 +2062,38 @@ class JobTypeOption(QWidget):
                 self.constrained_torsions.pop(i)
                 self.constrained_torsion_table.removeRow(i)
 
+
+        previous_eles = {}
+        for i in range(0, self.nmr_elements.columnCount()):
+            button = self.nmr_elements.cellWidget(0, i)
+            previous_eles[button.text()] = button.state == ElementButton.Checked
+
+        self.nmr_elements.clear()
+        self.nmr_elements.setColumnCount(0)
+
+        elements = set(structure.atoms.elements.names.tolist())
+        elements = sorted([e for e in elements if e in ELEMENTS], key=ELEMENTS.index)
+        for i, ele in enumerate(elements):
+            self.nmr_elements.insertColumn(i)
+            ele_button = ElementButton(ele)
+            # placeholder = UserRoleSortableTableWidget()
+            # placeholder.setData(Qt.UserRole, ELEMENTS.index(ele))
+            try:
+                checked = previous_eles[ele]
+                if checked:
+                    ele_button.setState(ElementButton.Checked)
+                else:
+                    ele_button.setState(ElementButton.Unchecked)
+            except KeyError:
+                if ele in COMMONLY_ODD_ISOTOPES:
+                    ele_button.setState(ElementButton.Checked)
+                else:
+                    ele_button.setState(ElementButton.Unchecked)
+            self.nmr_elements.setCellWidget(0, i, ele_button)
+            # self.nmr_elements.setItem(0, i, placeholder)
+            self.nmr_elements.resizeColumnToContents(i)
+
+
         self.jobTypeChanged.emit()
 
     def check_constraints(self):
@@ -2069,6 +2149,10 @@ class JobTypeOption(QWidget):
     def getFrequencyCalculation(self):
         """returns whether the job is freq"""
         return self.do_freq.checkState() == Qt.Checked
+
+    def getNMR(self):
+        """returns whether the job is NMR"""
+        return self.do_nmr.checkState() == Qt.Checked
 
     def getJobs(self):
         """returns list(JobType) for the current jobs"""
@@ -2127,6 +2211,21 @@ class JobTypeOption(QWidget):
                         temperature=self.temp.value()
                     )
                 )
+
+        if self.do_nmr.checkState() == Qt.Checked:
+            coupling_type = None
+            if self.spin_coupling.isChecked():
+                coupling_type = "spin-spin"
+
+            elements = []
+            for i in range(0, self.nmr_elements.columnCount()):
+                button = self.nmr_elements.cellWidget(0, i)
+                if button.state == ElementButton.Checked:
+                    elements.append(button.text())
+                
+            job_types.append(
+                NMRJob(atoms=elements, coupling_type=coupling_type)
+            )
 
         return job_types
 
@@ -3177,9 +3276,42 @@ class MethodOption(QWidget):
 
 
 class CompactElementList(QTableWidget):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setColumnCount(1)
+        self.verticalHeader().setVisible(False)
+        self.horizontalHeader().setVisible(False)
+        self.setShowGrid(False)
+        #make element list roughly as wide as two characters + a scroll bar
+        #this keeps the widget as narrow as possible so it doesn't take up the entire screen
+        scroll_width = self.style().pixelMetric(QStyle.PM_ScrollBarExtent)
+        self.setMinimumWidth(2 + scroll_width + int(1.7 * self.fontMetrics().boundingRect("Qy").width()))
+        self.setMaximumWidth(2 + scroll_width + int(1.7 * self.fontMetrics().boundingRect("Qy").width()))
+        #set the max. height too b/c I can't seem to get it to respect setRowStretch
+        
     def sizeHintForRow(self, row):
         if self.cellWidget(row, 0):
             return self.cellWidget(row, 0).maximumHeight()
+        return int(1.7 * self.fontMetrics().boundingRect("Qy").width())
+
+
+class HorizontalCompactElementList(QTableWidget):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setRowCount(1)
+        self.verticalHeader().setVisible(False)
+        self.horizontalHeader().setVisible(False)
+        self.setShowGrid(False)
+        #make element list roughly as wide as two characters + a scroll bar
+        #this keeps the widget as narrow as possible so it doesn't take up the entire screen
+        scroll_width = self.style().pixelMetric(QStyle.PM_ScrollBarExtent)
+        self.setMinimumHeight(2 + scroll_width + int(1.7 * self.fontMetrics().boundingRect("Qy").height()))
+        self.setMaximumHeight(2 + scroll_width + int(1.7 * self.fontMetrics().boundingRect("Qy").height()))
+        #set the max. height too b/c I can't seem to get it to respect setRowStretch
+        
+    def sizeHintForColumn(self, column):
+        if self.cellWidget(0, column):
+            return self.cellWidget(0, column).maximumWidth()
         return int(1.7 * self.fontMetrics().boundingRect("Qy").width())
 
 
@@ -3238,16 +3370,6 @@ class BasisOption(QWidget):
         self.basis_name_options.addRow(self.basis_option)
 
         self.elements = CompactElementList()
-        self.elements.setColumnCount(1)
-        self.elements.verticalHeader().setVisible(False)
-        self.elements.horizontalHeader().setVisible(False)
-        self.elements.setShowGrid(False)
-        #make element list roughly as wide as two characters + a scroll bar
-        #this keeps the widget as narrow as possible so it doesn't take up the entire screen
-        scroll_width = self.style().pixelMetric(QStyle.PM_ScrollBarExtent)
-        self.elements.setMinimumWidth(2 + scroll_width + int(1.7 * self.fontMetrics().boundingRect("Qy").width()))
-        self.elements.setMaximumWidth(2 + scroll_width + int(1.7 * self.fontMetrics().boundingRect("Qy").width()))
-        #set the max. height too b/c I can't seem to get it to respect setRowStretch
         self.elements.setMaximumHeight(int(6*self.fontMetrics().boundingRect("Qy").height()))
         self.layout.addWidget(self.elements, 0, 2, 3, 1, Qt.AlignTop)
 
