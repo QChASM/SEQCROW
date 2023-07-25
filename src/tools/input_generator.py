@@ -1687,7 +1687,7 @@ class JobTypeOption(QWidget):
 
         self.do_geom_opt.stateChanged.connect(self.opt_checked)
         self.do_freq.stateChanged.connect(self.freq_checked)
-        self.do_nmr.stateChanged.connect(self.freq_checked)
+        self.do_nmr.stateChanged.connect(self.nmr_checked)
         self.do_geom_opt.stateChanged.connect(self.change_job_type)
         self.do_freq.stateChanged.connect(self.change_job_type)
         self.do_nmr.stateChanged.connect(self.change_job_type)
@@ -2063,35 +2063,33 @@ class JobTypeOption(QWidget):
                 self.constrained_torsion_table.removeRow(i)
 
 
-        previous_eles = {}
-        for i in range(0, self.nmr_elements.columnCount()):
-            button = self.nmr_elements.cellWidget(0, i)
-            previous_eles[button.text()] = button.state == ElementButton.Checked
-
-        self.nmr_elements.clear()
-        self.nmr_elements.setColumnCount(0)
-
-        elements = set(structure.atoms.elements.names.tolist())
-        elements = sorted([e for e in elements if e in ELEMENTS], key=ELEMENTS.index)
-        for i, ele in enumerate(elements):
-            self.nmr_elements.insertColumn(i)
-            ele_button = ElementButton(ele)
-            # placeholder = UserRoleSortableTableWidget()
-            # placeholder.setData(Qt.UserRole, ELEMENTS.index(ele))
-            try:
-                checked = previous_eles[ele]
-                if checked:
-                    ele_button.setState(ElementButton.Checked)
-                else:
-                    ele_button.setState(ElementButton.Unchecked)
-            except KeyError:
-                if ele in COMMONLY_ODD_ISOTOPES:
-                    ele_button.setState(ElementButton.Checked)
-                else:
-                    ele_button.setState(ElementButton.Unchecked)
-            self.nmr_elements.setCellWidget(0, i, ele_button)
-            # self.nmr_elements.setItem(0, i, placeholder)
-            self.nmr_elements.resizeColumnToContents(i)
+        if hasattr(self, "nmr_elements"):
+            previous_eles = {}
+            for i in range(0, self.nmr_elements.columnCount()):
+                button = self.nmr_elements.cellWidget(0, i)
+                previous_eles[button.text()] = button.state == ElementButton.Checked
+    
+            self.nmr_elements.clear()
+            self.nmr_elements.setColumnCount(0)
+    
+            elements = set(structure.atoms.elements.names.tolist())
+            elements = sorted([e for e in elements if e in ELEMENTS], key=ELEMENTS.index)
+            for i, ele in enumerate(elements):
+                self.nmr_elements.insertColumn(i)
+                ele_button = ElementButton(ele)
+                try:
+                    checked = previous_eles[ele]
+                    if checked:
+                        ele_button.setState(ElementButton.Checked)
+                    else:
+                        ele_button.setState(ElementButton.Unchecked)
+                except KeyError:
+                    if ele in COMMONLY_ODD_ISOTOPES:
+                        ele_button.setState(ElementButton.Checked)
+                    else:
+                        ele_button.setState(ElementButton.Unchecked)
+                self.nmr_elements.setCellWidget(0, i, ele_button)
+                self.nmr_elements.resizeColumnToContents(i)
 
 
         self.jobTypeChanged.emit()

@@ -3,6 +3,8 @@ import pathlib
 import re
 import ssl
 
+import numpy as np
+
 from AaronTools.config import Config
 from AaronTools.fileIO import FileReader
 from AaronTools.geometry import CACTUS_HOST
@@ -590,6 +592,10 @@ class MolBuilder(HtmlToolInstance):
         # this is the 2D mol file that we will convert to a 3D structure
         # as some point in the HTML file, spaces are turned into sPaCe so they don't get nuked
         molfile = query["molfile"][0].replace("sPaCe", " ").replace("\\n", "\n")
+        center_x = float(query["x"][0])
+        center_y = float(query["y"][0])
+        center_z = float(query["z"][0])
+        target_destination = np.array([center_x, center_y, center_z])
         # copy-paste from AaronTools.from_string
         # instead of smiles, we have a file
         url = "https://cactus.nci.nih.gov/cgi-bin/translate.tcl?smiles=&format=sdf&astyle=kekule&dim=3D&file=%s" % urllib.parse.quote_plus(molfile)
@@ -639,6 +645,7 @@ class MolBuilder(HtmlToolInstance):
             )
             return
         rescol = ResidueCollection(fr)
+        rescol.coords += target_destination - rescol.COM(mass_weight=False)
         # if not optimization was requested, open the new molecule
         if query["method"][0] == "no":
             struc = rescol.get_chimera(self.session, filereader=fr)

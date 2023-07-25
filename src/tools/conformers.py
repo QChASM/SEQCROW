@@ -282,13 +282,16 @@ class ConformerTool(BuildQM):
         self.job_widget.setStructure(mdl)
         self.check_elements()
 
-        if mdl in self.session.filereader_manager.filereader_dict:
-            for fr in self.session.filereader_manager.filereader_dict[mdl]:
-                if 'charge' in fr.other:
-                    self.job_widget.setCharge(fr.other['charge'])
-
-                if 'multiplicity' in fr.other:
-                    self.job_widget.setMultiplicity(fr.other['multiplicity'])
+        if hasattr(mdl, "filereaders") and mdl.filereaders:
+            fr = mdl.filereaders[-1]
+            try:
+                self.job_widget.setCharge(fr["charge"])
+            except KeyError:
+                pass
+            try:
+                self.job_widget.setCharge(fr["multiplicity"])
+            except KeyError:
+                pass
 
     def update_theory(self, update_settings=False):
         """grabs the current settings and updates self.theory

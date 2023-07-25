@@ -53,6 +53,17 @@
                 <br>
                 <label for="name" style="">model name:</label>
                 <input type="text" id="name" name="name" value="new" required="true">
+				<br>
+				<br>
+				<label for="centroid">move centoid to:</label>
+				<div id="centroid">
+					<label for="x_com">x=</label>
+					<input id="x_com" type="number" value="0.0" name="x" min="-100000" max="100000" step="0.5">
+					<label for="y_com">y=</label>
+					<input id="y_com" type="number" value="0.0" name="y" min="-100000" max="100000" step="0.5">
+					<label for="z_com">z=</label>
+					<input id="z_com" type="number" value="0.0" name="z" min="-100000" max="100000" step="0.5">
+				</div>
         </form>
         <form method="get" action="cxcmd:open">
             <p style="font-family: sans-serif">
