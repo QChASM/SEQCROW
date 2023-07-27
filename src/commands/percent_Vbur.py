@@ -135,14 +135,13 @@ def _vbur(
     if not isinstance(center_xyz, np.ndarray):
         center_xyz = np.mean(center.coords, axis=0)
         out["at_center"] = [AtomSpec(c.atomspec) for c in center]
-    
+        
     if labels != "none" or reportComponent != "total" or determine_key:
         if not key_atoms:
             key_atoms = set()
             for c in center:
                 key_atoms.update(c.neighbors)
             
-        if not key_atoms:
             for m in model.child_models():
                 if isinstance(m, PseudobondGroup) and m.name == model.PBG_METAL_COORDINATION:
                     for pb in m.pseudobonds:
@@ -366,6 +365,7 @@ def percent_vbur(
                 "shape": shape,
                 "labels": labels,
                 "reportComponent": reportComponent,
+                "determine_key": difference or steric_map,
             })
 
     # results = [_vbur(*arg, **kwarg) for arg, kwarg in zip(args, kwargs)]
