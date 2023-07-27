@@ -435,13 +435,16 @@ class BuildRaven(BuildQM, ToolInstance):
         product = self.product_selector.currentData()
         self.check_elements()
 
-        if product in self.session.filereader_manager.filereader_dict:
-            for fr in self.session.filereader_manager.filereader_dict[product]:
-                if 'charge' in fr.other:
-                    self.job_widget.setCharge(fr.other['charge'])
-
-                if 'multiplicity' in fr.other:
-                    self.job_widget.setMultiplicity(fr.other['multiplicity'])
+        if hasattr(product, "filereaders") and product.filereaders:
+            fr = product.filereaders[-1]
+            try:
+                self.job_widget.setCharge(fr["charge"])
+            except KeyError:
+                pass
+            try:
+                self.job_widget.setMultiplicity(fr["multiplicity"])
+            except KeyError:
+                pass
 
     def change_reactant(self, index):
         if index == -1:

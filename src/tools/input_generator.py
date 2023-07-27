@@ -1663,7 +1663,7 @@ class JobTypeOption(QWidget):
         self.spin_coupling.setChecked(self.settings.last_spin_coupling)
         nmr_layout.addRow("spin-spin coupling:", self.spin_coupling)
 
-        self.nmr_elements = HorizontalCompactElementList()
+        self.nmr_elements = QHBoxLayout()
         nmr_layout.addRow("select elements:", self.nmr_elements)
 
         self.job_type_opts.addTab(self.nmr_opt, "nmr settings")
@@ -1928,6 +1928,7 @@ class JobTypeOption(QWidget):
         """disables tabs when they don't apply to the job type"""
         self.job_type_opts.setTabEnabled(2, self.do_geom_opt.checkState() == Qt.Checked)
         self.job_type_opts.setTabEnabled(3, self.do_freq.checkState() == Qt.Checked)
+        self.job_type_opts.setTabEnabled(4, self.do_nmr.checkState() == Qt.Checked)
 
         self.jobTypeChanged.emit()
 
@@ -2065,17 +2066,18 @@ class JobTypeOption(QWidget):
 
         if hasattr(self, "nmr_elements"):
             previous_eles = {}
-            for i in range(0, self.nmr_elements.columnCount()):
-                button = self.nmr_elements.cellWidget(0, i)
+            while (item := self.nmr_elements.takeAt(0)) is not None:
+                button = item.widget()
+                if button is None:
+                    del item
+                    continue
                 previous_eles[button.text()] = button.state == ElementButton.Checked
-    
-            self.nmr_elements.clear()
-            self.nmr_elements.setColumnCount(0)
-    
+                button.deleteLater()
+                del item
+        
             elements = set(structure.atoms.elements.names.tolist())
             elements = sorted([e for e in elements if e in ELEMENTS], key=ELEMENTS.index)
             for i, ele in enumerate(elements):
-                self.nmr_elements.insertColumn(i)
                 ele_button = ElementButton(ele)
                 try:
                     checked = previous_eles[ele]
@@ -2088,8 +2090,8 @@ class JobTypeOption(QWidget):
                         ele_button.setState(ElementButton.Checked)
                     else:
                         ele_button.setState(ElementButton.Unchecked)
-                self.nmr_elements.setCellWidget(0, i, ele_button)
-                self.nmr_elements.resizeColumnToContents(i)
+                self.nmr_elements.addWidget(ele_button, stretch=0)
+            self.nmr_elements.addStretch(1)
 
 
         self.jobTypeChanged.emit()
@@ -2216,8 +2218,10 @@ class JobTypeOption(QWidget):
                 coupling_type = "spin-spin"
 
             elements = []
-            for i in range(0, self.nmr_elements.columnCount()):
-                button = self.nmr_elements.cellWidget(0, i)
+            for i in range(0, self.nmr_elements.count()):
+                button = self.nmr_elements.itemAt(i).widget()
+                if button is None:
+                    continue
                 if button.state == ElementButton.Checked:
                     elements.append(button.text())
                 
@@ -3300,13 +3304,7 @@ class HorizontalCompactElementList(QTableWidget):
         self.verticalHeader().setVisible(False)
         self.horizontalHeader().setVisible(False)
         self.setShowGrid(False)
-        #make element list roughly as wide as two characters + a scroll bar
-        #this keeps the widget as narrow as possible so it doesn't take up the entire screen
-        scroll_width = self.style().pixelMetric(QStyle.PM_ScrollBarExtent)
-        self.setMinimumHeight(2 + scroll_width + int(1.7 * self.fontMetrics().boundingRect("Qy").height()))
-        self.setMaximumHeight(2 + scroll_width + int(1.7 * self.fontMetrics().boundingRect("Qy").height()))
-        #set the max. height too b/c I can't seem to get it to respect setRowStretch
-        
+
     def sizeHintForColumn(self, column):
         if self.cellWidget(0, column):
             return self.cellWidget(0, column).maximumWidth()
