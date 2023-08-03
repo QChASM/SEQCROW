@@ -1024,6 +1024,8 @@ class ThermoGroup(QWidget):
                 if data is None:
                     continue
                 fr, mdl = data
+                if not fr:
+                    continue
 
                 out[-1].append(fr['energy'])
         
