@@ -458,6 +458,7 @@
                 <ChimeraXClassifier>ChimeraX :: Tool :: Ligand Solid Angle             :: Structure Analysis   :: Calculate ligand solid angles</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Conformer Search               :: Structure Prediction :: automated conformer search</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Z-Matrix Builder               :: Structure Editing    :: build structure using internal coordinates</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: NMR Spectrum                   :: Quantum Chemistry    :: plot simulated NMR spectra from DFT computations</ChimeraXClassifier>
                 <!--<ChimeraXClassifier>ChimeraX :: Tool :: AaronJr Input Builder          :: AaronJr            :: Create input files for AaronJr</ChimeraXClassifier>-->
                 <!--ChimeraXClassifier>ChimeraX :: Tool :: AARON Input Builder :: AARON :: Build AARON input file</ChimeraXClassifier-->
                 

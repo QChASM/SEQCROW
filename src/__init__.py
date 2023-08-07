@@ -492,6 +492,10 @@ class _SEQCROW_API(BundleAPI):
         elif ti.name == "Z-Matrix Builder":
             from .tools.zmat_builder import ZMatrixBuilder
             return ZMatrixBuilder(session, ti.name)
+        
+        elif ti.name == "NMR Spectrum":
+            from .tools.nmr_plot import NMRSpectrum
+            return NMRSpectrum(session, ti.name)
 
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)

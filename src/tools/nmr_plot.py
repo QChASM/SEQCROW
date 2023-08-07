@@ -1,23 +1,27 @@
+from json import loads, dumps
+import re
+
 import numpy as np
 
 from chimerax.core.tools import ToolInstance
-from chimerax.ui.gui import MainToolWindow
+from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.ui.widgets import ColorButton
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
 from chimerax.core.commands.cli import FloatArg, TupleOf, IntArg
+from chimerax.core.commands import run
 
 from AaronTools.comp_output import CompOutput
-from AaronTools.geometry import Geometry
-from AaronTools.spectra import ValenceExcitations
+from AaronTools.const import NMR_SCALE_LIBS
+from AaronTools.spectra import NMR
 
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
 from matplotlib import rcParams
 import matplotlib.patheffects as pe
 
 from Qt.QtCore import Qt, QSize
-from Qt.QtGui import QIcon, QPixmap
+from Qt.QtGui import QIcon
 from Qt.QtWidgets import (
     QSpinBox,
     QDoubleSpinBox,
@@ -31,118 +35,67 @@ from Qt.QtWidgets import (
     QCheckBox,
     QFileDialog,
     QStyle,
+    QGroupBox,
     QLabel,
     QHBoxLayout,
+    QLineEdit,
     QTreeWidget,
     QSizePolicy,
     QTreeWidgetItem,
 )
 
 from SEQCROW.tools.per_frame_plot import NavigationToolbar
+from SEQCROW.tools.uvvis_plot import (
+    solid_line,
+    dashed_line, 
+    dotted_line,
+    dashdot_line,
+    color_cycle,
+)
+    
 from SEQCROW.utils import iter2str
-from SEQCROW.widgets import FilereaderComboBox, FakeMenu
+from SEQCROW.widgets import FilereaderComboBox, FakeMenu, ScientificSpinBox
 
 
 rcParams["savefig.dpi"] = 300
 
 
-solid_line_pixmap = QPixmap([
-    "50  4  2  1",
-    "a c #FFFFFF",
-    "b c #000000",
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbba",
-    "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbba",
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-])
-solid_line = QIcon(solid_line_pixmap)
 
-dashed_line_pixmap = QPixmap([
-    "50  4  2  1",
-    "a c #FFFFFF",
-    "b c #000000",
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "abbbbbbbbaabbbbbbbbaabbbbbbbbaabbbbbbbbaabbbbbbbba",
-    "abbbbbbbbaabbbbbbbbaabbbbbbbbaabbbbbbbbaabbbbbbbba",
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-])
-dashed_line = QIcon(dashed_line_pixmap)
-
-dotted_line_pixmap = QPixmap([
-    "48  4  2  1",
-    "a c #FFFFFF",
-    "b c #000000",
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "abbaabbaabbaabbaabbaabbaabbaabbaabbaabbaabbaabba",
-    "abbaabbaabbaabbaabbaabbaabbaabbaabbaabbaabbaabba",
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-])
-dotted_line = QIcon(dotted_line_pixmap)
-
-dashdot_line_pixmap = QPixmap([
-    "56  4  2  1",
-    "a c #FFFFFF",
-    "b c #000000",
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "abbbbbbbbaabbaabbbbbbbbaabbaabbbbbbbbaabbaabbbbbbbbaabba",
-    "abbbbbbbbaabbaabbbbbbbbaabbaabbbbbbbbaabbaabbbbbbbbaabba",
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-])
-dashdot_line = QIcon(dashdot_line_pixmap)
-
-dashdotdot_line_pixmap = QPixmap([
-    "50  4  2  1",
-    "a c #FFFFFF",
-    "b c #000000",
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "abbbbbbbbaabbaabbaabbbbbbbbaabbaabbaabbbbbbbbaabba",
-    "abbbbbbbbaabbaabbaabbbbbbbbaabbaabbaabbbbbbbbaabba",
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-])
-dashdotdot_line = QIcon(dashdotdot_line_pixmap)
-
-
-color_cycle = [
-    (1.0, 0.0, 0.0),
-    (0.0, 0.0, 1.0),
-    (0.0, 0.7, 0.1),
-    (0.9, 0.6, 0.2),
-    (0.8, 0.1, 0.8),
-]
-
-
-class _UVVisSpectrumSettings(Settings):
+class _NMRSpectrumSettings(Settings):
     AUTO_SAVE = {
-        'fwhm': Value(0.5, FloatArg), 
-        'peak_type': 'Gaussian', 
-        'plot_type': 'uv-vis',
+        'fwhm': Value(2.5, FloatArg), 
+        'peak_type': 'Lorentzian', 
         'voigt_mix': 0.5,
         'exp_color': Value((0.0, 0.0, 1.0), TupleOf(FloatArg, 3), iter2str),
+        'reverse_x': True,
         'figure_width': 5,
         'figure_height': 3.5,
         "fixed_size": False,
+        "scales": "{}",
+        "version": 0,
         'w0': 100,
         'temperature': 298.15,
-        'transient': False,
         "weight_method": "QRRHO",
         'col_1': Value(150, IntArg), 
         'col_2': Value(150, IntArg), 
         'col_3': Value(150, IntArg), 
-        'x_units': "nm",
+        "pulse_frequency": 90.0,
 }
 
 
-class UVVisSpectrum(ToolInstance):
+class NMRSpectrum(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False
-    help = "https://github.com/QChASM/SEQCROW/wiki/UV-Vis-Spectrum-Tool"
     
     def __init__(self, session, name):
         super().__init__(session, name)
         
         self.tool_window = MainToolWindow(self)        
 
-        self.settings = _UVVisSpectrumSettings(session, "UV-Vis Spectrum")
+        self.settings = _NMRSpectrumSettings(session, name)
+        if self.settings.version == 0:
+            self.update_scales()
+            self.settings.version = 1
 
         self.highlighted_mode = []
         self.highlight_frs = []
@@ -167,7 +120,7 @@ class UVVisSpectrum(ToolInstance):
         
         self.tree = QTreeWidget()
         self.tree.setColumnCount(4)
-        self.tree.setHeaderLabels(["UV/vis file", "frequency file", "energy file", "remove"])
+        self.tree.setHeaderLabels(["NMR file", "frequency file", "energy file", "remove"])
         self.tree.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.tree.resizeColumnToContents(3)
         
@@ -188,6 +141,7 @@ class UVVisSpectrum(ToolInstance):
         # TODO: have a setting save the size the thermo tool
         self.tree.setColumnWidth(0, self.settings.col_1)
         self.tree.setColumnWidth(1, self.settings.col_2)
+        self.tree.setColumnWidth(2, self.settings.col_3)
         
         self.add_mol_group()
         
@@ -232,19 +186,19 @@ class UVVisSpectrum(ToolInstance):
         component_layout.addWidget(self.weight_method, 1, 1, 1, 1, Qt.AlignLeft | Qt.AlignHCenter)
 
 
-        show_conformers = QLabel("show contribution from conformers with a Boltzmann population above:")
-        component_layout.addWidget(show_conformers, 2, 0, 1, 4, Qt.AlignRight | Qt.AlignVCenter)
-        
-        self.boltzmann_pop_limit = QDoubleSpinBox()
-        self.boltzmann_pop_limit.setRange(1.0, 99.0)
-        self.boltzmann_pop_limit.setSingleStep(1.0)
-        self.boltzmann_pop_limit.setDecimals(1)
-        self.boltzmann_pop_limit.setValue(10.0)
-        self.boltzmann_pop_limit.setSuffix("%")
-        component_layout.addWidget(self.boltzmann_pop_limit, 2, 4, 1, 1, Qt.AlignLeft | Qt.AlignVCenter)
-        
-        self.show_boltzmann_pop = QCheckBox()
-        component_layout.addWidget(self.show_boltzmann_pop, 2, 5, 1, 1, Qt.AlignLeft | Qt.AlignVCenter)
+        # show_conformers = QLabel("show contribution from conformers with a Boltzmann population above:")
+        # component_layout.addWidget(show_conformers, 2, 0, 1, 4, Qt.AlignRight | Qt.AlignVCenter)
+        # 
+        # self.boltzmann_pop_limit = QDoubleSpinBox()
+        # self.boltzmann_pop_limit.setRange(1.0, 99.0)
+        # self.boltzmann_pop_limit.setSingleStep(1.0)
+        # self.boltzmann_pop_limit.setDecimals(1)
+        # self.boltzmann_pop_limit.setValue(10.0)
+        # self.boltzmann_pop_limit.setSuffix("%")
+        # component_layout.addWidget(self.boltzmann_pop_limit, 2, 4, 1, 1, Qt.AlignLeft | Qt.AlignVCenter)
+        # 
+        # self.show_boltzmann_pop = QCheckBox()
+        # component_layout.addWidget(self.show_boltzmann_pop, 2, 5, 1, 1, Qt.AlignLeft | Qt.AlignVCenter)
 
 
         tabs.addTab(component_widget, "components")
@@ -267,24 +221,24 @@ class UVVisSpectrum(ToolInstance):
         self.canvas.setMinimumWidth(400)
         # self.canvas.setMinimumHeight(300)
 
-        plot_layout.addWidget(self.canvas, 1, 0, 1, 7)
+        plot_layout.addWidget(self.canvas, 0, 0, 1, 7)
 
         refresh_button = QPushButton()
         refresh_button.setIcon(QIcon(refresh_button.style().standardIcon(QStyle.SP_BrowserReload)))
         refresh_button.clicked.connect(self.refresh_plot)
-        plot_layout.addWidget(refresh_button, 2, 0, 1, 1, Qt.AlignVCenter)
+        plot_layout.addWidget(refresh_button, 1, 0, 1, 1, Qt.AlignVCenter)
 
         toolbar_widget = QWidget()
         self.toolbar = NavigationToolbar(self.canvas, toolbar_widget)
         self.toolbar.setMaximumHeight(32)
-        plot_layout.addWidget(self.toolbar, 2, 1, 1, 1)
+        plot_layout.addWidget(self.toolbar, 1, 1, 1, 1)
 
-        plot_layout.addWidget(QLabel("fixed size:"), 2, 2, 1, 1, Qt.AlignVCenter | Qt.AlignRight)
+        plot_layout.addWidget(QLabel("fixed size:"), 1, 2, 1, 1, Qt.AlignVCenter | Qt.AlignRight)
 
         self.fixed_size = QCheckBox()
         self.fixed_size.setCheckState(Qt.Checked if self.settings.fixed_size else Qt.Unchecked)
         self.fixed_size.stateChanged.connect(self.change_figure_size)
-        plot_layout.addWidget(self.fixed_size, 2, 3, 1, 1, Qt.AlignVCenter | Qt.AlignLeft)
+        plot_layout.addWidget(self.fixed_size, 1, 3, 1, 1, Qt.AlignVCenter | Qt.AlignLeft)
 
         self.figure_width = QDoubleSpinBox()
         self.figure_width.setRange(1, 24)
@@ -293,9 +247,9 @@ class UVVisSpectrum(ToolInstance):
         self.figure_width.setSuffix(" in.")
         self.figure_width.setValue(self.settings.figure_width)
         self.figure_width.valueChanged.connect(self.change_figure_size)
-        plot_layout.addWidget(self.figure_width, 2, 4, 1, 1)
+        plot_layout.addWidget(self.figure_width, 1, 4, 1, 1)
      
-        plot_layout.addWidget(QLabel("x"), 2, 5, 1, 1, Qt.AlignVCenter | Qt.AlignHCenter)
+        plot_layout.addWidget(QLabel("x"), 1, 5, 1, 1, Qt.AlignVCenter | Qt.AlignHCenter)
      
         self.figure_height = QDoubleSpinBox()
         self.figure_height.setRange(1, 24)
@@ -304,35 +258,12 @@ class UVVisSpectrum(ToolInstance):
         self.figure_height.setSuffix(" in.")
         self.figure_height.setValue(self.settings.figure_height)
         self.figure_height.valueChanged.connect(self.change_figure_size)
-        plot_layout.addWidget(self.figure_height, 2, 6, 1, 1)
+        plot_layout.addWidget(self.figure_height, 1, 6, 1, 1)
 
         self.change_figure_size()
 
-        self.plot_type = QComboBox()
-        self.plot_type.addItems([
-            "UV/vis",
-            "UV/vis transmittance",
-            "UV/vis (dipole velocity)",
-            "UV/vis transmittance (dipole velocity)",
-            "ECD",
-            "ECD (dipole velocity)",
-        ])
-        self.plot_type.setItemData(0, "uv-vis")
-        self.plot_type.setItemData(1, "transmittance")
-        self.plot_type.setItemData(2, "uv-vis-velocity")
-        self.plot_type.setItemData(3, "transmittance-velocity")
-        self.plot_type.setItemData(4, "ecd")
-        self.plot_type.setItemData(5, "ecd-velocity")
-        ndx = self.plot_type.findData(self.settings.plot_type, flags=Qt.MatchExactly)
-        if ndx:
-            self.plot_type.setCurrentIndex(ndx)
-        self.plot_type.currentIndexChanged.connect(self.refresh_plot)
-        plot_layout.addWidget(QLabel("plot type:"), 0, 0, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
-        plot_layout.addWidget(self.plot_type, 0, 1, 1, 6, Qt.AlignLeft | Qt.AlignVCenter)
-        
-        plot_layout.setRowStretch(0, 0)
-        plot_layout.setRowStretch(1, 1)
-        plot_layout.setRowStretch(2, 0)
+        plot_layout.setRowStretch(0, 1)
+        plot_layout.setRowStretch(1, 0)
         
         tabs.addTab(plot_widget, "plot")
 
@@ -341,16 +272,16 @@ class UVVisSpectrum(ToolInstance):
         plot_settings_layout = QFormLayout(plot_settings_widget)
 
         self.peak_type = QComboBox()
-        self.peak_type.addItems(['Gaussian', 'Lorentzian', 'pseudo-Voigt', 'Delta'])
+        self.peak_type.addItems(['Gaussian', 'Lorentzian', 'pseudo-Voigt'])
         ndx = self.peak_type.findText(self.settings.peak_type, Qt.MatchExactly)
         self.peak_type.setCurrentIndex(ndx)
         plot_settings_layout.addRow("peak type:", self.peak_type)
         
         self.fwhm = QDoubleSpinBox()
-        self.fwhm.setRange(0.01, 10.0)
-        self.fwhm.setSingleStep(0.01)
+        self.fwhm.setSingleStep(5)
+        self.fwhm.setRange(0.01, 200.0)
+        self.fwhm.setSuffix(" Hz")
         self.fwhm.setValue(self.settings.fwhm)
-        self.fwhm.setSuffix(" eV")
         self.fwhm.setToolTip("width of peaks at half of their maximum value")
         plot_settings_layout.addRow("FWHM:", self.fwhm)
         
@@ -368,22 +299,17 @@ class UVVisSpectrum(ToolInstance):
         self.voigt_mix.setEnabled(self.peak_type.currentText() == "pseudo-Voigt")
         self.peak_type.currentTextChanged.connect(lambda text, widget=self.voigt_mix: widget.setEnabled(text == "pseudo-Voigt"))
         
-        self.shift = QDoubleSpinBox()
-        self.shift.setRange(-5, 5)
-        self.shift.setSingleStep(0.1)
-        self.shift.setDecimals(2)
-        self.shift.setSuffix(" eV")
-        plot_settings_layout.addRow("shift excitation energies:", self.shift)
-
-        self.x_units = QComboBox()
-        self.x_units.addItems(["nm", "eV"])
-        ndx = self.x_units.findText(self.settings.x_units, Qt.MatchExactly)
-        self.x_units.setCurrentIndex(ndx)
-        plot_settings_layout.addRow("x-axis units:", self.x_units)
+        self.pulse_frequency = QDoubleSpinBox()
+        self.pulse_frequency.setMinimum(1.0)
+        self.pulse_frequency.setMaximum(10000.0)
+        self.pulse_frequency.setSuffix(" MHz")
+        self.pulse_frequency.setValue(self.settings.pulse_frequency)
+        self.pulse_frequency.setSingleStep(10)
+        plot_settings_layout.addRow("pulse frequency:", self.pulse_frequency)
         
-        self.spectra_type = QComboBox()
-        self.spectra_type.addItems(["regular", "transient", "SOC"])
-        plot_settings_layout.addRow("data:", self.spectra_type)
+        self.reverse_x = QCheckBox()
+        self.reverse_x.setCheckState(Qt.Checked)
+        plot_settings_layout.addRow("reverse x-axis:", self.reverse_x)
         
         tabs.addTab(plot_settings_widget, "plot settings")
         
@@ -409,6 +335,85 @@ class UVVisSpectrum(ToolInstance):
         
         tabs.addTab(experimental_widget, "plot experimental data")
         
+        
+        # frequency scaling
+        scaling_group = QWidget()
+        scaling_layout = QFormLayout(scaling_group)
+        
+        desc = QLabel("")
+        desc.setText("<a href=\"test\" style=\"text-decoration: none;\">&#x1D6FF;' = &#x1D6FF;<sub>ref</sub> + &#x1D6FC; &times; &#x1D6FF;<sub>0</sub></a>")
+        desc.setTextFormat(Qt.RichText)
+        desc.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        desc.linkActivated.connect(self.open_link)
+        desc.setToolTip("")
+        scaling_layout.addRow(desc)
+
+        self.scalar = QDoubleSpinBox()
+        self.scalar.setMinimum(-100)
+        self.scalar.setMaximum(100)
+        self.scalar.setDecimals(4)
+        self.scalar.setSingleStep(0.025)
+        self.scalar.setValue(32)
+        scaling_layout.addRow("&#x1D6FF;<sub>ref</sub> =", self.scalar)
+        
+        self.linear = QDoubleSpinBox()
+        self.linear.setMaximum(2)
+        self.linear.setMinimum(-2)
+        self.linear.setDecimals(4)
+        self.linear.setSingleStep(0.025)
+        self.linear.setValue(-1.0)
+        scaling_layout.addRow("α =", self.linear)
+
+        save_scales = QPushButton("save current scale factors...")
+        save_scales.clicked.connect(self.open_save_scales)
+        scaling_layout.addRow(save_scales)
+        
+        set_zero = QPushButton("set scales to α = -1, reference δ = 0")
+        set_zero.clicked.connect(lambda *args: self.linear.setValue(-1.0))
+        set_zero.clicked.connect(lambda *args: self.scalar.setValue(0.))
+        scaling_layout.addRow(set_zero)
+        
+        
+        lookup_scale = QGroupBox("scale factor lookup")
+        scaling_layout.addRow(lookup_scale)
+        lookup_layout = QFormLayout(lookup_scale)
+        
+        self.library = QComboBox()
+        lookup_layout.addRow("database:", self.library)
+        
+        self.method = QComboBox()
+        lookup_layout.addRow("NMR method:", self.method)
+        
+        self.basis = QComboBox()
+        lookup_layout.addRow("structure opt. method:", self.basis)
+        
+        self.fill_lib_options()
+        
+        desc = QLabel("")
+        desc.setText("view database online <a href=\"test\" style=\"text-decoration: none;\">here</a>")
+        desc.setTextFormat(Qt.RichText)
+        desc.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        desc.linkActivated.connect(self.open_scale_library_link)
+        desc.setToolTip("view library online")
+        lookup_layout.addRow(desc)
+
+        self.library.currentTextChanged.connect(self.change_scale_lib)
+        self.method.currentTextChanged.connect(self.change_method)
+        self.basis.currentTextChanged.connect(self.change_basis)
+
+        # fit_scale = QGroupBox("linear least squares fitting")
+        # scaling_layout.addRow(fit_scale)
+        # fit_layout = QFormLayout(fit_scale)
+        # 
+        # self.fit_c1 = QCheckBox()
+        # fit_layout.addRow("fit c<sub>1</sub>:", self.fit_c1)
+        # 
+        # self.fit_c2 = QCheckBox()
+        # fit_layout.addRow("fit c<sub>2</sub>:", self.fit_c2)
+        
+        tabs.addTab(scaling_group, "shift scaling")
+        
+        
         # break x axis
         interrupt_widget = QWidget()
         interrupt_layout = QFormLayout(interrupt_widget)
@@ -429,7 +434,6 @@ class UVVisSpectrum(ToolInstance):
         
 
         tabs.currentChanged.connect(lambda ndx: self.refresh_plot() if ndx == 1 else None)
-        tabs.currentChanged.connect(lambda ndx: self.check_units() if ndx == 4 else None)
 
         #menu bar for saving stuff
         menu = FakeMenu()
@@ -442,32 +446,6 @@ class UVVisSpectrum(ToolInstance):
         layout.setMenuBar(menu)        
         self.tool_window.ui_area.setLayout(layout)
         self.tool_window.manage(None)
-
-    def check_units(self):
-        units = self.x_units.currentText()
-        if self.section_table.rowCount() > 1:
-            for i in range(0, self.section_table.rowCount() - 1):
-                curr_units = self.section_table.cellWidget(i, 0).suffix().strip()
-                if curr_units == "nm" and units == "eV":
-                    val1 = self.section_table.cellWidget(i, 0).value()
-                    val1 = ValenceExcitations.nm_to_ev(val1)
-                    val2 = self.section_table.cellWidget(i, 1).value()
-                    val2 = ValenceExcitations.nm_to_ev(val2)
-                    self.section_table.cellWidget(i, 0).setValue(val2)
-                    self.section_table.cellWidget(i, 1).setValue(val1)
-                    self.section_table.cellWidget(i, 0).setSingleStep(0.5)
-                    self.section_table.cellWidget(i, 1).setSingleStep(0.5)
-                if curr_units == "eV" and units == "nm":
-                    val1 = self.section_table.cellWidget(i, 0).value()
-                    val1 = ValenceExcitations.ev_to_nm(val1)
-                    val2 = self.section_table.cellWidget(i, 1).value()
-                    val2 = ValenceExcitations.ev_to_nm(val2)
-                    self.section_table.cellWidget(i, 0).setValue(val2)
-                    self.section_table.cellWidget(i, 1).setValue(val1)
-                    self.section_table.cellWidget(i, 0).setSingleStep(25)
-                    self.section_table.cellWidget(i, 1).setSingleStep(25)
-                self.section_table.cellWidget(i, 0).setSuffix(" %s" % units)
-                self.section_table.cellWidget(i, 1).setSuffix(" %s" % units)
 
     def add_mol_group(self, *args):
         row = self.tree.topLevelItemCount()
@@ -512,9 +490,10 @@ class UVVisSpectrum(ToolInstance):
         self.tree.setItemWidget(style_group, 0, line_widget)
         self.tree.setItemWidget(style_group, 1, line_widget2)
         
-        
+
         trash_button = QPushButton()
         trash_button.setFlat(True)
+        
         trash_button.clicked.connect(lambda *args, parent=mol_group: self.remove_mol_group(parent))
         trash_button.setIcon(QIcon(self.tree.style().standardIcon(QStyle.SP_DialogDiscardButton)))
         
@@ -526,15 +505,10 @@ class UVVisSpectrum(ToolInstance):
         add_conf_button2.setFlat(True)
         add_conf_button2.clicked.connect(lambda *args, conf_group_widget=mol_group: self.add_conf_group(conf_group_widget))
         
-        add_conf_button3 = QPushButton("")
-        add_conf_button3.setFlat(True)
-        add_conf_button3.clicked.connect(lambda *args, conf_group_widget=mol_group: self.add_conf_group(conf_group_widget))
-        
         add_conf_child = QTreeWidgetItem(mol_group)
         self.tree.setItemWidget(add_conf_child, 0, add_conf_button)
         self.tree.setItemWidget(add_conf_child, 1, add_conf_button2)
-        self.tree.setItemWidget(add_conf_child, 2, add_conf_button3)
-        self.tree.setItemWidget(mol_group, 3, trash_button)
+        self.tree.setItemWidget(mol_group, 2, trash_button)
         
         mol_group.setText(0, "group %i" % row)
         
@@ -546,8 +520,8 @@ class UVVisSpectrum(ToolInstance):
         
         mol_fraction_widget = QWidget()
         mol_fraction_layout = QFormLayout(mol_fraction_widget)
-        mol_fraction_layout.setContentsMargins(4, 1, 4, 1)
         mol_fraction_layout.addRow("ratio:", mol_fraction)
+        mol_fraction_layout.setContentsMargins(4, 1, 4, 1)
         self.tree.setItemWidget(mol_group, 1, mol_fraction_widget)
         
         mol_group.addChild(add_conf_child)
@@ -560,7 +534,6 @@ class UVVisSpectrum(ToolInstance):
             conf = parent.child(conf_ndx)
             self.tree.itemWidget(conf, 0).destroy()
             self.tree.itemWidget(conf, 1).destroy()
-            self.tree.itemWidget(conf, 2).destroy()
         
         ndx = self.tree.indexOfTopLevelItem(parent)
         self.tree.takeTopLevelItem(ndx)
@@ -571,21 +544,18 @@ class UVVisSpectrum(ToolInstance):
         conformer_item = QTreeWidgetItem(conf_group_widget)
         conf_group_widget.insertChild(row, conformer_item)
         
-        uv_vis_combobox = FilereaderComboBox(self.session, otherItems=['uv_vis'])
         nrg_combobox = FilereaderComboBox(self.session, otherItems=['energy'])
         freq_combobox = FilereaderComboBox(self.session, otherItems=['frequency'])
+        nmr_combobox = FilereaderComboBox(self.session, otherItems=['nmr'])
         
         trash_button = QPushButton()
         trash_button.setFlat(True)
-        trash_button.clicked.connect(lambda *args, combobox=uv_vis_combobox: combobox.deleteLater())
         trash_button.clicked.connect(lambda *args, combobox=nrg_combobox: combobox.deleteLater())
         trash_button.clicked.connect(lambda *args, combobox=freq_combobox: combobox.deleteLater())
-        trash_button.clicked.connect(
-            lambda *args, child=conformer_item: conf_group_widget.removeChild(child)
-        )
+        trash_button.clicked.connect(lambda *args, child=conformer_item: conf_group_widget.removeChild(child))
         trash_button.setIcon(QIcon(self.tree.style().standardIcon(QStyle.SP_DialogCancelButton)))
         
-        self.tree.setItemWidget(conformer_item, 0, uv_vis_combobox)
+        self.tree.setItemWidget(conformer_item, 0, nmr_combobox)
         self.tree.setItemWidget(conformer_item, 1, freq_combobox)
         self.tree.setItemWidget(conformer_item, 2, nrg_combobox)
         self.tree.setItemWidget(conformer_item, 3, trash_button)
@@ -632,6 +602,66 @@ class UVVisSpectrum(ToolInstance):
         self.tree.setItemWidget(style_group, 0, line_widget)
         self.tree.setItemWidget(style_group, 1, line_widget2)
 
+    def fill_lib_options(self):
+        cur_lib = self.library.currentIndex()
+        cur_method = self.method.currentText()
+        cur_basis = self.basis.currentText()
+        self.library.blockSignals(True)
+        self.method.blockSignals(True)
+        self.basis.blockSignals(True)
+        self.library.clear()
+        self.method.clear()
+        self.basis.clear()
+        lib_names = list(NMR_SCALE_LIBS.keys())
+        user_def = loads(self.settings.scales)
+        if user_def:
+            lib_names.append("user-defined")
+        
+        self.library.addItems(lib_names)
+        if cur_lib >= 0:
+            self.library.setCurrentIndex(cur_lib)
+
+        if self.library.currentText() != "user-defined":
+            self.method.addItems(
+                NMR_SCALE_LIBS[self.library.currentText()][1].keys()
+            )
+
+            self.basis.addItems(
+                NMR_SCALE_LIBS[lib_names[0]][1][self.method.currentText()].keys()
+            )
+
+        else:
+            user_def = loads(self.settings.scales)
+            self.method.addItems(user_def.keys())
+            ndx = self.method.findText(cur_method, Qt.MatchExactly)
+        
+        ndx = self.method.findText(cur_method, Qt.MatchExactly)
+        if ndx >= 0:
+            self.method.setCurrentIndex(ndx)
+
+        ndx = self.basis.findText(cur_basis, Qt.MatchExactly)
+        if ndx >= 0:
+            self.basis.setCurrentIndex(ndx)
+        
+        self.library.blockSignals(False)
+        self.method.blockSignals(False)
+        self.basis.blockSignals(False)
+
+    def update_scales(self):
+        from SEQCROW.tools.normal_modes import _NormalModeSettings
+        normal_mode_settings = _NormalModeSettings(self.session, "Visualize Normal Modes")
+        self.settings.scales = normal_mode_settings.scales
+
+    def open_save_scales(self):
+        m = self.linear.value()
+        b = self.scalar.value()
+        self.tool_window.create_child_window(
+            "saving shift scales",
+            window_class=SaveScales,
+            m=m,
+            b=b,
+        )
+
     def change_figure_size(self, *args):
         if self.fixed_size.checkState() == Qt.Checked:
             self.figure_height.setEnabled(True)
@@ -659,30 +689,22 @@ class UVVisSpectrum(ToolInstance):
         elif column == 2:
             self.section_table.removeRow(row)
     
-    def add_section(self, xmin=150.0, xmax=450.0):
+    def add_section(self, xmin=0, xmax=11):
         rows = self.section_table.rowCount()
-        units = self.x_units.currentText()
-        single_step = 25
-        if units == "eV":
-            x1 = ValenceExcitations.nm_to_ev(xmin)
-            x2 = ValenceExcitations.nm_to_ev(xmax)
-            xmax = x1
-            xmin = x2
-            single_step = 0.5
         if rows != 0:
             rows -= 1
             section_min = QDoubleSpinBox()
-            section_min.setRange(0, 5000)
+            section_min.setRange(0, 500)
             section_min.setValue(xmin)
-            section_min.setSuffix(" %s" % units)
-            section_min.setSingleStep(single_step)
+            section_min.setSuffix(" ppm")
+            section_min.setSingleStep(25)
             self.section_table.setCellWidget(rows, 0, section_min)
             
             section_max = QDoubleSpinBox()
-            section_max.setRange(1, 5000)
+            section_max.setRange(1, 500)
             section_max.setValue(xmax)
-            section_max.setSuffix(" %s" % units)
-            section_max.setSingleStep(single_step)
+            section_max.setSuffix(" ppm")
+            section_max.setSingleStep(25)
             self.section_table.setCellWidget(rows, 1, section_max)
             
             widget_that_lets_me_horizontally_align_an_icon = QWidget()
@@ -707,18 +729,13 @@ class UVVisSpectrum(ToolInstance):
     def save(self):
         filename, _ = QFileDialog.getSaveFileName(filter="CSV Files (*.csv)")
         if filename:
-            units = self.x_units.currentText()
-            if units == "nm":
-                s = "wavelenth (nm),intensity"
-            else:
-                s = "hv (eV),intensity"
+            s = "shift (ppm),intensity"
 
-            data = self.get_mixed_spectrum()
-            if not data:
-                self.session.logger.error("no data to save")
+            mixed_nmr = self.get_mixed_spectrum()
+            if not mixed_nmr:
                 return
             
-            mixed_uv_vis, shown_confs = data
+            mixed_nmr, shown_confs = mixed_nmr
         
             for conf in shown_confs:
                 s += ",%s" % conf[-1]
@@ -726,47 +743,31 @@ class UVVisSpectrum(ToolInstance):
         
             fwhm = self.fwhm.value()
             peak_type = self.peak_type.currentText()
-            plot_type = self.plot_type.currentData(Qt.UserRole)
+            plot_type = self.plot_type.currentText()
             voigt_mixing = self.voigt_mix.value()
-            shift = self.shift.value()
-            intensity_attr = "oscillator_str"
-            if plot_type.lower() == "uv-vis-velocity":
-                intensity_attr = "oscillator_str_vel"
-            elif plot_type.lower() == "transmittance-velocity":
-                intensity_attr = "oscillator_str_vel"
-            elif plot_type.lower() == "transmittance":
-                intensity_attr = "oscillator_str"
-            elif plot_type.lower() == "uv-vis":
-                intensity_attr = "oscillator_str"
-            elif plot_type.lower() == "ecd":
-                intensity_attr = "delta_abs_len"
-            elif plot_type.lower() == "ecd-velocity":
-                intensity_attr = "delta_abs_vel"
-            change_x_unit_func = None
-            if units == "nm":
-                change_x_unit_func = ValenceExcitations.ev_to_nm
+            linear = self.linear.value()
+            scalar = self.scalar.value()
 
-            funcs, x_positions, intensities = mixed_uv_vis.get_spectrum_functions(
+            funcs, x_positions, intensities = mixed_nmr.get_spectrum_functions(
                 fwhm=fwhm,
                 peak_type=peak_type,
                 voigt_mixing=voigt_mixing,
-                scalar_scale=shift,
-                intensity_attr=intensity_attr,
+                linear_scale=linear,
+                scalar_scale=scalar,
             )
             
             show_functions = None
             if shown_confs:
                 show_functions = [info[0] for info in shown_confs]
             
-            x_values, y_values, other_y_list = mixed_uv_vis.get_plot_data(
+            x_values, y_values, other_y_list = mixed_nmr.get_plot_data(
                 funcs,
                 x_positions,
-                transmittance="transmittance" in plot_type,
+                transmittance="transmittance" in plot_type.lower(),
                 peak_type=peak_type,
                 fwhm=fwhm,
-                normalize=True,
                 show_functions=show_functions,
-                change_x_unit_func=change_x_unit_func,
+                normalize=False,
             )
                 
             for i, (x, y) in enumerate(zip(x_values, y_values)):
@@ -779,6 +780,66 @@ class UVVisSpectrum(ToolInstance):
                 f.write(s.strip())
                 
             self.session.logger.info("saved to %s" % filename)
+
+    def open_link(self, *args):
+        """open CHESHIRE CCAT site on scaling NMR shifts"""
+        run(self.session, "open http://cheshirenmr.info/index.htm")
+
+    def open_scale_library_link(self, *args):
+        if self.library.currentText() != "user-defined":
+            run(self.session, "open %s" % NMR_SCALE_LIBS[self.library.currentText()][0])
+        else:
+            self.session.logger.info("that's your database")
+
+    def change_scale_lib(self, lib):
+        cur_method = self.method.currentText()
+        cur_basis = self.basis.currentText()
+        self.prev_basis = self.basis.currentText()
+        self.method.blockSignals(True)
+        self.method.clear()
+        self.method.blockSignals(False)
+        if lib in NMR_SCALE_LIBS:
+            self.basis.setEnabled(True)
+            self.method.addItems(NMR_SCALE_LIBS[lib][1].keys())
+            ndx = self.method.findText(cur_method, Qt.MatchExactly)
+            if ndx >= 0:
+                self.method.setCurrentIndex(ndx)
+            
+            ndx = self.basis.findText(cur_basis, Qt.MatchExactly)
+            if ndx >= 0:
+                self.basis.setCurrentIndex(ndx)
+        else:
+            self.basis.setEnabled(False)
+            user_def = loads(self.settings.scales)
+            self.method.addItems(user_def.keys())
+    
+    def change_method(self, method):
+        cur_basis = self.basis.currentText()
+        self.basis.blockSignals(True)
+        self.basis.clear()
+        self.basis.blockSignals(False)
+        if self.library.currentText() in NMR_SCALE_LIBS:
+            if isinstance(NMR_SCALE_LIBS[self.library.currentText()][1][method], dict):
+                self.basis.addItems(
+                    NMR_SCALE_LIBS[self.library.currentText()][1][method].keys()
+                )
+                ndx = self.basis.findText(cur_basis, Qt.MatchExactly)
+                if ndx >= 0:
+                    self.basis.setCurrentIndex(ndx)
+            else:
+                slope, intercept = NMR_SCALE_LIBS[self.library.currentText()][1][method]
+                self.linear.setValue(slope)
+                self.quadratic.setValue(intercept)
+        elif method:
+            user_def = loads(self.settings.scales)
+            m, b = user_def[method]
+            self.linear.setValue(m)
+            self.scalar.setValue(b)
+
+    def change_basis(self, basis):
+        slope, intercept = NMR_SCALE_LIBS[self.library.currentText()][1][self.method.currentText()][basis]
+        self.linear.setValue(slope)
+        self.scalar.setValue(intercept)
 
     def zoom(self, event):
         if event.xdata is None:
@@ -828,12 +889,17 @@ class UVVisSpectrum(ToolInstance):
         self.canvas.draw()
 
     def onclick(self, event):
+        raise NotImplementedError
         if self.toolbar.mode != "":
             return
 
         self.press = event.x, event.y, event.xdata, event.ydata
         
         if event.dblclick and event.xdata:
+            anharmonic = self.anharmonic.checkState() == Qt.Checked
+            data_attr = "data"
+            if anharmonic:
+                data_attr = "anharm_data"
             closest = None
             for mol_ndx in range(1, self.tree.topLevelItemCount()):
                 mol = self.tree.topLevelItem(mol_ndx)
@@ -843,27 +909,26 @@ class UVVisSpectrum(ToolInstance):
                     if data is None:
                         continue
                     fr, _ = data
-                    uv_vis = fr["uv_vis"]
+                    freq = fr["frequency"]
+                    if anharmonic and not freq.anharm_data:
+                        self.session.logger.error(
+                            "anharmonic frequencies requested on the 'plot settings' "
+                            "tab, but anharmonic data was not parsed from %s" % fr["name"]
+                        )
+                        return
                     
-                    data_attr = "data"
-                    if self.spectra_type.currentText() == "transient":
-                        data_attr = "transient_data"
-                    elif self.spectra_type.currentText() == "SOC":
-                        data_attr = "spin_orbit_data"
-                    
-                    excitations = np.array(
-                        [data.excitation_energy for data in getattr(uv_vis, data_attr)]
-                    )
-                    c0 = self.shift.value()
-                    excitations += c0
-                    if self.x_units.currentText() == "nm":
-                        excitations = ValenceExcitations.ev_to_nm(excitations)[0]
+                    data_list = getattr(freq, data_attr)
+                    data_list = [data for data in data_list if data.frequency > 0]
+                    frequencies = np.array([data.frequency for data in data_list])
+                    c1 = self.linear.value()
+                    c2 = self.quadratic.value()
+                    frequencies -= c1 * frequencies + c2 * frequencies ** 2
                     diff = np.abs(
-                        event.xdata - excitations
+                        event.xdata - frequencies
                     )
                     min_arg = np.argmin(diff)
                     if not closest or diff[min_arg] < closest[0]:
-                        closest = (diff[min_arg], getattr(uv_vis, data_attr)[min_arg], fr)
+                        closest = (diff[min_arg], data_list[min_arg], fr)
             
             if closest:
                 self.highlight(closest[1], closest[2])
@@ -876,114 +941,84 @@ class UVVisSpectrum(ToolInstance):
         self.drag_prev = None
         self.dragging = False
 
-    def show_conformers(self):
-        fracs = self.get_mixed_spectrum(weights_only=True)
-        if not fracs:
-            return
-        fracs, weights = fracs
-        min_pop = self.boltzmann_pop_limit.value() / 100.0
-        
-        i = 0
-        for mol_ndx in range(1, self.tree.topLevelItemCount()):
-            mol = self.tree.topLevelItem(mol_ndx)
-            w = weights[i]
-            j = 0
-            for conf_ndx in range(2, mol.childCount(), 2):
-                conf = mol.child(conf_ndx)
-                uv_vis_file = self.tree.itemWidget(conf, 0).currentData()
-                if uv_vis_file is None:
-                    continue
-                conf_style = mol.child(conf_ndx + 1)
-                show_button = self.tree.itemWidget(conf_style, 0).layout().itemAt(1).widget()
-                if w[j] > min_pop:
-                    show_button.setCheckState(Qt.Checked)
-                    self.session.logger.info(
-                        "Boltzmann population of %s: %.1f%%" % (
-                            uv_vis_file.name,
-                            100 * w[j],
-                        )
-                    )
-                else:
-                    show_button.setCheckState(Qt.Unchecked)
-                j += 1
-            if j > 0:
-                i += 1
+    # def show_conformers(self):
+    #     fracs = self.get_mixed_spectrum(weights_only=True)
+    #     if not fracs:
+    #         return
+    #     fracs, weights = fracs
+    #     min_pop = self.boltzmann_pop_limit.value() / 100.0
+    #     
+    #     i = 0
+    #     for mol_ndx in range(1, self.tree.topLevelItemCount()):
+    #         mol = self.tree.topLevelItem(mol_ndx)
+    #         w = weights[i]
+    #         j = 0
+    #         for conf_ndx in range(2, mol.childCount(), 2):
+    #             conf = mol.child(conf_ndx)
+    #             data = self.tree.itemWidget(conf, 0).currentData()
+    #             if data is None:
+    #                 continue
+    #             fr, _ = data
+    #             conf_style = mol.child(conf_ndx + 1)
+    #             show_button = self.tree.itemWidget(conf_style, 0).layout().itemAt(1).widget()
+    #             if w[j] > min_pop:
+    #                 show_button.setCheckState(Qt.Checked)
+    #                 self.session.logger.info(
+    #                     "Boltzmann population of %s: %.1f%%" % (
+    #                         fr["name"],
+    #                         100 * w[j],
+    #                     )
+    #                 )
+    #             else:
+    #                 show_button.setCheckState(Qt.Unchecked)
+    #             j += 1
+    #         if j > 0:
+    #             i += 1
 
     def get_mixed_spectrum(self, weights_only=False):
         weight_method = self.weight_method.currentData(Qt.UserRole)
-        data_attr = "data"
-        if self.spectra_type.currentText() == "transient":
-            data_attr = "transient_data"
-        elif self.spectra_type.currentText() == "SOC":
-            data_attr = "spin_orbit_data"
-
-        uv_vis_files = []
+        nmrs = []
         freqs = []
         single_points = []
         mol_fracs = []
         show_components = []
+        data_attr = "data"
         for mol_ndx in range(1, self.tree.topLevelItemCount()):
-            uv_vis_files.append([])
-            freqs.append([])
-            single_points.append([])
             mol = self.tree.topLevelItem(mol_ndx)
             mol_fracs_widget = self.tree.itemWidget(mol, 1).layout().itemAt(1).widget()
             mol_fracs.append(mol_fracs_widget.value())
-
+            
             for conf_ndx in range(2, mol.childCount(), 2):
                 conf = mol.child(conf_ndx)
                 data = self.tree.itemWidget(conf, 0).currentData()
                 if data is None:
                     continue
                 fr, mdl = data
-                uv_vis = fr["uv_vis"]
-                if getattr(uv_vis, data_attr) is None:
-                    self.session.logger.warning("%s does not have %s data - skipping" % (
-                        fr["name"], self.spectra_type.currentText(),
-                    ))
+                nmrs.append(fr["nmr"])
+
+                data = self.tree.itemWidget(conf, 1).currentData()
+                if data is None:
                     continue
-                uv_vis_files[-1].append(uv_vis)
-
-                sp_file, _ = self.tree.itemWidget(conf, 2).currentData()
-                single_points[-1].append(CompOutput(sp_file))
-
-                if weight_method != CompOutput.ELECTRONIC_ENERGY:
-                    freq_file = self.tree.itemWidget(conf, 1).currentData()
-                    if freq_file is None:
-                        self.session.logger.error(
-                            "frequency jobs must be given if you are not weighting"
-                            " based on electronic energy"
-                        )
-                        return
-                    freq_file, _ = freq_file
-                    freqs[-1].append(CompOutput(freq_file))
+                fr, mdl = data
+                freqs.append(CompOutput(fr))
                 
-                    rmsd = freqs[-1][-1].geometry.RMSD(
-                        single_points[-1][-1].geometry,
-                        sort=True,
-                    )
-                    if rmsd > 1e-2:
-                        s = "the structure of %s (frequencies) might not match" % freqs[-1][-1].geometry.name
-                        s += " the structure of %s (energy)" % single_points[-1][-1].geometry.name
-                        self.session.logger.warning(s)
-                else:
-                    freqs[-1].append(None)
+                sp_file, _ = self.tree.itemWidget(conf, 1).currentData()
+                single_points.append(CompOutput(sp_file))
                 
-                geom = Geometry(fr["atoms"])
-                rmsd = single_points[-1][-1].geometry.RMSD(
-                    geom,
+                rmsd = freqs[-1][-1].geometry.RMSD(
+                    single_points[-1][-1].geometry,
                     sort=True,
                 )
                 if rmsd > 1e-2:
-                    s = "the structure of %s (UV/vis) might not match" % geom.name
-                    s += "the structure of %s (energy)" % single_points[-1][-1].geometry.name
+                    s = "the structure of %s (frequencies) might not match" % freqs[-1][-1].geometry.name
+                    s += " the structure of %s (energy)" % single_points[-1][-1].geometry.name
                     self.session.logger.warning(s)
                 
                 conf_style = mol.child(conf_ndx + 1)
                 show_comp = self.tree.itemWidget(conf_style, 0).layout().itemAt(1).widget()
                 if show_comp.checkState() == Qt.Checked:
-                    stop_ndx = sum(sum(len(uv_vis.data) for uv_vis in conf) for conf in uv_vis_files)
-                    start_ndx = stop_ndx - len(uv_vis_files[-1][-1].data)
+                    stop_ndx = sum(sum(len(freq.frequency.data) for freq in conf) for conf in freqs)
+                    start_ndx = stop_ndx - len(freqs[-1][-1].frequency.data)
                     color = self.tree.itemWidget(conf_style, 0).layout().itemAt(2).widget().get_color()
                     line_style = self.tree.itemWidget(conf_style, 1).layout().itemAt(1).widget().currentData(Qt.UserRole)
                     show_components.append([
@@ -993,16 +1028,15 @@ class UVVisSpectrum(ToolInstance):
                         fr["name"],
                     ])
 
-            if not uv_vis_files[-1]:
-                uv_vis_files.pop(-1)
+            if not freqs[-1]:
                 freqs.pop(-1)
                 single_points.pop(-1)
             else:
                 mol_style = mol.child(0)
                 show_mol = self.tree.itemWidget(mol_style, 0).layout().itemAt(1).widget()
                 if show_mol.checkState() == Qt.Checked:
-                    stop_ndx = sum(sum(len(uv_vis.data) for uv_vis in conf) for conf in uv_vis_files)
-                    start_ndx = stop_ndx - sum(len(f.data) for f in uv_vis_files[-1])
+                    stop_ndx = sum(sum(len(freq.frequency.data) for freq in conf) for conf in freqs)
+                    start_ndx = stop_ndx - sum(len(f.frequency.data) for f in freqs[-1])
                     color = self.tree.itemWidget(mol_style, 0).layout().itemAt(2).widget().get_color()
                     line_style = self.tree.itemWidget(mol_style, 1).layout().itemAt(1).widget().currentData(Qt.UserRole)
                     show_components.append([
@@ -1016,20 +1050,16 @@ class UVVisSpectrum(ToolInstance):
             return
         
         weights_list = []
-        mixed_spectra = []
-        for i, (uv_vis, conf_freq, conf_nrg) in enumerate(zip(uv_vis_files, freqs, single_points)):
-            for j, nrg_co1 in enumerate(conf_nrg):
-                for k, nrg_co2 in enumerate(conf_nrg[:j]):
-                    rmsd = nrg_co1.geometry.RMSD(nrg_co2.geometry, sort=True)
+        mixed_freqs = []
+        for i, (conf_freq, conf_nrg) in enumerate(zip(freqs, single_points)):
+            for j, freq1 in enumerate(conf_freq):
+                for k, freq2 in enumerate(conf_freq[:j]):
+                    rmsd = freq1.geometry.RMSD(freq2.geometry, sort=True)
                     if rmsd < 1e-2:
                         s = "%s and %s appear to be duplicate structures " % (
-                                nrg_co1.geometry.name, nrg_co2.geometry.name
+                                freq1.geometry.name, freq2.geometry.name
                             )
                         self.session.logger.warning(s)
-            
-            if weight_method == CompOutput.ELECTRONIC_ENERGY:
-                conf_freq = conf_nrg
-            
             weights = CompOutput.boltzmann_weights(
                 conf_freq,
                 nrg_cos=conf_nrg,
@@ -1038,16 +1068,16 @@ class UVVisSpectrum(ToolInstance):
                 weighting=weight_method,
             )
             weights_list.append(weights)
-            
-            conf_mixed = ValenceExcitations.get_mixed_signals(
-                uv_vis,
+
+            conf_mixed = NMR.get_mixed_signals(
+                [co.frequency for co in conf_freq],
                 weights=weights,
                 data_attr=data_attr,
             )
-            mixed_spectra.append(conf_mixed)
+            mixed_nmr.append(conf_mixed)
         
-        final_mixed = ValenceExcitations.get_mixed_signals(
-            mixed_spectra,
+        final_mixed = NMR.get_mixed_signals(
+            mixed_freqs,
             weights=np.array(mol_fracs),
         )
         
@@ -1056,8 +1086,8 @@ class UVVisSpectrum(ToolInstance):
         return final_mixed, show_components
 
     def refresh_plot(self):
-        if self.show_boltzmann_pop.checkState() == Qt.Checked:
-            self.show_conformers()
+        # if self.show_boltzmann_pop.checkState() == Qt.Checked:
+        #     self.show_conformers()
     
         mixed_spectra = self.get_mixed_spectrum()
         if not mixed_spectra:
@@ -1066,7 +1096,6 @@ class UVVisSpectrum(ToolInstance):
         mixed_spectra, show_components = mixed_spectra
 
         self.figure.clear()
-        self.check_units()
         
         temperature=self.temperature.value()
         self.settings.temperature = temperature
@@ -1074,62 +1103,22 @@ class UVVisSpectrum(ToolInstance):
         self.settings.w0 = w0
         weight_method = self.weight_method.currentData(Qt.UserRole)
         self.settings.weight_method = weight_method
-        plot_type = self.plot_type.currentData(Qt.UserRole)
-        data_attr = "data"
-        if self.spectra_type.currentText() == "transient":
-            data_attr = "transient_data"
-        elif self.spectra_type.currentText() == "SOC":
-            data_attr = "spin_orbit_data"
-
+        plot_type = self.plot_type.currentText()
+        self.settings.plot_type = plot_type
+        
         model = self.plot_type.model()
-        uv_vis_vel_item = model.item(2)
-        uv_vis_trans_vel_item = model.item(3)
-        ecd_item = model.item(4)
-        ecd_vel_item = model.item(5)
-        if any(data.oscillator_str_vel is None for data in mixed_spectra.data):
-            uv_vis_vel_item.setFlags(uv_vis_vel_item.flags() & ~Qt.ItemIsEnabled)
-            uv_vis_trans_vel_item.setFlags(uv_vis_trans_vel_item.flags() & ~Qt.ItemIsEnabled)
-        else:
-            uv_vis_vel_item.setFlags(uv_vis_vel_item.flags() | Qt.ItemIsEnabled)
-            uv_vis_trans_vel_item.setFlags(uv_vis_trans_vel_item.flags() | Qt.ItemIsEnabled)
-        
-        if any(data.rotatory_str_len is None for data in mixed_spectra.data):
-            ecd_item.setFlags(ecd_item.flags() & ~Qt.ItemIsEnabled)
-        else:
-            ecd_item.setFlags(ecd_item.flags() | Qt.ItemIsEnabled)
-        
-        if any(data.rotatory_str_vel is None for data in mixed_spectra.data):
-            ecd_vel_item.setFlags(ecd_vel_item.flags() & ~Qt.ItemIsEnabled)
-        else:
-            ecd_vel_item.setFlags(ecd_vel_item.flags() | Qt.ItemIsEnabled)
-
-        if plot_type == "ecd":
-            if not all(data.rotatory_str_len is not None for data in mixed_spectra.data):
-                self.plot_type.blockSignals(True)
-                self.plot_type.setCurrentIndex(0)
-                self.plot_type.blockSignals(False)
-        if plot_type == "ecd-velocity":
-            if not all(data.rotatory_str_vel is not None for data in mixed_spectra.data):
-                self.plot_type.blockSignals(True)
-                self.plot_type.setCurrentIndex(0)
-                self.plot_type.blockSignals(False)
-        if plot_type == "uv-vis-velocity" or plot_type == "transmittance-velocity":
-            if not all(data.oscillator_str_vel is not None for data in mixed_spectra.data):
-                self.plot_type.blockSignals(True)
-                self.plot_type.setCurrentIndex(0)
-                self.plot_type.blockSignals(False)
 
         fwhm = self.fwhm.value()
         self.settings.fwhm = fwhm
         peak_type = self.peak_type.currentText()
         self.settings.peak_type = peak_type
-        plot_type = self.plot_type.currentData(Qt.UserRole)
+        plot_type = self.plot_type.currentText()
         self.settings.plot_type = plot_type
+        reverse_x = self.reverse_x.checkState() == Qt.Checked
         voigt_mixing = self.voigt_mix.value()
         self.settings.voigt_mix = voigt_mixing
-        shift = self.shift.value()
-        x_units = self.x_units.currentText()
-        self.settings.x_units = x_units
+        linear = self.linear.value()
+        scalar = self.scalar.value()
 
         centers = None
         widths = None
@@ -1141,133 +1130,144 @@ class UVVisSpectrum(ToolInstance):
                 xmax = self.section_table.cellWidget(i, 1).value()
                 centers.append((xmin + xmax) / 2)
                 widths.append(abs(xmin - xmax))
-
-        mixed_spectra.plot_uv_vis(
+        
+        mixed_spectra.plot_nmr(
             self.figure,
             centers=centers,
             widths=widths,
             exp_data=self.exp_data,
             plot_type=plot_type,
             peak_type=peak_type,
+            reverse_x=reverse_x,
             fwhm=fwhm,
             voigt_mixing=voigt_mixing,
-            scalar_scale=shift,
-            units=x_units,
+            linear_scale=linear,
+            scalar_scale=scalar,
             show_functions=show_components,
-            normalize=True,
         )
 
         self.canvas.draw()
-        if self.highlighted_mode:
-            mode = self.highlighted_mode
-            self.highlighted_mode = None
-            self.highlight(mode, self.highlight_frs)
+        # if self.highlighted_mode:
+        #     mode = self.highlighted_mode
+        #     self.highlighted_mode = None
+        #     self.highlight(mode, self.highlight_frs)
 
-    def highlight(self, item, fr):
-        highlights = []
-        labels = []
-
-        excits = self.get_mixed_spectrum()
-        if not excits:
-            return
-        
-        excits, _ = excits
-
-        plot_type = self.plot_type.currentText()
-        shift = self.shift.value()
-        
-        for ax in self.figure.get_axes():
-            for mode in self.highlighted_lines:
-                if mode in ax.collections:
-                    ax.collections.remove(mode)
-
-            for text in ax.texts:
-                text.remove()
-
-            if item is self.highlighted_mode:
-                continue
-                
-            for excit in excits.data:
-                if excit.excitation_energy == item.excitation_energy:
-                    break
-            else:
-                continue
-
-            nrg = excit.excitation_energy + shift
-            use_nm = self.x_units.currentText() == "nm"
-            if use_nm:
-                nrg = ValenceExcitations.ev_to_nm(nrg)
-            
-            if "transmittance" in plot_type:
-                y_vals = (10 ** (2 - 0.9), 100)
-            elif plot_type == "ECD":
-                y_vals = (0, np.sign(item.rotatory_str_len))
-            elif plot_type == "ECD (dipole velocity)":
-                y_vals = (0, np.sign(item.rotatory_str_vel))
-            else:
-                y_vals = (0, 1)
-            
-            if plot_type == "UV/vis":
-                y_rel = excit.oscillator_str / item.oscillator_str
-            elif plot_type == "UV/vis (dipole velocity)":
-                y_rel = excit.oscillator_str_vel / item.oscillator_str_vel
-            elif plot_type == "UV/vis transmittance":
-                y_rel = excit.oscillator_str / item.oscillator_str
-            elif plot_type == "UV/vis transmittance (dipole velocity)":
-                y_rel = excit.oscillator_str_vel / item.oscillator_str_vel
-            elif plot_type == "ECD":
-                y_rel = excit.rotatory_str_len / item.rotatory_str_len
-            elif plot_type == "ECD (dipole velocity)":
-                y_rel = excit.rotatory_str_vel / item.rotatory_str_vel
-       
-            label = "%s" % fr["name"]
-            label += "\n%.2f %s" % (nrg, "nm" if use_nm else "eV")
-            if shift:
-                if use_nm:
-                    delta = nrg - ValenceExcitations.ev_to_nm(item.excitation_energy)
-                else:
-                    delta = nrg - item.excitation_energy
-                label += "\n$\Delta_{corr}$ = %.2f %s" % (delta, "nm" if use_nm else "eV")
-            label += "\nintensity scaled by %.2e" % y_rel
-            
-            if nrg < min(ax.get_xlim()) or nrg > max(ax.get_xlim()):
-                continue
-            
-            x_mid = nrg < sum(ax.get_xlim()) / 2
-            label_x = nrg
-            if x_mid:
-                label_x += 0.01 * sum(ax.get_xlim())
-            else:
-                label_x -= 0.01 * sum(ax.get_xlim())
-            
-            labels.append(
-                ax.text(
-                    label_x,
-                    y_vals[1] / len(label.splitlines()),
-                    label,
-                    va="bottom" if y_vals[1] > 0 else "top",
-                    ha="left" if x_mid else "right",
-                    path_effects=[pe.withStroke(linewidth=2, foreground="white")],
-                )
-            )
-            
-            highlights.append(
-                ax.vlines(
-                    nrg, *y_vals, color='r', zorder=-1, label="highlight"
-                )
-            )
-        
-        if item is not self.highlighted_mode:
-            self.highlighted_mode = item
-            self.highlight_frs = fr
-        else:
-            self.highlighted_mode = None
-            self.highlight_frs = None
-
-        self.highlighted_lines = highlights
-        self.highlighted_labels = labels
-        self.canvas.draw()
-
+    # def highlight(self, item, fr):
+    #     highlights = []
+    #     labels = []
+    # 
+    #     freqs = self.get_mixed_spectrum()
+    #     if not freqs:
+    #         return
+    # 
+    #     freqs, _ = freqs
+    # 
+    #     anharmonic = self.anharmonic.checkState() == Qt.Checked
+    #     data_attr = "data"
+    #     if anharmonic:
+    #         data_attr = "anharm_data"
+    # 
+    #     plot_type = self.plot_type.currentText()
+    #     
+    #     for ax in self.figure.get_axes():
+    #         for mode in self.highlighted_lines:
+    #             if mode in ax.collections:
+    #                 ax.collections.remove(mode)
+    # 
+    #         for text in ax.texts:
+    #             text.remove()
+    # 
+    #         if item is self.highlighted_mode:
+    #             continue
+    #             
+    #         for freq in getattr(freqs, data_attr):
+    #             if freq.frequency == item.frequency:
+    #                 break
+    #         else:
+    #             continue
+    # 
+    #         c1 = self.linear.value()
+    #         c2 = self.quadratic.value()
+    #         frequency = freq.frequency
+    #         frequency -= c1 * frequency + c2 * frequency ** 2
+    #         
+    #         if plot_type == "Transmittance":
+    #             y_vals = (10 ** (2 - 0.9), 100)
+    #         elif plot_type == "VCD":
+    #             y_vals = (0, np.sign(item.rotation))
+    #         else:
+    #             y_vals = (0, 1)
+    #         
+    #         if plot_type == "Raman":
+    #             y_rel = freq.raman_activity / item.raman_activity
+    #         elif plot_type == "VCD":
+    #             y_rel = freq.rotation / item.rotation
+    #         else:
+    #             y_rel = freq.intensity / item.intensity
+    #         
+    #         label = "%s" % fr["name"]
+    #         label += "\n%.2f cm$^{-1}$" % frequency
+    #         if c1 or c2:
+    #             label += "\n$\Delta_{corr}$ = %.2f cm$^{-1}$" % (frequency - item.frequency)
+    #         if item.symmetry and item.symmetry != "A":
+    #             text = item.symmetry
+    #             if re.search("\d", text):
+    #                 text = re.sub(r"(\d+)", r"$_{\1", text)
+    #             if text.startswith("SG"):
+    #                 text = "$\Sigma$" + text[2:]
+    #             elif text.startswith("PI"):
+    #                 text = "$\Pi$" + text[2:]
+    #             elif text.startswith("DLT"):
+    #                 text = "$\Delta$" + text[3:]
+    #                 if text[1:] == "A":
+    #                     text = text[0]
+    #             if any(text.endswith(char) for char in "vhdugVHDUG"):
+    #                 if "_" not in text:
+    #                     text = text[:-1] + "$_{" + text[-1]
+    #                 text = text + text[-1].lower()
+    #             if "_" in text:
+    #                 text = text + "}$"
+    #             label += "\n%s" % text
+    #         label += "\nintensity scaled by %.2e" % y_rel
+    #         
+    #         if frequency < min(ax.get_xlim()) or frequency > max(ax.get_xlim()):
+    #             continue
+    #         
+    #         x_mid = frequency > sum(ax.get_xlim()) / 2
+    #         label_x = frequency
+    #         if x_mid:
+    #             label_x -= 0.01 * sum(ax.get_xlim())
+    #         else:
+    #             label_x += 0.01 * sum(ax.get_xlim())
+    #         
+    #         labels.append(
+    #             ax.text(
+    #                 label_x,
+    #                 y_vals[1] / len(label.splitlines()),
+    #                 label,
+    #                 va="bottom" if y_vals[1] > 0 else "top",
+    #                 ha="left" if x_mid else "right",
+    #                 path_effects=[pe.withStroke(linewidth=2, foreground="white")],
+    #             )
+    #         )
+    #         
+    #         highlights.append(
+    #             ax.vlines(
+    #                 frequency, *y_vals, color='r', zorder=-1, label="highlight"
+    #             )
+    #         )
+    #     
+    #     if item is not self.highlighted_mode:
+    #         self.highlighted_mode = item
+    #         self.highlight_frs = fr
+    #     else:
+    #         self.highlighted_mode = None
+    #         self.highlight_frs = None
+    # 
+    #     self.highlighted_lines = highlights
+    #     self.highlighted_labels = labels
+    #     self.canvas.draw()
+    
     def load_data(self, *args):
         filename, _ = QFileDialog.getOpenFileName(filter="comma-separated values file (*.csv)")
 
@@ -1299,42 +1299,6 @@ class UVVisSpectrum(ToolInstance):
     def clear_data(self, *args):
         self.exp_data = None
 
-    def cleanup(self):
-        self.settings.figure_height = self.figure_height.value()
-        self.settings.figure_width = self.figure_width.value()
-        self.settings.fixed_size = self.fixed_size.checkState() == Qt.Checked
-        self.settings.col_1 = self.tree.columnWidth(0)
-        self.settings.col_2 = self.tree.columnWidth(1)
-        self.settings.col_3 = self.tree.columnWidth(2)
-
-        for mol_index in range(1, self.tree.topLevelItemCount()):
-            mol = self.tree.topLevelItem(mol_index)
-            for conf_ndx in range(2, mol.childCount(), 2):
-                conf = mol.child(conf_ndx)
-                self.tree.itemWidget(conf, 0).deleteLater()
-                self.tree.itemWidget(conf, 1).deleteLater()
-                self.tree.itemWidget(conf, 2).deleteLater()
-
-        super().cleanup()
-
-    def close(self):
-        self.settings.figure_height = self.figure_height.value()
-        self.settings.figure_width = self.figure_width.value()
-        self.settings.fixed_size = self.fixed_size.checkState() == Qt.Checked
-        self.settings.col_1 = self.tree.columnWidth(0)
-        self.settings.col_2 = self.tree.columnWidth(1)
-        self.settings.col_3 = self.tree.columnWidth(2)
-
-        for mol_index in range(1, self.tree.topLevelItemCount()):
-            mol = self.tree.topLevelItem(mol_index)
-            for conf_ndx in range(2, mol.childCount(), 2):
-                conf = mol.child(conf_ndx)
-                self.tree.itemWidget(conf, 0).deleteLater()
-                self.tree.itemWidget(conf, 1).deleteLater()
-                self.tree.itemWidget(conf, 2).deleteLater()
-
-        super().close()
-
     def delete(self):
         self.settings.figure_height = self.figure_height.value()
         self.settings.figure_width = self.figure_width.value()
@@ -1353,4 +1317,45 @@ class UVVisSpectrum(ToolInstance):
 
         super().delete()
 
+
+class SaveScales(ChildToolWindow):
+    def __init__(self, tool_instance, title, *args, m=-1.0, b=38.0, **kwargs):
+        super().__init__(tool_instance, title, *args, **kwargs)
+        
+        self.m = m
+        self.b = b
+        self._build_ui()
+    
+    def _build_ui(self):
+        layout = QFormLayout()
+        
+        self.scale_name = QLineEdit()
+        layout.addRow("name:", self.scale_name)
+        
+        do_it = QPushButton("save scales")
+        do_it.clicked.connect(self.save_scales)
+        layout.addRow(do_it)
+        
+        self.ui_area.setLayout(layout)
+        self.manage(None)
+    
+    def save_scales(self):
+        name = self.scale_name.text()
+        if not name:
+            self.session.logger.warning("no name entered")
+            return
+        
+        current = loads(self.tool_instance.settings.scales)
+        current[name] = (self.m, self.b)
+        self.tool_instance.settings.scales = dumps(current)
+        self.tool_instance.fill_lib_options()
+        
+        self.session.logger.info(
+            "saved NMR scale factors to user-defined database"
+        )
+        self.session.logger.status(
+            "saved NMR scale factors to user-defined database"
+        )
+
+        self.destroy()
 
