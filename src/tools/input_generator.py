@@ -1949,7 +1949,7 @@ class JobTypeOption(QWidget):
                     continue
                 ndx = self.opt_type.findText("constrained")
                 self.opt_type.setCurrentIndex(ndx)
-                for key, frozen in job.constraints.keys():
+                for key, frozen in job.constraints.items():
                     if key == "atoms":
                         for atom in frozen:
                             self.constrain_atom(
