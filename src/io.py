@@ -529,9 +529,9 @@ def save_aarontools(session, path, format_name, **kwargs):
     with open(path, "w") as f:
         for model in models:
             f.write("%i\n%s\n" % (model.num_atoms, model.name))
-        for atom in model.atoms:
-            f.write(
-                "%2s    %9.5f    %9.5f     %9.5f\n" % (
-                    atom.element.name, *atom.coord
+            for atom in model.atoms:
+                f.write(
+                    "%2s    %9.5f    %9.5f     %9.5f\n" % (
+                        atom.element.name, *atom.coord
+                    )
                 )
-            )
