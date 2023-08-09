@@ -625,6 +625,9 @@ class Thermochem(ToolInstance):
         if self.sp_selector.currentIndex() >= 0:
             fr, mdl = self.sp_selector.currentData()
 
+            if not fr:
+                return
+
             self.check_geometry_rmsd("SP")
 
             self.sp_table.insertRow(0)

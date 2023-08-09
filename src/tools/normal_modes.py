@@ -318,6 +318,9 @@ class NormalModes(ToolInstance):
 
         fr, mdl = data
 
+        if not fr:
+            return
+
         freq = fr['frequency']
         
         model = self.plot_type.model()

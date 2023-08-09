@@ -155,7 +155,12 @@ class LibAdd(ToolInstance):
                         
         else:
             key_atoms = rescol.find([AtomSpec(atom.atomspec) for atom in key_chix_atoms])
-                        
+
+        center_atoms = set()
+        for atom in key_atoms:
+            center_atoms.update([a for a in atom.connected if a not in ligand_atoms])
+        rescol.coord_shift(-rescol.COM(center_atoms))
+
         if len(key_atoms) < 1:
             raise RuntimeError("no key atoms could be determined")
         
@@ -179,7 +184,7 @@ class LibAdd(ToolInstance):
                 exists_warning.setText("%s already exists.\nWould you like to overwrite?" % filename)
                 exists_warning.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
                 
-                rv = exists_warning.exec_()
+                rv = exists_warning.exec()
                 if rv == QMessageBox.Yes:
                     ligand.write(outfile=filename)
                     self.tool_window.status("%s added to ligand library" % lig_name)
@@ -224,7 +229,7 @@ class LibAdd(ToolInstance):
                 exists_warning.setText("%s already exists.\nWould you like to overwrite?" % filename)
                 exists_warning.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
                 
-                rv = exists_warning.exec_()
+                rv = exists_warning.exec()
                 if rv == QMessageBox.Yes:
                     ring.write(outfile=filename)
                     self.tool_window.status("%s added to ring library" % ring_name)
@@ -308,7 +313,7 @@ class LibAdd(ToolInstance):
                 exists_warning.setText("%s already exists.\nWould you like to overwrite?" % filename)
                 exists_warning.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
                 
-                rv = exists_warning.exec_()
+                rv = exists_warning.exec()
                 if rv == QMessageBox.Yes:
                     add = True
                 

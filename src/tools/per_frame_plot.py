@@ -190,8 +190,8 @@ class EnergyPlot(ToolInstance):
         maxlocs = [cs_id for i, cs_id in enumerate(self.xs) if self.ys[i] == max_y]
         maxs = [max_y for m in maxlocs]
     
-        ax.plot(minlocs, mins, marker='*', c='blue', markersize=5)
-        ax.plot(maxlocs, maxs, marker='*', c='red', markersize=5)
+        ax.scatter(minlocs, mins, marker='*', c='blue', s=25, zorder=100)
+        ax.scatter(maxlocs, maxs, marker='*', c='red', s=25, zorder=100)
     
         ax.ticklabel_format(axis='y', style='sci', scilimits=(0,0), useOffset=True)
         ax.ticklabel_format(axis='x', style='plain', useOffset=False)
@@ -353,7 +353,6 @@ class EnergyPlot(ToolInstance):
             if self.minor_unit:
                 minor_item = QTableWidgetItem("%.2f" % (self.minor_conversion * (val - min_y)))
                 self.conv_table.setItem(row, 1, minor_item)
-        
 
     def check_changes(self, trigger_name=None, changes=None):
         if changes is not None:

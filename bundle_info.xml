@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="1.8">
+            version="1.8a1">
             
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -556,15 +556,12 @@
                 <ChimeraXClassifier>ChimeraX :: Command :: ligandSterimol      :: Structure Analysis :: calculate sterimol parameters for ligands on a metal center</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: solidAngle          :: Structure Analysis :: calculate ligand solid angle</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: force               :: Structure Analysis :: display computed force vector</ChimeraXClassifier>
-                <!--
-                <ChimeraXClassifier>ChimeraX :: Command :: duplicate           :: Structure Editing  :: duplicate selected atoms</ChimeraXClassifier>
-                -->
        </Classifiers>
     
     <AdditionalPackages>
-        <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools"/>
-        <!--
         <Package name="AaronTools" folder="C:\Users\ajs99778\Documents\GitHub\AaronTools"/>
+        <!--
+        <Package name="AaronTools" folder="C:\Users\normn\Documents\GitHub\AaronTools"/>
         <Package name="AaronTools.test" folder="C:\Users\normn\Documents\GitHub\AaronTools\test"/>
         <Package name="AaronTools.test" folder="C:\Users\ajs99778\Documents\GitHub\AaronTools\test"/>
         <Package name="AaronTools" folder="/home/tschaefer/QChASM/AaronTools"/>
