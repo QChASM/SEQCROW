@@ -182,7 +182,7 @@ class NormalModes(ToolInstance):
         self.vec_use_mass_weighted = QCheckBox()
         self.vec_use_mass_weighted.stateChanged.connect(self.change_mw_option)
         self.vec_use_mass_weighted.setToolTip("if checked, vectors will show mass-weighted displacements")
-        vector_opts.addRow("use mass-weighted:", self.vec_use_mass_weighted)
+        vector_opts.addRow("remove mass weighting:", self.vec_use_mass_weighted)
 
         self.vector_color = ColorButton(has_alpha_channel=True, max_size=(16, 16))
         self.vector_color.set_color(self.settings.arrow_color)
@@ -427,7 +427,7 @@ class NormalModes(ToolInstance):
         geom = Geometry(fr["atoms"], refresh_connected=False, refresh_ranks=False)
         atoms = atoms.intersect(mdl.atoms)
         n_atoms = len(self.coordinate_widgets)
-        if n_atoms < len(atoms):
+        if n_atoms != len(atoms):
             self.session.logger.error("%i atoms must be selected for %s" % (
                 n_atoms, self.coordinate_type.currentText(),
             ))
@@ -447,7 +447,8 @@ class NormalModes(ToolInstance):
             v1 /= np.linalg.norm(v1)
             v2 = geom.atoms[a3].bond(geom.atoms[a2])
             v2 /= np.linalg.norm(v2)
-            if np.isclose(np.dot(v1, v2), 1) or np.isclose(np.dot(v1, v2), 0):
+            print(np.dot(v1, v2))
+            if abs(np.dot(v1, v2)) > 0.999 or abs(np.dot(v1, v2)) < 1e-3:
                 coord = LinearAngle(a1, a2, a3)
             else:
                 coord = Angle(a1, a2, a3)
@@ -469,6 +470,7 @@ class NormalModes(ToolInstance):
                 mdl.atoms.index(atoms[-2]),
                 [mdl.atoms.index(atoms[-1])],
             )
+        print(coord)
         s_vec = coord.s_vector(geom.coords)
         # masses = np.sqrt(np.array([a.mass for a in geom.atoms]))
         self.table.sortItems(0, Qt.AscendingOrder)
@@ -480,7 +482,7 @@ class NormalModes(ToolInstance):
             if len(s_vec) == 2:
                 ovl1 = np.dot(s_vec[0], vec)
                 ovl2 = np.dot(s_vec[1], vec)
-                ovl = (ovl1 + ovl2) ** 2
+                ovl = ovl1 ** 2 + ovl2 ** 2
             else:
                 ovl = np.dot(s_vec, vec) ** 2
             item.setData(Qt.UserRole, ovl)
@@ -537,12 +539,18 @@ class NormalModes(ToolInstance):
         atoms = selected_atoms(self.session)
         data = self.model_selector.currentData()
         if data is None:
+            n_atoms = len(self.coordinate_widgets)
+            for widget in self.coordinate_widgets:
+                widget.setText("")
             return
         fr, mdl = data
         atoms = atoms.intersect(mdl.atoms)
         n_atoms = len(self.coordinate_widgets)
         for widget, atom in zip(self.coordinate_widgets, atoms[-n_atoms:]):
             widget.setText(atom.atomspec)
+        if len(atoms) < n_atoms:
+            for widget in self.coordinate_widgets[len(atoms):]:
+                widget.setText("")
 
     def change_mw_option(self, state):
         """toggle bool associated with mass-weighting option"""
@@ -557,7 +565,7 @@ class NormalModes(ToolInstance):
         for i, displacement in enumerate(vector):
             n = np.linalg.norm(displacement)
             if self.vec_mw_bool and self.display_tabs.currentIndex() == 0:
-                n *= geom.atoms[i].mass
+                n *= np.sqrt(geom.atoms[i].mass)
 
             if max_norm is None or n > max_norm:
                 max_norm = n
