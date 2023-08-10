@@ -20,6 +20,19 @@ class _SEQCROW_API(BundleAPI):
         """
         from SEQCROW import settings as seqcrow_settings
         seqcrow_settings.settings = settings._SEQCROWSettings(session, "SEQCROW")
+
+        #apply AARONLIB setting
+        if seqcrow_settings.settings.AARONLIB is not None:
+            os.environ['AARONLIB'] = seqcrow_settings.settings.AARONLIB
+            import AaronTools.const
+            AaronTools.const.AARONLIB = seqcrow_settings.settings.AARONLIB
+
+        # set queue type
+        if seqcrow_settings.settings.QUEUE_TYPE != "None":
+            os.environ['QUEUE_TYPE'] = seqcrow_settings.settings.QUEUE_TYPE
+            import AaronTools.job_control
+            AaronTools.job_control.QUEUE_TYPE = seqcrow_settings.settings.QUEUE_TYPE.upper()
+
         if session.ui.is_gui:
             from .presets import (
                 seqcrow_bse,
@@ -80,18 +93,6 @@ class _SEQCROW_API(BundleAPI):
             session.ui.mouse_modes.add_mode(DrawHydrogenBondMouseMode(session))
             
             session.triggers.add_handler(ADD_MODELS, _SEQCROW_API.open_useful_tools)
-
-        #apply AARONLIB setting
-        if seqcrow_settings.settings.AARONLIB is not None:
-            os.environ['AARONLIB'] = seqcrow_settings.settings.AARONLIB
-            import AaronTools.const
-            AaronTools.const.AARONLIB = seqcrow_settings.settings.AARONLIB
-
-        # set queue type
-        if seqcrow_settings.settings.QUEUE_TYPE != "None":
-            os.environ['QUEUE_TYPE'] = seqcrow_settings.settings.QUEUE_TYPE
-            import AaronTools.job_control
-            AaronTools.job_control.QUEUE_TYPE = seqcrow_settings.settings.QUEUE_TYPE.upper()
 
         session.seqcrow_settings = seqcrow_settings
 

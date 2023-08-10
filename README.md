@@ -18,10 +18,10 @@ Several tutorials for SEQCROW's tools can be found under ChimeraX's Help menu
 3. restart ChimeraX
 
 ### GitHub
-1. Download <a href="https://github.com/QChASM/SEQCROW/raw/master/dist/SEQCROW-1.8a1-py3-none-any.whl">SEQCROW-1.8a1-py3-none-any.whl</a>
+1. Download <a href="https://github.com/QChASM/SEQCROW/raw/master/dist/SEQCROW-1.8a2-py3-none-any.whl">SEQCROW-1.8a2-py3-none-any.whl</a>
 2. Open ChimeraX
 3. (if updating SEQCROW) On the ChimeraX command line, enter `toolshed uninstall SEQCROW` and restart ChimeraX
-4. On the ChimeraX command line, enter `toolshed install /path/to/SEQCROW-1.8a1-py3-none-any.whl`
+4. On the ChimeraX command line, enter `toolshed install /path/to/SEQCROW-1.8a2-py3-none-any.whl`
 5. Restart ChimeraX
 6. If you have a personal AaronTools library already, you can specify the path to it in the SEQCROW settings. Open ChimeraX and go Favorites &rarr; Settings... &rarr; SEQCROW. You will have to restart ChimeraX if you change this setting. 
 
