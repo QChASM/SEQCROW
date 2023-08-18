@@ -115,9 +115,6 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
         return [], "SEQCROW failed to open %s" % file_name
 
     structure = geom.get_chimera(session, coordsets=bool(fr.all_geom), filereader=fr)
-    #associate the AaronTools FileReader with each structure
-    session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([structure], [fr]))
-
 
     if fr.all_geom and "energy" in fr.other and coordsets is not False:
         try:
@@ -340,9 +337,6 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
         return [], "failed"
     
     if maxModels is not None:
-        session.filereader_manager.triggers.activate_trigger(
-            ADD_FILEREADER, (structures, [fr for s in structures])
-        )
         return structures, "opened %i structures from %s" % (len(structures), file_name)
     
     if not all(len(ele_set) == len(ele_sets[0]) for ele_set in ele_sets):
@@ -350,9 +344,6 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
             get_structure(session, eles, coords, name, name) for (eles, coords, name) in
             zip(ele_sets, all_coordsets, comments)
         ]
-        session.filereader_manager.triggers.activate_trigger(
-            ADD_FILEREADER, (structures, [fr for s in structures])
-        )
         for struc in structures:
             struc.filename = file_name
         return structures, "opened %i structures from %s" % (len(structures), file_name)
@@ -361,7 +352,6 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
     struc = get_structure(session, ele_sets[-1], all_coordsets[-1], name, comment)
     all_coordsets = np.array(all_coordsets)
     struc.add_coordsets(np.array(all_coordsets), replace=True)
-    session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([struc], [fr]))
     status = "opened %s as an XYZ coordinate file" % file_name
     struc.active_coordset_id = struc.num_coordsets
     if len(all_coordsets) > 1:
@@ -491,7 +481,6 @@ def open_nbo(session, path, file_name, format_name=None, orbitals=None):
 
     structure = geom.get_chimera(session, filereader=fr)
     #associate the AaronTools FileReader with each structure
-    session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([structure], [fr]))
 
     status = "Opened %s as an %s" % (file_name, format_name)
 
