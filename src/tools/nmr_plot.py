@@ -13,7 +13,8 @@ from chimerax.core.commands import run
 
 from AaronTools.comp_output import CompOutput
 from AaronTools.const import NMR_SCALE_LIBS
-from AaronTools.spectra import NMR
+from AaronTools.geometry import Geometry
+from AaronTools.spectra import NMR, Shift
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
@@ -278,7 +279,7 @@ class NMRSpectrum(ToolInstance):
         plot_settings_layout.addRow("peak type:", self.peak_type)
         
         self.fwhm = QDoubleSpinBox()
-        self.fwhm.setSingleStep(5)
+        self.fwhm.setSingleStep(0.25)
         self.fwhm.setRange(0.01, 200.0)
         self.fwhm.setSuffix(" Hz")
         self.fwhm.setValue(self.settings.fwhm)
@@ -984,41 +985,61 @@ class NMRSpectrum(ToolInstance):
         show_components = []
         data_attr = "data"
         for mol_ndx in range(1, self.tree.topLevelItemCount()):
+            nmrs.append([])
+            freqs.append([])
+            single_points.append([])
             mol = self.tree.topLevelItem(mol_ndx)
             mol_fracs_widget = self.tree.itemWidget(mol, 1).layout().itemAt(1).widget()
             mol_fracs.append(mol_fracs_widget.value())
-            
+
             for conf_ndx in range(2, mol.childCount(), 2):
                 conf = mol.child(conf_ndx)
                 data = self.tree.itemWidget(conf, 0).currentData()
                 if data is None:
                     continue
                 fr, mdl = data
-                nmrs.append(fr["nmr"])
+                nmrs[-1].append(fr["nmr"])
 
-                data = self.tree.itemWidget(conf, 1).currentData()
-                if data is None:
-                    continue
-                fr, mdl = data
-                freqs.append(CompOutput(fr))
+                sp_file, _ = self.tree.itemWidget(conf, 2).currentData()
+                single_points[-1].append(CompOutput(sp_file))
+
+                if weight_method != CompOutput.ELECTRONIC_ENERGY:
+                    freq_file = self.tree.itemWidget(conf, 1).currentData()
+                    if freq_file is None:
+                        self.session.logger.error(
+                            "frequency jobs must be given if you are not weighting"
+                            " based on electronic energy"
+                        )
+                        return
+                    freq_file, _ = freq_file
+                    freqs[-1].append(CompOutput(freq_file))
                 
-                sp_file, _ = self.tree.itemWidget(conf, 1).currentData()
-                single_points.append(CompOutput(sp_file))
+                    rmsd = freqs[-1][-1].geometry.RMSD(
+                        single_points[-1][-1].geometry,
+                        sort=True,
+                    )
+                    if rmsd > 1e-2:
+                        s = "the structure of %s (frequencies) might not match" % freqs[-1][-1].geometry.name
+                        s += " the structure of %s (energy)" % single_points[-1][-1].geometry.name
+                        self.session.logger.warning(s)
+                else:
+                    freqs[-1].append(None)
                 
-                rmsd = freqs[-1][-1].geometry.RMSD(
-                    single_points[-1][-1].geometry,
+                geom = Geometry(fr["atoms"])
+                rmsd = single_points[-1][-1].geometry.RMSD(
+                    geom,
                     sort=True,
                 )
                 if rmsd > 1e-2:
-                    s = "the structure of %s (frequencies) might not match" % freqs[-1][-1].geometry.name
-                    s += " the structure of %s (energy)" % single_points[-1][-1].geometry.name
+                    s = "the structure of %s (UV/vis) might not match" % geom.name
+                    s += "the structure of %s (energy)" % single_points[-1][-1].geometry.name
                     self.session.logger.warning(s)
                 
                 conf_style = mol.child(conf_ndx + 1)
                 show_comp = self.tree.itemWidget(conf_style, 0).layout().itemAt(1).widget()
                 if show_comp.checkState() == Qt.Checked:
-                    stop_ndx = sum(sum(len(freq.frequency.data) for freq in conf) for conf in freqs)
-                    start_ndx = stop_ndx - len(freqs[-1][-1].frequency.data)
+                    stop_ndx = sum(sum(len(uv_vis.data) for uv_vis in conf) for conf in uv_vis_files)
+                    start_ndx = stop_ndx - len(nmrs[-1][-1].data)
                     color = self.tree.itemWidget(conf_style, 0).layout().itemAt(2).widget().get_color()
                     line_style = self.tree.itemWidget(conf_style, 1).layout().itemAt(1).widget().currentData(Qt.UserRole)
                     show_components.append([
@@ -1028,15 +1049,17 @@ class NMRSpectrum(ToolInstance):
                         fr["name"],
                     ])
 
-            if not freqs[-1]:
+            if not nmrs[-1]:
+                nmrs.pop(-1)
+                geoms.pop(-1)
                 freqs.pop(-1)
                 single_points.pop(-1)
             else:
                 mol_style = mol.child(0)
                 show_mol = self.tree.itemWidget(mol_style, 0).layout().itemAt(1).widget()
                 if show_mol.checkState() == Qt.Checked:
-                    stop_ndx = sum(sum(len(freq.frequency.data) for freq in conf) for conf in freqs)
-                    start_ndx = stop_ndx - sum(len(f.frequency.data) for f in freqs[-1])
+                    stop_ndx = sum(sum(len(uv_vis.data) for uv_vis in conf) for conf in uv_vis_files)
+                    start_ndx = stop_ndx - sum(len(f.data) for f in nmrs[-1])
                     color = self.tree.itemWidget(mol_style, 0).layout().itemAt(2).widget().get_color()
                     line_style = self.tree.itemWidget(mol_style, 1).layout().itemAt(1).widget().currentData(Qt.UserRole)
                     show_components.append([
@@ -1050,16 +1073,16 @@ class NMRSpectrum(ToolInstance):
             return
         
         weights_list = []
-        mixed_freqs = []
+        mixed_nmrs = []
         for i, (conf_freq, conf_nrg) in enumerate(zip(freqs, single_points)):
-            for j, freq1 in enumerate(conf_freq):
-                for k, freq2 in enumerate(conf_freq[:j]):
-                    rmsd = freq1.geometry.RMSD(freq2.geometry, sort=True)
-                    if rmsd < 1e-2:
-                        s = "%s and %s appear to be duplicate structures " % (
-                                freq1.geometry.name, freq2.geometry.name
-                            )
-                        self.session.logger.warning(s)
+            # for j, freq1 in enumerate(conf_freq):
+            #     for k, freq2 in enumerate(conf_freq[:j]):
+            #         rmsd = freq1.geometry.RMSD(freq2.geometry, sort=True)
+            #         if rmsd < 1e-2:
+            #             s = "%s and %s appear to be duplicate structures " % (
+            #                     freq1.geometry.name, freq2.geometry.name
+            #                 )
+            #             self.session.logger.warning(s)
             weights = CompOutput.boltzmann_weights(
                 conf_freq,
                 nrg_cos=conf_nrg,
@@ -1070,16 +1093,32 @@ class NMRSpectrum(ToolInstance):
             weights_list.append(weights)
 
             conf_mixed = NMR.get_mixed_signals(
-                [co.frequency for co in conf_freq],
+                nmrs[i],
                 weights=weights,
                 data_attr=data_attr,
             )
-            mixed_nmr.append(conf_mixed)
-        
-        final_mixed = NMR.get_mixed_signals(
-            mixed_freqs,
-            weights=np.array(mol_fracs),
-        )
+            mixed_nmrs.append(conf_mixed)
+
+        data = []
+        coupling = {}
+        for i, (mol_frac, nmr) in enumerate(zip(mol_fracs, mixed_nmrs)):
+            offset = len(data)
+            data.extend([
+                Shift(
+                    shift.shift,
+                    intensity=(mol_frac * shift.intensity),
+                    element=shift.element,
+                    ndx=i + shift.ndx,
+                ) for shift in nmr.data
+            ])
+            for i in nmr.coupling:
+                coupling[i] = {}
+                for j in nmr.coupling[i]:
+                    coupling[i + offset][j + offset] = nmr.coupling[i][j]
+        print("final mixed", data)
+        print("final coupling", coupling)
+        final_mixed = NMR(data)
+        final_mixed.coupling = coupling
         
         if weights_only:
             return mol_fracs, weights_list
@@ -1097,23 +1136,17 @@ class NMRSpectrum(ToolInstance):
 
         self.figure.clear()
         
-        temperature=self.temperature.value()
+        temperature = self.temperature.value()
         self.settings.temperature = temperature
-        w0=self.w0.value()
+        w0 = self.w0.value()
         self.settings.w0 = w0
         weight_method = self.weight_method.currentData(Qt.UserRole)
         self.settings.weight_method = weight_method
-        plot_type = self.plot_type.currentText()
-        self.settings.plot_type = plot_type
         
-        model = self.plot_type.model()
-
         fwhm = self.fwhm.value()
         self.settings.fwhm = fwhm
         peak_type = self.peak_type.currentText()
         self.settings.peak_type = peak_type
-        plot_type = self.plot_type.currentText()
-        self.settings.plot_type = plot_type
         reverse_x = self.reverse_x.checkState() == Qt.Checked
         voigt_mixing = self.voigt_mix.value()
         self.settings.voigt_mix = voigt_mixing
@@ -1136,7 +1169,6 @@ class NMRSpectrum(ToolInstance):
             centers=centers,
             widths=widths,
             exp_data=self.exp_data,
-            plot_type=plot_type,
             peak_type=peak_type,
             reverse_x=reverse_x,
             fwhm=fwhm,
