@@ -145,6 +145,33 @@ class _SEQCROW_API(BundleAPI):
             hdlr.setStream(log)
 
         _SEQCROW_API.register_class_snapshot_map(session)
+        _SEQCROW_API.register_model_attributes(session)
+
+    @staticmethod
+    def register_model_attributes(session):
+        from chimerax.atomic import AtomicStructure, Atom
+        
+        AtomicStructure.register_attr(
+            session, "filereaders", "seqcrow", attr_type=list,
+        )
+        Atom.register_attr(
+            session, "loewdinCharge", "seqcrow", attr_type=float,
+        )
+        try:
+            Atom.register_attr(
+                session, "charge", "seqcrow", attr_type=float,
+            )
+        except Exception:
+            pass
+        Atom.register_attr(
+            session, "mullikenCharge", "seqcrow", attr_type=float,
+        )
+        Atom.register_attr(
+            session, "npaCharge", "seqcrow", attr_type=float,
+        )
+        Atom.register_attr(
+            session, "nuclearSpin", "seqcrow", attr_type=int,
+        )
 
     @staticmethod
     def register_class_snapshot_map(session):

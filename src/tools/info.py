@@ -357,6 +357,9 @@ class Info(ToolInstance):
             if info == "archive" and not self.settings.archive:
                 continue
 
+            if info == "name":
+                continue
+
             if any(isinstance(fr[info], obj) for obj in [str, float, int]):
                 row = self.table.rowCount()
                 self.table.insertRow(row)

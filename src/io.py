@@ -174,6 +174,10 @@ def get_structure(session, elements, coordinates, name, comment, bonded_threshol
     struc = AtomicStructure(session)
     struc.name = name
     struc.comment = comment
+    struc.filereaders = [{
+        "name": name,
+        "comment": comment,
+    }]
     res = struc.new_residue("UNK", "a", 1)
     ele_counts = dict()
     radii = np.vectorize(lambda x: RADII.get(x, 0))(elements)
