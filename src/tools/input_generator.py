@@ -5877,10 +5877,6 @@ class SavePreset(ChildToolWindow):
 
         self.status.showMessage("saved \"%s\"" % name)
 
-        #sometimes destroy causes an error
-        #I haven't seen any pattern
-        #self.destroy()
-
     def cleanup(self):
         self.tool_instance.preset_window = None
 

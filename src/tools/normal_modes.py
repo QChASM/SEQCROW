@@ -470,7 +470,6 @@ class NormalModes(ToolInstance):
                 mdl.atoms.index(atoms[-2]),
                 [mdl.atoms.index(atoms[-1])],
             )
-        print(coord)
         s_vec = coord.s_vector(geom.coords)
         # masses = np.sqrt(np.array([a.mass for a in geom.atoms]))
         self.table.sortItems(0, Qt.AscendingOrder)

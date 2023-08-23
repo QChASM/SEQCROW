@@ -1,6 +1,7 @@
 
 def open_aarontools(session, stream, file_name, format_name=None, coordsets=None):
     from AaronTools.fileIO import FileReader
+    from AaronTools.theory.job_types import suggested_fix
     from AaronTools.utils.utils import get_filename
     from SEQCROW.residue_collection import ResidueCollection
     from SEQCROW.managers import ADD_FILEREADER
@@ -62,6 +63,9 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
         session.logger.warning("error or warning in %s:\n %s" % (
             file_name, fr["error_msg"]
         ))
+        fix = suggested_fix(fr["error"])
+        if fix:
+            session.logger.warning("possible hint: %s" % fix)
     except KeyError:
         pass
 
