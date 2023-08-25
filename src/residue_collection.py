@@ -995,8 +995,8 @@ class ResidueCollection(Geometry):
                 if mode.frequency < 0:
                     max_disp = max(np.linalg.norm(x) for x in mode.vector)
                     cur_coords = self.coords
-                    coord_forward = self.coords + (0.2 / max_disp) * mode.vector
-                    coord_reverse = self.coords - (0.2 / max_disp) * mode.vector
+                    coord_forward = self.coords + (0.4 / max_disp) * mode.vector
+                    coord_reverse = self.coords - (0.4 / max_disp) * mode.vector
                     forward_connectivity = np.zeros((len(self.atoms), len(self.atoms)))
                     reverse_connectivity = np.zeros((len(self.atoms), len(self.atoms)))
                     self.update_geometry(coord_forward)
@@ -1004,16 +1004,16 @@ class ResidueCollection(Geometry):
                     for i, atom1 in enumerate(self.atoms):
                         for j, atom2 in enumerate(self.atoms[:i]):
                             if atom1 in atom2.connected:
-                                forward_connectivity[i,j] = 1
-                                forward_connectivity[j,i] = 1
+                                forward_connectivity[i, j] = 1
+                                forward_connectivity[j, i] = 1
                     
                     self.update_geometry(coord_reverse)
                     self.refresh_connected()
                     for i, atom1 in enumerate(self.atoms):
                         for j, atom2 in enumerate(self.atoms[:i]):
                             if atom1 in atom2.connected:
-                                reverse_connectivity[i,j] = 1
-                                reverse_connectivity[j,i] = 1
+                                reverse_connectivity[i, j] = 1
+                                reverse_connectivity[j, i] = 1
                     
                     changes = forward_connectivity - reverse_connectivity
                     for i, atom1 in enumerate(self.atoms):

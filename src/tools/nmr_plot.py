@@ -12,7 +12,7 @@ from chimerax.core.commands.cli import FloatArg, TupleOf, IntArg
 from chimerax.core.commands import run
 
 from AaronTools.comp_output import CompOutput
-from AaronTools.const import NMR_SCALE_LIBS
+from AaronTools.const import NMR_SCALE_LIBS, ELEMENTS, COMMONLY_ODD_ISOTOPES
 from AaronTools.geometry import Geometry
 from AaronTools.spectra import NMR, Shift
 
@@ -55,7 +55,7 @@ from SEQCROW.tools.uvvis_plot import (
 )
     
 from SEQCROW.utils import iter2str
-from SEQCROW.widgets import FilereaderComboBox, FakeMenu, ScientificSpinBox
+from SEQCROW.widgets import FilereaderComboBox, FakeMenu, ScientificSpinBox, ElementButton
 
 
 rcParams["savefig.dpi"] = 300
@@ -186,7 +186,6 @@ class NMRSpectrum(ToolInstance):
         component_layout.addWidget(QLabel("energy for weighting:"), 1, 0, 1, 1, Qt.AlignRight | Qt.AlignHCenter)
         component_layout.addWidget(self.weight_method, 1, 1, 1, 1, Qt.AlignLeft | Qt.AlignHCenter)
 
-
         # show_conformers = QLabel("show contribution from conformers with a Boltzmann population above:")
         # component_layout.addWidget(show_conformers, 2, 0, 1, 4, Qt.AlignRight | Qt.AlignVCenter)
         # 
@@ -312,6 +311,13 @@ class NMRSpectrum(ToolInstance):
         self.reverse_x.setCheckState(Qt.Checked)
         plot_settings_layout.addRow("reverse x-axis:", self.reverse_x)
         
+        self.elements = QHBoxLayout()
+        plot_settings_layout.addRow("elements:", self.elements)
+        
+        self.couple_with = QHBoxLayout()
+        plot_settings_layout.addRow("couple with:", self.couple_with)
+        
+        
         tabs.addTab(plot_settings_widget, "plot settings")
         
         # plot experimental data alongside computed
@@ -435,6 +441,8 @@ class NMRSpectrum(ToolInstance):
         
 
         tabs.currentChanged.connect(lambda ndx: self.refresh_plot() if ndx == 1 else None)
+        tabs.currentChanged.connect(lambda ndx: self.set_available_elements() if ndx == 2 else None)
+        tabs.currentChanged.connect(lambda ndx: self.set_coupling() if ndx == 2 else None)
 
         #menu bar for saving stuff
         menu = FakeMenu()
@@ -1124,6 +1132,97 @@ class NMRSpectrum(ToolInstance):
             return mol_fracs, weights_list
         return final_mixed, show_components
 
+    def set_available_elements(self):
+        elements = set()
+        data_attr = "data"
+        for mol_ndx in range(1, self.tree.topLevelItemCount()):
+            mol = self.tree.topLevelItem(mol_ndx)
+
+            for conf_ndx in range(2, mol.childCount(), 2):
+                conf = mol.child(conf_ndx)
+                data = self.tree.itemWidget(conf, 0).currentData()
+                if data is None:
+                    continue
+                fr, mdl = data
+                nmr = fr["nmr"]
+                elements.update([shift.element for shift in getattr(nmr, data_attr)])
+
+
+        previous_eles = {}
+        while (item := self.elements.takeAt(0)) is not None:
+            button = item.widget()
+            if button is None:
+                del item
+                continue
+            previous_eles[button.text()] = button.state == ElementButton.Checked
+            button.deleteLater()
+            del item
+        
+        elements = sorted([e for e in elements if e in ELEMENTS], key=ELEMENTS.index)
+        for i, ele in enumerate(elements):
+            ele_button = ElementButton(ele)
+            try:
+                checked = previous_eles[ele]
+                if checked:
+                    ele_button.setState(ElementButton.Checked)
+                else:
+                    ele_button.setState(ElementButton.Unchecked)
+            except KeyError:
+                if ele in COMMONLY_ODD_ISOTOPES:
+                    ele_button.setState(ElementButton.Checked)
+                else:
+                    ele_button.setState(ElementButton.Unchecked)
+            self.elements.addWidget(ele_button, stretch=0)
+        self.elements.addStretch(1)
+
+    def set_coupling(self):
+        elements = set()
+        data_attr = "data"
+        for mol_ndx in range(1, self.tree.topLevelItemCount()):
+            mol = self.tree.topLevelItem(mol_ndx)
+
+            for conf_ndx in range(2, mol.childCount(), 2):
+                conf = mol.child(conf_ndx)
+                data = self.tree.itemWidget(conf, 0).currentData()
+                if data is None:
+                    continue
+                fr, mdl = data
+                nmr = fr["nmr"]
+                for shift in getattr(nmr, data_attr):
+                    try:
+                        for j in nmr.coupling[shift.ndx]:
+                            j_shift = [shift for shift in getattr(nmr, data_attr) if shift.ndx == j][0]
+                            elements.add(j_shift.element)
+                    except KeyError:
+                        pass
+
+        previous_eles = {}
+        while (item := self.couple_with.takeAt(0)) is not None:
+            button = item.widget()
+            if button is None:
+                del item
+                continue
+            previous_eles[button.text()] = button.state == ElementButton.Checked
+            button.deleteLater()
+            del item
+        
+        elements = sorted([e for e in elements if e in ELEMENTS], key=ELEMENTS.index)
+        for i, ele in enumerate(elements):
+            ele_button = ElementButton(ele)
+            try:
+                checked = previous_eles[ele]
+                if checked:
+                    ele_button.setState(ElementButton.Checked)
+                else:
+                    ele_button.setState(ElementButton.Unchecked)
+            except KeyError:
+                if ele in COMMONLY_ODD_ISOTOPES:
+                    ele_button.setState(ElementButton.Checked)
+                else:
+                    ele_button.setState(ElementButton.Unchecked)
+            self.couple_with.addWidget(ele_button, stretch=0)
+        self.couple_with.addStretch(1)
+
     def refresh_plot(self):
         # if self.show_boltzmann_pop.checkState() == Qt.Checked:
         #     self.show_conformers()
@@ -1153,6 +1252,26 @@ class NMRSpectrum(ToolInstance):
         linear = self.linear.value()
         scalar = self.scalar.value()
 
+        elements = set()
+        for i in range(0, self.elements.count()):
+            item = self.elements.itemAt(i)
+            button = item.widget()
+            if button is None:
+                del item
+                continue
+            if button.state == ElementButton.Checked:
+                elements.add(button.text())
+        
+        couple_with = set()
+        for i in range(0, self.couple_with.count()):
+            item = self.couple_with.itemAt(i)
+            button = item.widget()
+            if button is None:
+                del item
+                continue
+            if button.state == ElementButton.Checked:
+                couple_with.add(button.text())
+        
         centers = None
         widths = None
         if self.section_table.rowCount() > 1:
@@ -1176,6 +1295,8 @@ class NMRSpectrum(ToolInstance):
             linear_scale=linear,
             scalar_scale=scalar,
             show_functions=show_components,
+            element=elements,
+            couple_with=couple_with,
         )
 
         self.canvas.draw()
