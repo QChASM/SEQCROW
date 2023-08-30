@@ -90,8 +90,9 @@ class BondEditor(ToolInstance):
         self.tsbond_color.set_color(self.settings.tsbond_color)
         ts_options.addRow("color:", self.tsbond_color)
         
-        self.tsbond_transparency = QSpinBox()
+        self.tsbond_transparency = QDoubleSpinBox()
         self.tsbond_transparency.setRange(1, 99)
+        self.tsbond_transparency.setDecimals(0)
         self.tsbond_transparency.setValue(self.settings.tsbond_transparency)
         self.tsbond_transparency.setSuffix("%")
         ts_options.addRow("transparency:", self.tsbond_transparency)

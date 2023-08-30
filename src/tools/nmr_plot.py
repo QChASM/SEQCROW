@@ -43,6 +43,7 @@ from Qt.QtWidgets import (
     QTreeWidget,
     QSizePolicy,
     QTreeWidgetItem,
+    QTableWidgetItem,
 )
 
 from SEQCROW.tools.per_frame_plot import NavigationToolbar
@@ -202,6 +203,9 @@ class NMRSpectrum(ToolInstance):
 
 
         tabs.addTab(component_widget, "components")
+        
+        self.nulcei_widget = EquivalentNuclei()
+        tabs.addTab(self.nulcei_widget, "equivalent nuclei")
         
         
         plot_widget = QWidget()
@@ -440,9 +444,10 @@ class NMRSpectrum(ToolInstance):
         tabs.addTab(interrupt_widget, "x-axis breaks")
         
 
-        tabs.currentChanged.connect(lambda ndx: self.refresh_plot() if ndx == 1 else None)
-        tabs.currentChanged.connect(lambda ndx: self.set_available_elements() if ndx == 2 else None)
-        tabs.currentChanged.connect(lambda ndx: self.set_coupling() if ndx == 2 else None)
+        tabs.currentChanged.connect(lambda ndx: self.refresh_equivalent_nuclei() if ndx == 1 else None)
+        tabs.currentChanged.connect(lambda ndx: self.refresh_plot() if ndx == 2 else None)
+        tabs.currentChanged.connect(lambda ndx: self.set_available_elements() if ndx == 3 else None)
+        tabs.currentChanged.connect(lambda ndx: self.set_coupling() if ndx == 3 else None)
 
         #menu bar for saving stuff
         menu = FakeMenu()
@@ -455,6 +460,22 @@ class NMRSpectrum(ToolInstance):
         layout.setMenuBar(menu)        
         self.tool_window.ui_area.setLayout(layout)
         self.tool_window.manage(None)
+
+    def refresh_equivalent_nuclei(self):
+        geoms = []
+        for mol_ndx in range(1, self.tree.topLevelItemCount()):
+            mol = self.tree.topLevelItem(mol_ndx)
+
+            for conf_ndx in range(2, mol.childCount(), 2):
+                conf = mol.child(conf_ndx)
+                data = self.tree.itemWidget(conf, 0).currentData()
+                if data is None:
+                    continue
+                fr, mdl = data
+                geoms.append(Geometry(fr["atoms"], refresh_ranks=False))
+                continue
+        
+        self.nulcei_widget.set_molecules(geoms)
 
     def add_mol_group(self, *args):
         row = self.tree.topLevelItemCount()
@@ -1109,8 +1130,9 @@ class NMRSpectrum(ToolInstance):
 
         data = []
         coupling = {}
+        offset = 0
         for i, (mol_frac, nmr) in enumerate(zip(mol_fracs, mixed_nmrs)):
-            offset = len(data)
+            print("original coupling", nmr.coupling)
             data.extend([
                 Shift(
                     shift.shift,
@@ -1120,9 +1142,10 @@ class NMRSpectrum(ToolInstance):
                 ) for shift in nmr.data
             ])
             for i in nmr.coupling:
-                coupling[i] = {}
+                coupling[i + offset] = {}
                 for j in nmr.coupling[i]:
                     coupling[i + offset][j + offset] = nmr.coupling[i][j]
+            offset += max(shift.ndx for shift in nmr.data) + 1
         print("final mixed", data)
         print("final coupling", coupling)
         final_mixed = NMR(data)
@@ -1227,6 +1250,14 @@ class NMRSpectrum(ToolInstance):
         # if self.show_boltzmann_pop.checkState() == Qt.Checked:
         #     self.show_conformers()
     
+        self.refresh_equivalent_nuclei()
+        self.set_available_elements()
+        self.set_coupling()
+        equivalent_nuclei = self.nulcei_widget.get_equivalent_nuclei()
+        graph = self.nulcei_widget.get_graph()
+        print("refresh_plot")
+        print(equivalent_nuclei)
+    
         mixed_spectra = self.get_mixed_spectrum()
         if not mixed_spectra:
             return
@@ -1297,6 +1328,8 @@ class NMRSpectrum(ToolInstance):
             show_functions=show_components,
             element=elements,
             couple_with=couple_with,
+            equivalent_nuclei=equivalent_nuclei,
+            graph=graph,
         )
 
         self.canvas.draw()
@@ -1469,6 +1502,135 @@ class NMRSpectrum(ToolInstance):
                 self.tree.itemWidget(conf, 2).deleteLater()
 
         super().delete()
+
+
+class EquivalentNuclei(QWidget):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        layout = QGridLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.tabs = QTabWidget()
+        layout.addWidget(self.tabs)
+        
+        self.geoms = []
+    
+    def set_molecules(self, geoms):        
+        self.geoms = geoms
+        
+        for i, geom in enumerate(geoms):
+            if i >= self.tabs.count():
+                self.create_mol_tab(i)
+            elif self.check_similar(i, geom):
+                continue
+            else:
+                self.reset_mol_tab(i, geom)
+
+        for i in range(self.tabs.count(), len(geoms), -1):
+            self.tabs.removeTab(i - 1)
+
+    def check_similar(self, ndx, geom):
+        tab = self.tabs.widget(ndx)
+        layout = tab.layout()
+        table = layout.itemAt(2).widget()
+        
+        if table.rowCount() != len(geom.atoms):
+            return False
+        
+        for i, a in enumerate(geom.atoms):
+            ele = table.item(i, 1).text()
+            if ele != a.element:
+                return False
+        
+        return True
+
+    def reset_mol_tab(self, i):
+        print("resetting", i)
+        geom = self.geoms[i]
+        ranks = geom.canonical_rank(
+            break_ties=False, update=False, invariant=False,
+        )
+        elements = geom.element_counts()
+
+        tab = self.tabs.widget(i)
+        layout = tab.layout()
+        table = layout.itemAt(2).widget()
+        table.clearContents()
+        table.setRowCount(0)
+
+        found_order = dict()
+        rank_labels = dict()
+        for j, a in enumerate(geom.atoms):
+            table.insertRow(j)
+            rank = ranks[j]
+            found_order.setdefault(a.element, dict())
+            found_order[a.element].setdefault(rank, len(found_order[a.element]) + 1)
+            rank_labels.setdefault(rank, "%s %i" % (a.element, found_order[a.element][rank]))
+            rank_choice = QComboBox()
+            rank_choice.addItems([
+                "%s %i" % (a.element, k + 1) for k in range(0, elements[a.element])
+            ])
+            ndx = rank_choice.findText(rank_labels[rank])
+            print(j, ndx, rank, rank_labels[rank])
+            rank_choice.setCurrentIndex(ndx)
+            
+            ndx_item = QTableWidgetItem(str(j + 1))
+            table.setItem(j, 0, ndx_item)
+            ele_item = QTableWidgetItem(a.element)
+            table.setItem(j, 1, ele_item)
+            table.setCellWidget(j, 2, rank_choice)
+
+    def create_mol_tab(self, i):
+        geom = self.geoms[i]
+        widget = QWidget()
+        layout = QFormLayout(widget)
+        
+        layout.addRow(QLabel("give equivalent nuclei the same group label"))
+        
+        reset_button = QPushButton("reset equivalent nuclei groups")
+        reset_button.clicked.connect(lambda *args, ndx=i, s=self: s.reset_mol_tab(ndx))
+        layout.addRow(reset_button)
+        
+        table = QTableWidget()
+        table.verticalHeader().setVisible(False)
+        table.setColumnCount(3)
+        table.setHorizontalHeaderLabels(["index", "element", "group label"])
+        layout.addRow(table)
+
+        self.tabs.insertTab(i, widget, "molecule %i" % (i + 1))
+        self.reset_mol_tab(i)
+
+    def get_equivalent_nuclei(self):
+        groups = []
+        for i in range(0, self.tabs.count()):
+            rank_labels = dict()
+            offset = len(groups)
+            tab = self.tabs.widget(i)
+            layout = tab.layout()
+            table = layout.itemAt(2).widget()
+
+            for j in range(0, table.rowCount()):
+                ndx = int(table.item(j, 0).text())
+                print(ndx)
+                label = table.cellWidget(j, 2).currentText()
+                rank_labels.setdefault(label, len(groups))
+                if len(groups) <= rank_labels[label]:
+                    groups.append([])
+                groups[rank_labels[label]].append(ndx - 1 + offset)
+        
+        print(groups)
+        
+        return groups
+
+    def get_graph(self):
+        graph = list()
+        offset = 0
+        for geom in self.geoms:
+            ndx = {a: i + offset for i, a in enumerate(geom.atoms)}
+            for a in geom.atoms:
+                graph.append([ndx[b] for b in a.connected])
+        
+        return graph
 
 
 class SaveScales(ChildToolWindow):

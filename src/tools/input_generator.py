@@ -677,13 +677,18 @@ class BuildQM(ToolInstance):
             if theory.job_type:
                 for job in theory.job_type:
                     if isinstance(job, OptimizationJob):
-                        self.job_widget.do_geom_opt.setChecked(True)
-                        self.job_widget.ts_opt.setChecked(job.transition_state)
+                        self.job_widget.setGeometryOptimization(True)
+                        self.job_widget.setTSOptimization(job.transition_state)
             
                     elif isinstance(job, FrequencyJob):
                         self.job_widget.do_freq.setChecked(True)
                         self.job_widget.temp.setValue(job.temperature)
                         self.job_widget.num_freq.setChecked(job.numerical)
+
+                    elif isinstance(job, NMRJob):
+                        self.job_widget.setNMR(True)
+                        self.job_widget.setNMRElements(job.atoms)
+                        self.job_widget.setNMRCoupling(bool(job.coupling_type))
 
             if 'raman' in preset:
                 self.job_widget.raman.setChecked(preset['raman'])
@@ -2118,7 +2123,10 @@ class JobTypeOption(QWidget):
     def setTSOptimization(self, value):
         """sets job type to ts opt"""
         ndx = self.opt_type.findText("transition state")
-        self.opt_type.setCurrentIndex(ndx)
+        if value:
+            self.opt_type.setCurrentIndex(ndx)
+        elif ndx == self.opt_type.currentIndex():
+            self.opt_type.setCurrentIndex(0)
 
     def setFrequencyCalculation(self, value):
         """sets job type to freq"""
@@ -2153,6 +2161,20 @@ class JobTypeOption(QWidget):
     def getNMR(self):
         """returns whether the job is NMR"""
         return self.do_nmr.checkState() == Qt.Checked
+
+    def setNMR(self, value):
+        self.do_nmr.setChecked(value)
+
+    def setNMRCoupling(self, value):
+        self.spin_coupling.setChecked(value)
+
+    def setNMRElements(self, elements):
+        for i in range(0, self.nmr_elements.count()):
+            button = self.nmr_elements.itemAt(i).widget()
+            if button is None:
+                continue
+            if button.text() in elements:
+                button.setCheckState(ElementButton.Checked)
 
     def getJobs(self):
         """returns list(JobType) for the current jobs"""
@@ -3224,7 +3246,10 @@ class MethodOption(QWidget):
         if dispersion is None:
             ndx = self.dispersion.findText("None")
         else:
-            ndx = self.dispersion.findText(dispersion)
+            try:
+                ndx = self.dispersion.findText(dispersion)
+            except TypeError:
+                ndx = self.dispersion.findText(dispersion.name)
 
         self.dispersion.setCurrentIndex(ndx)
 
@@ -6465,7 +6490,12 @@ class ExportPreset(ChildToolWindow):
                 job_type += "frequencies"
                 config.set(section, "temperature", str(preset["temp"]))
 
-            if preset["freq"] or preset["opt"]:
+            if preset["nmr"]:
+                if job_type:
+                    job_type += ", "
+                job_type += "nmr"
+
+            if preset["freq"] or preset["opt"] or preset["nmr"]:
                 config.set(section, "type", job_type)
 
         if "nproc" in preset:
