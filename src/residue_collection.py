@@ -450,7 +450,7 @@ class ResidueCollection(Geometry):
                 self.residues.append(new_res)
                 
                 all_atoms.extend(new_res.atoms)
-            
+
             refresh_ranks = False
             if "refresh_ranks" in kwargs:
                 refresh_ranks = kwargs.pop("refresh_ranks")
@@ -488,6 +488,10 @@ class ResidueCollection(Geometry):
                     aaron_atom2 = self.find(AtomSpec(atom2.atomspec))[0]
                     aaron_atom1.connected.add(aaron_atom2)
                     aaron_atom2.connected.add(aaron_atom1)
+            
+            if use_scene:
+                pos = molecule.session.main_view.camera.get_position().inverse()
+                self.coords = pos * self.coords
 
         else:
             #assume whatever we got is something AaronTools can turn into a Geometry

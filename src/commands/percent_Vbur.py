@@ -125,15 +125,14 @@ def _vbur(
 
 
     basis = None
-    if useScene:
-        oop_vector = session.view.camera.get_position().axes()[2]
-        ip_vector = session.view.camera.get_position().axes()[1]
-        x_vec = session.view.camera.get_position().axes()[0]
-        basis = np.array([x_vec, ip_vector, oop_vector]).T
-
+    
     center_xyz = center
     if not isinstance(center_xyz, np.ndarray):
         center_xyz = np.mean(center.coords, axis=0)
+        if useScene:
+            center_xyz = np.mean(center.scene_coords, axis=0)
+            pos = session.main_view.camera.get_position().inverse()
+            center_xyz = pos * center_xyz
         out["at_center"] = [AtomSpec(c.atomspec) for c in center]
         
     if labels != "none" or reportComponent != "total" or determine_key:
@@ -171,8 +170,15 @@ def _vbur(
         ip_vector /= np.linalg.norm(ip_vector)
 
         basis = np.array([x_vec, ip_vector, oop_vector]).T
-
+    
     out["center_xyz"] = center_xyz
+    if useScene:
+        pos = session.main_view.camera.get_position()
+        out["center_xyz"] = pos * out["center_xyz"]
+        basis = np.eye(3)
+        ip_vector = basis[1]
+        oop_vector = basis[2]
+
 
     if steric_map:
         steric_info = rescol.steric_map(
@@ -223,6 +229,7 @@ def _vbur(
             vbur,
             labels,
             basis=basis,
+            use_scene=useScene,
         )
         
         out["vis"] = mdls
@@ -493,6 +500,7 @@ def vbur_vis(
         volume_type,
         vbur,
         labels,
+        use_scene=False,
         basis=None,
 ):
     # from cProfile import Profile
@@ -556,6 +564,12 @@ def vbur_vis(
         radius_list.append(scale * radii_dict[atom.element])
         
     coords = geom.coordinates(atoms_within_radius)
+
+    if use_scene:
+        pos = session.main_view.camera.get_position()
+        basis = np.matmul(basis, pos.axes().T)
+        center_coords = pos * center_coords
+        coords = pos * coords
     
     atom_dist = distance_matrix(coords, coords)
     

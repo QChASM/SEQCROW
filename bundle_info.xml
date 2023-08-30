@@ -158,12 +158,12 @@
                 />                
 
 				<Provider name="XYZ trajectory file" 
-                          category="Molecular structure" 
+                          category="Molecular trajectory" 
                           suffixes=".allxyz" 
                           encoding="utf-8" 
-                          nicknames="xyz" 
+                          nicknames="allxyz" 
                           reference_url="https://en.wikipedia.org/wiki/XYZ_file_format" 
-                          synopsis="XYZ coordinate file"
+                          synopsis="XYZ trajectory file"
                 />                
                 
                 <Provider name="FCHK file" 
