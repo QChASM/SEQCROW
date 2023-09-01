@@ -95,9 +95,6 @@ class NMRSpectrum(ToolInstance):
         self.tool_window = MainToolWindow(self)        
 
         self.settings = _NMRSpectrumSettings(session, name)
-        if self.settings.version == 0:
-            self.update_scales()
-            self.settings.version = 1
 
         self.highlighted_mode = []
         self.highlight_frs = []
@@ -324,29 +321,6 @@ class NMRSpectrum(ToolInstance):
         
         tabs.addTab(plot_settings_widget, "plot settings")
         
-        # plot experimental data alongside computed
-        experimental_widget = QWidget()
-        experimental_layout = QFormLayout(experimental_widget)
-        
-        self.skip_lines = QSpinBox()
-        self.skip_lines.setRange(0, 15)
-        experimental_layout.addRow("skip first lines:", self.skip_lines)
-        
-        browse_button = QPushButton("browse...")
-        browse_button.clicked.connect(self.load_data)
-        experimental_layout.addRow("load CSV data:", browse_button)
-        
-        self.line_color = ColorButton(has_alpha_channel=False, max_size=(16, 16))
-        self.line_color.set_color(self.settings.exp_color)
-        experimental_layout.addRow("line color:", self.line_color)
-        
-        clear_button = QPushButton("clear experimental data")
-        clear_button.clicked.connect(self.clear_data)
-        experimental_layout.addRow(clear_button)
-        
-        tabs.addTab(experimental_widget, "plot experimental data")
-        
-        
         # frequency scaling
         scaling_group = QWidget()
         scaling_layout = QFormLayout(scaling_group)
@@ -444,6 +418,29 @@ class NMRSpectrum(ToolInstance):
         tabs.addTab(interrupt_widget, "x-axis breaks")
         
 
+        # plot experimental data alongside computed
+        experimental_widget = QWidget()
+        experimental_layout = QFormLayout(experimental_widget)
+        
+        self.skip_lines = QSpinBox()
+        self.skip_lines.setRange(0, 15)
+        experimental_layout.addRow("skip first lines:", self.skip_lines)
+        
+        browse_button = QPushButton("browse...")
+        browse_button.clicked.connect(self.load_data)
+        experimental_layout.addRow("load CSV data:", browse_button)
+        
+        self.line_color = ColorButton(has_alpha_channel=False, max_size=(16, 16))
+        self.line_color.set_color(self.settings.exp_color)
+        experimental_layout.addRow("line color:", self.line_color)
+        
+        clear_button = QPushButton("clear experimental data")
+        clear_button.clicked.connect(self.clear_data)
+        experimental_layout.addRow(clear_button)
+        
+        tabs.addTab(experimental_widget, "plot experimental data")
+        
+        
         tabs.currentChanged.connect(lambda ndx: self.refresh_equivalent_nuclei() if ndx == 1 else None)
         tabs.currentChanged.connect(lambda ndx: self.refresh_plot() if ndx == 2 else None)
         tabs.currentChanged.connect(lambda ndx: self.set_available_elements() if ndx == 3 else None)
@@ -676,11 +673,6 @@ class NMRSpectrum(ToolInstance):
         self.library.blockSignals(False)
         self.method.blockSignals(False)
         self.basis.blockSignals(False)
-
-    def update_scales(self):
-        from SEQCROW.tools.normal_modes import _NormalModeSettings
-        normal_mode_settings = _NormalModeSettings(self.session, "Visualize Normal Modes")
-        self.settings.scales = normal_mode_settings.scales
 
     def open_save_scales(self):
         m = self.linear.value()
@@ -1272,7 +1264,8 @@ class NMRSpectrum(ToolInstance):
         self.settings.w0 = w0
         weight_method = self.weight_method.currentData(Qt.UserRole)
         self.settings.weight_method = weight_method
-        
+        pulse_frequency = self.pulse_frequency.value()
+        self.settings.pulse_frequency = pulse_frequency
         fwhm = self.fwhm.value()
         self.settings.fwhm = fwhm
         peak_type = self.peak_type.currentText()
@@ -1322,6 +1315,7 @@ class NMRSpectrum(ToolInstance):
             peak_type=peak_type,
             reverse_x=reverse_x,
             fwhm=fwhm,
+            pulse_frequency=pulse_frequency,
             voigt_mixing=voigt_mixing,
             linear_scale=linear,
             scalar_scale=scalar,
