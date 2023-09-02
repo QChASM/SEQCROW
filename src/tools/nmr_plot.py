@@ -1518,7 +1518,7 @@ class EquivalentNuclei(QWidget):
             elif self.check_similar(i, geom):
                 continue
             else:
-                self.reset_mol_tab(i, geom)
+                self.reset_mol_tab(i)
 
         for i in range(self.tabs.count(), len(geoms), -1):
             self.tabs.removeTab(i - 1)
@@ -1579,7 +1579,11 @@ class EquivalentNuclei(QWidget):
         widget = QWidget()
         layout = QFormLayout(widget)
         
-        layout.addRow(QLabel("give equivalent nuclei the same group label"))
+        layout.addRow(QLabel(
+            "give equivalent nuclei the same group label\n"
+            "NOTE: the built-in algorithm will not distinguish certain nuclei, notably\n"
+            "diatereotopic protons, E/Z terminal protons, or nuclei on rotationally hindered groups"
+        ))
         
         reset_button = QPushButton("reset equivalent nuclei groups")
         reset_button.clicked.connect(lambda *args, ndx=i, s=self: s.reset_mol_tab(ndx))

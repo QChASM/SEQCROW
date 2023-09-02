@@ -316,7 +316,11 @@ class Residue(Geometry):
                 atom.serial_number = i + 1
         
         if apply_preset:
-            apply_seqcrow_preset(chix_residue.structure, atoms=[atom[1] for atom in new_atoms])
+            apply_seqcrow_preset(
+                chix_residue.structure,
+                atoms=[atom[1] for atom in new_atoms],
+                fallback="Ball-Stick-Endcap",
+            )
 
     def refresh_chix_connected(self, chix_residue):
         known_bonds = []
