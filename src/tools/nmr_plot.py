@@ -96,8 +96,7 @@ class NMRSpectrum(ToolInstance):
 
         self.settings = _NMRSpectrumSettings(session, name)
 
-        self.highlighted_mode = []
-        self.highlight_frs = []
+        self.highlighted_shift = None
         self.highlighted_labels = []
         self.highlighted_lines = []
         self._last_mouse_xy = None
@@ -108,6 +107,7 @@ class NMRSpectrum(ToolInstance):
         self.drag_prev = None
         self.dragging = False
         self.exp_data = None
+        self._plotted_spec = None
         
         self._build_ui()
 
@@ -338,7 +338,7 @@ class NMRSpectrum(ToolInstance):
         self.scalar.setMaximum(100)
         self.scalar.setDecimals(4)
         self.scalar.setSingleStep(0.025)
-        self.scalar.setValue(32)
+        self.scalar.setValue(31.8)
         scaling_layout.addRow("&#x1D6FF;<sub>ref</sub> =", self.scalar)
         
         self.linear = QDoubleSpinBox()
@@ -470,7 +470,7 @@ class NMRSpectrum(ToolInstance):
                     continue
                 fr, mdl = data
                 geoms.append(Geometry(fr["atoms"], refresh_ranks=False))
-                continue
+                break
         
         self.nulcei_widget.set_molecules(geoms)
 
@@ -711,7 +711,7 @@ class NMRSpectrum(ToolInstance):
         elif column == 2:
             self.section_table.removeRow(row)
     
-    def add_section(self, xmin=0, xmax=11):
+    def add_section(self, xmin=0, xmax=9):
         rows = self.section_table.rowCount()
         if rows != 0:
             rows -= 1
@@ -763,19 +763,43 @@ class NMRSpectrum(ToolInstance):
                 s += ",%s" % conf[-1]
             s += "\n"
         
-            fwhm = self.fwhm.value()
+            pulse_frequency = self.pulse_frequency.value()
+            fwhm = self.fwhm.value() / pulse_frequency
             peak_type = self.peak_type.currentText()
-            plot_type = self.plot_type.currentText()
             voigt_mixing = self.voigt_mix.value()
             linear = self.linear.value()
             scalar = self.scalar.value()
-
+            elements = set()
+            for i in range(0, self.elements.count()):
+                item = self.elements.itemAt(i)
+                button = item.widget()
+                if button is None:
+                    del item
+                    continue
+                if button.state == ElementButton.Checked:
+                    elements.add(button.text())
+            
+            couple_with = set()
+            for i in range(0, self.couple_with.count()):
+                item = self.couple_with.itemAt(i)
+                button = item.widget()
+                if button is None:
+                    del item
+                    continue
+                if button.state == ElementButton.Checked:
+                    couple_with.add(button.text())
+            
             funcs, x_positions, intensities = mixed_nmr.get_spectrum_functions(
                 fwhm=fwhm,
                 peak_type=peak_type,
                 voigt_mixing=voigt_mixing,
                 linear_scale=linear,
                 scalar_scale=scalar,
+                pulse_frequency=self.pulse_frequency.value(),
+                equivalent_nuclei=self.nulcei_widget.get_equivalent_nuclei(),
+                graph=self.nulcei_widget.get_graph(),
+                element=elements,
+                couple_with=couple_with,
             )
             
             show_functions = None
@@ -785,13 +809,13 @@ class NMRSpectrum(ToolInstance):
             x_values, y_values, other_y_list = mixed_nmr.get_plot_data(
                 funcs,
                 x_positions,
-                transmittance="transmittance" in plot_type.lower(),
                 peak_type=peak_type,
                 fwhm=fwhm,
                 show_functions=show_functions,
-                normalize=False,
+                normalize=True,
+                point_spacing=0.001,
             )
-                
+
             for i, (x, y) in enumerate(zip(x_values, y_values)):
                 s += "%f,%f" % (x, y)
                 for y_vals in other_y_list:
@@ -915,46 +939,58 @@ class NMRSpectrum(ToolInstance):
             return
 
         self.press = event.x, event.y, event.xdata, event.ydata
-        
-        return
-        
-        # if event.dblclick and event.xdata:
-        #     anharmonic = self.anharmonic.checkState() == Qt.Checked
-        #     data_attr = "data"
-        #     if anharmonic:
-        #         data_attr = "anharm_data"
-        #     closest = None
-        #     for mol_ndx in range(1, self.tree.topLevelItemCount()):
-        #         mol = self.tree.topLevelItem(mol_ndx)
-        #         for conf_ndx in range(2, mol.childCount(), 2):
-        #             conf = mol.child(conf_ndx)
-        #             data = self.tree.itemWidget(conf, 0).currentData()
-        #             if data is None:
-        #                 continue
-        #             fr, _ = data
-        #             freq = fr["frequency"]
-        #             if anharmonic and not freq.anharm_data:
-        #                 self.session.logger.error(
-        #                     "anharmonic frequencies requested on the 'plot settings' "
-        #                     "tab, but anharmonic data was not parsed from %s" % fr["name"]
-        #                 )
-        #                 return
-        #             
-        #             data_list = getattr(freq, data_attr)
-        #             data_list = [data for data in data_list if data.frequency > 0]
-        #             frequencies = np.array([data.frequency for data in data_list])
-        #             c1 = self.linear.value()
-        #             c2 = self.quadratic.value()
-        #             frequencies -= c1 * frequencies + c2 * frequencies ** 2
-        #             diff = np.abs(
-        #                 event.xdata - frequencies
-        #             )
-        #             min_arg = np.argmin(diff)
-        #             if not closest or diff[min_arg] < closest[0]:
-        #                 closest = (diff[min_arg], data_list[min_arg], fr)
-        #     
-        #     if closest:
-        #         self.highlight(closest[1], closest[2])
+
+        if event.dblclick and event.xdata:
+            if not self._plotted_spec:
+                return
+            elements = set()
+            for i in range(0, self.elements.count()):
+                item = self.elements.itemAt(i)
+                button = item.widget()
+                if button is None:
+                    del item
+                    continue
+                if button.state == ElementButton.Checked:
+                    elements.add(button.text())
+            
+            couple_with = set()
+            for i in range(0, self.couple_with.count()):
+                item = self.couple_with.itemAt(i)
+                button = item.widget()
+                if button is None:
+                    del item
+                    continue
+                if button.state == ElementButton.Checked:
+                    couple_with.add(button.text())
+            
+            c1 = self.linear.value()
+            c0 = self.scalar.value()
+            data = self._plotted_spec.get_spectrum_functions(
+                fwhm=self.fwhm.value(),
+                peak_type=self.peak_type.currentText(),
+                voigt_mixing=self.voigt_mix.value(),
+                scalar_scale=self.scalar.value(),
+                linear_scale=self.linear.value(),
+                intensity_attr="intensity",
+                data_attr="data",
+                pulse_frequency=self.pulse_frequency.value(),
+                equivalent_nuclei=self.nulcei_widget.get_equivalent_nuclei(),
+                graph=self.nulcei_widget.get_graph(),
+                element=elements,
+                couple_with=couple_with,
+                shifts_only=True,
+            )
+            
+            closest = None
+            for shift in data:
+                diff = abs(event.xdata - (
+                    self.linear.value() * shift.shift + self.scalar.value()
+                ))
+                if closest is None or diff < closest[0]:
+                    closest = (diff, shift)
+            
+            if closest:
+                self.highlight(closest[1])
 
     def unclick(self, event):
         if self.toolbar.mode != "":
@@ -964,39 +1000,39 @@ class NMRSpectrum(ToolInstance):
         self.drag_prev = None
         self.dragging = False
 
-    # def show_conformers(self):
-    #     fracs = self.get_mixed_spectrum(weights_only=True)
-    #     if not fracs:
-    #         return
-    #     fracs, weights = fracs
-    #     min_pop = self.boltzmann_pop_limit.value() / 100.0
-    #     
-    #     i = 0
-    #     for mol_ndx in range(1, self.tree.topLevelItemCount()):
-    #         mol = self.tree.topLevelItem(mol_ndx)
-    #         w = weights[i]
-    #         j = 0
-    #         for conf_ndx in range(2, mol.childCount(), 2):
-    #             conf = mol.child(conf_ndx)
-    #             data = self.tree.itemWidget(conf, 0).currentData()
-    #             if data is None:
-    #                 continue
-    #             fr, _ = data
-    #             conf_style = mol.child(conf_ndx + 1)
-    #             show_button = self.tree.itemWidget(conf_style, 0).layout().itemAt(1).widget()
-    #             if w[j] > min_pop:
-    #                 show_button.setCheckState(Qt.Checked)
-    #                 self.session.logger.info(
-    #                     "Boltzmann population of %s: %.1f%%" % (
-    #                         fr["name"],
-    #                         100 * w[j],
-    #                     )
-    #                 )
-    #             else:
-    #                 show_button.setCheckState(Qt.Unchecked)
-    #             j += 1
-    #         if j > 0:
-    #             i += 1
+    def show_conformers(self):
+        fracs = self.get_mixed_spectrum(weights_only=True)
+        if not fracs:
+            return
+        fracs, weights = fracs
+        min_pop = self.boltzmann_pop_limit.value() / 100.0
+        
+        i = 0
+        for mol_ndx in range(1, self.tree.topLevelItemCount()):
+            mol = self.tree.topLevelItem(mol_ndx)
+            w = weights[i]
+            j = 0
+            for conf_ndx in range(2, mol.childCount(), 2):
+                conf = mol.child(conf_ndx)
+                data = self.tree.itemWidget(conf, 0).currentData()
+                if data is None:
+                    continue
+                fr, _ = data
+                conf_style = mol.child(conf_ndx + 1)
+                show_button = self.tree.itemWidget(conf_style, 0).layout().itemAt(1).widget()
+                if w[j] > min_pop:
+                    show_button.setCheckState(Qt.Checked)
+                    self.session.logger.info(
+                        "Boltzmann population of %s: %.1f%%" % (
+                            fr["name"],
+                            100 * w[j],
+                        )
+                    )
+                else:
+                    show_button.setCheckState(Qt.Unchecked)
+                j += 1
+            if j > 0:
+                i += 1
 
     def get_mixed_spectrum(self, weights_only=False):
         weight_method = self.weight_method.currentData(Qt.UserRole)
@@ -1073,7 +1109,6 @@ class NMRSpectrum(ToolInstance):
 
             if not nmrs[-1]:
                 nmrs.pop(-1)
-                geoms.pop(-1)
                 freqs.pop(-1)
                 single_points.pop(-1)
             else:
@@ -1252,6 +1287,8 @@ class NMRSpectrum(ToolInstance):
 
         mixed_spectra, show_components = mixed_spectra
 
+        self._plotted_spec = mixed_spectra
+
         self.figure.clear()
         
         temperature = self.temperature.value()
@@ -1320,129 +1357,75 @@ class NMRSpectrum(ToolInstance):
             couple_with=couple_with,
             equivalent_nuclei=equivalent_nuclei,
             graph=graph,
+            normalize=True,
         )
 
         self.canvas.draw()
-        # if self.highlighted_mode:
-        #     mode = self.highlighted_mode
-        #     self.highlighted_mode = None
-        #     self.highlight(mode, self.highlight_frs)
 
-    # def highlight(self, item, fr):
-    #     highlights = []
-    #     labels = []
-    # 
-    #     freqs = self.get_mixed_spectrum()
-    #     if not freqs:
-    #         return
-    # 
-    #     freqs, _ = freqs
-    # 
-    #     anharmonic = self.anharmonic.checkState() == Qt.Checked
-    #     data_attr = "data"
-    #     if anharmonic:
-    #         data_attr = "anharm_data"
-    # 
-    #     plot_type = self.plot_type.currentText()
-    #     
-    #     for ax in self.figure.get_axes():
-    #         for mode in self.highlighted_lines:
-    #             if mode in ax.collections:
-    #                 ax.collections.remove(mode)
-    # 
-    #         for text in ax.texts:
-    #             text.remove()
-    # 
-    #         if item is self.highlighted_mode:
-    #             continue
-    #             
-    #         for freq in getattr(freqs, data_attr):
-    #             if freq.frequency == item.frequency:
-    #                 break
-    #         else:
-    #             continue
-    # 
-    #         c1 = self.linear.value()
-    #         c2 = self.quadratic.value()
-    #         frequency = freq.frequency
-    #         frequency -= c1 * frequency + c2 * frequency ** 2
-    #         
-    #         if plot_type == "Transmittance":
-    #             y_vals = (10 ** (2 - 0.9), 100)
-    #         elif plot_type == "VCD":
-    #             y_vals = (0, np.sign(item.rotation))
-    #         else:
-    #             y_vals = (0, 1)
-    #         
-    #         if plot_type == "Raman":
-    #             y_rel = freq.raman_activity / item.raman_activity
-    #         elif plot_type == "VCD":
-    #             y_rel = freq.rotation / item.rotation
-    #         else:
-    #             y_rel = freq.intensity / item.intensity
-    #         
-    #         label = "%s" % fr["name"]
-    #         label += "\n%.2f cm$^{-1}$" % frequency
-    #         if c1 or c2:
-    #             label += "\n$\Delta_{corr}$ = %.2f cm$^{-1}$" % (frequency - item.frequency)
-    #         if item.symmetry and item.symmetry != "A":
-    #             text = item.symmetry
-    #             if re.search("\d", text):
-    #                 text = re.sub(r"(\d+)", r"$_{\1", text)
-    #             if text.startswith("SG"):
-    #                 text = "$\Sigma$" + text[2:]
-    #             elif text.startswith("PI"):
-    #                 text = "$\Pi$" + text[2:]
-    #             elif text.startswith("DLT"):
-    #                 text = "$\Delta$" + text[3:]
-    #                 if text[1:] == "A":
-    #                     text = text[0]
-    #             if any(text.endswith(char) for char in "vhdugVHDUG"):
-    #                 if "_" not in text:
-    #                     text = text[:-1] + "$_{" + text[-1]
-    #                 text = text + text[-1].lower()
-    #             if "_" in text:
-    #                 text = text + "}$"
-    #             label += "\n%s" % text
-    #         label += "\nintensity scaled by %.2e" % y_rel
-    #         
-    #         if frequency < min(ax.get_xlim()) or frequency > max(ax.get_xlim()):
-    #             continue
-    #         
-    #         x_mid = frequency > sum(ax.get_xlim()) / 2
-    #         label_x = frequency
-    #         if x_mid:
-    #             label_x -= 0.01 * sum(ax.get_xlim())
-    #         else:
-    #             label_x += 0.01 * sum(ax.get_xlim())
-    #         
-    #         labels.append(
-    #             ax.text(
-    #                 label_x,
-    #                 y_vals[1] / len(label.splitlines()),
-    #                 label,
-    #                 va="bottom" if y_vals[1] > 0 else "top",
-    #                 ha="left" if x_mid else "right",
-    #                 path_effects=[pe.withStroke(linewidth=2, foreground="white")],
-    #             )
-    #         )
-    #         
-    #         highlights.append(
-    #             ax.vlines(
-    #                 frequency, *y_vals, color='r', zorder=-1, label="highlight"
-    #             )
-    #         )
-    #     
-    #     if item is not self.highlighted_mode:
-    #         self.highlighted_mode = item
-    #         self.highlight_frs = fr
-    #     else:
-    #         self.highlighted_mode = None
-    #         self.highlight_frs = None
-    # 
-    #     self.highlighted_lines = highlights
-    #     self.highlighted_labels = labels
-    #     self.canvas.draw()
+    def highlight(self, item):
+        highlights = []
+        labels = []
+
+        y_vals = (0, 1)
+        c1 = self.linear.value()
+        c0 = self.scalar.value()
+        ppm = c1 * item.origin + c0
+
+        for ax in self.figure.get_axes():
+            for mode in self.highlighted_lines:
+                if mode in ax.collections:
+                    ax.collections.remove(mode)
+    
+            for text in ax.texts:
+                text.remove()
+    
+            if (
+                self.highlighted_shift and
+                item.origin == self.highlighted_shift.origin
+            ):
+                continue
+
+            label = "%s" % ", ".join([str(n + 1) for n in item.ndx])
+            label += "\n%.2f ppm" % ppm
+
+            if ppm < min(ax.get_xlim()) or ppm > max(ax.get_xlim()):
+                continue
+            
+            x_mid = ppm > sum(ax.get_xlim()) / 2
+            label_x = ppm
+            if x_mid:
+                label_x -= 0.01 * sum(ax.get_xlim())
+            else:
+                label_x += 0.01 * sum(ax.get_xlim())
+            
+            labels.append(
+                ax.text(
+                    label_x,
+                    y_vals[1] / len(label.splitlines()),
+                    label,
+                    va="bottom" if y_vals[1] > 0 else "top",
+                    ha="left" if x_mid else "right",
+                    path_effects=[pe.withStroke(linewidth=2, foreground="white")],
+                )
+            )
+            
+            highlights.append(
+                ax.vlines(
+                    ppm, *y_vals, color='r', zorder=-1, label="highlight"
+                )
+            )
+        
+        if (
+            self.highlighted_shift and
+            self.highlighted_shift.shift == item.shift
+        ):
+            self.highlighted_shift = None
+        else:
+            self.highlighted_shift = item
+    
+        self.highlighted_lines = highlights
+        self.highlighted_labels = labels
+        self.canvas.draw()
     
     def load_data(self, *args):
         filename, _ = QFileDialog.getOpenFileName(filter="comma-separated values file (*.csv)")

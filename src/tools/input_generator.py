@@ -675,6 +675,7 @@ class BuildQM(ToolInstance):
         if "use_job_type" in preset and preset["use_job_type"]:
             self.job_widget.do_geom_opt.setChecked(False)
             self.job_widget.do_freq.setChecked(False)
+            self.job_widget.do_nmr.setChecked(False)
             if theory.job_type:
                 for job in theory.job_type:
                     if isinstance(job, OptimizationJob):
@@ -1420,7 +1421,7 @@ class JobTypeOption(QWidget):
         )
 
         checkbox_layout.insertWidget(
-            4, QLabel("nmr:"), stretch=1, alignment=Qt.AlignRight | Qt.AlignVCenter
+            4, QLabel("NMR:"), stretch=1, alignment=Qt.AlignRight | Qt.AlignVCenter
         )
         self.do_nmr = QCheckBox()
         checkbox_layout.insertWidget(
@@ -1677,7 +1678,7 @@ class JobTypeOption(QWidget):
         self.nmr_elements = QHBoxLayout()
         nmr_layout.addRow("select elements:", self.nmr_elements)
 
-        self.job_type_opts.addTab(self.nmr_opt, "nmr settings")
+        self.job_type_opts.addTab(self.nmr_opt, "NMR settings")
 
         self.job_type_opts.tabBarDoubleClicked.connect(self.tab_dble_click)
 
@@ -2181,7 +2182,9 @@ class JobTypeOption(QWidget):
             if button is None:
                 continue
             if button.text() in elements:
-                button.setCheckState(ElementButton.Checked)
+                button.setState(ElementButton.Checked)
+            else:
+                button.setState(ElementButton.Unchecked)
 
     def getJobs(self):
         """returns list(JobType) for the current jobs"""
@@ -2658,6 +2661,7 @@ class JobTypeOption(QWidget):
             self.settings.last_freq = self.do_freq.checkState() == Qt.Checked
             self.settings.last_num_freq = self.num_freq.checkState() == Qt.Checked
             self.settings.last_raman = self.raman.checkState() == Qt.Checked
+            self.settings.last_nmr = self.do_nmr.checkState() == Qt.Checked
 
         return self.form.get_job_kw_dict(
             self.do_geom_opt.checkState() == Qt.Checked,
@@ -6451,7 +6455,8 @@ class ExportPreset(ChildToolWindow):
                 preset_item.setCheckState(1, Qt.Unchecked)
 
     def save_presets(self):
-        filename, _ = QFileDialog.getSaveFileName(filter="JSON files (*.json);;INI files (*.ini)")
+        filename, _ = QFileDialog.getSaveFileName(filter="JSON files (*.json)")
+        # filename, _ = QFileDialog.getSaveFileName(filter="JSON files (*.json);;INI files (*.ini)")
         if not filename:
             return
 
