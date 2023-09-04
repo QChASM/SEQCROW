@@ -716,17 +716,17 @@ class NMRSpectrum(ToolInstance):
         if rows != 0:
             rows -= 1
             section_min = QDoubleSpinBox()
-            section_min.setRange(0, 500)
+            section_min.setRange(0, 1000)
             section_min.setValue(xmin)
             section_min.setSuffix(" ppm")
-            section_min.setSingleStep(25)
+            section_min.setSingleStep(1)
             self.section_table.setCellWidget(rows, 0, section_min)
             
             section_max = QDoubleSpinBox()
-            section_max.setRange(1, 500)
+            section_max.setRange(1, 1000)
             section_max.setValue(xmax)
             section_max.setSuffix(" ppm")
-            section_max.setSingleStep(25)
+            section_max.setSingleStep(1)
             self.section_table.setCellWidget(rows, 1, section_max)
             
             widget_that_lets_me_horizontally_align_an_icon = QWidget()
@@ -911,49 +911,50 @@ class NMRSpectrum(ToolInstance):
         self.canvas.draw()
 
     def onclick(self, event):
-        raise NotImplementedError
         if self.toolbar.mode != "":
             return
 
         self.press = event.x, event.y, event.xdata, event.ydata
         
-        if event.dblclick and event.xdata:
-            anharmonic = self.anharmonic.checkState() == Qt.Checked
-            data_attr = "data"
-            if anharmonic:
-                data_attr = "anharm_data"
-            closest = None
-            for mol_ndx in range(1, self.tree.topLevelItemCount()):
-                mol = self.tree.topLevelItem(mol_ndx)
-                for conf_ndx in range(2, mol.childCount(), 2):
-                    conf = mol.child(conf_ndx)
-                    data = self.tree.itemWidget(conf, 0).currentData()
-                    if data is None:
-                        continue
-                    fr, _ = data
-                    freq = fr["frequency"]
-                    if anharmonic and not freq.anharm_data:
-                        self.session.logger.error(
-                            "anharmonic frequencies requested on the 'plot settings' "
-                            "tab, but anharmonic data was not parsed from %s" % fr["name"]
-                        )
-                        return
-                    
-                    data_list = getattr(freq, data_attr)
-                    data_list = [data for data in data_list if data.frequency > 0]
-                    frequencies = np.array([data.frequency for data in data_list])
-                    c1 = self.linear.value()
-                    c2 = self.quadratic.value()
-                    frequencies -= c1 * frequencies + c2 * frequencies ** 2
-                    diff = np.abs(
-                        event.xdata - frequencies
-                    )
-                    min_arg = np.argmin(diff)
-                    if not closest or diff[min_arg] < closest[0]:
-                        closest = (diff[min_arg], data_list[min_arg], fr)
-            
-            if closest:
-                self.highlight(closest[1], closest[2])
+        return
+        
+        # if event.dblclick and event.xdata:
+        #     anharmonic = self.anharmonic.checkState() == Qt.Checked
+        #     data_attr = "data"
+        #     if anharmonic:
+        #         data_attr = "anharm_data"
+        #     closest = None
+        #     for mol_ndx in range(1, self.tree.topLevelItemCount()):
+        #         mol = self.tree.topLevelItem(mol_ndx)
+        #         for conf_ndx in range(2, mol.childCount(), 2):
+        #             conf = mol.child(conf_ndx)
+        #             data = self.tree.itemWidget(conf, 0).currentData()
+        #             if data is None:
+        #                 continue
+        #             fr, _ = data
+        #             freq = fr["frequency"]
+        #             if anharmonic and not freq.anharm_data:
+        #                 self.session.logger.error(
+        #                     "anharmonic frequencies requested on the 'plot settings' "
+        #                     "tab, but anharmonic data was not parsed from %s" % fr["name"]
+        #                 )
+        #                 return
+        #             
+        #             data_list = getattr(freq, data_attr)
+        #             data_list = [data for data in data_list if data.frequency > 0]
+        #             frequencies = np.array([data.frequency for data in data_list])
+        #             c1 = self.linear.value()
+        #             c2 = self.quadratic.value()
+        #             frequencies -= c1 * frequencies + c2 * frequencies ** 2
+        #             diff = np.abs(
+        #                 event.xdata - frequencies
+        #             )
+        #             min_arg = np.argmin(diff)
+        #             if not closest or diff[min_arg] < closest[0]:
+        #                 closest = (diff[min_arg], data_list[min_arg], fr)
+        #     
+        #     if closest:
+        #         self.highlight(closest[1], closest[2])
 
     def unclick(self, event):
         if self.toolbar.mode != "":
@@ -1124,7 +1125,6 @@ class NMRSpectrum(ToolInstance):
         coupling = {}
         offset = 0
         for i, (mol_frac, nmr) in enumerate(zip(mol_fracs, mixed_nmrs)):
-            print("original coupling", nmr.coupling)
             data.extend([
                 Shift(
                     shift.shift,
@@ -1138,8 +1138,6 @@ class NMRSpectrum(ToolInstance):
                 for j in nmr.coupling[i]:
                     coupling[i + offset][j + offset] = nmr.coupling[i][j]
             offset += max(shift.ndx for shift in nmr.data) + 1
-        print("final mixed", data)
-        print("final coupling", coupling)
         final_mixed = NMR(data)
         final_mixed.coupling = coupling
         
@@ -1247,9 +1245,7 @@ class NMRSpectrum(ToolInstance):
         self.set_coupling()
         equivalent_nuclei = self.nulcei_widget.get_equivalent_nuclei()
         graph = self.nulcei_widget.get_graph()
-        print("refresh_plot")
-        print(equivalent_nuclei)
-    
+
         mixed_spectra = self.get_mixed_spectrum()
         if not mixed_spectra:
             return
@@ -1539,7 +1535,6 @@ class EquivalentNuclei(QWidget):
         return True
 
     def reset_mol_tab(self, i):
-        print("resetting", i)
         geom = self.geoms[i]
         ranks = geom.canonical_rank(
             break_ties=False, update=False, invariant=False,
@@ -1565,7 +1560,6 @@ class EquivalentNuclei(QWidget):
                 "%s %i" % (a.element, k + 1) for k in range(0, elements[a.element])
             ])
             ndx = rank_choice.findText(rank_labels[rank])
-            print(j, ndx, rank, rank_labels[rank])
             rank_choice.setCurrentIndex(ndx)
             
             ndx_item = QTableWidgetItem(str(j + 1))
@@ -1609,15 +1603,12 @@ class EquivalentNuclei(QWidget):
 
             for j in range(0, table.rowCount()):
                 ndx = int(table.item(j, 0).text())
-                print(ndx)
                 label = table.cellWidget(j, 2).currentText()
                 rank_labels.setdefault(label, len(groups))
                 if len(groups) <= rank_labels[label]:
                     groups.append([])
                 groups[rank_labels[label]].append(ndx - 1 + offset)
-        
-        print(groups)
-        
+
         return groups
 
     def get_graph(self):

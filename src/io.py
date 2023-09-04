@@ -364,6 +364,11 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
     struc.active_coordset_id = struc.num_coordsets
     if len(all_coordsets) > 1:
         fr["all_geom"] = all_coordsets
+        if (
+            "multiframe .xyz" in session.seqcrow_settings.settings.XYZ_OPEN
+            and coordsets is None
+        ):
+            coordsets = True
         if coordsets:
             from chimerax.std_commands.coordset_gui import CoordinateSetSlider
             status += " movie"

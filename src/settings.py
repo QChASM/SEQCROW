@@ -27,6 +27,17 @@ class QueueOptions(EnumOption):
     values = ['None', 'Slurm', 'PBS', 'SGE', 'LSF']
     labels = ['None', 'Slurm', 'PBS', 'SGE', 'LSF']
 
+class XYZOpenOptions(EnumOption):
+    labels = [
+        'slider for .allxyz and multiframe .xyz',
+        'slider for .allxyz only',
+    ]
+    values = [
+        'slider for .allxyz and multiframe .xyz',
+        'slider for .allxyz only',
+    ]
+    
+
 # 'settings' module attribute will be set by manager initialization
 class _SEQCROWSettings(Settings):
     EXPLICIT_SAVE = {
@@ -49,6 +60,10 @@ class _SEQCROWSettings(Settings):
             'None', 
             EnumOf(IOPresets.values),
         ),
+        "XYZ_OPEN": Value(
+            'slider for .allxyz and multiframe .xyz',
+            EnumOf(XYZOpenOptions.values),
+        ),
         'ORBIT_OPEN': Value(
             'do nothing',
             EnumOf(OrbitOptions.values),
@@ -57,7 +72,6 @@ class _SEQCROWSettings(Settings):
             'do nothing',
             EnumOf(FreqOptions.values),
         ),
-        'NON_SEQCROW_IO_PRESET': [],
         'MAX_FCHK_ARRAY': 10000000,
         'QUEUE_TYPE': Value(
             getenv('AARONLIB', 'None'),
@@ -110,13 +124,19 @@ def register_settings_options(session):
             InputFolderOption,
             "Directory containing your substituents (/Subs), ligands (/Ligands), rings (/Rings), and AARON templates (/TS_geoms)\nYou will need to restart ChimeraX for changes to take effect"
         ),
-            
+
         "SEQCROW_IO_PRESET" : (
             "Preset for molecules opened with SEQCROW", 
             IOPresets, 
             "Molecules opened through SEQCROW (xyz, log, etc.) will use this graphical preset"
         ),
-        
+
+        "XYZ_OPEN" : (
+            "XYZ slider", 
+            XYZOpenOptions, 
+            "When to automatically open a slider for XYZ files"
+        ),
+
         "ORBIT_OPEN": (
             "When orbital files are opened",
             OrbitOptions,
@@ -128,24 +148,13 @@ def register_settings_options(session):
             FreqOptions,
             "whether or not to open the Normal Modes tool when a file with orbital info is opened",
         ),
-        
+
         "MAX_FCHK_ARRAY": (
             "max. FCHK array size:",
             IntOption,
             """maximum array size to read from FCHK files
 can speed up reading large files, but may need to be
 increased if not all data is read""",
-        ),
-        
-        "NON_SEQCROW_IO_PRESET" : (
-            """commands executed when a model is added:
-use <model> in place of model ID
-prefix a command with the file type
-for it to only apply to new models
-from that file type 
-(e.g. cif: color <model>/A purple)""",
-            StringsOption,
-            "opening a model will run these commands"
         ),
     }
     
