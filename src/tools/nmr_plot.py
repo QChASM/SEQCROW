@@ -338,7 +338,7 @@ class NMRSpectrum(ToolInstance):
         self.scalar.setMaximum(100)
         self.scalar.setDecimals(4)
         self.scalar.setSingleStep(0.025)
-        self.scalar.setValue(31.8)
+        self.scalar.setValue(31.9)
         scaling_layout.addRow("&#x1D6FF;<sub>ref</sub> =", self.scalar)
         
         self.linear = QDoubleSpinBox()
