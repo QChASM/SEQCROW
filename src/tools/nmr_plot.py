@@ -1096,12 +1096,10 @@ class NMRSpectrum(ToolInstance):
                 conf_style = mol.child(conf_ndx + 1)
                 show_comp = self.tree.itemWidget(conf_style, 0).layout().itemAt(1).widget()
                 if show_comp.checkState() == Qt.Checked:
-                    stop_ndx = sum(sum(len(uv_vis.data) for uv_vis in conf) for conf in uv_vis_files)
-                    start_ndx = stop_ndx - len(nmrs[-1][-1].data)
                     color = self.tree.itemWidget(conf_style, 0).layout().itemAt(2).widget().get_color()
                     line_style = self.tree.itemWidget(conf_style, 1).layout().itemAt(1).widget().currentData(Qt.UserRole)
                     show_components.append([
-                        (start_ndx, stop_ndx),
+                        nmr,
                         [c / 255. for c in color],
                         line_style,
                         fr["name"],
@@ -1115,12 +1113,10 @@ class NMRSpectrum(ToolInstance):
                 mol_style = mol.child(0)
                 show_mol = self.tree.itemWidget(mol_style, 0).layout().itemAt(1).widget()
                 if show_mol.checkState() == Qt.Checked:
-                    stop_ndx = sum(sum(len(uv_vis.data) for uv_vis in conf) for conf in uv_vis_files)
-                    start_ndx = stop_ndx - sum(len(f.data) for f in nmrs[-1])
                     color = self.tree.itemWidget(mol_style, 0).layout().itemAt(2).widget().get_color()
                     line_style = self.tree.itemWidget(mol_style, 1).layout().itemAt(1).widget().currentData(Qt.UserRole)
                     show_components.append([
-                        (start_ndx, stop_ndx),
+                        nmrs[-1],
                         [c / 255. for c in color],
                         line_style,
                         "molecule %i" % mol_ndx,

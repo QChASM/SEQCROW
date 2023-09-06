@@ -159,7 +159,7 @@ class FilereaderComboBox(QComboBox):
             for i in range(last_i, self.count()):
                 fr, mdl = self.itemData(i)
                 last_i = i
-                if fr in filereaders:
+                if any(fr is x for x in filereaders):
                     self.removeItem(i)
                     removed = True
                     break
