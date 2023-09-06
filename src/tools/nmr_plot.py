@@ -579,6 +579,7 @@ class NMRSpectrum(ToolInstance):
         trash_button.setFlat(True)
         trash_button.clicked.connect(lambda *args, combobox=nrg_combobox: combobox.deleteLater())
         trash_button.clicked.connect(lambda *args, combobox=freq_combobox: combobox.deleteLater())
+        trash_button.clicked.connect(lambda *args, combobox=nmr_combobox: combobox.deleteLater())
         trash_button.clicked.connect(lambda *args, child=conformer_item: conf_group_widget.removeChild(child))
         trash_button.setIcon(QIcon(self.tree.style().standardIcon(QStyle.SP_DialogCancelButton)))
         

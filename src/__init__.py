@@ -184,7 +184,7 @@ class _SEQCROW_API(BundleAPI):
         from AaronTools.orbitals import Orbitals
         from AaronTools.theory import Theory
         from AaronTools.json_extension import ATEncoder, ATDecoder
-        from AaronTools.spectra import Frequency, ValenceExcitations
+        from AaronTools.spectra import Frequency, ValenceExcitations, NMR
         
         class _ATState:
             version = 1
@@ -286,6 +286,7 @@ class _SEQCROW_API(BundleAPI):
             Theory: _ATState,
             Frequency: _ATState,
             ValenceExcitations: _ATState,
+            NMR: _ATState,
         }
         
         session.register_snapshot_methods(methods)
@@ -1156,6 +1157,9 @@ class _SEQCROW_API(BundleAPI):
         elif name == "ValenceExcitations":
             from AaronTools.spectra import ValenceExcitations
             return ValenceExcitations
+        elif name == "NMR":
+            from AaronTools.spectra import NMR
+            return NMR
         elif name == "Atom":
             from AaronTools.atoms import Atom
             return Atom
