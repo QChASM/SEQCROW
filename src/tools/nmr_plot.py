@@ -334,8 +334,8 @@ class NMRSpectrum(ToolInstance):
         scaling_layout.addRow(desc)
 
         self.scalar = QDoubleSpinBox()
-        self.scalar.setMinimum(-100)
-        self.scalar.setMaximum(100)
+        self.scalar.setMinimum(-10000)
+        self.scalar.setMaximum(10000)
         self.scalar.setDecimals(4)
         self.scalar.setSingleStep(0.025)
         self.scalar.setValue(31.9)
@@ -531,11 +531,16 @@ class NMRSpectrum(ToolInstance):
         add_conf_button2 = QPushButton("")
         add_conf_button2.setFlat(True)
         add_conf_button2.clicked.connect(lambda *args, conf_group_widget=mol_group: self.add_conf_group(conf_group_widget))
+
+        add_conf_button3 = QPushButton("")
+        add_conf_button3.setFlat(True)
+        add_conf_button3.clicked.connect(lambda *args, conf_group_widget=mol_group: self.add_conf_group(conf_group_widget))
         
         add_conf_child = QTreeWidgetItem(mol_group)
         self.tree.setItemWidget(add_conf_child, 0, add_conf_button)
         self.tree.setItemWidget(add_conf_child, 1, add_conf_button2)
-        self.tree.setItemWidget(mol_group, 2, trash_button)
+        self.tree.setItemWidget(add_conf_child, 2, add_conf_button3)
+        self.tree.setItemWidget(mol_group, 3, trash_button)
         
         mol_group.setText(0, "group %i" % row)
         
@@ -561,6 +566,7 @@ class NMRSpectrum(ToolInstance):
             conf = parent.child(conf_ndx)
             self.tree.itemWidget(conf, 0).destroy()
             self.tree.itemWidget(conf, 1).destroy()
+            self.tree.itemWidget(conf, 2).destroy()
         
         ndx = self.tree.indexOfTopLevelItem(parent)
         self.tree.takeTopLevelItem(ndx)
@@ -1041,12 +1047,16 @@ class NMRSpectrum(ToolInstance):
         freqs = []
         single_points = []
         mol_fracs = []
-        show_components = []
+        shown_confs = []
+        shown_weights = []
+        shown_mols = []
         data_attr = "data"
+        offset = 0
         for mol_ndx in range(1, self.tree.topLevelItemCount()):
             nmrs.append([])
             freqs.append([])
             single_points.append([])
+            shown_confs.append([])
             mol = self.tree.topLevelItem(mol_ndx)
             mol_fracs_widget = self.tree.itemWidget(mol, 1).layout().itemAt(1).widget()
             mol_fracs.append(mol_fracs_widget.value())
@@ -1099,8 +1109,9 @@ class NMRSpectrum(ToolInstance):
                 if show_comp.checkState() == Qt.Checked:
                     color = self.tree.itemWidget(conf_style, 0).layout().itemAt(2).widget().get_color()
                     line_style = self.tree.itemWidget(conf_style, 1).layout().itemAt(1).widget().currentData(Qt.UserRole)
-                    show_components.append([
-                        nmr,
+                    shown_confs[-1].append([
+                        int(conf_ndx // 2) - 1,
+                        nmrs[-1][-1],
                         [c / 255. for c in color],
                         line_style,
                         fr["name"],
@@ -1110,33 +1121,28 @@ class NMRSpectrum(ToolInstance):
                 nmrs.pop(-1)
                 freqs.pop(-1)
                 single_points.pop(-1)
+                continue
             else:
                 mol_style = mol.child(0)
                 show_mol = self.tree.itemWidget(mol_style, 0).layout().itemAt(1).widget()
                 if show_mol.checkState() == Qt.Checked:
                     color = self.tree.itemWidget(mol_style, 0).layout().itemAt(2).widget().get_color()
                     line_style = self.tree.itemWidget(mol_style, 1).layout().itemAt(1).widget().currentData(Qt.UserRole)
-                    show_components.append([
-                        nmrs[-1],
+                    shown_mols.append([
                         [c / 255. for c in color],
                         line_style,
                         "molecule %i" % mol_ndx,
                     ])
+                else:
+                    shown_mols.append(False)
 
-        if not freqs or all(not conf_group for conf_group in freqs):
+        if not nmrs or all(not conf_group for conf_group in nmrs):
             return
-        
+
         weights_list = []
         mixed_nmrs = []
+        show_components = []
         for i, (conf_freq, conf_nrg) in enumerate(zip(freqs, single_points)):
-            # for j, freq1 in enumerate(conf_freq):
-            #     for k, freq2 in enumerate(conf_freq[:j]):
-            #         rmsd = freq1.geometry.RMSD(freq2.geometry, sort=True)
-            #         if rmsd < 1e-2:
-            #             s = "%s and %s appear to be duplicate structures " % (
-            #                     freq1.geometry.name, freq2.geometry.name
-            #                 )
-            #             self.session.logger.warning(s)
             weights = CompOutput.boltzmann_weights(
                 conf_freq,
                 nrg_cos=conf_nrg,
@@ -1152,24 +1158,48 @@ class NMRSpectrum(ToolInstance):
                 data_attr=data_attr,
             )
             mixed_nmrs.append(conf_mixed)
+            for (j, nmr, color, style, name) in shown_confs[i]:
+                new_data = []
+                for shift in nmr.data:
+                    new_data.append(Shift(
+                        shift.shift,
+                        intensity=shift.intensity * weights[j],
+                        element=shift.element,
+                        ndx=shift.ndx + offset,
+                    ))
+                new_coupling = {}
+                for k in nmr.coupling:
+                    new_coupling[k + offset] = {m + offset: couple for m, couple in nmr.coupling[k].items()}
+                new_nmr = NMR(new_data, n_atoms=nmr.n_atoms, coupling=new_coupling)
+                show_components.append([new_nmr, color, style, name])
+        
+            offset += nmrs[i][0].n_atoms
 
         data = []
         coupling = {}
         offset = 0
         for i, (mol_frac, nmr) in enumerate(zip(mol_fracs, mixed_nmrs)):
-            data.extend([
+            new_data = [
                 Shift(
                     shift.shift,
                     intensity=(mol_frac * shift.intensity),
                     element=shift.element,
-                    ndx=i + shift.ndx,
+                    ndx=offset + shift.ndx,
                 ) for shift in nmr.data
-            ])
-            for i in nmr.coupling:
-                coupling[i + offset] = {}
-                for j in nmr.coupling[i]:
-                    coupling[i + offset][j + offset] = nmr.coupling[i][j]
-            offset += max(shift.ndx for shift in nmr.data) + 1
+            ]
+            data.extend(new_data)
+            for k in nmr.coupling:
+                coupling[k + offset] = {}
+                for j in nmr.coupling[k]:
+                    coupling[k + offset][j + offset] = nmr.coupling[k][j]
+            
+            offset += nmr.n_atoms
+            
+            if shown_mols[i]:
+                mol_nmr = NMR(new_data)
+                mol_nmr.coupling = coupling
+                show_components.append([mol_nmr, *shown_mols[i]])
+
         final_mixed = NMR(data)
         final_mixed.coupling = coupling
         
@@ -1574,9 +1604,9 @@ class EquivalentNuclei(QWidget):
 
     def get_equivalent_nuclei(self):
         groups = []
+        offset = 0
         for i in range(0, self.tabs.count()):
             rank_labels = dict()
-            offset = len(groups)
             tab = self.tabs.widget(i)
             layout = tab.layout()
             table = layout.itemAt(2).widget()
@@ -1589,6 +1619,8 @@ class EquivalentNuclei(QWidget):
                     groups.append([])
                 groups[rank_labels[label]].append(ndx - 1 + offset)
 
+            offset += table.rowCount()
+
         return groups
 
     def get_graph(self):
@@ -1598,6 +1630,7 @@ class EquivalentNuclei(QWidget):
             ndx = {a: i + offset for i, a in enumerate(geom.atoms)}
             for a in geom.atoms:
                 graph.append([ndx[b] for b in a.connected])
+            offset += len(geom.atoms)
         
         return graph
 

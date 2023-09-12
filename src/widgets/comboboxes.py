@@ -170,3 +170,9 @@ class FilereaderComboBox(QComboBox):
         
         return super().deleteLater(*args, **kwargs)
     
+    def destroy(self, *args, **kwargs):
+        self._session.filereader_manager.triggers.remove_handler(self._add_handler)
+        self._session.filereader_manager.triggers.remove_handler(self._del_handler)
+        
+        return super().destroy(*args, **kwargs)
+    
