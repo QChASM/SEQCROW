@@ -97,6 +97,13 @@ class EnergyPlot(ToolInstance):
             self.delete()
             return
 
+        try:
+            y_units = filereader["y_units"]
+            self.energy_widgets[1].setCurrentIndex(y_units)
+            self.switch_units(delete_unit_selector=False)
+        except KeyError:
+            pass
+
         self.press = None
         self.drag_prev = None
         self.dragging = False
@@ -325,16 +332,18 @@ class EnergyPlot(ToolInstance):
 
         self.opened = True
 
-    def switch_units(self):
+    def switch_units(self, delete_unit_selector=True):
         major, minor, conversion, abbr_type, data_type = self.energy_widgets[1].currentData(role=Qt.UserRole)
+        self.filereader["y_units"] = self.energy_widgets[1].currentIndex()
         self.major_unit = major
         self.minor_unit = minor
         self.minor_conversion = conversion
         self.unit_type = data_type
         self.abbreviated_type = abbr_type
         self.ylabel = "%s (%s)" % (self.unit_type, self.major_unit)
-        for widget in self.energy_widgets:
-            widget.deleteLater()
+        if delete_unit_selector:
+            for widget in self.energy_widgets:
+                widget.deleteLater()
         ax = self.figure.gca()
         ax.set_ylabel(self.ylabel)
         self.canvas.draw()
