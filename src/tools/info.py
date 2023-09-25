@@ -357,6 +357,9 @@ class Info(ToolInstance):
             if info == "archive" and not self.settings.archive:
                 continue
 
+            if info == "name":
+                continue
+
             if any(isinstance(fr[info], obj) for obj in [str, float, int]):
                 row = self.table.rowCount()
                 self.table.insertRow(row)
@@ -498,7 +501,7 @@ class Info(ToolInstance):
                 self.add_copy_button(row)
 
         # show spectra data
-        for signal_data in ["frequency", "uv_vis"]:
+        for signal_data in ["frequency", "uv_vis", "nmr"]:
             if signal_data not in fr.keys():
                 continue
             for data_type in fr[signal_data].__dict__.keys():
@@ -620,6 +623,8 @@ class Info(ToolInstance):
                 return "transient excitations"
             if data_type == "spin_orbit_data":
                 return "SOC excitations"
+        if signal_type == "nmr":
+            return "NMR shifts"
         return data_type
     
     def header_map(self, attribute_type):

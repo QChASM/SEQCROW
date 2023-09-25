@@ -1,6 +1,7 @@
 
 def open_aarontools(session, stream, file_name, format_name=None, coordsets=None):
     from AaronTools.fileIO import FileReader
+    from AaronTools.theory.job_types import suggested_fix
     from AaronTools.utils.utils import get_filename
     from SEQCROW.residue_collection import ResidueCollection
     from SEQCROW.managers import ADD_FILEREADER
@@ -62,6 +63,9 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
         session.logger.warning("error or warning in %s:\n %s" % (
             file_name, fr["error_msg"]
         ))
+        fix = suggested_fix(fr["error"])
+        if fix:
+            session.logger.warning("possible hint: %s" % fix)
     except KeyError:
         pass
 
@@ -115,9 +119,6 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
         return [], "SEQCROW failed to open %s" % file_name
 
     structure = geom.get_chimera(session, coordsets=bool(fr.all_geom), filereader=fr)
-    #associate the AaronTools FileReader with each structure
-    session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([structure], [fr]))
-
 
     if fr.all_geom and "energy" in fr.other and coordsets is not False:
         try:
@@ -177,6 +178,10 @@ def get_structure(session, elements, coordinates, name, comment, bonded_threshol
     struc = AtomicStructure(session)
     struc.name = name
     struc.comment = comment
+    struc.filereaders = [{
+        "name": name,
+        "comment": comment,
+    }]
     res = struc.new_residue("UNK", "a", 1)
     ele_counts = dict()
     radii = np.vectorize(lambda x: RADII.get(x, 0))(elements)
@@ -340,9 +345,6 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
         return [], "failed"
     
     if maxModels is not None:
-        session.filereader_manager.triggers.activate_trigger(
-            ADD_FILEREADER, (structures, [fr for s in structures])
-        )
         return structures, "opened %i structures from %s" % (len(structures), file_name)
     
     if not all(len(ele_set) == len(ele_sets[0]) for ele_set in ele_sets):
@@ -350,9 +352,6 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
             get_structure(session, eles, coords, name, name) for (eles, coords, name) in
             zip(ele_sets, all_coordsets, comments)
         ]
-        session.filereader_manager.triggers.activate_trigger(
-            ADD_FILEREADER, (structures, [fr for s in structures])
-        )
         for struc in structures:
             struc.filename = file_name
         return structures, "opened %i structures from %s" % (len(structures), file_name)
@@ -361,12 +360,16 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
     struc = get_structure(session, ele_sets[-1], all_coordsets[-1], name, comment)
     all_coordsets = np.array(all_coordsets)
     struc.add_coordsets(np.array(all_coordsets), replace=True)
-    session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([struc], [fr]))
     status = "opened %s as an XYZ coordinate file" % file_name
     struc.active_coordset_id = struc.num_coordsets
     struc.filereaders.append(fr)
     if len(all_coordsets) > 1:
         fr["all_geom"] = all_coordsets
+        if (
+            "multiframe .xyz" in session.seqcrow_settings.settings.XYZ_OPEN
+            and coordsets is None
+        ):
+            coordsets = True
         if coordsets:
             from chimerax.std_commands.coordset_gui import CoordinateSetSlider
             status += " movie"
@@ -492,7 +495,6 @@ def open_nbo(session, path, file_name, format_name=None, orbitals=None):
 
     structure = geom.get_chimera(session, filereader=fr)
     #associate the AaronTools FileReader with each structure
-    session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([structure], [fr]))
 
     status = "Opened %s as an %s" % (file_name, format_name)
 

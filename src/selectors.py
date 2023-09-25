@@ -578,7 +578,7 @@ def canonical_rank(structure, heavy_only=False, break_ties=True):
         new_rank += len(idx_list)
 
     # re-rank using neighbors until no change
-    for i in range(0, min(500, len(ranks))):
+    for i in range(0, len(ranks)):
         new_ranks = neighbors_rank(ranks)
         if ranks == new_ranks:
             break
@@ -589,7 +589,7 @@ def canonical_rank(structure, heavy_only=False, break_ties=True):
     # break ties using spatial positions
     # AND update neighbors until no change
     if break_ties:
-        for i in range(0, min(500, len(ranks))):
+        for i in range(0, len(ranks)):
             new_ranks = tie_break(ranks)
             new_ranks = neighbors_rank(new_ranks)
             if ranks == new_ranks:

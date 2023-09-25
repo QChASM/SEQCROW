@@ -194,6 +194,7 @@ class BuildRaven(BuildQM, ToolInstance):
 
         basics_form = QWidget()
         form_layout = QFormLayout(basics_form)
+        form_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         self.tss_algorithm = QComboBox()
         self.tss_algorithm.addItems(
@@ -1023,6 +1024,7 @@ class TSSWidget(QWidget):
         
         job_form = QWidget()
         job_type_layout = QFormLayout(job_form)
+        job_type_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
 
         self.charge = QSpinBox()
@@ -1080,6 +1082,7 @@ class TSSWidget(QWidget):
 
         algorithm_widget = QWidget()
         self.algorithm_layout = QFormLayout(algorithm_widget)
+        self.algorithm_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         self.tabs.addTab(algorithm_widget, "algorithm options")
         self.options = dict()
@@ -1088,7 +1091,8 @@ class TSSWidget(QWidget):
 
         solvent_widget = QWidget()
         solvent_layout = QFormLayout(solvent_widget)
-        
+        solvent_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+
         self.solvent_option = QComboBox()
         self.solvent_option.currentTextChanged.connect(self.change_solvent_model)
         solvent_layout.addRow("implicit solvent model:", self.solvent_option)

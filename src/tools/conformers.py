@@ -179,6 +179,7 @@ class ConformerTool(BuildQM):
 
         basics_form = QWidget()
         form_layout = QFormLayout(basics_form)
+        form_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         self.file_type = QComboBox()
         self.file_type.addItems(self.manager.formats.keys())
@@ -388,6 +389,7 @@ class ConformerJob(JobTypeOption):
         
         job_form = QWidget()
         job_type_layout = QFormLayout(job_form)
+        job_type_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
 
         self.charge = QSpinBox()
@@ -447,6 +449,7 @@ class ConformerJob(JobTypeOption):
         # algorithm-specific options
         algorithm_widget = QWidget()
         self.algorithm_layout = QFormLayout(algorithm_widget)
+        self.algorithm_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         self.tabs.addTab(algorithm_widget, "algorithm options")
         self.options = dict()
@@ -458,6 +461,7 @@ class ConformerJob(JobTypeOption):
 
         solvent_form = QWidget()
         solvent_form_layout = QFormLayout(solvent_form)
+        solvent_form_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         self.solvent_option = QComboBox()
         self.solvent_option.currentTextChanged.connect(self.change_solvent_model)

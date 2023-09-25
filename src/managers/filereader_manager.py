@@ -37,22 +37,30 @@ class FileReaderManager(ProviderManager):
 
     def trigger_fr_add(self, trigger_name, models):
         """FILEREADER_ADDED should not get triggered until the model is loaded"""
-        filereaders = []
-        for fr, mdl in zip(self.waiting_filereaders, self.waiting_models):
-            if mdl in models:
-                filereaders.append(fr)
+        models_and_filereaders = []
+        for model in models:
+            filereaders = []
+            try:
+                filereaders.extend([fr for fr in model.filereaders if fr])
+            except (IndexError, AttributeError):
+                pass
+            if filereaders:
+                models_and_filereaders.append((model, filereaders))
         
-        if len(filereaders) > 0:
-            self.triggers.activate_trigger(FILEREADER_ADDED, filereaders)
+        if len(models_and_filereaders) > 0:
+            self.triggers.activate_trigger(
+                FILEREADER_ADDED, models_and_filereaders
+            )
 
     def apply_preset(self, trigger_name, models):
         """if a graphical preset is set in SEQCROW settings, apply that preset to models"""
         for model in models:
-            if model in self.models:
-                if not model.session:
-                    continue
-                if model.session.ui.is_gui:
+            if model.session.ui.is_gui:
+                try:
+                    model.filereaders[-1]
                     apply_seqcrow_preset(model)
+                except (AttributeError, IndexError):
+                    pass
 
     def add_filereader(self, trigger_name, models_and_filereaders):
         """add models with filereader data to our list"""
@@ -84,16 +92,10 @@ class FileReaderManager(ProviderManager):
         """remove models with filereader data from our list when they are closed"""
         removed_frs = []
         for model in models:
-            while model in self.models:
-                ndx = self.models.index(model)
-                removed_frs.append(self.filereaders.pop(ndx))
-                self.models.remove(model)
-            if hasattr(model, "filereaders") and model.filereaders:
-                for fr in model.filereaders:
-                    for (key, attr) in list(fr.items()):
-                        del fr[key]
-                        del attr
-                    del fr
+            try:
+                removed_frs.extend(model.filereaders)
+            except AttributeError:
+                pass
         
         if len(removed_frs) > 0:
             self.triggers.activate_trigger(FILEREADER_REMOVED, removed_frs)
@@ -111,7 +113,6 @@ class FileReaderManager(ProviderManager):
                     pass
                 del attr
             del fr
-
 
     def add_provider(self, bundle_info, name, **kw):
         #*buzz lightyear* ah yes, the models are models
@@ -167,6 +168,3 @@ def apply_seqcrow_preset(model, atoms=None, fallback=None):
     if "Index Labels" in preset:
         from SEQCROW.presets import indexLabel
         indexLabel(model.session, models=[model])
-
-fmt_only = re.compile("(\S*):(.*)")
-

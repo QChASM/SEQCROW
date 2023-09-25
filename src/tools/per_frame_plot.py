@@ -24,6 +24,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
 
 from matplotlib.figure import Figure
+import matplotlib.patheffects as pe
 
 from SEQCROW.widgets import FakeMenu
 from AaronTools.const import UNIT
@@ -201,7 +202,13 @@ class EnergyPlot(ToolInstance):
         self.canvas.mpl_connect('motion_notify_event', self.drag)
         self.canvas.mpl_connect('scroll_event', self.zoom)
 
-        self.annotation = ax.annotate("", xy=(0,0), xytext=(0, 10), textcoords="offset points", fontfamily='sans-serif')
+        self.annotation = ax.annotate(
+            "", xy=(0,0),
+            xytext=(0, 10),
+            textcoords="offset points",
+            fontfamily='sans-serif',
+            path_effects=[pe.withStroke(linewidth=2, foreground="white")],
+        )
         self.annotation.set_visible(False)
 
         ax.autoscale()

@@ -107,8 +107,12 @@ class FilereaderComboBox(QComboBox):
         self._session = session
         self._other = otherItems
         
-        self._add_handler = session.triggers.add_handler(ADD_MODELS, self._add_filereaders)
-        self._del_handler = session.triggers.add_handler(REMOVE_MODELS, self._del_filereaders)
+        self._add_handler = session.filereader_manager.triggers.add_handler(
+            FILEREADER_ADDED, self._add_filereaders
+        )
+        self._del_handler = session.filereader_manager.triggers.add_handler(
+            FILEREADER_REMOVED, self._del_filereaders
+        )
         
         self.setSizeAdjustPolicy(self.AdjustToMinimumContentsLengthWithIcon)
         
@@ -132,10 +136,10 @@ class FilereaderComboBox(QComboBox):
                         (fr, mdl),
                     )
 
-    def _add_filereaders(self, trigger_name, models):
-        for mdl in models:
+    def _add_filereaders(self, trigger_name, models_and_filereaders):
+        for (mdl, filereaders) in models_and_filereaders:
             try:
-                for fr in mdl.filereaders:
+                for fr in filereaders:
                     if self._other and not all(x in fr for x in self._other):
                         continue
                     if self._other is None or all(x in fr for x in self._other):
@@ -147,7 +151,7 @@ class FilereaderComboBox(QComboBox):
             except AttributeError as e:
                 pass
 
-    def _del_filereaders(self, trigger_name, models):
+    def _del_filereaders(self, trigger_name, filereaders):
         removed = True
         last_i = 0
         while removed:
@@ -155,15 +159,20 @@ class FilereaderComboBox(QComboBox):
             for i in range(last_i, self.count()):
                 fr, mdl = self.itemData(i)
                 last_i = i
-                if mdl in models:
+                if any(fr is x for x in filereaders):
                     self.removeItem(i)
                     removed = True
                     break
 
-
     def deleteLater(self, *args, **kwargs):
-        self._session.triggers.remove_handler(self._add_handler)
-        self._session.triggers.remove_handler(self._del_handler)
+        self._session.filereader_manager.triggers.remove_handler(self._add_handler)
+        self._session.filereader_manager.triggers.remove_handler(self._del_handler)
         
         return super().deleteLater(*args, **kwargs)
+    
+    def destroy(self, *args, **kwargs):
+        self._session.filereader_manager.triggers.remove_handler(self._add_handler)
+        self._session.filereader_manager.triggers.remove_handler(self._del_handler)
+        
+        return super().destroy(*args, **kwargs)
     

@@ -316,7 +316,11 @@ class Residue(Geometry):
                 atom.serial_number = i + 1
         
         if apply_preset:
-            apply_seqcrow_preset(chix_residue.structure, atoms=[atom[1] for atom in new_atoms])
+            apply_seqcrow_preset(
+                chix_residue.structure,
+                atoms=[atom[1] for atom in new_atoms],
+                fallback="Ball-Stick-Endcap",
+            )
 
     def refresh_chix_connected(self, chix_residue):
         known_bonds = []
@@ -450,7 +454,7 @@ class ResidueCollection(Geometry):
                 self.residues.append(new_res)
                 
                 all_atoms.extend(new_res.atoms)
-            
+
             refresh_ranks = False
             if "refresh_ranks" in kwargs:
                 refresh_ranks = kwargs.pop("refresh_ranks")
@@ -488,6 +492,10 @@ class ResidueCollection(Geometry):
                     aaron_atom2 = self.find(AtomSpec(atom2.atomspec))[0]
                     aaron_atom1.connected.add(aaron_atom2)
                     aaron_atom2.connected.add(aaron_atom1)
+            
+            if use_scene:
+                pos = molecule.session.main_view.camera.get_position().inverse()
+                self.coords = pos * self.coords
 
         else:
             #assume whatever we got is something AaronTools can turn into a Geometry
@@ -972,13 +980,6 @@ class ResidueCollection(Geometry):
     def get_chimera(self, session, coordsets=False, filereader=None, discard_residues=False):
         """returns a chimerax equivalent of self"""
         struc = AtomicStructure(session, name=self.name)
-        if not any(attr[0] == "filereader" for attr in struc.custom_attrs):
-            struc.register_attr(
-                session,
-                "filereaders",
-                "FileReader",
-                attr_type=list,
-            )
         if filereader is not None:
             struc.filereaders = [{key: filereader[key] for key in filereader.keys()}]
         struc.comment = self.comment
@@ -1002,8 +1003,8 @@ class ResidueCollection(Geometry):
                 if mode.frequency < 0:
                     max_disp = max(np.linalg.norm(x) for x in mode.vector)
                     cur_coords = self.coords
-                    coord_forward = self.coords + (0.2 / max_disp) * mode.vector
-                    coord_reverse = self.coords - (0.2 / max_disp) * mode.vector
+                    coord_forward = self.coords + (0.4 / max_disp) * mode.vector
+                    coord_reverse = self.coords - (0.4 / max_disp) * mode.vector
                     forward_connectivity = np.zeros((len(self.atoms), len(self.atoms)))
                     reverse_connectivity = np.zeros((len(self.atoms), len(self.atoms)))
                     self.update_geometry(coord_forward)
@@ -1011,16 +1012,16 @@ class ResidueCollection(Geometry):
                     for i, atom1 in enumerate(self.atoms):
                         for j, atom2 in enumerate(self.atoms[:i]):
                             if atom1 in atom2.connected:
-                                forward_connectivity[i,j] = 1
-                                forward_connectivity[j,i] = 1
+                                forward_connectivity[i, j] = 1
+                                forward_connectivity[j, i] = 1
                     
                     self.update_geometry(coord_reverse)
                     self.refresh_connected()
                     for i, atom1 in enumerate(self.atoms):
                         for j, atom2 in enumerate(self.atoms[:i]):
                             if atom1 in atom2.connected:
-                                reverse_connectivity[i,j] = 1
-                                reverse_connectivity[j,i] = 1
+                                reverse_connectivity[i, j] = 1
+                                reverse_connectivity[j, i] = 1
                     
                     changes = forward_connectivity - reverse_connectivity
                     for i, atom1 in enumerate(self.atoms):
@@ -1037,84 +1038,23 @@ class ResidueCollection(Geometry):
             for atom, charge in zip(struc.atoms, filereader.other["Löwdin Charges"]):
                 atom.loewdinCharge = charge
                 atom.charge = charge
-            
-                if not any(attr[0] == "loewdinCharge" for attr in atom.custom_attrs):
-                    atom.register_attr(
-                        session,
-                        "loewdinCharge",
-                        "seqcrow ResidueCollection.get_chimera",
-                        attr_type=float
-                    )
-                if not any(attr[0] == "charge" for attr in atom.custom_attrs):
-                    atom.register_attr(
-                        session,
-                        "charge",
-                        "seqcrow ResidueCollection.get_chimera",
-                        attr_type=float
-                    )
-        
+
         if filereader is not None and "Mulliken Charges" in filereader.other:
             for atom, charge in zip(struc.atoms, filereader.other["Mulliken Charges"]):
                 atom.mullikenCharge = charge
                 atom.charge = charge
-            
-                if not any(attr[0] == "mullikenCharge" for attr in atom.custom_attrs):
-                    atom.register_attr(
-                        session,
-                        "mullikenCharge",
-                        "seqcrow ResidueCollection.get_chimera",
-                        attr_type=float
-                    )
-                if not any(attr[0] == "charge" for attr in atom.custom_attrs):
-                    atom.register_attr(
-                        session,
-                        "charge",
-                        "seqcrow ResidueCollection.get_chimera",
-                        attr_type=float
-                    )
 
         if filereader is not None and "NPA Charges" in filereader.other:
             for atom, charge in zip(struc.atoms, filereader.other["NPA Charges"]):
                 atom.npaCharge = charge
                 atom.charge = charge
-            
-                if not any(attr[0] == "npaCharge" for attr in atom.custom_attrs):
-                    atom.register_attr(
-                        session,
-                        "npaCharge",
-                        "seqcrow ResidueCollection.get_chimera",
-                        attr_type=float
-                    )
-                if not any(attr[0] == "charge" for attr in atom.custom_attrs):
-                    atom.register_attr(
-                        session,
-                        "charge",
-                        "seqcrow ResidueCollection.get_chimera",
-                        attr_type=float
-                    )
 
         if filereader is not None and "Nuclear ZEff" in filereader.other:
             for atom, zeff in zip(struc.atoms, filereader.other["Nuclear ZEff"]):
                 atom.Zeff = zeff
-            
-                if not any(attr[0] == "Zeff" for attr in atom.custom_attrs):
-                    atom.register_attr(
-                        session,
-                        "Zeff",
-                        "seqcrow ResidueCollection.get_chimera",
-                        attr_type=float
-                    )
 
         if filereader is not None and "Nuclear spins" in filereader.other:
             for atom, spin in zip(struc.atoms, filereader.other["Nuclear spins"]):
                 atom.nuclearSpin = spin
-            
-                if not any(attr[0] == "nuclearSpin" for attr in atom.custom_attrs):
-                    atom.register_attr(
-                        session,
-                        "nuclearSpin",
-                        "seqcrow ResidueCollection.get_chimera",
-                        attr_type=int
-                    )
 
         return struc

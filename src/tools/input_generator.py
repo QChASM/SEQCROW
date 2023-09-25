@@ -223,6 +223,7 @@ class BuildQM(ToolInstance):
         
         basics_form = QWidget()
         form_layout = QFormLayout(basics_form)
+        form_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         self.file_type = QComboBox()
         self.file_type.addItems(self.manager.formats.keys())
@@ -674,16 +675,22 @@ class BuildQM(ToolInstance):
         if "use_job_type" in preset and preset["use_job_type"]:
             self.job_widget.do_geom_opt.setChecked(False)
             self.job_widget.do_freq.setChecked(False)
+            self.job_widget.do_nmr.setChecked(False)
             if theory.job_type:
                 for job in theory.job_type:
                     if isinstance(job, OptimizationJob):
-                        self.job_widget.do_geom_opt.setChecked(True)
-                        self.job_widget.ts_opt.setChecked(job.transition_state)
+                        self.job_widget.setGeometryOptimization(True)
+                        self.job_widget.setTSOptimization(job.transition_state)
             
                     elif isinstance(job, FrequencyJob):
                         self.job_widget.do_freq.setChecked(True)
                         self.job_widget.temp.setValue(job.temperature)
                         self.job_widget.num_freq.setChecked(job.numerical)
+
+                    elif isinstance(job, NMRJob):
+                        self.job_widget.setNMR(True)
+                        self.job_widget.setNMRElements(job.atoms)
+                        self.job_widget.setNMRCoupling(bool(job.coupling_type))
 
             if 'raman' in preset:
                 self.job_widget.raman.setChecked(preset['raman'])
@@ -1414,7 +1421,7 @@ class JobTypeOption(QWidget):
         )
 
         checkbox_layout.insertWidget(
-            4, QLabel("nmr:"), stretch=1, alignment=Qt.AlignRight | Qt.AlignVCenter
+            4, QLabel("NMR:"), stretch=1, alignment=Qt.AlignRight | Qt.AlignVCenter
         )
         self.do_nmr = QCheckBox()
         checkbox_layout.insertWidget(
@@ -1430,6 +1437,7 @@ class JobTypeOption(QWidget):
         runtime_outer_shell_layout = QGridLayout(self.runtime)
         runtime_form = QWidget()
         runtime_layout = QFormLayout(runtime_form)
+        runtime_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         margins = runtime_layout.contentsMargins()
         new_margins = (margins.left(), 0, margins.right(), 0)
         runtime_layout.setContentsMargins(*new_margins)
@@ -1494,6 +1502,7 @@ class JobTypeOption(QWidget):
 
         solvent_form = QWidget()
         solvent_form_layout = QFormLayout(solvent_form)
+        solvent_form_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         self.solvent_option = QComboBox()
         self.solvent_option.currentTextChanged.connect(self.change_solvent_model)
@@ -1523,6 +1532,7 @@ class JobTypeOption(QWidget):
         geom_opt_layout.setContentsMargins(0, 0, 0, 0)
         geom_opt_form_widget = QWidget()
         geom_opt_form = QFormLayout(geom_opt_form_widget)
+        geom_opt_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         self.opt_type = QComboBox()
         self.opt_type.addItems(["local minimum", "constrained", "transition state"])
@@ -1626,6 +1636,7 @@ class JobTypeOption(QWidget):
 
         self.freq_opt = QWidget()
         freq_opt_form = QFormLayout(self.freq_opt)
+        freq_opt_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         self.temp = QDoubleSpinBox()
         self.temp.setRange(0, 10000)
@@ -1658,7 +1669,8 @@ class JobTypeOption(QWidget):
         
         self.nmr_opt = QWidget()
         nmr_layout = QFormLayout(self.nmr_opt)
-        
+        nmr_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+
         self.spin_coupling = QCheckBox()
         self.spin_coupling.setChecked(self.settings.last_spin_coupling)
         nmr_layout.addRow("spin-spin coupling:", self.spin_coupling)
@@ -1666,7 +1678,7 @@ class JobTypeOption(QWidget):
         self.nmr_elements = QHBoxLayout()
         nmr_layout.addRow("select elements:", self.nmr_elements)
 
-        self.job_type_opts.addTab(self.nmr_opt, "nmr settings")
+        self.job_type_opts.addTab(self.nmr_opt, "NMR settings")
 
         self.job_type_opts.tabBarDoubleClicked.connect(self.tab_dble_click)
 
@@ -1779,7 +1791,7 @@ class JobTypeOption(QWidget):
         if Qt.CheckState(state) == Qt.Checked:
             self.job_type_opts.setCurrentIndex(3)
             if self.form.single_job_type:
-                for x in [self.do_opt, self.do_nmr]:
+                for x in [self.do_geom_opt, self.do_nmr]:
                     x.blockSignals(True)
                     x.setCheckState(Qt.Unchecked)
                     x.blockSignals(False)
@@ -1791,7 +1803,7 @@ class JobTypeOption(QWidget):
         if Qt.CheckState(state) == Qt.Checked:
             self.job_type_opts.setCurrentIndex(4)
             if self.form.single_job_type:
-                for x in [self.do_freq, self.do_opt]:
+                for x in [self.do_freq, self.do_geom_opt]:
                     x.blockSignals(True)
                     x.setCheckState(Qt.Unchecked)
                     x.blockSignals(False)
@@ -2118,7 +2130,11 @@ class JobTypeOption(QWidget):
     def setTSOptimization(self, value):
         """sets job type to ts opt"""
         ndx = self.opt_type.findText("transition state")
-        self.opt_type.setCurrentIndex(ndx)
+        if value:
+            self.do_geom_opt.setChecked(value)
+            self.opt_type.setCurrentIndex(ndx)
+        elif ndx == self.opt_type.currentIndex():
+            self.opt_type.setCurrentIndex(0)
 
     def setFrequencyCalculation(self, value):
         """sets job type to freq"""
@@ -2153,6 +2169,22 @@ class JobTypeOption(QWidget):
     def getNMR(self):
         """returns whether the job is NMR"""
         return self.do_nmr.checkState() == Qt.Checked
+
+    def setNMR(self, value):
+        self.do_nmr.setChecked(value)
+
+    def setNMRCoupling(self, value):
+        self.spin_coupling.setChecked(value)
+
+    def setNMRElements(self, elements):
+        for i in range(0, self.nmr_elements.count()):
+            button = self.nmr_elements.itemAt(i).widget()
+            if button is None:
+                continue
+            if button.text() in elements:
+                button.setState(ElementButton.Checked)
+            else:
+                button.setState(ElementButton.Unchecked)
 
     def getJobs(self):
         """returns list(JobType) for the current jobs"""
@@ -2629,6 +2661,7 @@ class JobTypeOption(QWidget):
             self.settings.last_freq = self.do_freq.checkState() == Qt.Checked
             self.settings.last_num_freq = self.num_freq.checkState() == Qt.Checked
             self.settings.last_raman = self.raman.checkState() == Qt.Checked
+            self.settings.last_nmr = self.do_nmr.checkState() == Qt.Checked
 
         return self.form.get_job_kw_dict(
             self.do_geom_opt.checkState() == Qt.Checked,
@@ -2851,6 +2884,7 @@ class MethodOption(QWidget):
 
         method_form = QWidget()
         func_form_layout = QFormLayout(method_form)
+        func_form_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         margins = func_form_layout.contentsMargins()
         new_margins = (margins.left(), margins.top(), margins.right(), 0)
         func_form_layout.setContentsMargins(*new_margins)
@@ -2878,6 +2912,7 @@ class MethodOption(QWidget):
 
         sapt_widget = QWidget()
         sapt_layout = QFormLayout(sapt_widget)
+        sapt_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         sapt_layout.setContentsMargins(0, 0, 0, 0)
 
         self.sapt_type = QComboBox()
@@ -2926,6 +2961,7 @@ class MethodOption(QWidget):
 
         dft_form = QWidget()
         disp_form_layout = QFormLayout(dft_form)
+        disp_form_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         margins = disp_form_layout.contentsMargins()
         new_margins = (margins.left(), 0, margins.right(), 0)
         disp_form_layout.setContentsMargins(*new_margins)
@@ -3224,7 +3260,10 @@ class MethodOption(QWidget):
         if dispersion is None:
             ndx = self.dispersion.findText("None")
         else:
-            ndx = self.dispersion.findText(dispersion)
+            try:
+                ndx = self.dispersion.findText(dispersion)
+            except TypeError:
+                ndx = self.dispersion.findText(dispersion.name)
 
         self.dispersion.setCurrentIndex(ndx)
 
@@ -3359,6 +3398,7 @@ class BasisOption(QWidget):
 
         self.basis_names = QWidget()
         self.basis_name_options = QFormLayout(self.basis_names)
+        self.basis_name_options.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         self.basis_name_options.setContentsMargins(0, 0, 0, 0)
 
         self.basis_option = QComboBox()
@@ -5386,6 +5426,7 @@ class KeywordOptions(QWidget):
 
         position_widget = QWidget()
         position_widget_layout = QFormLayout(position_widget)
+        position_widget_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         position_selector = QComboBox()
         position_selector.addItems([x for x in self.items.keys()])
         position_widget_layout.addRow("position:", position_selector)
@@ -5757,6 +5798,7 @@ class SavePreset(ChildToolWindow):
     def _build_ui(self):
 
         layout = QFormLayout()
+        layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         layout.addRow(QLabel("select what to save in the preset and enter a name"))
 
@@ -5877,10 +5919,6 @@ class SavePreset(ChildToolWindow):
 
         self.status.showMessage("saved \"%s\"" % name)
 
-        #sometimes destroy causes an error
-        #I haven't seen any pattern
-        #self.destroy()
-
     def cleanup(self):
         self.tool_instance.preset_window = None
 
@@ -5980,6 +6018,7 @@ class PrepLocalJob(ChildToolWindow):
 
     def _build_ui(self):
         layout = QFormLayout()
+        layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         self.auto_update = QComboBox()
         self.auto_update.addItems(['do nothing', 'open structure', 'change model'])
@@ -5989,6 +6028,7 @@ class PrepLocalJob(ChildToolWindow):
 
         self.options_widget = QGroupBox("")
         self.options_layout = QFormLayout(self.options_widget)
+        self.options_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         layout.addRow(self.options_widget)
         self.options = dict()
 
@@ -6092,16 +6132,19 @@ class PrepClusterJob(ChildToolWindow):
     
     def _build_ui(self):
         layout = QFormLayout()
+        layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         tabs = QTabWidget()
         layout.addRow(tabs)
 
         basic_options = QWidget()
         basic_layout = QFormLayout(basic_options)
+        basic_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         tabs.addTab(basic_options, "standard options")
 
         more_options = QWidget()
         more_layout = QFormLayout(more_options)
+        more_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         tabs.addTab(more_options, "additional options")
 
         template_options = QGroupBox("execution instructions")
@@ -6134,6 +6177,7 @@ class PrepClusterJob(ChildToolWindow):
 
         resource_options = QGroupBox("requested resources")
         resource_layout = QFormLayout(resource_options)
+        resource_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         basic_layout.addRow(resource_options)
         
         self.memory = QSpinBox()
@@ -6169,6 +6213,7 @@ class PrepClusterJob(ChildToolWindow):
 
         kwarg_options = QGroupBox("other variables")
         kwarg_layout = QFormLayout(kwarg_options)
+        kwarg_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         more_layout.addRow(kwarg_options)
 
         previous_options = loads(self.tool_instance.settings.queue_kwargs)
@@ -6410,7 +6455,8 @@ class ExportPreset(ChildToolWindow):
                 preset_item.setCheckState(1, Qt.Unchecked)
 
     def save_presets(self):
-        filename, _ = QFileDialog.getSaveFileName(filter="JSON files (*.json);;INI files (*.ini)")
+        filename, _ = QFileDialog.getSaveFileName(filter="JSON files (*.json)")
+        # filename, _ = QFileDialog.getSaveFileName(filter="JSON files (*.json);;INI files (*.ini)")
         if not filename:
             return
 
@@ -6469,7 +6515,12 @@ class ExportPreset(ChildToolWindow):
                 job_type += "frequencies"
                 config.set(section, "temperature", str(preset["temp"]))
 
-            if preset["freq"] or preset["opt"]:
+            if preset["nmr"]:
+                if job_type:
+                    job_type += ", "
+                job_type += "nmr"
+
+            if preset["freq"] or preset["opt"] or preset["nmr"]:
                 config.set(section, "type", job_type)
 
         if "nproc" in preset:
@@ -6595,6 +6646,7 @@ class NewTemplate(ChildToolWindow):
 
     def _build_ui(self):
         layout = QFormLayout()
+        layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         self.contents = QTextEdit()
         font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
