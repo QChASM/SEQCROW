@@ -364,6 +364,7 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
     session.filereader_manager.triggers.activate_trigger(ADD_FILEREADER, ([struc], [fr]))
     status = "opened %s as an XYZ coordinate file" % file_name
     struc.active_coordset_id = struc.num_coordsets
+    struc.filereaders.append(fr)
     if len(all_coordsets) > 1:
         fr["all_geom"] = all_coordsets
         if coordsets:
