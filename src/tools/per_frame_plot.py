@@ -368,9 +368,9 @@ class EnergyPlot(ToolInstance):
 
     def circle_current_cs(self):
         ax = self.figure.gca()
-        for line in ax.lines:
+        for i, line in enumerate(ax.lines):
             if line.get_label() == "current_cs":
-                ax.lines.remove(line)
+                ax.lines[i].remove()
                 break
         
         cs_id = self.structure.active_coordset_id
@@ -515,9 +515,9 @@ class EnergyPlot(ToolInstance):
     
     def update_hover(self, cs_id, ndx):  
         ax = self.figure.gca()
-        for line in ax.lines:
+        for i, line in enumerate(ax.lines):
             if line.get_label() == "hover":
-                ax.lines.remove(line)
+                ax.lines[i].remove()
                 break
         
         ax.plot(
@@ -570,9 +570,9 @@ class EnergyPlot(ToolInstance):
                 if vis:
                     self.annotation.set_visible(False)
                     ax = self.figure.gca()
-                    for line in ax.lines:
+                    for i, line in enumerate(ax.lines):
                         if line.get_label() == "hover":
-                            ax.lines.remove(line)
+                            ax.lines[i].remove()
                             break
                     self.canvas.draw()
             return
