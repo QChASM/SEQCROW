@@ -364,6 +364,7 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
     struc.active_coordset_id = struc.num_coordsets
     if len(all_coordsets) > 1:
         fr["all_geom"] = all_coordsets
+        struc.filereaders[-1]["all_geom"] = fr["all_geom"]
         if (
             "multiframe .xyz" in session.seqcrow_settings.settings.XYZ_OPEN
             and coordsets is None
@@ -393,6 +394,8 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
                 )
                 if not nrg_plot.opened:
                     nrg_plot.delete()
+                else:
+                    struc.filereaders[0]["y_data"] = data
             except Exception as e:
                 session.logger.warning(repr(e))
 
