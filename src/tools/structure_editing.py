@@ -37,6 +37,7 @@ class _EditStructureSettings(Settings):
         'use_greek': Value(False, BoolArg),
         'new_residue': Value(False, BoolArg),
         'minimize_ring': Value(False, BoolArg),
+        'minimize_ligand': Value(False, BoolArg),
     }
 
 
@@ -165,21 +166,27 @@ class EditStructure(ToolInstance):
         self.close_previous_lig.stateChanged.connect(self.close_previous_change)
         maplig_layout.addWidget(self.close_previous_lig, 1, 1, 1, 2, Qt.AlignTop)
 
+        self.minimize_ligand = QCheckBox()
+        self.minimize_ligand.setChecked(self.settings.minimize_ligand)
+        maplig_layout.addWidget(QLabel("relax new ligands"), 2, 0, 1, 1, Qt.AlignVCenter)
+        maplig_layout.addWidget(self.minimize_ligand, 2, 1, 1, 2, Qt.AlignTop)
+
         maplig_button = QPushButton("swap ligand with selected coordinating atoms")
         maplig_button.clicked.connect(self.do_maplig)
-        maplig_layout.addWidget(maplig_button, 2, 0, 1, 3, Qt.AlignTop)
+        maplig_layout.addWidget(maplig_button, 3, 0, 1, 3, Qt.AlignTop)
         self.maplig_button = maplig_button
 
         start_structure_button = QPushButton("place in:")
         self.lig_model_selector = ModelComboBox(self.session, addNew=True)
         start_structure_button.clicked.connect(self.do_new_lig)
-        maplig_layout.addWidget(start_structure_button, 3, 0, 1, 1, Qt.AlignTop)
-        maplig_layout.addWidget(self.lig_model_selector, 3, 1, 1, 2, Qt.AlignTop)
+        maplig_layout.addWidget(start_structure_button, 4, 0, 1, 1, Qt.AlignTop)
+        maplig_layout.addWidget(self.lig_model_selector, 4, 1, 1, 2, Qt.AlignTop)
 
         maplig_layout.setRowStretch(0, 0)
         maplig_layout.setRowStretch(1, 0)
         maplig_layout.setRowStretch(2, 0)
-        maplig_layout.setRowStretch(3, 1)
+        maplig_layout.setRowStretch(3, 0)
+        maplig_layout.setRowStretch(4, 1)
         
         
         #close ring
@@ -415,9 +422,12 @@ class EditStructure(ToolInstance):
     def do_maplig(self):
         lignames = self.ligname.text()
         selection = selected_atoms(self.session)
+        minimize = self.minimize_ligand.isChecked()
+        self.settings.minimize_ligand = minimize
         
         if len(selection) < 1:
-            raise RuntimeWarning("nothing selected")
+            raise self.session.logger.error("nothing selected")
+            return
         
         models = {}
         for atom in selection:
@@ -457,7 +467,7 @@ class EditStructure(ToolInstance):
                 else:
                     raise RuntimeError("number of key atoms no not match: %i now, new ligand has %i" % (len(target), len(lig.key_atoms)))
                 
-                rescol.map_ligand(ligands, target)
+                rescol.map_ligand(ligands, target, minimize=minimize)
 
                 for center_atom in rescol.center:
                     center_atom.connected = set([])

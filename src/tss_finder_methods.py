@@ -465,7 +465,7 @@ class NEB(TSSFinder):
         "pre_optimization": (
             BooleanOption, {
                 "default": False,
-                "name": "pre-optimization",
+                "name": "pre-optimize input structures",
             },
         ),
     }
