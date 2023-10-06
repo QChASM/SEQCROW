@@ -259,16 +259,19 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
                     line = stream.readline()
                 n_atoms = int(line)
             except ValueError:
-                error_msg = get_error_msg(
-                    file_name,
-                    ele_sets,
-                    all_coordsets,
-                    eles,
-                    comments,
-                    n_atoms,
-                    comment,
-                    coord_data,
-                )
+                try:
+                    error_msg = get_error_msg(
+                        file_name,
+                        ele_sets,
+                        all_coordsets,
+                        eles,
+                        comments,
+                        n_atoms,
+                        comment,
+                        coord_data,
+                    )
+                except UnboundLocalError:
+                    error_msg = "no data read"
                 error_msg += "\nlast line read:\n"
                 error_msg += line
                 error_msg += "\n expected number of atoms here"

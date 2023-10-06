@@ -4,7 +4,7 @@ from configparser import ConfigParser
 
 from AaronTools.utils.utils import combine_dicts
 
-from chimerax.ui.options import FloatOption, Option, IntOption
+from chimerax.ui.options import FloatOption, Option, IntOption, BooleanOption
 
 from Qt.QtCore import Qt
 from Qt.QtWidgets import QComboBox
@@ -142,6 +142,7 @@ def fixup_orca_neb_theory(
     kind="standard",
     images=6,
     optimization_algorithm="BFGS",
+    pre_optimization=False,
 ):
     theory.job_type = None
     if kind == "standard":
@@ -168,6 +169,7 @@ def fixup_orca_neb_theory(
                     "product \"product.xyz\"",
                     "NImages %i" % images,
                     "Opt_Method %s" % optimization_algorithm,
+                    "PreOpt %s" % pre_optimization,
                 ],
             },
         },
@@ -459,6 +461,12 @@ class NEB(TSSFinder):
                     "VPO",
                 ],
             }
+        ),
+        "pre_optimization": (
+            BooleanOption, {
+                "default": False,
+                "name": "pre-optimization",
+            },
         ),
     }
     
