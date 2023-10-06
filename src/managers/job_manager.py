@@ -274,7 +274,7 @@ class JobManager(ProviderManager):
                     not os.path.exists(job.output_name)
                 ) or (
                     isinstance(job.output_name, dict) and
-                    not all(os.path.exists(f) for f in job.output_name.values())
+                    not all(isinstance(f, str) and os.path.exists(f) for f in job.output_name.values())
                 ) or (
                     not isinstance(job.output_name, str) and
                     hasattr(job.output_name, "__iter__") and

@@ -214,26 +214,41 @@ class LocalJob(QThread):
     def open_structure(self):
         if isinstance(self.output_name, str):
             args = ["open", "\"%s\"" % self.output_name, "format", self.format_name]
-            if self.theory.job_type and any(
-                isinstance(job, OptimizationJob) for job in self.theory.job_type
-            ):
-                args.extend(["coordsets", "true"])
+            # if self.theory.job_type and any(
+            #     isinstance(job, OptimizationJob) for job in self.theory.job_type
+            # ):
+            #     args.extend(["coordsets", "true"])
             run(self.session, " ".join(args))
         
         elif hasattr(self.output_name, "__iter__"):
             if isinstance(self.output_name, dict):
                 for fmt, path in self.output_name.items():
-                    args = [
-                        "open",
-                        "\"%s\"" % path,
-                        "format",
-                        fmt,
-                    ]
-                    if self.theory.job_type and any(
-                        isinstance(job, OptimizationJob) for job in self.theory.job_type
-                    ):
-                        args.extend(["coordsets", "true"])
-                    run(self.session, " ".join(args))
+                    if not isinstance(path, str):
+                        for f in path:
+                            args = [
+                                "open",
+                                "\"%s\"" % f,
+                                "format",
+                                fmt,
+                            ]
+                            # if self.theory.job_type and any(
+                            #     isinstance(job, OptimizationJob) for job in self.theory.job_type
+                            # ):
+                            #     args.extend(["coordsets", "true"])
+                            run(self.session, " ".join(args))
+                    
+                    else:
+                        args = [
+                            "open",
+                            "\"%s\"" % path,
+                            "format",
+                            fmt,
+                        ]
+                        # if self.theory.job_type and any(
+                        #     isinstance(job, OptimizationJob) for job in self.theory.job_type
+                        # ):
+                        #     args.extend(["coordsets", "true"])
+                        run(self.session, " ".join(args))
         
             else:
                 for file in self.output_name:
@@ -708,16 +723,14 @@ class XTBJob(LocalJob):
         self.output_name = dict()
         for f in os.listdir(self.scratch_dir):
             if f.endswith("xyz"):
-                if "xyz" in self.output_name:
-                    self.output_name["xyz"] = [
-                        self.output_name["xyz"], os.path.join(self.scratch_dir, f)
-                    ]
+                if "xyz" in self.output_name :
+                    self.output_name["xyz"].append(os.path.join(self.scratch_dir, f))
                     continue
-                self.output_name["xyz"] = os.path.join(self.scratch_dir, f)
+                self.output_name["xyz"] = [os.path.join(self.scratch_dir, f)]
             elif f.endswith("g98.out"):
                 self.output_name["log"] = os.path.join(self.scratch_dir, f)
             elif f.endswith("mol"):
-                self.output_name["mol"] = os.path.join(self.scratch_dir, f)
+                self.output_name["sdf"] = os.path.join(self.scratch_dir, f)
 
         if self.job_options.get("delete_everything_but_output_file", False):
             self.remove_extra_files()

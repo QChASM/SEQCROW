@@ -95,7 +95,7 @@ class FileReaderPanel(ToolInstance):
             item.setText(self.NAME_COL, name)
             item.setText(self.ID_COL, model.atomspec)
             
-            if any(fr["all_geom"] and len(fr["all_geom"]) > 2 for fr in filereaders):
+            if any(fr["all_geom"] is not None and len(fr["all_geom"]) > 2 for fr in filereaders):
                 item.setText(self.COORDSETS_COL, "yes")
             else:
                 item.setText(self.COORDSETS_COL, "no")
@@ -172,7 +172,12 @@ class FileReaderPanel(ToolInstance):
                 mdl = parent.data(self.NAME_COL, Qt.UserRole)
                 fr = item.data(self.NAME_COL, Qt.UserRole)
 
-            EnergyPlot(self.session, mdl, fr)
+            try:
+                y_data = fr["y_data"]
+                ylabel = "comment value"
+                EnergyPlot(self.session, mdl, fr, ylabel=ylabel, y_data=y_data)
+            except KeyError:
+                EnergyPlot(self.session, mdl, fr)
     
     def open_movie_slider(self):
         items = [item for item in self.tree.selectedItems()]
