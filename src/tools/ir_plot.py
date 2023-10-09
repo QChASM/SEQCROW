@@ -1211,10 +1211,12 @@ class IRSpectrum(ToolInstance):
         plot_type = self.plot_type.currentText()
         
         for ax in self.figure.get_axes():
-            for mode in self.highlighted_lines:
-                if mode in ax.collections:
-                    ax.collections.remove(mode)
-
+            for i, mode in enumerate(ax.collections):
+                if mode in self.highlighted_lines:
+                    self.highlighted_lines.remove(mode)
+                    ax.collections[i].remove()
+                    break
+            
             for text in ax.texts:
                 text.remove()
 

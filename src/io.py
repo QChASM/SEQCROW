@@ -237,7 +237,7 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
     
     # from cProfile import Profile
     # profile = Profile()
-    # profile.enable()
+    # profile.enable() filereaders
 
     if file_name.lower().endswith(".allxyz") and coordsets is None:
         coordsets = True
@@ -365,9 +365,10 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
     struc.add_coordsets(np.array(all_coordsets), replace=True)
     status = "opened %s as an XYZ coordinate file" % file_name
     struc.active_coordset_id = struc.num_coordsets
+    struc.filereaders[0]["all_geom"] = None
     if len(all_coordsets) > 1:
         fr["all_geom"] = all_coordsets
-        struc.filereaders[-1]["all_geom"] = fr["all_geom"]
+        struc.filereaders[0]["all_geom"] = fr["all_geom"]
         if (
             "multiframe .xyz" in session.seqcrow_settings.settings.XYZ_OPEN
             and coordsets is None
