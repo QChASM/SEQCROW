@@ -697,10 +697,9 @@ class _ModelSelector(ToolInstance):
             vsepr = "bent 3 tetrahedral"
         
         if vsepr:
-            atoms = Atom.get_shape(vsepr)
-            atoms[0].element = element
-            for atom in atoms[1:]:
-                atom.element = "H"
+            coords = Atom.get_shape(vsepr)
+            elements = [element] + (len(coords) - 1) * ["H"]
+            atoms = [Atom(ele, coords=coord) for ele, coord in zip(elements, coords)]
             if adjust_bonds:
                 # this works b/c all atoms are 1 angstrom from the center
                 # just multiply by the distance we want

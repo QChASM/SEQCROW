@@ -28,6 +28,7 @@ from AaronTools.theory import Theory
 from AaronTools.const import UNIT, PHYSICAL
 from AaronTools.spectra import Signal
 
+from SEQCROW.presets import indexLabel
 from SEQCROW.tools.normal_modes import FreqTableWidgetItem
 from SEQCROW.widgets import FakeMenu, copy_icon
 
@@ -344,7 +345,7 @@ class Info(ToolInstance):
         fr = self.file_selector.currentData()
         if fr is None:
             return
-        fr, _ = fr
+        fr, model = fr
         item = QTableWidgetItem()
         item.setData(Qt.DisplayRole, "name")
         val = QTableWidgetItem()
@@ -577,7 +578,8 @@ class Info(ToolInstance):
                             item = QTableWidgetItem()
                             item.setData(Qt.DisplayRole, fmt % getattr(signal, signal.x_attr))
                             table.setItem(row, 0, item)
-                            for j, info in enumerate(sorted(labels)):
+                            columns = 0
+                            for info in sorted(labels):
                                 value = getattr(signal, info)
                                 if isinstance(value, float):
                                     text = "%.4f" % value
@@ -591,7 +593,22 @@ class Info(ToolInstance):
                                     text = repr(value)
                                 item = QTableWidgetItem()
                                 item.setData(Qt.DisplayRole, text)
-                                table.setItem(row, j + 1, item)
+                                table.setItem(row, columns + 1, item)
+                                columns += 1
+                                if info == "ndx":
+                                    if "atomspec" not in normal_labels:
+                                        normal_labels.insert(columns + 1, "atomspec")
+                                        normal_labels.insert(columns + 1, "atom name")
+                                        table.setColumnCount(len(normal_labels))
+                                        table.setHorizontalHeaderLabels(normal_labels)
+                                    item = QTableWidgetItem()
+                                    item.setData(Qt.DisplayRole, model.atoms[value].name)
+                                    table.setItem(row, columns + 1, item)
+                                    columns += 1
+                                    item = QTableWidgetItem()
+                                    item.setData(Qt.DisplayRole, model.atoms[value].atomspec)
+                                    table.setItem(row, columns + 1, item)
+                                    columns += 1
 
                     for j in range(0, table.columnCount()):
                         table.resizeColumnToContents(j)
@@ -599,6 +616,35 @@ class Info(ToolInstance):
                         nest = data_type
                     label = self.signal_name_map(signal_data, nest)
                     self.tabs.addTab(table, label)
+
+            if "nmr" in fr.keys():
+                widget = QWidget()
+                coupling_layout = QVBoxLayout(widget)
+                button = QPushButton("label atoms with indices")
+                button.clicked.connect(lambda *args, mdl=model: indexLabel(self.session, models=mdl))
+                coupling_layout.addWidget(button, 0)
+                nmr = fr["nmr"]
+                table = QTableWidget()
+                table.setColumnCount(len(nmr.data))
+                table.setHorizontalHeaderLabels([str(shift.ndx + 1) for shift in nmr.data])
+                for i, shift in enumerate(nmr.data):
+                    table.insertRow(table.rowCount())
+                    for j, shift2 in enumerate(nmr.data[:i]):
+                        try:
+                            coupling = nmr.coupling[shift.ndx][shift2.ndx]
+                        except KeyError:
+                            continue
+                        item = QTableWidgetItem()
+                        item.setData(Qt.DisplayRole, "%.2f" % coupling)
+                        table.setItem(i, j, item)
+                        item = QTableWidgetItem()
+                        item.setData(Qt.DisplayRole, "%.2f" % coupling)
+                        table.setItem(j, i, item)
+                for j in range(0, table.columnCount()):
+                    table.resizeColumnToContents(j)
+                table.setVerticalHeaderLabels([str(shift.ndx + 1) for shift in nmr.data])
+                coupling_layout.addWidget(table, 1)
+                self.tabs.addTab(widget, "NMR coupling")
 
         self.table.resizeColumnToContents(0)
         self.table.resizeColumnToContents(1)

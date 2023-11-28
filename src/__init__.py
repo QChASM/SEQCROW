@@ -1034,6 +1034,14 @@ class _SEQCROW_API(BundleAPI):
         elif command_info.name == "force":
             from .commands.force import force, force_description
             register("force", force_description, force)
+        
+        elif command_info.name == "monitorBonds":
+            from .commands.monitor_bonds import monitor_bonds, monitor_bonds_description
+            register("monitorBonds", monitor_bonds_description, monitor_bonds)
+        
+        elif command_info.name == "~monitorBonds":
+            from .commands.monitor_bonds import remove_bond_monitor, remove_monitor_description
+            register("monitorBonds", remove_monitor_description, remove_bond_monitor)
 
     @staticmethod
     def register_selector_menus(session):

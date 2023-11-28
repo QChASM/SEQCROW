@@ -977,14 +977,21 @@ class ResidueCollection(Geometry):
 
         return coordsets                    
     
-    def get_chimera(self, session, coordsets=False, filereader=None, discard_residues=False):
+    def get_chimera(
+        self,
+        session,
+        coordsets=False,
+        filereader=None,
+        discard_residues=False,
+        apply_preset=True,
+    ):
         """returns a chimerax equivalent of self"""
         struc = AtomicStructure(session, name=self.name)
         if filereader is not None:
             struc.filereaders = [{key: filereader[key] for key in filereader.keys()}]
         struc.comment = self.comment
 
-        self.update_chix(struc, discard_residues=discard_residues)
+        self.update_chix(struc, discard_residues=discard_residues, apply_preset=apply_preset)
 
         if coordsets and filereader is not None and filereader.all_geom is not None:
             #make a trajectory
