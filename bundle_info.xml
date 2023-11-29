@@ -558,6 +558,7 @@
                 <ChimeraXClassifier>ChimeraX :: Command :: force               :: Structure Analysis :: display computed force vector</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: monitorBonds        :: Structure Analysis :: update connectivity during trajectories</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: ~monitorBonds       :: Structure Analysis :: stop updating connectivity during trajectories</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: dipoleMoment        :: Structure Analysis :: plot dipole moments</ChimeraXClassifier>
        </Classifiers>
     
     <AdditionalPackages>

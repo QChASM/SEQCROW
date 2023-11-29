@@ -1042,6 +1042,10 @@ class _SEQCROW_API(BundleAPI):
         elif command_info.name == "~monitorBonds":
             from .commands.monitor_bonds import remove_bond_monitor, remove_monitor_description
             register("monitorBonds", remove_monitor_description, remove_bond_monitor)
+        
+        elif command_info.name == "dipoleMoment":
+            from .commands.dipole_moment import dipole_moment, dipole_moment_description
+            register("dipoleMoment", dipole_moment_description, dipole_moment)
 
     @staticmethod
     def register_selector_menus(session):

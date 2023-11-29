@@ -24,15 +24,14 @@ def force(session, selection, transparency=100, color=[250, 50, 115, 255]):
         color = color.uint8x4()
     color = [c for c in color][:-1]
     color.append(int( 255 * ( transparency / 100.)))
-    print(color)
     if transparency > 100 or transparency < 0:
         session.logger.error("transparency must be between 0 and 100")
         return
     
     for model in selection:
-        fr = session.filereader_manager.filereader_dict[model][-1]
+        fr = model.filereaders[-1]
         try:
-            forces = fr.other["forces"]
+            forces = fr["forces"]
         except KeyError:
             session.logger.warning("no forces for %s (%s)" % (model.name, model.atomspec))
         
@@ -46,9 +45,7 @@ def force(session, selection, transparency=100, color=[250, 50, 115, 255]):
             s += ".arrow %10.6f %10.6f %10.6f   %10.6f %10.6f %10.6f  0.02 0.05 %5.3f\n" % (
                 *atom.coord, *disp, r
             )
-        
-        print(s)
-        
+
         stream = BytesIO(bytes(s, 'utf-8'))
         bild_obj, status = read_bild(session, stream, "force (eV/Bohr)")
 
