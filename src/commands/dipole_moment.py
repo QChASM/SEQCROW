@@ -30,6 +30,7 @@ dipole_moment_description = CmdDesc(
                 "zero",
             ])
         ),
+        ("scale", FloatArg),
         ("color", ColorArg),
         ("state", IntArg),
     ],
@@ -45,6 +46,7 @@ def dipole_moment(
     color=[250, 50, 115, 255],
     origin="nuclearCharge",
     state=1,
+    scale=1,
 ):   
     if not isinstance(color, list):
         color = color.uint8x4()
@@ -85,7 +87,7 @@ def dipole_moment(
             session.logger.warning("no state %i for %s (%s)" % (state, model.name, model.atomspec))
             return
         
-        
+        v = scale * np.array(v)
         n = np.linalg.norm(v)
         v = v + x0
         r = n / (n + 0.75)
