@@ -1005,63 +1005,80 @@ class ResidueCollection(Geometry):
             struc.active_coordset_id = len(xyzs)
 
         # if it's a frequency file, draw TS bonds for imaginary modes
-        if filereader is not None and "frequency" in filereader.other:
-            for mode in filereader.other["frequency"].data:
-                if mode.frequency < 0:
-                    max_disp = max(np.linalg.norm(x) for x in mode.vector)
-                    cur_coords = self.coords
-                    coord_forward = self.coords + (0.4 / max_disp) * mode.vector
-                    coord_reverse = self.coords - (0.4 / max_disp) * mode.vector
-                    forward_connectivity = np.zeros((len(self.atoms), len(self.atoms)))
-                    reverse_connectivity = np.zeros((len(self.atoms), len(self.atoms)))
-                    self.update_geometry(coord_forward)
-                    self.refresh_connected()
-                    for i, atom1 in enumerate(self.atoms):
-                        for j, atom2 in enumerate(self.atoms[:i]):
-                            if atom1 in atom2.connected:
-                                forward_connectivity[i, j] = 1
-                                forward_connectivity[j, i] = 1
-                    
-                    self.update_geometry(coord_reverse)
-                    self.refresh_connected()
-                    for i, atom1 in enumerate(self.atoms):
-                        for j, atom2 in enumerate(self.atoms[:i]):
-                            if atom1 in atom2.connected:
-                                reverse_connectivity[i, j] = 1
-                                reverse_connectivity[j, i] = 1
-                    
-                    changes = forward_connectivity - reverse_connectivity
-                    for i, atom1 in enumerate(self.atoms):
-                        for j, atom1 in enumerate(self.atoms[:i]):
-                            if changes[i,j] != 0:
-                                sel = _FauxAtomSelection(
-                                    atoms=(struc.atoms[i], struc.atoms[j])
-                                )
-                                tsbond(session, sel)
-                    
-                    self.update_geometry(cur_coords)
+        if filereader is not None:
+            fr_keys = filereader.keys()
+            if "frequency" in fr_keys:
+                for mode in filereader["frequency"].data:
+                    if mode.frequency < 0:
+                        max_disp = max(np.linalg.norm(x) for x in mode.vector)
+                        cur_coords = self.coords
+                        coord_forward = self.coords + (0.4 / max_disp) * mode.vector
+                        coord_reverse = self.coords - (0.4 / max_disp) * mode.vector
+                        forward_connectivity = np.zeros((len(self.atoms), len(self.atoms)))
+                        reverse_connectivity = np.zeros((len(self.atoms), len(self.atoms)))
+                        self.update_geometry(coord_forward)
+                        self.refresh_connected()
+                        for i, atom1 in enumerate(self.atoms):
+                            for j, atom2 in enumerate(self.atoms[:i]):
+                                if atom1 in atom2.connected:
+                                    forward_connectivity[i, j] = 1
+                                    forward_connectivity[j, i] = 1
+                        
+                        self.update_geometry(coord_reverse)
+                        self.refresh_connected()
+                        for i, atom1 in enumerate(self.atoms):
+                            for j, atom2 in enumerate(self.atoms[:i]):
+                                if atom1 in atom2.connected:
+                                    reverse_connectivity[i, j] = 1
+                                    reverse_connectivity[j, i] = 1
+                        
+                        changes = forward_connectivity - reverse_connectivity
+                        for i, atom1 in enumerate(self.atoms):
+                            for j, atom1 in enumerate(self.atoms[:i]):
+                                if changes[i,j] != 0:
+                                    sel = _FauxAtomSelection(
+                                        atoms=(struc.atoms[i], struc.atoms[j])
+                                    )
+                                    tsbond(session, sel)
+                        
+                        self.update_geometry(cur_coords)
+            
+            if "Löwdin Charges" in fr_keys:
+                for atom, charge in zip(struc.atoms, filereader["Löwdin Charges"]):
+                    atom.loewdinCharge = charge
+                    atom.charge = charge
+    
+            if "Mulliken Charges" in fr_keys:
+                for atom, charge in zip(struc.atoms, filereader["Mulliken Charges"]):
+                    atom.mullikenCharge = charge
+                    atom.charge = charge
+    
+            if "ESP Charges" in fr_keys:
+                for atom, charge in zip(struc.atoms, filereader["ESP Charges"]):
+                    atom.espCharge = charge
+                    atom.charge = charge
         
-        if filereader is not None and "Löwdin Charges" in filereader.other:
-            for atom, charge in zip(struc.atoms, filereader.other["Löwdin Charges"]):
-                atom.loewdinCharge = charge
-                atom.charge = charge
-
-        if filereader is not None and "Mulliken Charges" in filereader.other:
-            for atom, charge in zip(struc.atoms, filereader.other["Mulliken Charges"]):
-                atom.mullikenCharge = charge
-                atom.charge = charge
-
-        if filereader is not None and "NPA Charges" in filereader.other:
-            for atom, charge in zip(struc.atoms, filereader.other["NPA Charges"]):
-                atom.npaCharge = charge
-                atom.charge = charge
-
-        if filereader is not None and "Nuclear ZEff" in filereader.other:
-            for atom, zeff in zip(struc.atoms, filereader.other["Nuclear ZEff"]):
-                atom.Zeff = zeff
-
-        if filereader is not None and "Nuclear spins" in filereader.other:
-            for atom, spin in zip(struc.atoms, filereader.other["Nuclear spins"]):
-                atom.nuclearSpin = spin
+            if "Hirshfeld Charges" in fr_keys:
+                for atom, charge in zip(struc.atoms, filereader["Hirshfeld Charges"]):
+                    atom.hirshfeldCharge = charge
+                    atom.charge = charge
+            
+            if "CM5 Charges" in fr_keys:
+                for atom, charge in zip(struc.atoms, filereader["CM5 Charges"]):
+                    atom.cm5Charge = charge
+                    atom.charge = charge
+    
+            if "NPA Charges" in fr_keys:
+                for atom, charge in zip(struc.atoms, filereader["NPA Charges"]):
+                    atom.npaCharge = charge
+                    atom.charge = charge
+    
+            if "Nuclear ZEff" in fr_keys:
+                for atom, zeff in zip(struc.atoms, filereader.other["Nuclear ZEff"]):
+                    atom.Zeff = zeff
+    
+            if "Nuclear spins" in fr_keys:
+                for atom, spin in zip(struc.atoms, filereader.other["Nuclear spins"]):
+                    atom.nuclearSpin = spin
 
         return struc
