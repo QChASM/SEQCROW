@@ -37,21 +37,10 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
             get_all=True,
             max_length=max_length,
         )
-    except UnicodeDecodeError:
-        try:
-            with open(file_name, "r") as f:
-                fr = FileReader(
-                    (file_name, fmt, f),
-                    just_geom=False,
-                    get_all=True,
-                    max_length=max_length,
-                )
-        except Exception as e:
-            session.logger.error("unable to open %s" % file_name)
-            raise e
-        finally:
-            if hasattr(f, "close") and callable(f.close):
-                f.close()
+    except UnicodeDecodeError as e:
+        session.logger.error("unable to open %s" % file_name)
+        raise e
+
     except Exception as e:
         session.logger.error("unable to open %s" % file_name)
         raise e

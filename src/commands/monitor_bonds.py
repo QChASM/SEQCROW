@@ -230,7 +230,6 @@ def monitor_bonds(session, selection, tolerance=0.35, tsTolerance=0.6, guess=Fal
         )
         handlers[mdl] = hdlr
 
-
 def remove_monitor(session, selection):
     """stop checking for bond changes"""
     for model in selection:

@@ -1040,8 +1040,8 @@ class _SEQCROW_API(BundleAPI):
             register("monitorBonds", monitor_bonds_description, monitor_bonds)
         
         elif command_info.name == "~monitorBonds":
-            from .commands.monitor_bonds import remove_bond_monitor, remove_monitor_description
-            register("monitorBonds", remove_monitor_description, remove_bond_monitor)
+            from .commands.monitor_bonds import remove_monitor, remove_monitor_description
+            register("monitorBonds", remove_monitor_description, remove_monitor)
         
         elif command_info.name == "dipoleMoment":
             from .commands.dipole_moment import dipole_moment, dipole_moment_description
