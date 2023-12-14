@@ -1588,7 +1588,7 @@ class EquivalentNuclei(QWidget):
         layout.addRow(QLabel(
             "give equivalent nuclei the same group label\n"
             "NOTE: the built-in algorithm will not distinguish certain nuclei, notably\n"
-            "diatereotopic protons, E/Z terminal protons, or nuclei on rotationally hindered groups"
+            "diastereotopic protons, E/Z terminal protons, or nuclei on rotationally hindered groups"
         ))
         
         reset_button = QPushButton("reset equivalent nuclei groups")
