@@ -525,6 +525,10 @@ class _SEQCROW_API(BundleAPI):
         elif ti.name == "NMR Spectrum":
             from .tools.nmr_plot import NMRSpectrum
             return NMRSpectrum(session, ti.name)
+        
+        elif ti.name == "Dipoles":
+            from .tools.dipoles import Dipoles
+            return Dipoles(session, ti.name)
 
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)

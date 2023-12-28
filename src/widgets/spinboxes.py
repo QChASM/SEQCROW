@@ -257,12 +257,12 @@ class ScientificSpinBox(QDoubleSpinBox):
     def stepUp(self):
         value = self._unmappedValue()
         mantissa, characteristic = self.getMantissaCharacteristic()
-        if characteristic == 0:
-            characteristic = -self.decimals()
-            if self.maxAbsoluteCharacteristic:
-                characteristic = -(self.maxAbsoluteCharacteristic - 1)
-            elif self.maxAbsoluteCharacteristic and abs(characteristic) > self.maxAbsoluteCharacteristic:
-                characteristic = -(self.maxAbsoluteCharacteristic - 1)
+        # if characteristic == 0:
+        #     characteristic = -self.decimals()
+        #     if self.maxAbsoluteCharacteristic:
+        #         characteristic = -(self.maxAbsoluteCharacteristic - 1)
+        #     elif self.maxAbsoluteCharacteristic and abs(characteristic) > self.maxAbsoluteCharacteristic:
+        #         characteristic = -(self.maxAbsoluteCharacteristic - 1)
         
         characteristic -= 1
         value = value + self.stepMultiplier * 10 ** characteristic
@@ -292,12 +292,12 @@ class ScientificSpinBox(QDoubleSpinBox):
     def stepDown(self):
         value = self._unmappedValue()
         mantissa, characteristic = self.getMantissaCharacteristic()
-        if characteristic == 0:
-            characteristic = -self.decimals()
-            if self.maxAbsoluteCharacteristic:
-                characteristic = -(self.maxAbsoluteCharacteristic - 1)
-            elif self.maxAbsoluteCharacteristic and abs(characteristic) > self.maxAbsoluteCharacteristic:
-                characteristic = -(self.maxAbsoluteCharacteristic - 1)
+        # if characteristic == 0:
+        #     characteristic = -self.decimals()
+        #     if self.maxAbsoluteCharacteristic:
+        #         characteristic = -(self.maxAbsoluteCharacteristic - 1)
+        #     elif self.maxAbsoluteCharacteristic and abs(characteristic) > self.maxAbsoluteCharacteristic:
+        #         characteristic = -(self.maxAbsoluteCharacteristic - 1)
  
         characteristic -= 1
         value = value - self.stepMultiplier * 10 ** characteristic

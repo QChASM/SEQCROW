@@ -819,6 +819,11 @@ class CRESTJob(LocalJob):
             test_file = os.path.join(self.scratch_dir, f + ".xyz")
             if os.path.exists(test_file):
                 self.output_name = test_file
+                break
+        else:
+            self.session.logger.error("no output file found for %s" % self.name)
+            self.session.logger.info(repr(self.theory.kwargs["command_line"]))
+            self.error = True
 
         if self.job_options.get("delete_everything_but_output_file", False):
             self.remove_extra_files()
@@ -834,7 +839,7 @@ class CRESTJob(LocalJob):
         fr = FileReader(self.output_name, get_all=True)
         
         for i, (comment, _) in enumerate(fr.all_geom):
-            fr.all_geom[i] = (*fr.all_geom[i], {"energy": float(comment)})
+            fr.all_geom[i] = (*fr.all_geom[i], {"energy": float(comment.split()[0])})
         fr.other["energy"] = float(fr.comment)
         
         geom = ResidueCollection(fr, refresh_ranks=False).copy(

@@ -811,7 +811,21 @@ class NMRSpectrum(ToolInstance):
             
             show_functions = None
             if shown_confs:
-                show_functions = [info[0] for info in shown_confs]
+                show_functions = [
+                    info[0].get_spectrum_functions(
+                        fwhm=fwhm,
+                        peak_type=peak_type,
+                        voigt_mixing=voigt_mixing,
+                        linear_scale=linear,
+                        scalar_scale=scalar,
+                        pulse_frequency=self.pulse_frequency.value(),
+                        equivalent_nuclei=self.nulcei_widget.get_equivalent_nuclei(),
+                        graph=self.nulcei_widget.get_graph(),
+                        element=elements,
+                        couple_with=couple_with,
+                    )[0]
+                    for info in shown_confs
+                ]
             
             x_values, y_values, other_y_list = mixed_nmr.get_plot_data(
                 funcs,
@@ -997,7 +1011,25 @@ class NMRSpectrum(ToolInstance):
                     closest = (diff, shift)
             
             if closest:
-                self.highlight(closest[1])
+                offset = 0
+                label = None
+                if self.tree.topLevelItemCount() > 2:
+                    label = "molecule 1: "
+                for mol_ndx in range(1, self.tree.topLevelItemCount()):
+                    mol = self.tree.topLevelItem(mol_ndx)
+                    conf = mol.child(2)
+                    data = self.tree.itemWidget(conf, 0).currentData()
+                    if data is None:
+                        continue
+                    if closest[1].ndx[0] > (offset + len(data[0]["atoms"])):
+                        offset += len(data[0]["atoms"])
+                        
+                    else:
+                        closest[1].ndx = [n - offset for n in closest[1].ndx]
+                        if mol_ndx != 1:
+                            label = "molecule %i: " % (i + 1)
+                        break
+                self.highlight(closest[1], label)
 
     def unclick(self, event):
         if self.toolbar.mode != "":
@@ -1082,12 +1114,18 @@ class NMRSpectrum(ToolInstance):
                         return
                     freq_file, _ = freq_file
                     freqs[-1].append(CompOutput(freq_file))
-                
-                    rmsd = freqs[-1][-1].geometry.RMSD(
-                        single_points[-1][-1].geometry,
-                        sort=True,
-                    )
-                    if rmsd > 1e-2:
+                    
+                    warn = False
+                    if len(geometry.atoms) == len(single_points[-1][-1].geometry.atoms):
+                        rmsd = freqs[-1][-1].geometry.RMSD(
+                            single_points[-1][-1].geometry,
+                            sort=True,
+                        )
+                        if rmsd > 1e-2:
+                            warn = True
+                    else:
+                        warn = True
+                    if warn:
                         s = "the structure of %s (frequencies) might not match" % freqs[-1][-1].geometry.name
                         s += " the structure of %s (energy)" % single_points[-1][-1].geometry.name
                         self.session.logger.warning(s)
@@ -1095,12 +1133,18 @@ class NMRSpectrum(ToolInstance):
                     freqs[-1].append(None)
                 
                 geom = Geometry(fr["atoms"])
-                rmsd = single_points[-1][-1].geometry.RMSD(
-                    geom,
-                    sort=True,
-                )
-                if rmsd > 1e-2:
-                    s = "the structure of %s (UV/vis) might not match" % geom.name
+                warn = False
+                if len(geom.atoms) == len(single_points[-1][-1].geometry.atoms):
+                    rmsd = single_points[-1][-1].geometry.RMSD(
+                        geom,
+                        sort=True,
+                    )
+                    if rmsd > 1e-2:
+                        warn = True
+                else:
+                    warn = True
+                if warn:
+                    s = "the structure of %s (NMR) might not match" % geom.name
                     s += "the structure of %s (energy)" % single_points[-1][-1].geometry.name
                     self.session.logger.warning(s)
                 
@@ -1389,7 +1433,7 @@ class NMRSpectrum(ToolInstance):
 
         self.canvas.draw()
 
-    def highlight(self, item):
+    def highlight(self, item, prefix=None):
         highlights = []
         labels = []
 
@@ -1414,7 +1458,10 @@ class NMRSpectrum(ToolInstance):
             ):
                 continue
 
-            label = "%s" % ", ".join([str(n + 1) for n in item.ndx])
+            label = ""
+            if prefix:
+                label += prefix
+            label += "%s" % ", ".join([str(n + 1) for n in item.ndx])
             label += "\n%.2f ppm" % ppm
 
             if ppm < min(ax.get_xlim()) or ppm > max(ax.get_xlim()):
@@ -1638,7 +1685,7 @@ class EquivalentNuclei(QWidget):
 
 
 class SaveScales(ChildToolWindow):
-    def __init__(self, tool_instance, title, *args, m=-1.0, b=38.0, **kwargs):
+    def __init__(self, tool_instance, title, *args, m=-1.0, b=31.9, **kwargs):
         super().__init__(tool_instance, title, *args, **kwargs)
         
         self.m = m
