@@ -42,11 +42,23 @@ class Dipoles(ToolInstance):
     def _build_ui(self):
         layout = QFormLayout()
         
-        self.model_selector = FilereaderComboBox(self.session)
+        self.model_selector = FilereaderComboBox(
+            self.session,
+            otherItems=[
+                "Hirshfeld Charges",
+                "Löwdin Charges",
+                "Mulliken Charges",
+                "ESP Charges",
+                "CM5 Charges",
+                "NPA Charges",
+                "uv_vis",
+            ],
+        )
         layout.addRow(self.model_selector)
         
         self.dipole_type = QComboBox()
         layout.addRow("dipole type:", self.dipole_type)
+        self.model_selector.currentIndexChanged.connect(self.fill_dipole_types)
         
         self.origin = QComboBox()
         self.origin.addItems([
@@ -71,6 +83,52 @@ class Dipoles(ToolInstance):
         )
         layout.addRow("scale:", self.scale)
         
+        self.fill_dipole_types(0)
+        
         self.tool_window.ui_area.setLayout(layout)
         
         self.tool_window.manage(None)
+    
+    def fill_dipole_types(self, ndx):
+        current_text = self.dipole_type.currentText()
+        
+        self.dipole_type.clear()
+        
+        info = self.model_selector.currentData()
+        if info is None:
+            return
+        fr, mdl = info
+        
+        items = []
+        def name_map(x, fr):
+            if "Charges" in x:
+                return [x.replace("Charges", "Charge Dipole")]
+            if x == "uv_vis":
+                uv_vis_dipoles = []
+                exc = fr[x].data[0]
+                if exc.dipole_len_vec is not None:
+                    uv_vis_dipoles.append("Transition Dipole Moment")
+                if exc.dipole_vel_vec is not None:
+                    uv_vis_dipoles.append("Transition Velocity Moment")
+                if exc.magnetic_mom is not None:
+                    uv_vis_dipoles.append("Transition Magnetic Dipole")
+                return uv_vis_dipoles
+        
+        for x in [
+            "Hirshfeld Charges",
+            "Löwdin Charges",
+            "Mulliken Charges",
+            "ESP Charges",
+            "CM5 Charges",
+            "NPA Charges",
+            "uv_vis",
+        ]:
+            if x in fr:
+                items.extend(name_map(x, fr))
+        
+        self.dipole_type.addItems(items)
+        n = self.dipole_type.findText(current_text, Qt.MatchExactly)
+        if n >= 0:
+            self.dipole_type.setCurrentIndex(n)
+        else:
+            self.dipole_type.setCurrentIndex(0)

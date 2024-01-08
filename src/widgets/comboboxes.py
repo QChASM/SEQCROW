@@ -140,9 +140,13 @@ class FilereaderComboBox(QComboBox):
         for (mdl, filereaders) in models_and_filereaders:
             try:
                 for fr in filereaders:
-                    if self._other and not all(x in fr for x in self._other):
+                    if isinstance(self._other, tuple) and not all(x in fr for x in self._other):
+                        print("skipping tuple", fr.keys())
                         continue
-                    if self._other is None or all(x in fr for x in self._other):
+                    elif isinstance(self._other, list) and not any(x in fr for x in self._other):
+                        print("skipping list", fr.keys())
+                        continue
+                    else:
                         self.addItem(
                             "%s (%s)" % (basename(fr["name"]), mdl.atomspec),
                             (fr, mdl),
