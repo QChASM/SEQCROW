@@ -246,7 +246,10 @@ def substitute(
                         )
 
                 rescol.update_chix(model_copy)
-
+                model_copy.name += "_%s=%s" % (
+                    ",".join(t.name for t in models[model][res]),
+                    sub.name,
+                )
                 new_structures.append(model_copy)
 
         first_pass = False

@@ -44,9 +44,9 @@ class _SEQCROW_API(BundleAPI):
             )
 
             session.presets.add_presets("SEQCROW", {"ball-stick-endcap":lambda p=seqcrow_bse: p(session)})
-            session.presets.add_presets("SEQCROW", {"ball-stick-endcap 2":lambda p=seqcrow_bse_cartoon: p(session)})
+            session.presets.add_presets("SEQCROW", {"ball-stick-endcap (displayed only)":lambda p=seqcrow_bse_cartoon: p(session)})
             session.presets.add_presets("SEQCROW", {"sticks":lambda p=seqcrow_s: p(session)})
-            session.presets.add_presets("SEQCROW", {"sticks 2":lambda p=seqcrow_s_cartoon: p(session)})
+            session.presets.add_presets("SEQCROW", {"sticks (displayed only)":lambda p=seqcrow_s_cartoon: p(session)})
             session.presets.add_presets("SEQCROW", {"VDW":lambda p=seqcrow_vdw: p(session)})
             session.presets.add_presets("SEQCROW", {"index labels":lambda p=indexLabel: p(session)})
 
@@ -1045,7 +1045,7 @@ class _SEQCROW_API(BundleAPI):
         
         elif command_info.name == "~monitorBonds":
             from .commands.monitor_bonds import remove_monitor, remove_monitor_description
-            register("monitorBonds", remove_monitor_description, remove_monitor)
+            register("~monitorBonds", remove_monitor_description, remove_monitor)
         
         elif command_info.name == "dipoleMoment":
             from .commands.dipole_moment import dipole_moment, dipole_moment_description

@@ -159,6 +159,8 @@ class LibAdd(ToolInstance):
         center_atoms = set()
         for atom in key_atoms:
             center_atoms.update([a for a in atom.connected if a not in ligand_atoms])
+        if not center_atoms:
+            raise RuntimeError("key atoms must be bonded to a non-ligand atom")
         rescol.coord_shift(-rescol.COM(center_atoms))
 
         if len(key_atoms) < 1:

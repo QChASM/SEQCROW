@@ -170,6 +170,10 @@ def fuseRing(session, selection=None, rings=None, newName=None, modify=True, min
                 rescol.update_chix(model)
             else:
                 rescol.update_chix(model_copy)
+                model_copy.name += "_%s=%s" % (
+                    ",".join(t.name for t in models[model]),
+                    ringname,
+                )
                 new_structures.append(model_copy)
         
         first_pass = False

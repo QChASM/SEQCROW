@@ -3,8 +3,9 @@ import re
 
 from jinja2 import Template
 
-from chimerax.atomic import selected_atoms, selected_bonds, selected_pseudobonds, get_triggers
+from chimerax.atomic import AtomicStructure, selected_atoms, selected_bonds, selected_pseudobonds, get_triggers
 from chimerax.core.tools import ToolInstance
+from chimerax.core.models import ADD_MODELS, REMOVE_MODELS
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
@@ -47,6 +48,7 @@ from Qt.QtWidgets import (
     QTreeWidgetItem,
     QSizePolicy,
     QStyle,
+    QMenu,
 )
 
 from SEQCROW.jobs import LocalClusterJob
@@ -285,6 +287,10 @@ class BuildQM(ToolInstance):
         #save.setShortcut(shortcut)
         #save.setShortcutContext(Qt.WidgetShortcut)
         export.addAction(save)
+
+        save_batch = QAction("Save Batch...", self.tool_window.ui_area)
+        save_batch.triggered.connect(self.open_save_batch_dialog)
+        export.addAction(save_batch)
 
         view = self._menu.addMenu("View")
         
@@ -1250,6 +1256,12 @@ class BuildQM(ToolInstance):
             return
         
         self.save_file(filename)
+
+    def open_save_batch_dialog(self):
+        self.tool_window.create_child_window(
+            "save batch input",
+            window_class=BatchExport,
+        )
 
     def save_file(self, filename):
         """
@@ -5726,69 +5738,70 @@ class WarningPreview(ChildToolWindow):
         super().cleanup()
 
 
+class BasisElements(QWidget):
+    """widget to select what elements belong in which basis"""
+    def __init__(self, parent=None, tool_instance=None):
+        super().__init__(parent)
+        self.tool_instance = tool_instance
+
+        layout = QGridLayout(self)
+        self.basis_box = QTabWidget()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.basis_box)
+
+        self.basis_ptables = []
+        self.ecp_ptables = []
+
+    def refresh_basis(self):
+        basis_set = self.tool_instance.basis_widget.getBasis(update_settings=False)
+        self.setBasis(basis_set)
+
+    def setBasis(self, basis_set):
+        """display current basis sets and element selectors"""
+        self.basis_ptables = []
+        self.ecp_ptables = []
+
+        for i in range(self.basis_box.count()-1, -1, -1):
+            #self.basis_box.removeItem(i)
+            self.basis_box.removeTab(i)
+
+        if basis_set.basis is not None:
+            for basis in basis_set.basis:
+                element_selector = PeriodicTable(initial_elements=basis.elements)
+                self.basis_ptables.append(element_selector)
+                basis_name = basis.name
+                aux = basis.aux_type
+                if aux is not None:
+                    label = "%s/%s" % (basis_name, aux)
+                else:
+                    label = "%s" % basis_name
+
+                #self.basis_box.addItem(element_selector, label)
+                self.basis_box.addTab(element_selector, label)
+
+        if basis_set.ecp is not None:
+            for ecp in basis_set.ecp:
+                element_selector = PeriodicTable(initial_elements=ecp.elements)
+                self.ecp_ptables.append(element_selector)
+                label = "ECP: %s" % ecp.name
+
+                #self.basis_box.addItem(element_selector, label)
+                self.basis_box.addTab(element_selector, label)
+
+    def getElements(self):
+        basis_elements = []
+        ecp_elements = []
+        for selector in self.basis_ptables:
+            basis_elements.append(selector.selectedElements(abbreviate=True))
+
+        for ecp in self.ecp_ptables:
+            ecp_elements.append(selector.selectedElements(abbreviate=True))
+
+        return basis_elements, ecp_elements
+
+
 class SavePreset(ChildToolWindow):
     """window for selecting what to save in a preset"""
-    class BasisElements(QWidget):
-        """widget to select what elements belong in which basis"""
-        def __init__(self, parent=None, tool_instance=None):
-            super().__init__(parent)
-            self.tool_instance = tool_instance
-
-            layout = QGridLayout(self)
-            self.basis_box = QTabWidget()
-            layout.setContentsMargins(0, 0, 0, 0)
-            layout.addWidget(self.basis_box)
-
-            self.basis_ptables = []
-            self.ecp_ptables = []
-
-        def refresh_basis(self):
-            basis_set = self.tool_instance.basis_widget.getBasis(update_settings=False)
-            self.setBasis(basis_set)
-
-        def setBasis(self, basis_set):
-            """display current basis sets and element selectors"""
-            self.basis_ptables = []
-            self.ecp_ptables = []
-
-            for i in range(self.basis_box.count()-1, -1, -1):
-                #self.basis_box.removeItem(i)
-                self.basis_box.removeTab(i)
-
-            if basis_set.basis is not None:
-                for basis in basis_set.basis:
-                    element_selector = PeriodicTable(initial_elements=basis.elements)
-                    self.basis_ptables.append(element_selector)
-                    basis_name = basis.name
-                    aux = basis.aux_type
-                    if aux is not None:
-                        label = "%s/%s" % (basis_name, aux)
-                    else:
-                        label = "%s" % basis_name
-
-                    #self.basis_box.addItem(element_selector, label)
-                    self.basis_box.addTab(element_selector, label)
-
-            if basis_set.ecp is not None:
-                for ecp in basis_set.ecp:
-                    element_selector = PeriodicTable(initial_elements=ecp.elements)
-                    self.ecp_ptables.append(element_selector)
-                    label = "ECP: %s" % ecp.name
-
-                    #self.basis_box.addItem(element_selector, label)
-                    self.basis_box.addTab(element_selector, label)
-
-        def getElements(self):
-            basis_elements = []
-            ecp_elements = []
-            for selector in self.basis_ptables:
-                basis_elements.append(selector.selectedElements(abbreviate=True))
-
-            for ecp in self.ecp_ptables:
-                ecp_elements.append(selector.selectedElements(abbreviate=True))
-
-            return basis_elements, ecp_elements
-
 
     def __init__(self, tool_instance, title, **kwargs):
         super().__init__(tool_instance, title, statusbar=False, **kwargs)
@@ -5828,7 +5841,7 @@ class SavePreset(ChildToolWindow):
         self.basis.setToolTip("basis functions and ECP")
         layout.addRow("basis set:", self.basis)
 
-        self.basis_elements = self.BasisElements(tool_instance=self.tool_instance)
+        self.basis_elements = BasisElements(tool_instance=self.tool_instance)
         self.tool_instance.basis_widget.basisChanged.connect(self.basis_elements.refresh_basis)
         self.basis_elements.refresh_basis()
         layout.addRow(self.basis_elements)
@@ -5921,6 +5934,206 @@ class SavePreset(ChildToolWindow):
 
     def cleanup(self):
         self.tool_instance.preset_window = None
+
+        super().cleanup()
+
+
+class BatchExport(ChildToolWindow):
+    """window for selecting what to save in a preset"""
+
+    def __init__(self, tool_instance, title, **kwargs):
+        super().__init__(tool_instance, title, statusbar=False, **kwargs)
+
+        self._build_ui()
+
+        self._add_handler = self.tool_instance.session.triggers.add_handler(
+            ADD_MODELS, self._add_models
+        )
+        self._del_handler = self.tool_instance.session.triggers.add_handler(
+            REMOVE_MODELS, self._del_models
+        )
+    
+        self._add_models("", self.tool_instance.session.models.list())
+    
+    def _add_models(self, trigger_name, models):
+        for m in models:
+            if isinstance(m, AtomicStructure):
+                action = self.menu.addAction(
+                    "%s (%s)" % (m.name, m.atomspec),
+                )
+                action.setCheckable(True)
+                action.setChecked(True)
+                action.setData(m)
+                self.menu.addAction(action)
+    
+    def _del_models(self, trigger_name, models):
+        actions = self.menu.actions()
+        for action in actions:
+            if action.data() in models:
+                self.menu.removeAction(action)
+                action.deleteLater()
+    
+    def _build_ui(self):
+
+        layout = QFormLayout()
+        layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+
+        self.select_models = QPushButton("click to select structures")
+        self.menu = QMenu("select models")
+        self.select_models.setMenu(self.menu)
+        layout.addRow(self.select_models)
+
+        self.basis_elements = BasisElements(tool_instance=self.tool_instance)
+        self.tool_instance.basis_widget.basisChanged.connect(self.basis_elements.refresh_basis)
+        self.basis_elements.refresh_basis()
+        layout.addRow(self.basis_elements)
+
+        file_browse = QWidget()
+        file_browse_layout = QGridLayout(file_browse)
+        margins = file_browse_layout.contentsMargins()
+        new_margins = (margins.left(), 0, margins.right(), 0)
+        file_browse_layout.setContentsMargins(*new_margins)
+        self.dir_path = QLineEdit()
+        self.dir_path.setText(os.path.expanduser("~"))
+        self.chk_browse_button = QPushButton("browse...")
+        self.chk_browse_button.clicked.connect(self.open_save_dialog)
+        label = QLabel("checkpoint path:")
+        file_browse_layout.addWidget(label, 0, 0, Qt.AlignVCenter)
+        file_browse_layout.addWidget(self.dir_path, 0, 1, Qt.AlignVCenter)
+        file_browse_layout.addWidget(self.chk_browse_button, 0, 2, Qt.AlignVCenter)
+        file_browse_layout.setColumnStretch(0, 0)
+        file_browse_layout.setColumnStretch(1, 1)
+        file_browse_layout.setColumnStretch(2, 0)
+        layout.addRow("save directory:", file_browse)
+
+        self.filename_pattern = QLineEdit()
+        ext_regex = re.compile("\*\.\w+")
+        program = self.tool_instance.file_type.currentText()
+        file_info = self.tool_instance.manager.get_info(program)
+        ext = ext_regex.search(file_info.save_file_filter).group(0)
+        ext = ext.replace("*", "")
+        self.filename_pattern.setText("{name}" + ext)
+        self.filename_pattern.setToolTip(
+            "words in curly brackets will be replaces with attribute values from the model"
+        )
+        layout.addRow("filename pattern:", self.filename_pattern)
+
+        check_errors = QPushButton("check for errors")
+        check_errors.clicked.connect(self.check_for_errors)
+        layout.addRow(check_errors)
+
+        save_inputs = QPushButton("save files")
+        save_inputs.clicked.connect(self.save_stuff)
+        layout.addRow(save_inputs)
+
+        self.status = QStatusBar()
+        self.status.setSizeGripEnabled(False)
+        layout.addRow(self.status)
+
+        self.ui_area.setLayout(layout)
+        self.manage(None)
+
+    def check_for_errors(self, *args):
+        self.tool_instance.update_theory(update_settings=False)
+        theory = self.tool_instance.theory
+        for batch_basis, basis in zip(self.basis_elements.basis_ptables, theory.basis.basis):
+            elements = batch_basis.selectedElements()
+            basis.elements = elements
+
+        for batch_ecp, ecp in zip(self.basis_elements.ecp_ptables, theory.basis.ecp):
+            elements = batch_ecp.selectedElements()
+            ecp.elements = elements
+
+        all_warnings = []
+        for job in theory.job_type:
+            if isinstance(job, OptimizationJob) and job.constraints:
+                all_warnings.append("constraints might not be set properly")
+        
+        for action in self.menu.actions():
+            if action.isChecked():
+                m = action.data()
+                rescol = ResidueCollection(m)
+                theory.geometry = rescol
+                program = self.tool_instance.file_type.currentText()
+                contents, warnings = self.tool_instance.manager.get_info(program).get_file_contents(theory)
+                if warnings:
+                    all_warnings.extend([
+                        "warnings for %s (%s):" % (m.name, m.atomspec),
+                        *warnings,
+                    ])
+        
+        for warning in all_warnings:
+            self.tool_instance.session.logger.warning(warning)
+        
+        if all_warnings:
+            self.status.showMessage("warnings have been printed to the log")
+        else:
+            self.status.showMessage("no errors detected")
+
+    def save_stuff(self, *args):
+        self.tool_instance.update_theory(update_settings=False)
+        theory = self.tool_instance.theory
+        for batch_basis, basis in zip(self.basis_elements.basis_ptables, theory.basis.basis):
+            elements = batch_basis.selectedElements()
+            basis.elements = elements
+
+        for batch_ecp, ecp in zip(self.basis_elements.ecp_ptables, theory.basis.ecp):
+            elements = batch_ecp.selectedElements()
+            ecp.elements = elements
+        
+        all_warnings = []
+        for job in theory.job_type:
+            if isinstance(job, OptimizationJob) and job.constraints:
+                all_warnings.append("constraints might not be set properly")
+        
+        for action in self.menu.actions():
+            if action.isChecked():
+                m = action.data()
+                rescol = ResidueCollection(m)
+                theory.geometry = rescol
+                program = self.tool_instance.file_type.currentText()
+                contents, warnings = self.tool_instance.manager.get_info(program).get_file_contents(theory)
+                if warnings:
+                    all_warnings.extend([
+                        "warnings for %s (%s):" % (m.name, m.atomspec),
+                        *warnings,
+                    ])
+                fname = self.filename_pattern.text()
+                substitutions = re.findall("{\S+}", fname)
+                for sub in substitutions:
+                    try:
+                        fname = fname.replace(sub, getattr(m, sub[1:-1]))
+                    except AttributeError:
+                        self.tool_instance.logger.error(
+                            "Error while saving batch files: model %s has no attribute %s" % (m.name, sub)
+                        )
+                full_name = os.path.join(self.dir_path.text(), fname)
+                os.makedirs(self.dir_path.text(), exist_ok=True)
+                with open(full_name, "w") as f:
+                    f.write(contents)
+        
+        for warning in all_warnings:
+            self.tool_instance.session.logger.warning(warning)
+        
+        if all_warnings:
+            self.status.showMessage("warnings have been printed to the log")
+        else:
+            self.status.showMessage("no errors detected")
+
+        self.status.showMessage("saved files")
+
+    def open_save_dialog(self, *args):
+        
+        dirname = QFileDialog.getExistingDirectory()
+
+        if dirname:
+            self.dir_path.setText(dirname)
+
+    def cleanup(self):
+        self.tool_instance.preset_window = None
+
+        self.tool_instance.session.triggers.remove_handler(self._add_handler)
+        self.tool_instance.session.triggers.remove_handler(self._del_handler)
 
         super().cleanup()
 

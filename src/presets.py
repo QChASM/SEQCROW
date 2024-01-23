@@ -125,7 +125,6 @@ def seqcrow_bse_cartoon(session, models=None, atoms=None):
             color = element_color(atom.element.number)
 
             atom.color = color
-            atom.display = True
 
             try:
                 #AaronTools has bonding radii, maybe I should use vdw?
@@ -142,7 +141,6 @@ def seqcrow_bse_cartoon(session, models=None, atoms=None):
                 atom.draw_mode = Atom.BALL_STYLE
             else:
                 atom.draw_mode = Atom.STICK_STYLE
-
 
 def seqcrow_vdw(session, models=None, atoms=None):
     """atoms are displayed as B
@@ -325,7 +323,6 @@ def seqcrow_s(session, models=None, atoms=None):
                 
                 atom.display = display
 
-
 def seqcrow_s_cartoon(session, models=None, atoms=None):
     """atoms are represented with sticks
     atoms colored by Jmol colors"""
@@ -386,7 +383,7 @@ def seqcrow_s_cartoon(session, models=None, atoms=None):
                 atom.draw_mode = Atom.STICK_STYLE
             
             if atom.element.name == "H":
-                display = len(atom.neighbors) != 1
+                display = atom.display and (len(atom.neighbors) != 1)
                 if tm_bonds:
                     if any(atom in bond.atoms for bond in tm_bonds.pseudobonds):
                         display = True
@@ -442,7 +439,6 @@ def seqcrow_s_cartoon(session, models=None, atoms=None):
                                     break
                 
                 atom.display = display
-
 
 def indexLabel(session, models=None):
     from chimerax.core.objects import Objects

@@ -481,6 +481,10 @@ class EditStructure(ToolInstance):
                     rescol.update_chix(model)
                 else:
                     struc = rescol.get_chimera(self.session)
+                    struc.name += "_%s=%s" % (
+                        ",".join(t.chix_atom.name for t in target),
+                        ligname,
+                    )
                     new_structures.append(struc)
             
             first_pass = False
