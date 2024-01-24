@@ -6035,11 +6035,11 @@ class BatchExport(ChildToolWindow):
         theory = self.tool_instance.theory
         for batch_basis, basis in zip(self.basis_elements.basis_ptables, theory.basis.basis):
             elements = batch_basis.selectedElements()
-            basis.elements = elements
+            basis.ele_selection = elements
 
         for batch_ecp, ecp in zip(self.basis_elements.ecp_ptables, theory.basis.ecp):
             elements = batch_ecp.selectedElements()
-            ecp.elements = elements
+            ecp.ele_selection = elements
 
         all_warnings = []
         for job in theory.job_type:
@@ -6072,11 +6072,11 @@ class BatchExport(ChildToolWindow):
         theory = self.tool_instance.theory
         for batch_basis, basis in zip(self.basis_elements.basis_ptables, theory.basis.basis):
             elements = batch_basis.selectedElements()
-            basis.elements = elements
+            basis.ele_selection = elements
 
         for batch_ecp, ecp in zip(self.basis_elements.ecp_ptables, theory.basis.ecp):
             elements = batch_ecp.selectedElements()
-            ecp.elements = elements
+            ecp.ele_selection = elements
         
         all_warnings = []
         for job in theory.job_type:
