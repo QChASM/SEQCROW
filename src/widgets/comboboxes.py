@@ -141,10 +141,10 @@ class FilereaderComboBox(QComboBox):
             try:
                 for fr in filereaders:
                     if isinstance(self._other, tuple) and not all(x in fr for x in self._other):
-                        print("skipping tuple", fr.keys())
+                        # print("skipping tuple", fr.keys())
                         continue
                     elif isinstance(self._other, list) and not any(x in fr for x in self._other):
-                        print("skipping list", fr.keys())
+                        # print("skipping list", fr.keys())
                         continue
                     else:
                         self.addItem(

@@ -558,10 +558,33 @@ class NormalModes(ToolInstance):
         else:
             self.vec_mw_bool = False
 
-    def _get_coord_change(self, geom, vector, scaling):
+    def _get_coord_change(self, geom, vector, scaling, fr):
         """determine displacement given scaling and vector"""
         max_norm = None
-        for i, displacement in enumerate(vector):
+        dX = vector
+        if len(dX) != geom.num_atoms:
+            if "QM atoms" in fr:
+                new_dX = np.zeros((geom.num_atoms, 3))
+                ndx = {n: i for i, n in enumerate(fr["QM atoms"])}
+                active = fr["active atoms"]
+                fixed = fr["fixed atoms"]
+                qm = fr["QM atoms"]
+                not_in_qm = set([a for a in [*active, *fixed] if a not in qm])
+                c = 0
+                for a in sorted([*active, *fixed]):
+                    if a in not_in_qm:
+                        c += 1
+                        continue
+                    new_dX[ndx[a]] = dX[c]
+                    c += 1
+                dX = new_dX
+            else:
+                dummy_ndx = [i for i in range(0, geom.num_atoms) if geom.atoms[i].is_dummy]
+                for ndx in dummy_ndx[::-1]:
+                    dX = np.insert(dX, ndx, np.zeros(3), axis=0)
+        
+        
+        for i, displacement in enumerate(dX):
             n = np.linalg.norm(displacement)
             if self.vec_mw_bool and self.display_tabs.currentIndex() == 0:
                 n *= np.sqrt(geom.atoms[i].mass)
@@ -569,7 +592,7 @@ class NormalModes(ToolInstance):
             if max_norm is None or n > max_norm:
                 max_norm = n
 
-        dX = vector * scaling / max_norm
+        dX *= scaling / max_norm
 
         if self.vec_mw_bool and self.display_tabs.currentIndex() == 0:
             i = 0
@@ -600,7 +623,11 @@ class NormalModes(ToolInstance):
 
     def show_vec(self):
         """display normal mode displacement vector"""
-        fr, model = self.model_selector.currentData()
+        info = self.model_selector.currentData()
+        if not info:
+            self.session.logger.error("no model with frequency data loaded")
+            return
+        fr, model = info
         modes = self.table.selectedItems()
         if len([mode for mode in modes if mode.column() == 0]) != 1:
             raise RuntimeError("one mode must be selected")
@@ -624,7 +651,7 @@ class NormalModes(ToolInstance):
 
         vector = fr['frequency'].data[mode].vector
 
-        dX = self._get_coord_change(geom, vector, scale)
+        dX = self._get_coord_change(geom, vector, scale, fr)
         
         #make a bild file for the model
         s = ".color %f %f %f\n" % tuple(color[:-1])
@@ -652,7 +679,11 @@ class NormalModes(ToolInstance):
     
     def show_anim(self):
         """play selected modes as an animation"""
-        fr, model = self.model_selector.currentData()
+        info = self.model_selector.currentData()
+        if not info:
+            self.session.logger.error("no model with frequency data loaded")
+            return
+        fr, model = info
         modes = self.table.selectedItems()
         if len([mode for mode in modes if mode.column() == 0]) != 1:
             raise RuntimeError("one mode must be selected")
@@ -673,12 +704,8 @@ class NormalModes(ToolInstance):
 
         vector = fr['frequency'].data[mode].vector
 
-        dX = self._get_coord_change(geom, vector, scale)
-        if len(dX) != geom.num_atoms:
-            dummy_ndx = [i for i in range(0, geom.num_atoms) if geom.atoms[i].is_dummy]
-            for ndx in dummy_ndx[::-1]:
-                dX = np.insert(dX, ndx, np.zeros(3), axis=0)
-        
+        dX = self._get_coord_change(geom, vector, scale, fr)
+
         coords = geom.coords
         Xf = coords + dX
         X = coords
