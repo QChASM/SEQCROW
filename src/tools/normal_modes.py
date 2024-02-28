@@ -474,7 +474,7 @@ class NormalModes(ToolInstance):
         # masses = np.sqrt(np.array([a.mass for a in geom.atoms]))
         self.table.sortItems(0, Qt.AscendingOrder)
         for i, mode in enumerate(fr["frequency"].data):
-            vec = mode.vector
+            vec = self._get_coord_change(geom, mode.vector, 1.0, fr)
             # vec *= masses[:, np.newaxis]
             vec = np.reshape(vec, -1)
             item = self.table.item(i, self.table.columnCount() - 1)
