@@ -349,7 +349,23 @@ class BuildQM(ToolInstance):
         clusterly.triggered.connect(self.show_cluster_job_prep)
         run.addAction(clusterly)
         #run.addAction(remotely)
-        
+
+        utilities = self._menu.addMenu("Utilities")
+        copy_0 = utilities.addMenu("copy selected atom indicies (0-start)")
+        action = QAction("comma-delimited", self.tool_window.ui_area)
+        action.triggered.connect(lambda *args: self.copy_atom_ndx(0, ","))
+        copy_0.addAction(action)
+        action = QAction("space-delimited", self.tool_window.ui_area)
+        action.triggered.connect(lambda *args: self.copy_atom_ndx(0, " "))
+        copy_0.addAction(action)
+        copy_1 = utilities.addMenu("copy selected atom indicies (1-start)")
+        action = QAction("comma-delimited", self.tool_window.ui_area)
+        action.triggered.connect(lambda *args: self.copy_atom_ndx(1, ","))
+        copy_1.addAction(action)
+        action = QAction("space-delimited", self.tool_window.ui_area)
+        action.triggered.connect(lambda *args: self.copy_atom_ndx(1, " "))
+        copy_1.addAction(action)
+
         layout.setMenuBar(self._menu)
 
         self.tool_window.ui_area.setLayout(layout)
@@ -634,6 +650,18 @@ class BuildQM(ToolInstance):
         self.settings.presets = dumps(self.presets, cls=ATEncoder)
 
         self.settings.save()
+
+    def copy_atom_ndx(self, offset, delimiter):
+        model = self.model_selector.currentData()
+        if not model:
+            return
+        atoms = selected_atoms(self.session).intersect(model.atoms)
+        ndx = [model.atoms.index(a) for a in atoms]
+        output = delimiter.join([str(n + offset) for n in ndx])
+
+        app = QApplication.instance()
+        clipboard = app.clipboard()
+        clipboard.setText(output)
 
     def refresh_presets(self):
         """cleans and repopulates the "presets" dropdown on the tool's ribbon"""

@@ -100,6 +100,8 @@ class FreqTableWidgetItem(QTableWidgetItem):
 
     def __lt__(self, other):
         if self.data(Qt.UserRole) is None:
+            if self.data(Qt.DisplayRole) is None:
+                return False
             return self.data(Qt.DisplayRole) < other.data(Qt.DisplayRole)
         return self.data(Qt.UserRole) < other.data(Qt.UserRole)
 
