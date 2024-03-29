@@ -147,7 +147,7 @@ class BuildRaven(BuildQM, ToolInstance):
         cached = loads(self.settings.presets, cls=ATDecoder)
         for file_format in session.seqcrow_qm_input_manager.formats:
             info = session.seqcrow_qm_input_manager.get_info(file_format)
-            if info.name not in available_programs:
+            if not any(p == info.name for p in available_programs):
                 continue
             if file_format not in self.presets:
                 self.presets[file_format] = info.initial_presets
@@ -159,7 +159,7 @@ class BuildRaven(BuildQM, ToolInstance):
             self.session.logger.warning("settings migrated from version 2")
             self.settings.settings_version = self.settings.settings_version + 1
 
-        self.refresh_presets()
+        self.refresh_presets(save_presets=False)
 
         global_triggers = get_triggers()
 

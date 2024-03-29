@@ -663,7 +663,7 @@ class BuildQM(ToolInstance):
         clipboard = app.clipboard()
         clipboard.setText(output)
 
-    def refresh_presets(self):
+    def refresh_presets(self, save_presets=True):
         """cleans and repopulates the "presets" dropdown on the tool's ribbon"""
         self.presets_menu.clear()
 
@@ -674,7 +674,8 @@ class BuildQM(ToolInstance):
                 preset_action.triggered.connect(lambda *args, program=program, name=preset: self.apply_preset(program, name))
                 program_submenu.addAction(preset_action)
 
-        self.settings.presets = dumps(self.presets, cls=ATEncoder)
+        if save_presets:
+            self.settings.presets = dumps(self.presets, cls=ATEncoder)
 
         if hasattr(self, "new_preset"):
             sep = self.presets_menu.addSeparator()
