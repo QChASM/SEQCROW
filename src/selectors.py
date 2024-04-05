@@ -340,6 +340,10 @@ def select_rings(session, models, results):
     select atoms in rings
     does not check the size of the ring
     """
+    # from cProfile import Profile
+    # profile = Profile()
+    # profile.enable()
+    
     for model in models:
         if not isinstance(model, AtomicStructure):
             continue
@@ -349,7 +353,7 @@ def select_rings(session, models, results):
         # index map to quickly get indices of atoms
         ndx = {a: i for i, a in enumerate(model.atoms)}
         # we use a connectivity path to look for rings
-        graph = [{ndx[n] for n in a.neighbors} for a in ndx]
+        graph = [[ndx[n] for n in a.neighbors] for a in ndx]
         # remove nodes that only have 1 neighbor, as it is not
         # possible for these to be in a ring
         prune_branches(graph)
@@ -377,7 +381,7 @@ def select_rings(session, models, results):
                 if path is not None:
                     ring_atoms.update(path)
                     found_ring = True
-                    graph[a].add(a2)
+                    graph[a].append(a2)
                 else:
                     # this pair of atoms is not in a ring
                     # we will not need to revisit
@@ -389,10 +393,13 @@ def select_rings(session, models, results):
             if not found_ring:
                 for a2 in graph[a]:
                     graph[a2].remove(a)
-                graph[a] = {}
+                graph[a] = []
                 prune_branches(graph)
         
         results.add_atoms(Atoms([model.atoms[i] for i in ring_atoms]))
+
+    # profile.disable()
+    # profile.print_stats()
 
 def get_fragment(start, stop=None, max_len=None):
     """
@@ -606,8 +613,8 @@ def prune_branches(graph):
         trimmed_leaves = False
         for i in range(0, len(graph)):
             if len(graph[i]) == 1:
-                for n in graph[i]:
-                    graph[n].remove(i)
-                graph[i] = {}
+                graph[graph[i][0]].remove(i)
+                graph[i] = []
                 trimmed_leaves = True
+
     
