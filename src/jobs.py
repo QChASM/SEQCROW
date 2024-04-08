@@ -262,7 +262,11 @@ class LocalJob(QThread):
         elif hasattr(self.output_name, "__iter__"):
             if isinstance(self.output_name, dict):
                 for fmt, path in self.output_name.items():
-                    check_for_errors.append((path, fmt, None))
+                    if not isinstance(path, str):
+                        for f in path:
+                            check_for_errors.append((f, fmt, None))
+                    else:
+                        check_for_errors.append((path, fmt, None))
 
             else:
                 for file in self.output_name:
