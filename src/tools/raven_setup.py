@@ -69,7 +69,6 @@ from SEQCROW.tools.input_generator import (
 from SEQCROW.jobs import LocalClusterJob
 from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.utils import iter2str
-from SEQCROW.widgets.periodic_table import PeriodicTable, ElementButton
 from SEQCROW.widgets.comboboxes import ModelComboBox
 from SEQCROW.widgets.menu import FakeMenu
 from SEQCROW.finders import AtomSpec
@@ -82,7 +81,10 @@ from AaronTools.theory.method import KNOWN_SEMI_EMPIRICAL
 from AaronTools.utils.utils import combine_dicts
 from AaronTools.json_extension import ATDecoder, ATEncoder
 from AaronTools.pathway import Pathway
+from AaronTools.internal_coordinates import InternalCoordinateSet
 
+
+# from cProfile import Profile
 
 
 class _NoScrollComboBox(QComboBox):
@@ -110,6 +112,9 @@ class BuildRaven(BuildQM, ToolInstance):
     SESSION_SAVE = False
 
     def __init__(self, session, name):
+        # p = Profile()
+        # p.enable()
+        
         ToolInstance.__init__(self, session, name)
 
         self.settings = _InputGeneratorSettings(
@@ -145,11 +150,12 @@ class BuildRaven(BuildQM, ToolInstance):
 
         self.presets = dict()
         cached = loads(self.settings.presets, cls=ATDecoder)
+
         for file_format in session.seqcrow_qm_input_manager.formats:
             info = session.seqcrow_qm_input_manager.get_info(file_format)
             if not any(p == info.name for p in available_programs):
                 continue
-            if file_format not in self.presets:
+            if file_format not in cached:
                 self.presets[file_format] = info.initial_presets
             else:
                 self.presets[file_format] = cached[file_format]
@@ -173,6 +179,9 @@ class BuildRaven(BuildQM, ToolInstance):
         # unless the user has saved its position, make it small
         if name not in self.session.ui.settings.tool_positions['windows']:
             self.tool_window.shrink_to_fit()
+        
+        # p.disable()
+        # p.print_stats()
 
     def _build_ui(self):
         #build an interface with a dropdown menu to select software package
@@ -260,6 +269,8 @@ class BuildRaven(BuildQM, ToolInstance):
         tabs.addTab(self.basis_widget, "basis functions")
         tabs.addTab(self.other_keywords_widget, "additional options")
 
+        # self.reactant_selector.blockSignals(True)
+        # self.product_selector.blockSignals(True)
         self.reactant_selector.currentIndexChanged.connect(self.change_reactant)
         self.product_selector.currentIndexChanged.connect(self.change_product)
 
@@ -296,9 +307,13 @@ class BuildRaven(BuildQM, ToolInstance):
         warnings.triggered.connect(self.show_warnings)
         view.addAction(warnings)
         
-        warnings = QAction("Linear path", self.tool_window.ui_area)
-        warnings.triggered.connect(self.load_initial_path)
-        view.addAction(warnings)
+        show_lin_cart = QAction("Linear Cartesian path", self.tool_window.ui_area)
+        show_lin_cart.triggered.connect(self.load_initial_path)
+        view.addAction(show_lin_cart)
+
+        show_lin_ic = QAction("Linear RIC path (experimental)", self.tool_window.ui_area)
+        show_lin_ic.triggered.connect(self.load_initial_ric_path)
+        view.addAction(show_lin_ic)
         
         queue = QAction("Queue", self.tool_window.ui_area)
         queue.triggered.connect(self.show_queue)
@@ -369,7 +384,7 @@ class BuildRaven(BuildQM, ToolInstance):
         for (a1, a2) in [*broken, *formed]:
             run(
                 self.session,
-                "tsbond %s %s" % (
+                "monitorBonds %s %s" % (
                     new_mol.atoms[a1].atomspec,
                     new_mol.atoms[a2].atomspec,
                 ),
@@ -377,6 +392,88 @@ class BuildRaven(BuildQM, ToolInstance):
             )
             
         css = CoordinateSetSlider(self.session, new_mol)
+        css.play_cb()
+
+    def load_initial_ric_path(self):
+        """
+        show the initial path to make sure the atoms are ordered correctly
+        """
+        reactant = self.reactant_selector.currentData()
+        product = self.product_selector.currentData()
+        if not reactant or not product:
+            self.session.logger.warning("reactant or product not set")
+            return 
+
+        reactant = ResidueCollection(
+            reactant,
+            bonds_matter=True
+        )
+        reactant_ndx = self.job_widget.reactant_order()
+        reactant.atoms = [reactant.atoms[i] for i in reactant_ndx]
+
+        product = ResidueCollection(
+            product,
+            bonds_matter=True
+        )
+        product_ndx = self.job_widget.product_order()
+        product.atoms = [product.atoms[i] for i in product_ndx]
+        product.RMSD(reactant, align=True, sort=False)
+        
+        ric = InternalCoordinateSet(reactant, torsion_type="all")
+        ric.determine_coordinates(product, torsion_type="all")
+
+        if np.linalg.norm(reactant.coords - product.coords) < 1e-3:
+            self.session.logger.error("reactant and product are the same")
+            return
+        
+        new_mol = reactant.get_chimera(self.session, discard_residues=True)
+        new_mol.name = "linear RIC interpolation"
+        
+        dq = ric.difference(reactant.coords, product.coords)
+        n = 21
+        coordsets = np.zeros((n, len(reactant.atoms), 3))
+        for i, t in enumerate(np.linspace(0, 1, num=n)):
+            if i == n - 1:
+                reactant.coords = coordsets[i-1]
+                product.RMSD(reactant, align=True, sort=False)
+                coordsets[i] = product.coords
+                break
+            if i == 0:
+                coordsets[i] = reactant.coords
+                continue
+            # if t <= 0.5:
+            new_coords, err = ric.apply_change(
+                reactant.coords,
+                t * dq,
+                debug=False,
+            )
+            # else:
+            #     new_coords, err = ric.apply_change(
+            #         product.coords,
+            #         (1 - t * dq),
+            #     )
+
+            if err > 1e-3:
+                target_dq = t * dq - ric.difference(reactant.coords, coordsets[i-1])
+                B = ric.B_matrix(coordsets[i-1])
+                B_inv = np.linalg.pinv(B)
+                dx = np.matmul(B_inv, target_dq)
+                new_coords = np.reshape(dx, (len(reactant.atoms), 3))
+                new_coords += coordsets[i-1]
+
+            # print(i, err)
+            coordsets[i] = new_coords
+            
+        new_mol.add_coordsets(coordsets, replace=True)
+        self.session.models.add([new_mol])
+        seqcrow_bse(self.session, models=[new_mol])
+        run(
+            self.session,
+            "monitorBonds %s guess True" % new_mol.atomspec,
+            log=False
+        )
+            
+        css = CoordinateSetSlider(self.session, new_mol, pause_frames=3)
         css.play_cb()
 
     def change_tss_algorithm(self, text):
