@@ -290,7 +290,7 @@ class ConformerTool(BuildQM):
             except KeyError:
                 pass
             try:
-                self.job_widget.setCharge(fr["multiplicity"])
+                self.job_widget.setMultiplicity(fr["multiplicity"])
             except KeyError:
                 pass
 
