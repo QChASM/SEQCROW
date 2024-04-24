@@ -116,10 +116,7 @@ def get_gaussian_stqn_file_contents(reactant, product, theory):
     molecule, mol_warnings = theory.make_molecule(
         style="gaussian", return_warnings=True
     )
-    footer, footer_warnings = theory.make_footer(
-        style="gaussian", return_warnings=True
-    )
-    contents = header + molecule + footer
+    contents = header + molecule
     contents = contents.rstrip()
     contents += "\n\nproduct\n\n%i %i\n" % (
         theory.charge, theory.multiplicity

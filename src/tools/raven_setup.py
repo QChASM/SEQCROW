@@ -229,6 +229,8 @@ class BuildRaven(BuildQM, ToolInstance):
         )
 
         ndx = self.file_type.findText(init_form.name, Qt.MatchExactly)
+        if ndx == -1:
+            init_form = self.session.seqcrow_qm_input_manager.get_info(tss_info.available_for[0])
         if ndx >= 0:
             self.file_type.setCurrentIndex(ndx)
         self.file_type.currentIndexChanged.connect(self.change_file_type)
