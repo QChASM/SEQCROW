@@ -2240,7 +2240,7 @@ class JobTypeOption(QWidget):
                     for atom in constraints["atoms"]:
                         if atom.deleted:
                             continue
-                        new_constraints["atoms"].append(AtomSpec(atom.atomspec))
+                        new_constraints["atoms"].append(str(atom.structure.atoms.index(atom) + 1))
 
                     for key in ["bonds", "angles", "torsions"]:
                         if key in constraints:
@@ -2252,7 +2252,7 @@ class JobTypeOption(QWidget):
                                             break
                                     else:
                                         new_constraints[key].append(
-                                            [AtomSpec(atom.atomspec) for atom in constraint]
+                                            [str(atom.structure.atoms.index(atom) + 1) for atom in constraint]
                                         )
 
                 constraints = new_constraints
@@ -6040,7 +6040,9 @@ class BatchExport(ChildToolWindow):
         ext = ext.replace("*", "")
         self.filename_pattern.setText("{name}" + ext)
         self.filename_pattern.setToolTip(
-            "words in curly brackets will be replaces with attribute values from the model"
+            "words in curly brackets will be replaces with attribute values from the model\n"
+            "e.g. {atomspec} could become #1 or #2 in the file name\n"
+            "{i} will be replaced with a counter for how many models have been saved"
         )
         layout.addRow("filename pattern:", self.filename_pattern)
 
@@ -6112,8 +6114,10 @@ class BatchExport(ChildToolWindow):
             if isinstance(job, OptimizationJob) and job.constraints:
                 all_warnings.append("constraints might not be set properly")
         
+        n = 0
         for action in self.menu.actions():
             if action.isChecked():
+                n += 1
                 m = action.data()
                 rescol = ResidueCollection(m)
                 theory.geometry = rescol
@@ -6130,9 +6134,12 @@ class BatchExport(ChildToolWindow):
                     try:
                         fname = fname.replace(sub, getattr(m, sub[1:-1]))
                     except AttributeError:
-                        self.tool_instance.logger.error(
-                            "Error while saving batch files: model %s has no attribute %s" % (m.name, sub)
-                        )
+                        if sub[1:-1] == "i":
+                            fname = fname.replace(sub, str(n))
+                        else:
+                            self.tool_instance.logger.error(
+                                "Error while saving batch files: model %s has no attribute %s" % (m.name, sub)
+                            )
                 full_name = os.path.join(self.dir_path.text(), fname)
                 os.makedirs(self.dir_path.text(), exist_ok=True)
                 with open(full_name, "w") as f:
