@@ -3,6 +3,8 @@ things used to construct input files for the QM Input File Builder and
 run local jobs using the input files
 """
 
+import re
+
 from AaronTools.theory import *
 from AaronTools.fileIO import FileWriter
 from AaronTools.theory.implicit_solvent import (
@@ -775,6 +777,7 @@ class GaussianFileInfo(QMInputFileInfo):
         molecule, mol_warnings = theory.make_molecule(style="gaussian", return_warnings=True)
         footer, footer_warnings = theory.make_footer(style="gaussian", return_warnings=True)
         contents = header + molecule + footer
+        contents = re.sub("{{\s?name\s?}}", theory.geometry.name, contents)
         warnings = header_warnings + mol_warnings + footer_warnings
         return contents, warnings
 
@@ -969,6 +972,7 @@ class ORCAFileInfo(QMInputFileInfo):
 
         molecule += "*\n"
         contents = header + molecule + footer
+        contents = re.sub("{{\s?name\s?}}", theory.geometry.name, contents)
         warnings = header_warnings
         return contents, warnings
 
@@ -1125,6 +1129,7 @@ class Psi4FileInfo(QMInputFileInfo):
         molecule, mol_warnings = theory.make_molecule(style="psi4", return_warnings=True)
         footer, footer_warnings = theory.make_footer(style="psi4", return_warnings=True)
         contents = header + molecule + footer
+        contents = re.sub("{{\s?name\s?}}", theory.geometry.name, contents)
         warnings = header_warnings + mol_warnings + footer_warnings
         return contents, warnings
 
@@ -1183,6 +1188,7 @@ class SQMFileInfo(QMInputFileInfo):
         header, header_warnings = theory.make_header(style="sqm", return_warnings=True)
         molecule, mol_warnings = theory.make_molecule(style="sqm", return_warnings=True)
         contents = header + molecule
+        contents = re.sub("{{\s?name\s?}}", theory.geometry.name, contents)
         warnings = header_warnings + mol_warnings
         return contents, warnings
 
@@ -1304,6 +1310,7 @@ class QChemFileInfo(QMInputFileInfo):
         )
 
         out = header + mol
+        contents = re.sub("{{\s?name\s?}}", theory.geometry.name, out)
         warnings = header_warnings + mol_warnings
         
         return out, warnings
