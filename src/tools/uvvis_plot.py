@@ -958,6 +958,18 @@ class UVVisSpectrum(ToolInstance):
                     freq_file, _ = freq_file
                     freqs[-1].append(CompOutput(freq_file))
                 
+                    if single_points[-1][-1].geometry.num_atoms != freqs[-1][-1].geometry.num_atoms:
+                        self.session.logger.error(
+                            "different number of atoms between paired frequency file %s "
+                            "and energy file %s. Structures for the energy and frequency "
+                            "are expected to match, otherwise the Boltzmann weighting "
+                            "of conformers will be incorrect" % (
+                                single_points[-1][-1].geometry.name,
+                                freqs[-1][-1].geometry.name
+                            )
+                        )
+                        return
+                
                     rmsd = freqs[-1][-1].geometry.RMSD(
                         single_points[-1][-1].geometry,
                         sort=True,
@@ -970,6 +982,17 @@ class UVVisSpectrum(ToolInstance):
                     freqs[-1].append(None)
                 
                 geom = Geometry(fr["atoms"])
+                
+                if single_points[-1][-1].geometry.num_atoms != geom.num_atoms:
+                    self.session.logger.error(
+                        "different number of atoms between paired energy file %s "
+                        "and UV/vis file %s." % (
+                            single_points[-1][-1].geometry.name,
+                            geom.name
+                        )
+                    )
+                    return
+                
                 rmsd = single_points[-1][-1].geometry.RMSD(
                     geom,
                     sort=True,

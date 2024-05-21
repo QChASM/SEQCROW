@@ -1024,6 +1024,18 @@ class IRSpectrum(ToolInstance):
                 sp_file, _ = self.tree.itemWidget(conf, 1).currentData()
                 single_points[-1].append(CompOutput(sp_file))
                 
+                if single_points[-1][-1].geometry.num_atoms != freqs[-1][-1].geometry.num_atoms:
+                    self.session.logger.error(
+                        "different number of atoms between paired frequency file %s "
+                        "and energy file %s. Structures for the energy and frequency "
+                        "are expected to match, otherwise the Boltzmann weighting "
+                        "of conformers will be incorrect" % (
+                            single_points[-1][-1].geometry.name,
+                            freqs[-1][-1].geometry.name
+                        )
+                    )
+                    return
+                
                 rmsd = freqs[-1][-1].geometry.RMSD(
                     single_points[-1][-1].geometry,
                     sort=True,

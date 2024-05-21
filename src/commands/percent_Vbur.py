@@ -168,6 +168,14 @@ def _vbur(
             x_vec /= np.linalg.norm(x_vec)
             ip_vector = -np.cross(x_vec, oop_vector)
         ip_vector /= np.linalg.norm(ip_vector)
+        
+        if not len(key_atoms) and not useScene and (steric_map or labels != "none"):
+            session.logger.error(
+                "error while creating visuals for " + rescol.name + "\n"\
+                "center atom has no bonds to help orient visuals\n" + \
+                "try checking the 'use display orientation' box in the settings"
+            )
+            return
 
         basis = np.array([x_vec, ip_vector, oop_vector]).T
     
@@ -183,7 +191,7 @@ def _vbur(
     if steric_map:
         steric_info = rescol.steric_map(
             center=center_xyz,
-            key_atoms=[AtomSpec(a.atomspec) for a in key_atoms],
+            key_atoms=[AtomSpec(a.atomspec) for a in key_atoms] if len(key_atoms) else None,
             radii=radii,
             oop_vector=oop_vector,
             ip_vector=ip_vector,
@@ -375,17 +383,19 @@ def percent_vbur(
                 "determine_key": difference or steric_map,
             })
 
-    # results = [_vbur(*arg, **kwarg) for arg, kwarg in zip(args, kwargs)]
+    results = [_vbur(*arg, **kwarg) for arg, kwarg in zip(args, kwargs)]
 
-    n_threads = max(1, int(os.cpu_count() - 2))
-    with concurrent.futures.ThreadPoolExecutor(max_workers=n_threads) as executor:
-        data = [
-            executor.submit(_vbur, *arg, **kwarg)
-            for arg, kwarg in zip(args, kwargs)
-        ]
-        results = [d.result() for d in data]
+    # n_threads = max(1, int(os.cpu_count() - 2))
+    # with concurrent.futures.ThreadPoolExecutor(max_workers=n_threads) as executor:
+    #     data = [
+    #         executor.submit(_vbur, *arg, **kwarg)
+    #         for arg, kwarg in zip(args, kwargs)
+    #     ]
+    #     results = [d.result() for d in data]
 
     for result in results:
+        if result is None:
+            continue
         model = result["model"]
         center = result["center"]
         if isinstance(center, np.ndarray):
@@ -437,6 +447,8 @@ def percent_vbur(
                 "the buried volume for multiple centers to visualize the differences between them"
             )
         for i, data1 in enumerate(results):
+            if data1 is None:
+                continue
             model1 = data1["model"]
             center1 = data1["at_center"]
             targets1 = data1["targets"]
@@ -444,6 +456,8 @@ def percent_vbur(
             vbur1 = data1["vbur"]
             rescol1 = data1["rescol"]
             for j, data2 in enumerate(results[i+1:]):
+                if data2 is None:
+                    continue
                 model2 = data2["model"]
                 center2 = data2["at_center"]
                 targets2 = data2["targets"]
@@ -479,12 +493,7 @@ def percent_vbur(
                 ]
                 run(session, " ".join(args))
 
-    return results
-    
-    if not return_values:
-        session.logger.info(s, is_html=True)
-    else:
-        return out
+    return [r for r in results if r is not None]
 
 
 def vbur_vis(
