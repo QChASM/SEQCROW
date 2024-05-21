@@ -314,7 +314,7 @@ class _SEQCROW_API(BundleAPI):
         """
         save an XYZ file
         """
-        from .io import save_aarontools
+        from .io import save_xyz
         if format_name != "XYZ":
             raise NotImplementedError("SEQCROW can only save XYZ files, not %s files" % format_name)
 
@@ -714,24 +714,46 @@ class _SEQCROW_API(BundleAPI):
 
         elif mgr is session.save_command:
             from chimerax.save_command import SaverInfo
-            from SEQCROW.io import save_aarontools
+            from SEQCROW.io import save_xyz
 
             if name == "XYZ file":
                 class Info(SaverInfo):
                     def save(self, session, path, **kw):
-                        #save_aarontools doesn't actually pay attention to format_name yet
-                        save_aarontools(session, path, "XYZ file", **kw)
+                        save_xyz(session, path, **kw)
 
                     @property
                     def save_args(self):
-                        return {'models': ModelsArg, 'comment': StringArg}
+                        return {
+                            'models': ModelsArg,
+                            'comment': StringArg,
+                            'coordsets': BoolArg,
+                        }
 
                     def save_args_widget(self, session):
-                        from .widgets import ModelComboBox
-                        return ModelComboBox(session, autoUpdate=False)
+                        from Qt.QtWidgets import QWidget, QFormLayout, QCheckBox
+                        from .widgets import ModelsPushButton
+
+                        widget = QWidget()
+                        layout = QFormLayout(widget)
+                        models = ModelsPushButton(
+                            session,
+                            "click to select structures",
+                            autoUpdate=False,
+                            selectedByDefault=False,
+                        )
+                        layout.addRow(models)
+                        
+                        coordsets = QCheckBox()
+                        layout.addRow("save all coordinates", coordsets)
+                        
+                        return widget
 
                     def save_args_string_from_widget(self, widget):
-                        return widget.options_string()
+                        from Qt.QtWidgets import QFormLayout
+                        models = widget.layout().itemAt(0).widget().options_string()
+                        coordsets = widget.layout().itemAt(1, QFormLayout.FieldRole).widget().isChecked()
+                        
+                        return models + " coordsets %s" % str(coordsets)
 
                 return Info()
 
