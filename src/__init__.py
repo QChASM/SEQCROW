@@ -739,7 +739,7 @@ class _SEQCROW_API(BundleAPI):
                             session,
                             "click to select structures",
                             autoUpdate=False,
-                            selectedByDefault=False,
+                            selectedByDefault=True,
                         )
                         layout.addRow(models)
                         
