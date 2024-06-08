@@ -504,15 +504,15 @@ def open_nbo(session, path, file_name, format_name=None, orbitals=None):
     return [structure], status
 
 
-def save_aarontools(session, path, format_name, **kwargs):
+def save_xyz(session, path, **kwargs):
     """ 
-    save XYZ file using AaronTools
+    save XYZ file
     kwargs may be:
         comment - str
     """
     from chimerax.atomic import AtomicStructure
     
-    accepted_kwargs = ['comment', 'models']
+    accepted_kwargs = ['comment', 'models', 'coordsets']
     unknown_kwargs = [kw for kw in kwargs if kw not in accepted_kwargs]
     if len(unknown_kwargs) > 0:
         raise RuntimeWarning("unrecognized keyword%s %s?" % ("s" if len(unknown_kwargs) > 1 else "", ", ".join(unknown_kwargs)))
@@ -521,6 +521,16 @@ def save_aarontools(session, path, format_name, **kwargs):
         models = kwargs['models']
     else:
         models = None
+        
+    if 'coordsets' in kwargs:
+        coordsets = kwargs['coordsets']
+    else:
+        coordsets = False
+
+    if 'comment' in kwargs:
+        comment = kwargs['comment']
+    else:
+        comment = ""
     
     if models is None:
         models = session.models.list(type=AtomicStructure)
@@ -532,10 +542,19 @@ def save_aarontools(session, path, format_name, **kwargs):
     
     with open(path, "w") as f:
         for model in models:
-            f.write("%i\n%s\n" % (model.num_atoms, model.name))
-            for atom in model.atoms:
-                f.write(
-                    "%2s    %9.5f    %9.5f     %9.5f\n" % (
-                        atom.element.name, *atom.coord
+            if coordsets:
+                for cs in model.coordset_ids:
+                    f.write("%i\n%s\n" % (model.num_atoms, comment if comment else model.name))
+                    coords = model.coordset(cs).xyzs
+                    for atom, xyz in zip(model.atoms, coords):
+                        f.write("%2s    %9.5f    %9.5f     %9.5f\n" % (
+                            atom.element.name, *xyz
+                        ))
+            else:
+                f.write("%i\n%s\n" % (model.num_atoms, comment if comment else model.name))
+                for atom in model.atoms:
+                    f.write(
+                        "%2s    %9.5f    %9.5f     %9.5f\n" % (
+                            atom.element.name, *atom.coord
+                        )
                     )
-                )

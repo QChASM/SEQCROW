@@ -55,6 +55,7 @@ from SEQCROW.jobs import LocalClusterJob
 from SEQCROW.residue_collection import ResidueCollection, Residue
 from SEQCROW.utils import iter2str
 from SEQCROW.widgets.periodic_table import PeriodicTable, ElementButton
+from SEQCROW.widgets.buttons import ModelsPushButton
 from SEQCROW.widgets.comboboxes import ModelComboBox
 from SEQCROW.widgets.menu import FakeMenu
 from SEQCROW.widgets.icons import pencil_icon, plus_icon
@@ -5975,41 +5976,12 @@ class BatchExport(ChildToolWindow):
 
         self._build_ui()
 
-        self._add_handler = self.tool_instance.session.triggers.add_handler(
-            ADD_MODELS, self._add_models
-        )
-        self._del_handler = self.tool_instance.session.triggers.add_handler(
-            REMOVE_MODELS, self._del_models
-        )
-    
-        self._add_models("", self.tool_instance.session.models.list())
-    
-    def _add_models(self, trigger_name, models):
-        for m in models:
-            if isinstance(m, AtomicStructure):
-                action = self.menu.addAction(
-                    "%s (%s)" % (m.name, m.atomspec),
-                )
-                action.setCheckable(True)
-                action.setChecked(True)
-                action.setData(m)
-                self.menu.addAction(action)
-    
-    def _del_models(self, trigger_name, models):
-        actions = self.menu.actions()
-        for action in actions:
-            if action.data() in models:
-                self.menu.removeAction(action)
-                action.deleteLater()
-    
     def _build_ui(self):
 
         layout = QFormLayout()
         layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
-        self.select_models = QPushButton("click to select structures")
-        self.menu = QMenu("select models")
-        self.select_models.setMenu(self.menu)
+        self.select_models = ModelsPushButton(self.tool_instance.session, "click to select structures")
         layout.addRow(self.select_models)
 
         self.basis_elements = BasisElements(tool_instance=self.tool_instance)
@@ -6077,18 +6049,16 @@ class BatchExport(ChildToolWindow):
             if isinstance(job, OptimizationJob) and job.constraints:
                 all_warnings.append("constraints might not be set properly")
         
-        for action in self.menu.actions():
-            if action.isChecked():
-                m = action.data()
-                rescol = ResidueCollection(m)
-                theory.geometry = rescol
-                program = self.tool_instance.file_type.currentText()
-                contents, warnings = self.tool_instance.manager.get_info(program).get_file_contents(theory)
-                if warnings:
-                    all_warnings.extend([
-                        "warnings for %s (%s):" % (m.name, m.atomspec),
-                        *warnings,
-                    ])
+        for m in self.select_models.selectedModels():
+            rescol = ResidueCollection(m)
+            theory.geometry = rescol
+            program = self.tool_instance.file_type.currentText()
+            contents, warnings = self.tool_instance.manager.get_info(program).get_file_contents(theory)
+            if warnings:
+                all_warnings.extend([
+                    "warnings for %s (%s):" % (m.name, m.atomspec),
+                    *warnings,
+                ])
         
         for warning in all_warnings:
             self.tool_instance.session.logger.warning(warning)
@@ -6115,35 +6085,33 @@ class BatchExport(ChildToolWindow):
                 all_warnings.append("constraints might not be set properly")
         
         n = 0
-        for action in self.menu.actions():
-            if action.isChecked():
-                n += 1
-                m = action.data()
-                rescol = ResidueCollection(m)
-                theory.geometry = rescol
-                program = self.tool_instance.file_type.currentText()
-                contents, warnings = self.tool_instance.manager.get_info(program).get_file_contents(theory)
-                if warnings:
-                    all_warnings.extend([
-                        "warnings for %s (%s):" % (m.name, m.atomspec),
-                        *warnings,
-                    ])
-                fname = self.filename_pattern.text()
-                substitutions = re.findall("{\S+}", fname)
-                for sub in substitutions:
-                    try:
-                        fname = fname.replace(sub, getattr(m, sub[1:-1]))
-                    except AttributeError:
-                        if sub[1:-1] == "i":
-                            fname = fname.replace(sub, str(n))
-                        else:
-                            self.tool_instance.logger.error(
-                                "Error while saving batch files: model %s has no attribute %s" % (m.name, sub)
-                            )
-                full_name = os.path.join(self.dir_path.text(), fname)
-                os.makedirs(self.dir_path.text(), exist_ok=True)
-                with open(full_name, "w") as f:
-                    f.write(contents)
+        for m in self.select_models.selectedModels():
+            n += 1
+            rescol = ResidueCollection(m)
+            theory.geometry = rescol
+            program = self.tool_instance.file_type.currentText()
+            contents, warnings = self.tool_instance.manager.get_info(program).get_file_contents(theory)
+            if warnings:
+                all_warnings.extend([
+                    "warnings for %s (%s):" % (m.name, m.atomspec),
+                    *warnings,
+                ])
+            fname = self.filename_pattern.text()
+            substitutions = re.findall("{\S+}", fname)
+            for sub in substitutions:
+                try:
+                    fname = fname.replace(sub, getattr(m, sub[1:-1]))
+                except AttributeError:
+                    if sub[1:-1] == "i":
+                        fname = fname.replace(sub, str(n))
+                    else:
+                        self.tool_instance.logger.error(
+                            "Error while saving batch files: model %s has no attribute %s" % (m.name, sub)
+                        )
+            full_name = os.path.join(self.dir_path.text(), fname)
+            os.makedirs(self.dir_path.text(), exist_ok=True)
+            with open(full_name, "w") as f:
+                f.write(contents)
         
         for warning in all_warnings:
             self.tool_instance.session.logger.warning(warning)
@@ -6161,14 +6129,6 @@ class BatchExport(ChildToolWindow):
 
         if dirname:
             self.dir_path.setText(dirname)
-
-    def cleanup(self):
-        self.tool_instance.preset_window = None
-
-        self.tool_instance.session.triggers.remove_handler(self._add_handler)
-        self.tool_instance.session.triggers.remove_handler(self._del_handler)
-
-        super().cleanup()
 
 
 class RemovePreset(ChildToolWindow):
