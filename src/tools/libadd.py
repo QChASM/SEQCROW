@@ -105,10 +105,25 @@ class LibAdd(ToolInstance):
         libadd_ring.clicked.connect(self.libadd_ring)
         ring_layout.addRow(libadd_ring)
         
+        #solvent tab
+        solvent_tab = QWidget()
+        solvent_layout = QFormLayout(solvent_tab)
         
+        self.solvent_name = QLineEdit()
+        self.solvent_name.setText("")
+        self.solvent_name.setPlaceholderText("leave blank to preview")
+        self.solvent_name.setToolTip("name of ring you are adding to your ring library\nleave blank to open a new model with just the ring")
+        solvent_layout.addRow("solvent name:", self.solvent_name)
+        
+        libadd_solvent = QPushButton("add solvent molecule to library")
+        libadd_solvent.clicked.connect(self.libadd_solvent)
+        solvent_layout.addRow(libadd_solvent)
+        
+
         library_tabs.addTab(sub_tab, "substituent")
         library_tabs.addTab(ring_tab, "ring")
         library_tabs.addTab(ligand_tab, "ligand")
+        library_tabs.addTab(solvent_tab, "solvent")
         self.library_tabs = library_tabs
 
         layout.addWidget(library_tabs)
@@ -340,6 +355,72 @@ class LibAdd(ToolInstance):
                     substituent_menu = add_submenu(['Che&mistry'], 'Substituents')
                     add_selector(substituent_menu, sub_name, sub_name)
     
+    def libadd_solvent(self):
+        """add ligand to library or open it in a new model"""
+        selection = selected_atoms(self.session)
+        
+        if not selection.single_structure:
+            raise RuntimeError("selected atoms must be on the same model")
+        residues = []
+        for atom in selection:
+            if atom.residue not in residues:
+                residues.append(atom.residue)
+            
+        rescol = ResidueCollection(selection[0].structure, convert_residues=residues)
+
+        solvent_atoms = [atom for atom in rescol.atoms if atom.chix_atom in selection]
+        solvent_fragment = rescol.get_all_connected(solvent_atoms[0])
+        if any(a not in solvent_atoms for a in solvent_fragment):
+            raise RuntimeError("entire solvent molecule must be selected")
+            
+        solvent = ResidueCollection(solvent_atoms, refresh_connected=False)
+        solvent_name = self.solvent_name.text()
+
+        add = False
+        if len(solvent_name) == 0:
+            chimerax_solvent = ResidueCollection(solvent_atoms).get_chimera(self.session)
+            chimerax_solvent.name = "solvent preview"
+            self.session.models.add([chimerax_solvent])
+            
+        else:
+            check_aaronlib_dir()
+            filenames = [
+                os.path.join(AARONLIB, "Solvents", solvent_name + ".xyz"),
+                os.path.join(AARONLIB, "Solvents", solvent_name + ".mol")
+            ]
+            for filename in filenames:
+                if os.path.exists(filename):
+                    exists_warning = QMessageBox()
+                    exists_warning.setIcon(QMessageBox.Warning)
+                    exists_warning.setText("solvent %s already exists.\nWould you like to overwrite?" % solvent_name)
+                    exists_warning.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+                    
+                    rv = exists_warning.exec()
+                    if rv == QMessageBox.Yes:
+                        add = True
+                        os.remove(filename)
+                    
+                    else:
+                        self.tool_window.status("%s has not been added to solvent library" % solvent_name)
+    
+            else:
+                add = True
+
+        if add:
+            solvent.write(outfile=filename, style="mol")
+            self.tool_window.status("%s added to solvent library" % solvent_name)
+            register_selectors(self.session.logger, solvent_name)
+            if self.session.ui.is_gui:
+                if (
+                        solvent_name not in ELEMENTS and
+                        solvent_name[0].isalpha() and
+                        (len(solvent_name) > 1 and not any(not (c.isalnum() or c in "+-") for c in solvent_name[1:]))
+                ):
+                    add_submenu = self.session.ui.main_window.add_select_submenu
+                    add_selector = self.session.ui.main_window.add_menu_selector
+                    solvent_menu = add_submenu(['&Structure'], 'Solvents')
+                    add_selector(solvent_menu, solvent_name, solvent_name)
+    
     def display_help(self):
         """Show the help for this tool in the help viewer."""
         from chimerax.core.commands import run
@@ -351,7 +432,7 @@ class LibAdd(ToolInstance):
             link = "https://github.com/QChASM/AaronTools.py/wiki/AaronTools-Libraries#substituents"
         elif self.library_tabs.currentIndex() == 1:
             link = "https://github.com/QChASM/AaronTools.py/wiki/AaronTools-Libraries#rings"
-        elif self.library_tabs.currentIndex() == 2:
+        else:
             link = "https://github.com/QChASM/AaronTools.py/wiki/AaronTools-Libraries#ligands"
 
         run(self.session, "open %s" % link)
@@ -363,7 +444,7 @@ def check_aaronlib_dir():
         aaronlib = AARONLIB
         warn("AARONLIB environment variable not set, using %s" % aaronlib)
         
-    libs = ["Subs", "Ligands", "Rings"]
+    libs = ["Subs", "Ligands", "Rings", "Solvents"]
     for d in libs:
         library_dir = os.path.join(aaronlib, d)
         if not os.path.isdir(library_dir):
