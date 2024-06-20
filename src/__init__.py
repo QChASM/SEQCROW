@@ -113,7 +113,19 @@ class _SEQCROW_API(BundleAPI):
             if not any([selector.name == sub for selector in bundle_info.selectors]):
                 si = SelectorInfo(sub, atomic=True, synopsis="%s substituent" % sub)
                 bundle_info.selectors.append(si)
-
+        
+        from AaronTools.geometry import Geometry
+        for solvent in Geometry.list_solvents():
+            if solvent in ELEMENTS:
+                continue
+            if not solvent[0].isalpha():
+                continue
+            if len(solvent) > 1 and any(not (c.isalnum() or c in "+-") for c in solvent[1:]):
+                continue
+            if not any([selector.name == solvent for selector in bundle_info.selectors]):
+                si = SelectorInfo(solvent, atomic=True, synopsis="%s solvent" % solvent)
+                bundle_info.selectors.append(si)
+        
         #need to reregister selectors b/c ^ that bypassed the bundle_info.xml or something
         bundle_info._register_selectors(session.logger)
 
@@ -1081,6 +1093,7 @@ class _SEQCROW_API(BundleAPI):
         from Qt.QtWidgets import QAction
 
         from AaronTools.const import ELEMENTS
+        from AaronTools.geometry import Geometry
         from AaronTools.substituent import Substituent
 
         # substituent selectors
@@ -1098,6 +1111,16 @@ class _SEQCROW_API(BundleAPI):
                 # print(sub, "contains non-alphanumeric character")
                 continue
             add_selector(substituent_menu, sub)
+
+        solvent_menu = add_submenu(['Che&mistry'], 'Solvents')
+        for solvent in Geometry.list_solvents():
+            if solvent in ELEMENTS:
+                continue
+            if not solvent[0].isalpha():
+                continue
+            if len(solvent) > 1 and any(not (c.isalnum() or c in "+-") for c in solvent[1:]):
+                continue
+            add_selector(solvent_menu, solvent, selector_text=solvent)
 
         # connected selector
         mw = session.ui.main_window

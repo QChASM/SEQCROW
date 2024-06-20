@@ -5,6 +5,7 @@ from chimerax.core.commands import register_selector
 
 from AaronTools.atoms import BondOrder
 from AaronTools.finders import ChiralCenters, VSEPR, Bridgehead, SpiroCenters
+from AaronTools.geometry import Geometry
 from AaronTools.substituent import Substituent
 from AaronTools.const import TMETAL
 from AaronTools.utils.prime_numbers import Primes
@@ -168,6 +169,19 @@ def register_selectors(logger, name):
             ),
             logger,
             desc="%s" % name.replace("-", " ")
+        )
+
+    elif any(name == solvent for solvent in ResidueCollection.list_solvents()):
+        register_selector(
+            name,
+            lambda sess, models, results, solvent_name=name: solvent_selection(
+                sess,
+                solvent_name,
+                models,
+                results
+            ),
+            logger,
+            desc="solvent %s" % name
         )
 
 def tm_selector(session, models, results):
@@ -400,6 +414,91 @@ def select_rings(session, models, results):
 
     # profile.disable()
     # profile.print_stats()
+
+def solvent_selection(session, solvent_name, models, results):
+    # from time import perf_counter
+    # frag_time = 0
+    # rank_time = 0
+    
+    atoms = Atoms()
+
+    solvent = ResidueCollection(Geometry.get_solvent(solvent_name))
+    chix_solvent = solvent.get_chimera(session)
+    solv_elements = sorted(chix_solvent.atoms.elements.names)
+    solv_ranks = canonical_rank(Atoms(chix_solvent.atoms), break_ties=False)
+    # print(solv_ranks)
+    sorted_solv_atoms = [x for _, x in sorted(zip(solv_ranks, chix_solvent.atoms), key = lambda pair: pair[0])]
+    length = len(solvent.atoms)
+    # print(length)
+    # print(solv_elements)
+
+    for mdl in models:
+        if not isinstance(mdl, AtomicStructure):
+            continue
+        # frag_start = perf_counter()
+        
+        mdl_atoms = Atoms(mdl.atoms)
+        new_frag = True
+        fragments = []
+        frag_ranks = dict()
+        while new_frag:
+            new_frag = False
+            for i, atom in enumerate(mdl_atoms):
+                frag = get_fragment(atom)
+                new_frag = True
+                mdl_atoms = mdl_atoms.subtract(frag)
+                if len(frag) == length:
+                    fragments.append(frag)
+                break
+        
+        # frag_stop = perf_counter()
+        # frag_time += frag_stop - frag_start
+        
+        # print(fragments)
+        # print(len(fragments))
+        
+        for frag in fragments:
+            # print(len(frag))
+            frag_elements = sorted(frag.elements.names)
+            # print(frag_elements)
+            if not all([solv_elements[i] == frag_elements[i] for i in range(0, length)]):
+                continue
+            
+            # rank_start = perf_counter()
+            ranks = canonical_rank(frag, break_ties=False)
+            # rank_stop = perf_counter()
+            # rank_time += rank_stop - rank_start
+            sorted_frag_atoms = [x for _, x in sorted(zip(ranks, frag.instances()), key=lambda pair: pair[0])]
+            # print(ranks)
+            # print(sorted_solv_atoms)
+            # print(sorted_frag_atoms)
+            for a, b in zip(sorted_solv_atoms, sorted_frag_atoms):
+                if a.element.name != b.element.name:
+                    # print("element", a.element.name, b.element.name)
+                    break
+                
+                if len(a.neighbors) != len(b.neighbors):
+                    # print("num neighbors", len(a.neighbors), len(b.neighbors))
+                    break
+                
+                failed = False
+                for j, k in zip(
+                    sorted([aa.element.name for aa in a.neighbors]),
+                    sorted([bb.element.name for bb in b.neighbors]),
+                ):
+                    if j != k:
+                        # print("neighbor element", j, k)
+                        failed = True
+                        break
+                if failed:
+                    break
+            else:
+                # print("selecting frag")
+                atoms = atoms.merge(frag)
+
+    # session.logger.info("spent %f time fragmenting" % frag_time)
+    # session.logger.info("spent %f time ranking atoms" % rank_time)
+    results.add_atoms(atoms)
 
 def get_fragment(start, stop=None, max_len=None):
     """
