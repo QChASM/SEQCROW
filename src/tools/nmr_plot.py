@@ -82,6 +82,7 @@ class _NMRSpectrumSettings(Settings):
         'col_2': Value(150, IntArg), 
         'col_3': Value(150, IntArg), 
         "pulse_frequency": 90.0,
+        "coupling_threshold": 0.1,
 }
 
 
@@ -307,6 +308,15 @@ class NMRSpectrum(ToolInstance):
         self.pulse_frequency.setValue(self.settings.pulse_frequency)
         self.pulse_frequency.setSingleStep(10)
         plot_settings_layout.addRow("pulse frequency:", self.pulse_frequency)
+
+        self.coupling_threshold = QDoubleSpinBox()
+        self.coupling_threshold.setMinimum(0.0)
+        self.coupling_threshold.setMaximum(10000.0)
+        self.coupling_threshold.setDecimals(3)
+        self.coupling_threshold.setSuffix(" Hz")
+        self.coupling_threshold.setValue(self.settings.coupling_threshold)
+        self.coupling_threshold.setSingleStep(0.01)
+        plot_settings_layout.addRow("coupling threshold:", self.coupling_threshold)
         
         self.reverse_x = QCheckBox()
         self.reverse_x.setCheckState(Qt.Checked)
@@ -1377,6 +1387,8 @@ class NMRSpectrum(ToolInstance):
         reverse_x = self.reverse_x.checkState() == Qt.Checked
         voigt_mixing = self.voigt_mix.value()
         self.settings.voigt_mix = voigt_mixing
+        coupling_threshold = self.coupling_threshold.value()
+        self.settings.coupling_threshold = coupling_threshold
         linear = self.linear.value()
         scalar = self.scalar.value()
 
@@ -1429,6 +1441,7 @@ class NMRSpectrum(ToolInstance):
             equivalent_nuclei=equivalent_nuclei,
             graph=graph,
             normalize=True,
+            coupling_threshold=coupling_threshold,
         )
 
         self.canvas.draw()
