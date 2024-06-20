@@ -1,4 +1,3 @@
-
 def open_aarontools(session, stream, file_name, format_name=None, coordsets=None):
     from AaronTools.fileIO import FileReader
     from AaronTools.theory.job_types import suggested_fix
@@ -38,11 +37,11 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
             max_length=max_length,
         )
     except UnicodeDecodeError as e:
-        session.logger.error("unable to open %s" % file_name)
+        session.logger.error("unable to open %s as a %s" % (file_name, format_name))
         raise e
 
     except Exception as e:
-        session.logger.error("unable to open %s" % file_name)
+        session.logger.error("unable to open %s as a %s" % (file_name, format_name))
         raise e
     finally:
         if hasattr(stream, "close") and callable(stream.close):

@@ -1102,17 +1102,14 @@ class _SEQCROW_API(BundleAPI):
         substituent_menu = add_submenu(['Che&mistry'], 'Substituents')
         for sub in Substituent.list():
             if sub in ELEMENTS:
-                # print(sub, "in ELEMENTS")
                 continue
             if not sub[0].isalpha():
-                # print(sub, "startswith non-alpha")
                 continue
             if len(sub) > 1 and any(not (c.isalnum() or c in "+-") for c in sub[1:]):
-                # print(sub, "contains non-alphanumeric character")
                 continue
             add_selector(substituent_menu, sub)
 
-        solvent_menu = add_submenu(['Che&mistry'], 'Solvents')
+        solvent_menu = add_submenu(['&Structure'], 'Solvents')
         for solvent in Geometry.list_solvents():
             if solvent in ELEMENTS:
                 continue
@@ -1120,7 +1117,7 @@ class _SEQCROW_API(BundleAPI):
                 continue
             if len(solvent) > 1 and any(not (c.isalnum() or c in "+-") for c in solvent[1:]):
                 continue
-            add_selector(solvent_menu, solvent, selector_text=solvent)
+            add_selector(solvent_menu, solvent)
 
         # connected selector
         mw = session.ui.main_window

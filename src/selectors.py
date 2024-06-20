@@ -244,7 +244,7 @@ def substituent_selection(session, sub_name, models, results):
     atoms = Atoms()
     
     sub = Substituent(sub_name)
-    chix_sub = ResidueCollection(sub).get_chimera(session)
+    chix_sub = ResidueCollection(sub).get_chimera(session, apply_preset=False)
     sub_elements = sorted(chix_sub.atoms.elements.names)
     sub_ranks = canonical_rank(Atoms(chix_sub.atoms))
     sorted_sub_atoms = [x for _, x in sorted(zip(sub_ranks, chix_sub.atoms), key = lambda pair: pair[0])]
@@ -423,7 +423,7 @@ def solvent_selection(session, solvent_name, models, results):
     atoms = Atoms()
 
     solvent = ResidueCollection(Geometry.get_solvent(solvent_name))
-    chix_solvent = solvent.get_chimera(session)
+    chix_solvent = solvent.get_chimera(session, apply_preset=False)
     solv_elements = sorted(chix_solvent.atoms.elements.names)
     solv_ranks = canonical_rank(Atoms(chix_solvent.atoms), break_ties=False)
     # print(solv_ranks)
