@@ -142,9 +142,7 @@ class NMRSpectrum(ToolInstance):
         self.tree.setColumnWidth(0, self.settings.col_1)
         self.tree.setColumnWidth(1, self.settings.col_2)
         self.tree.setColumnWidth(2, self.settings.col_3)
-        
-        self.add_mol_group()
-        
+
         component_layout.addWidget(self.tree, 0, 0, 1, 6)
         
         self.temperature = QDoubleSpinBox()
@@ -173,6 +171,7 @@ class NMRSpectrum(ToolInstance):
             "free (RRHO)",
             "free (Quasi-RRHO)",
             "free (Quasi-harmonic)",
+            "manually enter ratios",
         ])
         self.weight_method.setItemData(0, CompOutput.ELECTRONIC_ENERGY)
         self.weight_method.setItemData(1, CompOutput.ZEROPOINT_ENERGY)
@@ -180,10 +179,14 @@ class NMRSpectrum(ToolInstance):
         self.weight_method.setItemData(3, CompOutput.RRHO)
         self.weight_method.setItemData(4, CompOutput.QUASI_RRHO)
         self.weight_method.setItemData(5, CompOutput.QUASI_HARMONIC)
+        self.weight_method.setItemData(6, "manual")
         ndx = self.weight_method.findData(self.settings.weight_method, flags=Qt.MatchExactly)
         self.weight_method.setCurrentIndex(ndx)
         component_layout.addWidget(QLabel("energy for weighting:"), 1, 0, 1, 1, Qt.AlignRight | Qt.AlignHCenter)
         component_layout.addWidget(self.weight_method, 1, 1, 1, 1, Qt.AlignLeft | Qt.AlignHCenter)
+        self.showing_manual_weights = self.weight_method.currentData() == "manual"
+        self.weight_method.currentTextChanged.connect(self.change_to_or_from_manual_weights)
+        self.weight_method.currentTextChanged.connect(lambda x: self.session.logger.info(self.weight_method.currentData(Qt.UserRole)))
 
         # show_conformers = QLabel("show contribution from conformers with a Boltzmann population above:")
         # component_layout.addWidget(show_conformers, 2, 0, 1, 4, Qt.AlignRight | Qt.AlignVCenter)
@@ -465,8 +468,64 @@ class NMRSpectrum(ToolInstance):
         
         self._menu = menu
         layout.setMenuBar(menu)        
+        
+        self.add_mol_group()
+
         self.tool_window.ui_area.setLayout(layout)
         self.tool_window.manage(None)
+
+    def change_to_or_from_manual_weights(self, *args):
+        weight_method = self.weight_method.currentData()
+        manual = weight_method == "manual"
+        if manual and not self.showing_manual_weights:
+            self.showing_manual_weights = True
+            self.tree.setHeaderLabels(["NMR file", "weight", "", "remove"])
+            for mol_ndx in range(1, self.tree.topLevelItemCount()):
+                mol = self.tree.topLevelItem(mol_ndx)
+                mol_fracs_widget = self.tree.itemWidget(mol, 1).layout().itemAt(1).widget()
+                for conf_ndx in range(2, mol.childCount(), 2):
+                    conf = mol.child(conf_ndx)
+                    trash_button = self.tree.itemWidget(conf, 3)
+                    trash_button.disconnect()
+                    nmr_widget = self.tree.itemWidget(conf, 0)
+                    freq_widget = self.tree.itemWidget(conf, 1)
+                    nrg_widget = self.tree.itemWidget(conf, 2)
+                    # yes, we need to deleteLater and removeItemWidget
+                    # yes, The Internet says removeItemWidget will deleteLater
+                    # yes, The Internet is always right
+                    freq_widget.deleteLater()
+                    nrg_widget.deleteLater()
+                    self.tree.removeItemWidget(conf, 1)
+                    self.tree.removeItemWidget(conf, 2)
+                    trash_button.clicked.connect(lambda *args, combobox=nmr_widget: combobox.deleteLater())
+                    trash_button.clicked.connect(lambda *args, child=conf: mol_fracs_widget.removeChild(child))
+
+                    weight = ScientificSpinBox(
+                        minimum=0,
+                        maximum=100,
+                        decimals=3,
+                        maxAbsoluteCharacteristic=4,
+                        default=1,
+                    )
+                    self.tree.setItemWidget(conf, 1, weight)
+
+        elif not manual and self.showing_manual_weights:
+            self.showing_manual_weights = False
+            self.tree.setHeaderLabels(["NMR file", "frequency file", "energy file", "remove"])
+            for mol_ndx in range(1, self.tree.topLevelItemCount()):
+                mol = self.tree.topLevelItem(mol_ndx)
+                mol_fracs_widget = self.tree.itemWidget(mol, 1).layout().itemAt(1).widget()
+                for conf_ndx in range(2, mol.childCount(), 2):
+                    conf = mol.child(conf_ndx)
+                    self.tree.removeItemWidget(conf, 1)
+                    trash_button = self.tree.itemWidget(conf, 3)
+                    nrg_combobox = FilereaderComboBox(self.session, otherItems=['energy'])
+                    freq_combobox = FilereaderComboBox(self.session, otherItems=['frequency'])
+                    self.tree.setItemWidget(conf, 1, freq_combobox)
+                    self.tree.setItemWidget(conf, 2, nrg_combobox)
+                    trash_button.clicked.connect(lambda *args, combobox=nrg_combobox: combobox.deleteLater())
+                    trash_button.clicked.connect(lambda *args, combobox=freq_combobox: combobox.deleteLater())
+
 
     def refresh_equivalent_nuclei(self):
         geoms = []
@@ -587,21 +646,36 @@ class NMRSpectrum(ToolInstance):
         conformer_item = QTreeWidgetItem(conf_group_widget)
         conf_group_widget.insertChild(row, conformer_item)
         
-        nrg_combobox = FilereaderComboBox(self.session, otherItems=['energy'])
-        freq_combobox = FilereaderComboBox(self.session, otherItems=['frequency'])
+        weight_method = self.weight_method.currentData()
+        
         nmr_combobox = FilereaderComboBox(self.session, otherItems=['nmr'])
+        if weight_method == "manual":
+            weight_widget = ScientificSpinBox(
+                minimum=0,
+                maximum=100,
+                decimals=3,
+                maxAbsoluteCharacteristic=4,
+                default=1,
+            )
+        else:
+            freq_combobox = FilereaderComboBox(self.session, otherItems=['frequency'])
+            nrg_combobox = FilereaderComboBox(self.session, otherItems=['energy'])
         
         trash_button = QPushButton()
         trash_button.setFlat(True)
-        trash_button.clicked.connect(lambda *args, combobox=nrg_combobox: combobox.deleteLater())
-        trash_button.clicked.connect(lambda *args, combobox=freq_combobox: combobox.deleteLater())
+        if weight_method != "manual":
+            trash_button.clicked.connect(lambda *args, combobox=nrg_combobox: combobox.deleteLater())
+            trash_button.clicked.connect(lambda *args, combobox=freq_combobox: combobox.deleteLater())
         trash_button.clicked.connect(lambda *args, combobox=nmr_combobox: combobox.deleteLater())
         trash_button.clicked.connect(lambda *args, child=conformer_item: conf_group_widget.removeChild(child))
         trash_button.setIcon(QIcon(self.tree.style().standardIcon(QStyle.SP_DialogCancelButton)))
         
         self.tree.setItemWidget(conformer_item, 0, nmr_combobox)
-        self.tree.setItemWidget(conformer_item, 1, freq_combobox)
-        self.tree.setItemWidget(conformer_item, 2, nrg_combobox)
+        if weight_method == "manual":
+            self.tree.setItemWidget(conformer_item, 1, weight_widget)
+        else:
+            self.tree.setItemWidget(conformer_item, 1, freq_combobox)
+            self.tree.setItemWidget(conformer_item, 2, nrg_combobox)
         self.tree.setItemWidget(conformer_item, 3, trash_button)
 
         style_group = QTreeWidgetItem(conf_group_widget)
@@ -1085,6 +1159,7 @@ class NMRSpectrum(ToolInstance):
 
     def get_mixed_spectrum(self, weights_only=False):
         weight_method = self.weight_method.currentData(Qt.UserRole)
+        self.session.logger.warning(weight_method)
         nmrs = []
         freqs = []
         single_points = []
@@ -1092,6 +1167,7 @@ class NMRSpectrum(ToolInstance):
         shown_confs = []
         shown_weights = []
         shown_mols = []
+        weights_list = []
         data_attr = "data"
         offset = 0
         for mol_ndx in range(1, self.tree.topLevelItemCount()):
@@ -1099,6 +1175,8 @@ class NMRSpectrum(ToolInstance):
             freqs.append([])
             single_points.append([])
             shown_confs.append([])
+            if weight_method == "manual":
+                weights_list.append([])
             mol = self.tree.topLevelItem(mol_ndx)
             mol_fracs_widget = self.tree.itemWidget(mol, 1).layout().itemAt(1).widget()
             mol_fracs.append(mol_fracs_widget.value())
@@ -1111,24 +1189,47 @@ class NMRSpectrum(ToolInstance):
                 fr, mdl = data
                 nmrs[-1].append(fr["nmr"])
 
-                sp_file, _ = self.tree.itemWidget(conf, 2).currentData()
-                single_points[-1].append(CompOutput(sp_file))
+                if weight_method == "manual":
+                    weight = self.tree.itemWidget(conf, 1).value()
+                    weights_list[-1].append(weight)
 
-                if weight_method != CompOutput.ELECTRONIC_ENERGY:
-                    freq_file = self.tree.itemWidget(conf, 1).currentData()
-                    if freq_file is None:
-                        self.session.logger.error(
-                            "frequency jobs must be given if you are not weighting"
-                            " based on electronic energy"
-                        )
-                        return
-                    freq_file, _ = freq_file
-                    freqs[-1].append(CompOutput(freq_file))
+                else:
+                    sp_file, _ = self.tree.itemWidget(conf, 2).currentData()
+                    single_points[-1].append(CompOutput(sp_file))
+    
+                    if weight_method != CompOutput.ELECTRONIC_ENERGY:
+                        freq_file = self.tree.itemWidget(conf, 1).currentData()
+                        if freq_file is None:
+                            self.session.logger.error(
+                                "frequency jobs must be given if you are not weighting"
+                                " based on electronic energy"
+                            )
+                            return
+                        freq_file, _ = freq_file
+                        freqs[-1].append(CompOutput(freq_file))
+                        
+                        warn = False
+                        if len(geometry.atoms) == len(single_points[-1][-1].geometry.atoms):
+                            rmsd = freqs[-1][-1].geometry.RMSD(
+                                single_points[-1][-1].geometry,
+                                sort=True,
+                            )
+                            if rmsd > 1e-2:
+                                warn = True
+                        else:
+                            warn = True
+                        if warn:
+                            s = "the structure of %s (frequencies) might not match" % freqs[-1][-1].geometry.name
+                            s += " the structure of %s (energy)" % single_points[-1][-1].geometry.name
+                            self.session.logger.warning(s)
+                    else:
+                        freqs[-1].append(None)
                     
+                    geom = Geometry(fr["atoms"])
                     warn = False
-                    if len(geometry.atoms) == len(single_points[-1][-1].geometry.atoms):
-                        rmsd = freqs[-1][-1].geometry.RMSD(
-                            single_points[-1][-1].geometry,
+                    if len(geom.atoms) == len(single_points[-1][-1].geometry.atoms):
+                        rmsd = single_points[-1][-1].geometry.RMSD(
+                            geom,
                             sort=True,
                         )
                         if rmsd > 1e-2:
@@ -1136,27 +1237,9 @@ class NMRSpectrum(ToolInstance):
                     else:
                         warn = True
                     if warn:
-                        s = "the structure of %s (frequencies) might not match" % freqs[-1][-1].geometry.name
-                        s += " the structure of %s (energy)" % single_points[-1][-1].geometry.name
+                        s = "the structure of %s (NMR) might not match" % geom.name
+                        s += "the structure of %s (energy)" % single_points[-1][-1].geometry.name
                         self.session.logger.warning(s)
-                else:
-                    freqs[-1].append(None)
-                
-                geom = Geometry(fr["atoms"])
-                warn = False
-                if len(geom.atoms) == len(single_points[-1][-1].geometry.atoms):
-                    rmsd = single_points[-1][-1].geometry.RMSD(
-                        geom,
-                        sort=True,
-                    )
-                    if rmsd > 1e-2:
-                        warn = True
-                else:
-                    warn = True
-                if warn:
-                    s = "the structure of %s (NMR) might not match" % geom.name
-                    s += "the structure of %s (energy)" % single_points[-1][-1].geometry.name
-                    self.session.logger.warning(s)
                 
                 conf_style = mol.child(conf_ndx + 1)
                 show_comp = self.tree.itemWidget(conf_style, 0).layout().itemAt(1).widget()
@@ -1175,6 +1258,8 @@ class NMRSpectrum(ToolInstance):
                 nmrs.pop(-1)
                 freqs.pop(-1)
                 single_points.pop(-1)
+                if weight_method == "manual":
+                        weights_list.pop(-1)
                 continue
             else:
                 mol_style = mol.child(0)
@@ -1193,22 +1278,29 @@ class NMRSpectrum(ToolInstance):
         if not nmrs or all(not conf_group for conf_group in nmrs):
             return
 
-        weights_list = []
         mixed_nmrs = []
         show_components = []
-        for i, (conf_freq, conf_nrg) in enumerate(zip(freqs, single_points)):
-            weights = CompOutput.boltzmann_weights(
-                conf_freq,
-                nrg_cos=conf_nrg,
-                temperature=self.temperature.value(),
-                v0=self.w0.value(),
-                weighting=weight_method,
-            )
-            weights_list.append(weights)
+        for i, nmr in enumerate(nmrs):
+            if weight_method != "manual":
+                conf_nrg = single_points[i]
+                conf_freq = freqs[i]
+                weights = CompOutput.boltzmann_weights(
+                    conf_freq,
+                    nrg_cos=conf_nrg,
+                    temperature=self.temperature.value(),
+                    v0=self.w0.value(),
+                    weighting=weight_method,
+                )
+                weights_list.append(weights)
+            else:
+                try:
+                    weights_list[i] = [x / sum(weights_list[i]) for x in weights_list[i]]
+                except ZeroDivisionError:
+                    raise RuntimeError("all weights are zero: %s" % repr(weights_list[i]))
 
             conf_mixed = NMR.get_mixed_signals(
                 nmrs[i],
-                weights=weights,
+                weights=weights_list[i],
                 data_attr=data_attr,
             )
             mixed_nmrs.append(conf_mixed)
@@ -1217,7 +1309,7 @@ class NMRSpectrum(ToolInstance):
                 for shift in nmr.data:
                     new_data.append(Shift(
                         shift.shift,
-                        intensity=shift.intensity * weights[j],
+                        intensity=shift.intensity * weights_list[i][j],
                         element=shift.element,
                         ndx=shift.ndx + offset,
                     ))
@@ -1355,6 +1447,8 @@ class NMRSpectrum(ToolInstance):
     def refresh_plot(self):
         # if self.show_boltzmann_pop.checkState() == Qt.Checked:
         #     self.show_conformers()
+        weight_method = self.weight_method.currentData(Qt.UserRole)
+        self.session.logger.warning(weight_method)
     
         self.refresh_equivalent_nuclei()
         self.set_available_elements()
@@ -1560,8 +1654,11 @@ class NMRSpectrum(ToolInstance):
             for conf_ndx in range(2, mol.childCount(), 2):
                 conf = mol.child(conf_ndx)
                 self.tree.itemWidget(conf, 0).deleteLater()
-                self.tree.itemWidget(conf, 1).deleteLater()
-                self.tree.itemWidget(conf, 2).deleteLater()
+                try:
+                    self.tree.itemWidget(conf, 1).deleteLater()
+                    self.tree.itemWidget(conf, 2).deleteLater()
+                except AttributeError:
+                    pass
 
         super().delete()
 

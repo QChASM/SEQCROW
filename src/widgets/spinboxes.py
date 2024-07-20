@@ -132,7 +132,8 @@ class ScientificSpinBox(QDoubleSpinBox):
         if default is None:
             try:
                 min_char = int(np.log10(abs(minimum)))
-            except ValueError:
+            # I guess newer versions of numpy do OverflowError instead of ValueError
+            except (OverflowError, ValueError):
                 min_char = 0
             min_mant = minimum / (10 ** min_char)
             if min_mant < 1:

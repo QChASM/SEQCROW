@@ -1863,6 +1863,7 @@ class JobTypeOption(QWidget):
     def setOptions(self, file_info):
         """change all options to show the ones available for 'program'"""
         self.form = file_info
+        self.solvent_option.blockSignals(True)
         self.solvent_option.clear()
         self.solvent_names.clear()
         self.solvent_option.addItems(["None"])
@@ -1926,6 +1927,7 @@ class JobTypeOption(QWidget):
                 self.do_geom_opt.setCheckState(Qt.Unchecked)
                 self.do_freq.setCheckState(Qt.Unchecked)
 
+        self.solvent_option.blockSignals(False)
         self.solvent_names.sortItems()
 
     def change_selected_solvent(self):

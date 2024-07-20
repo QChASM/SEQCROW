@@ -1109,7 +1109,7 @@ class _SEQCROW_API(BundleAPI):
                 continue
             add_selector(substituent_menu, sub)
 
-        solvent_menu = add_submenu(['&Structure'], 'Solvents')
+        solvent_menu = add_submenu(['Che&mistry'], 'Solvents')
         for solvent in Geometry.list_solvents():
             if solvent in ELEMENTS:
                 continue
