@@ -91,8 +91,10 @@ class Thermochem(ToolInstance):
     SESSION_SAVE = False         
     help = "https://github.com/QChASM/SEQCROW/wiki/Process-Thermochemistry-Tool"
 
-    theory_helper = {"Grimme's Quasi-RRHO":"https://doi.org/10.1002/chem.201200497",
-                     "Truhlar's Quasi-Harmonic":"https://doi.org/10.1021/jp205508z"}
+    theory_helper = {
+        "Grimme's Quasi-RRHO":"https://doi.org/10.1002/chem.201200497",
+        "Truhlar's Quasi-Harmonic":"https://doi.org/10.1021/jp205508z",
+    }
     
     def __init__(self, session, name):       
         super().__init__(session, name)
@@ -711,10 +713,12 @@ class Thermochem(ToolInstance):
             dZPE = co.ZPVE
             #compute enthalpy and entropy at this temperature
             #AaronTools uses Grimme's Quasi-RRHO, but this is the same as RRHO when w0=0
-            dE, dH, s = co.therm_corr(temperature=T, v0=0, method="RRHO")
+            dE, qrrho_dH, qrrho_s = co.therm_corr(temperature=T, v0=v0, method="QRRHO", enthalpy_method="QRRHO")
+            dE, dH, s = co.therm_corr(temperature=T, v0=0, method="RRHO", enthalpy_method="RRHO")
             rrho_dg = dH - T * s
             #compute G with quasi entropy treatments
-            qrrho_dg = co.calc_G_corr(v0=v0, temperature=T, method="QRRHO")
+            qrrho_dg = dH - T * qrrho_s
+            full_qrrho_dg = qrrho_dH - T * qrrho_s
             qharm_dg = co.calc_G_corr(v0=v0, temperature=T, method="QHARM")
             
             items = [(
@@ -744,6 +748,11 @@ class Thermochem(ToolInstance):
                     None,
                     "enthalpy of formation",
                 ), (
+                    "δH<sub>quasi-RRHO</sub> =",
+                    qrrho_dH,
+                    "Head-Gordon's quasi-RRHO treatment of enthalpy",
+                    "enthalpy of formation",
+                ), (
                     "δG<sub>RRHO</sub> =",
                     rrho_dg,
                     None,
@@ -759,6 +768,11 @@ class Thermochem(ToolInstance):
                     "frequencies < ω\u2080\n"
                     "can mitigate error from inaccuracies in the harmonic oscillator\n"
                     "approximation for low-frequency vibrations",
+                ), (
+                    "δ(H - T × S)<sub>Quasi-RRHO</sub> =",
+                    full_qrrho_dg,
+                    None,
+                    "both enthalpy and entropy recieve the quasi-RRHO treatment",
                 ), (
                     "δG<sub>Quasi-Harmonic</sub> =",
                     qharm_dg,
