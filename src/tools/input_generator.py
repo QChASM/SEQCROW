@@ -6132,6 +6132,13 @@ class BatchExport(ChildToolWindow):
         if dirname:
             self.dir_path.setText(dirname)
 
+    def cleanup(self):
+        """deregister trigger handlers"""
+
+        self.select_models.deleteLater()
+
+        return super().cleanup()
+
 
 class RemovePreset(ChildToolWindow):
     """window for deleting saved presets"""

@@ -1188,6 +1188,7 @@ class NMRSpectrum(ToolInstance):
                     continue
                 fr, mdl = data
                 nmrs[-1].append(fr["nmr"])
+                geom = Geometry(fr["atoms"])
 
                 if weight_method == "manual":
                     weight = self.tree.itemWidget(conf, 1).value()
@@ -1207,10 +1208,11 @@ class NMRSpectrum(ToolInstance):
                             return
                         freq_file, _ = freq_file
                         freqs[-1].append(CompOutput(freq_file))
+                        freq_geom = Geometry(freq_file["atoms"])
                         
                         warn = False
-                        if len(geometry.atoms) == len(single_points[-1][-1].geometry.atoms):
-                            rmsd = freqs[-1][-1].geometry.RMSD(
+                        if len(freq_geom.atoms) == len(single_points[-1][-1].geometry.atoms):
+                            rmsd = freq_geom.RMSD(
                                 single_points[-1][-1].geometry,
                                 sort=True,
                             )
@@ -1225,7 +1227,6 @@ class NMRSpectrum(ToolInstance):
                     else:
                         freqs[-1].append(None)
                     
-                    geom = Geometry(fr["atoms"])
                     warn = False
                     if len(geom.atoms) == len(single_points[-1][-1].geometry.atoms):
                         rmsd = single_points[-1][-1].geometry.RMSD(
