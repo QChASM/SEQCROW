@@ -92,8 +92,9 @@ class Thermochem(ToolInstance):
     help = "https://github.com/QChASM/SEQCROW/wiki/Process-Thermochemistry-Tool"
 
     theory_helper = {
-        "Grimme's Quasi-RRHO":"https://doi.org/10.1002/chem.201200497",
-        "Truhlar's Quasi-Harmonic":"https://doi.org/10.1021/jp205508z",
+        "Grimme's Quasi-RRHO": "https://doi.org/10.1002/chem.201200497",
+        "Truhlar's Quasi-Harmonic": "https://doi.org/10.1021/jp205508z",
+        "Head-Gordon's Quasi-RRHO": "https://doi.org/10.1021/jp509921r"
     }
     
     def __init__(self, session, name):       
@@ -355,16 +356,20 @@ class Thermochem(ToolInstance):
                 anharm_ZVPEs = None
             Hs = []
             Gs = []
-            RRHOG = []
+            QRRHOG = []
             QHARMG = []
+            QRRHOH = []
+            full_QRRHOG = []
             for i in range(0, len(nrg_list)):
                 ZPVEs.append([])
                 if anharm_ZVPEs is not None:
                     anharm_ZVPEs.append([])
                 Hs.append([])
                 Gs.append([])
-                RRHOG.append([])
+                QRRHOG.append([])
+                full_QRRHOG.append([])
                 QHARMG.append([])
+                QRRHOH.append([])
                 for nrg, co in zip(nrg_list[i], co_list[i]):
                     ZPVE = co.ZPVE
                     ZPVEs[-1].append(nrg + ZPVE)
@@ -372,20 +377,24 @@ class Thermochem(ToolInstance):
                     if anharm_ZVPEs is not None:
                         zpve_anharm = co.calc_zpe(anharmonic=True)
                         anharm_ZVPEs[-1].append(nrg + zpve_anharm)
-                    
+
                     dH = co.therm_corr(T, w0, CompOutput.RRHO)[1]
                     Hs[-1].append(nrg + dH)
                     
+                    dE, qrrho_dH, qrrho_s = co.therm_corr(temperature=T, v0=w0, method="QRRHO", enthalpy_method="QRRHO")
+
+                    QRRHOH[-1].append(nrg + qrrho_dH)
+
                     dG = co.calc_G_corr(temperature=T, v0=w0, method=CompOutput.RRHO)
                     Gs[-1].append(nrg + dG)            
                     
-                    dQRRHOG = co.calc_G_corr(temperature=T, v0=w0, method=CompOutput.QUASI_RRHO)
-                    RRHOG[-1].append(nrg + dQRRHOG)
+                    QRRHOG[-1].append(nrg + dH - T * qrrho_s)
+                    full_QRRHOG[-1].append(nrg + qrrho_dH - T * qrrho_s)
                     
                     dQHARMG = co.calc_G_corr(temperature=T, v0=w0, method=CompOutput.QUASI_HARMONIC)
                     QHARMG[-1].append(nrg + dQHARMG)
             
-            return ZPVEs, anharm_ZVPEs, Hs, Gs, RRHOG, QHARMG
+            return ZPVEs, anharm_ZVPEs, Hs, QRRHOH, Gs, QRRHOG, full_QRRHOG, QHARMG
         
         def boltzmann_weight(energies1, energies2, T):
             """
@@ -464,43 +473,49 @@ class Thermochem(ToolInstance):
             rel_E = boltzmann_weight(ref_Es, other_Es, T)
             data = [rel_E]
 
-            ref_ZPVEs, ref_anharm_zpve, ref_Hs, ref_Gs, ref_QRRHOGs, ref_QHARMGs = calc_free_energies(
+            ref_ZPVEs, ref_anharm_zpve, ref_Hs, ref_qrrho_Hs, ref_Gs, ref_QRRHOGs, ref_full_QRRHOGs, ref_QHARMGs = calc_free_energies(
                 ref_Es, ref_cos, T, w0
             )
-            other_ZPVEs, other_anharm_zpve, other_Hs, other_Gs, other_QRRHOGs, other_QHARMGs = calc_free_energies(
+            other_ZPVEs, other_anharm_zpve, other_Hs, other_qrrho_Hs, other_Gs, other_QRRHOGs, other_full_QRRHOGs, other_QHARMGs = calc_free_energies(
                 other_Es, other_cos, T, w0
             )
 
             rel_ZPVE = boltzmann_weight(ref_ZPVEs, other_ZPVEs, T)
             rel_H = boltzmann_weight(ref_Hs, other_Hs, T)
+            rel_qrrho_H = boltzmann_weight(ref_qrrho_Hs, other_qrrho_Hs, T)
             rel_G = boltzmann_weight(ref_Gs, other_Gs, T)
             rel_QRRHOG = boltzmann_weight(ref_QRRHOGs, other_QRRHOGs, T)
+            rel_full_QRRHOG = boltzmann_weight(ref_full_QRRHOGs, other_full_QRRHOGs, T)
             rel_QHARMG = boltzmann_weight(ref_QHARMGs, other_QHARMGs, T)
     
             if ref_anharm_zpve and other_anharm_zpve:
                 rel_anharm_ZPVE = boltzmann_weight(ref_anharm_zpve, other_anharm_zpve, T)
                 headers.extend([
-                    "ΔZPE", "ΔZPE<sub>anh</sub>", "ΔH<sub>RRHO</sub>", "ΔG<sub>RRHO</sub>",
-                    "ΔG<sub>Quasi-RRHO</sub>", "ΔG<sub>Quasi-Harmonic</sub>",
+                    "ΔZPE", "ΔZPE<sub>anh</sub>", "ΔH<sub>RRHO</sub>", "ΔH<sub>Quasi-RRHO</sub>", "ΔG<sub>RRHO</sub>",
+                    "ΔG<sub>Quasi-RRHO</sub>", "ΔG<sub>full_Quasi-RRHO</sub>", "ΔG<sub>Quasi-Harmonic</sub>",
                 ])
                 data.extend([
                     rel_ZPVE,
                     rel_anharm_ZPVE,
                     rel_H,
+                    rel_qrrho_H,
                     rel_G,
                     rel_QRRHOG,
+                    rel_full_QRRHOG,
                     rel_QHARMG,
                 ])
             else:
                 headers.extend([
-                    "ΔZPE", "ΔH<sub>RRHO</sub>", "ΔG<sub>RRHO</sub>",
-                    "ΔG<sub>Quasi-RRHO</sub>", "ΔG<sub>Quasi-Harmonic</sub>",
+                    "ΔZPE", "ΔH<sub>RRHO</sub>", "ΔH<sub>Quasi-RRHO</sub>", "ΔG<sub>RRHO</sub>",
+                    "ΔG<sub>Quasi-RRHO</sub>", "ΔG<sub>full_Quasi-RRHO</sub>", "ΔG<sub>Quasi-Harmonic</sub>",
                 ])
                 data.extend([
                     rel_ZPVE,
                     rel_H,
+                    rel_qrrho_H,
                     rel_G,
                     rel_QRRHOG,
+                    rel_full_QRRHOG,
                     rel_QHARMG,
                 ])
 
@@ -750,8 +765,8 @@ class Thermochem(ToolInstance):
                 ), (
                     "δH<sub>quasi-RRHO</sub> =",
                     qrrho_dH,
-                    "Head-Gordon's quasi-RRHO treatment of enthalpy",
-                    "enthalpy of formation",
+                    "Head-Gordon's Quasi-RRHO",
+                    "enthalpy with low-frequency modes tempered by free rotor enthalpy",
                 ), (
                     "δG<sub>RRHO</sub> =",
                     rrho_dg,
@@ -769,7 +784,7 @@ class Thermochem(ToolInstance):
                     "can mitigate error from inaccuracies in the harmonic oscillator\n"
                     "approximation for low-frequency vibrations",
                 ), (
-                    "δ(H - T × S)<sub>Quasi-RRHO</sub> =",
+                    "δG<sub>full_Quasi-RRHO</sub> =",
                     full_qrrho_dg,
                     None,
                     "both enthalpy and entropy recieve the quasi-RRHO treatment",
