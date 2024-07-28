@@ -1159,7 +1159,6 @@ class NMRSpectrum(ToolInstance):
 
     def get_mixed_spectrum(self, weights_only=False):
         weight_method = self.weight_method.currentData(Qt.UserRole)
-        self.session.logger.warning(weight_method)
         nmrs = []
         freqs = []
         single_points = []
@@ -1448,9 +1447,7 @@ class NMRSpectrum(ToolInstance):
     def refresh_plot(self):
         # if self.show_boltzmann_pop.checkState() == Qt.Checked:
         #     self.show_conformers()
-        weight_method = self.weight_method.currentData(Qt.UserRole)
-        self.session.logger.warning(weight_method)
-    
+        
         self.refresh_equivalent_nuclei()
         self.set_available_elements()
         self.set_coupling()
