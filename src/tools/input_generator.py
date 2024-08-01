@@ -1018,6 +1018,18 @@ class BuildQM(ToolInstance):
         nproc = self.job_widget.getNProc(update_settings)
         mem = self.job_widget.getMem(update_settings)
         jobs = self.job_widget.getJobs() #job settings get updated during getKWDict
+        for job in jobs:
+            try:
+                constraints = job.constraints
+                if constraints:
+                    for key in constraints:
+                        for i, con in enumerate(constraints[key]):
+                            if hasattr(con, "__iter__"):
+                                constraints[key][i] = [rescol.atoms[x].name for x in con]
+                            else:
+                                constraints[key][i] = rescol.atoms[con].name
+            except AttributeError:
+                pass
 
         solvent = self.job_widget.getSolvent(update_settings)
         
@@ -1042,6 +1054,8 @@ class BuildQM(ToolInstance):
             geometry=rescol,
             **combined_dict
         )
+
+
 
     def change_model(self, index):
         """changes model to the one selected in self.model_selector (index is basically ignored"""
@@ -1120,27 +1134,6 @@ class BuildQM(ToolInstance):
     def run_local_job(self, *args, name="local_job", **kwargs):
         """run job"""
         self.update_theory(update_settings=True)
-
-        # need to convert constraints to atoms so they can be encoded by the 
-        # job manager
-        if self.theory.job_type:
-            for job in self.theory.job_type:
-                if isinstance(job, OptimizationJob) or isinstance(job, ConformerSearchJob):
-                    if job.constraints:
-                        for key in job.constraints:
-                            if key == "atoms":
-                                if not job.constraints["atoms"]:
-                                    continue
-                                job.constraints["atoms"] = [
-                                    "%i" % (self.theory.geometry.atoms.index(atom) + 1)
-                                    for atom in self.theory.geometry.find(job.constraints["atoms"])
-                                ]
-                            else:
-                                for i, con in enumerate(job.constraints[key]):
-                                    job.constraints[key][i] = [
-                                        "%i" % (self.theory.geometry.atoms.index(atom) + 1)
-                                        for atom in self.theory.geometry.find(con)
-                                    ]
 
         program = self.file_type.currentText()
         self.settings.last_program = program
@@ -2243,7 +2236,7 @@ class JobTypeOption(QWidget):
                     for atom in constraints["atoms"]:
                         if atom.deleted:
                             continue
-                        new_constraints["atoms"].append(str(atom.structure.atoms.index(atom) + 1))
+                        new_constraints["atoms"].append(atom.structure.atoms.index(atom))
 
                     for key in ["bonds", "angles", "torsions"]:
                         if key in constraints:
@@ -2255,7 +2248,7 @@ class JobTypeOption(QWidget):
                                             break
                                     else:
                                         new_constraints[key].append(
-                                            [str(atom.structure.atoms.index(atom) + 1) for atom in constraint]
+                                            [atom.structure.atoms.index(atom) for atom in constraint]
                                         )
 
                 constraints = new_constraints
