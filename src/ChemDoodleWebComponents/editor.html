@@ -40,6 +40,7 @@
         </script>
         <form id="form" method="get" action="editor:mol">
             <input name="molfile" value="" id="form_value" hidden="true"/>
+            <input name="mol3file" value="" id="mol3file" hidden="true"/>
             <br>
                 <button type="button" id="test">open molecule</button>
             <br>
@@ -85,6 +86,7 @@
             var method = document.getElementById("opt");
             var form = document.getElementById("form");
             var form_val = document.getElementById("form_value");
+            var mol3file = document.getElementById("mol3file");
             // cooldown so people can't spam cactus
             var cooldown = 5;
             function submitForm() {
@@ -100,7 +102,10 @@
                 //sPaCe gets converted to " " once we get back to Python
                 var out = ChemDoodle.writeMOL(mol).replace(/\n/g, "\\n").replace(/\s/g, "sPaCe");
                 // put this on a form item so it gets passed to python
+                var out3 = ChemDoodle.writeMOL3(mol).replace(/\n/g, "\\n").replace(/\s/g, "sPaCe");
+                // put this on a form item so it gets passed to python
                 form_val.value = out;
+                mol3file.value = out3;
                 // turn off the button for cooldown seconds
                 button.disabled = true;
                 // change the text so it shows the time until the user

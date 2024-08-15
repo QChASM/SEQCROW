@@ -12274,13 +12274,89 @@ ChemDoodle.RESIDUE = function(f) {
         d.push("M  END");
         return d.join("")
     };
+    e.write_v3 = function(b) {
+        let d = [];
+        d.push("Molecule from ChemDoodle Web Components (Modified for SEQCROW)\n\nhttp://www.ichemlabs.com\n");
+        d.push("  0  0  0  0  0  0  0  0  0  0  0 V3000\n");
+        d.push("M  V30 BEGIN CTAB\n");
+        d.push("M  V30 COUNTS ");
+        d.push(b.atoms.length.toString());
+        d.push(" ");
+        d.push(b.bonds.length.toString());
+        d.push(" ");
+        d.push(" 0 0 0\n");
+        d.push("M  V30 BEGIN ATOM\n");
+        var e = b.getCenter();
+        for (let h = 0, k = b.atoms.length; h < k; h++) {
+            var a = b.atoms[h];
+            d.push("M  V30 ");
+            d.push((h + 1).toString());
+            d.push(" ");
+            d.push(a.label);
+            d.push(" ");
+            d.push(this.fit(((a.x - e.x) / f.DEFAULT_STYLES.bondLength_2D).toFixed(4), 10));
+            d.push(" ");
+            d.push(this.fit((-(a.y - e.y) / f.DEFAULT_STYLES.bondLength_2D).toFixed(4), 10));
+            d.push(" ");
+            d.push(this.fit((a.z / f.DEFAULT_STYLES.bondLength_2D).toFixed(4), 10));
+            d.push(" ");
+
+            if (-1 !== a.mass && q[a.label]) {
+                var g = a.mass - q[a.label].mass;
+                if (g !== 0) {
+                    d.push("MASS=");
+                    d.push(a.mass.toString());
+                    d.push(" ");
+                }
+            }
+            g = "  0";
+            if (a.charge !== 0) {
+                d.push("CHG=");
+                d.push(a.charge.toString());
+                d.push(" ");
+            }
+            d.push("\n");
+        }
+        d.push("M  V30 END ATOM\n");
+        d.push("M  V30 BEGIN BOND\n");
+        for (let g = 0, f = b.bonds.length; g < f; g++) {
+            a = b.bonds[g];
+            e = 0;
+            d.push("M  V30 ");
+            d.push((g + 1).toString());
+            d.push(" ");
+            var x = a.bondOrder;
+            if (1.5 == x) x = 4;
+            else if (3 < x || 0 != x % 1) x = 1;
+            d.push(x.toString());
+            d.push(" ");
+            d.push((b.atoms.indexOf(a.a1) + 1).toString());
+            d.push(" ");
+            d.push((b.atoms.indexOf(a.a2) + 1).toString());
+            d.push(" ");
+            a.stereo === t.Bond.STEREO_AMBIGUOUS ? e = 3 : a.stereo === t.Bond.STEREO_PROTRUDING ? e = 1 : a.stereo === t.Bond.STEREO_RECESSED && (e = 2);
+            if (e !== 0) {
+                d.push("CFG=");
+                d.push(e.toString());
+            }
+            d.push("\n")
+        }
+        d.push("M  V30 END BOND\n");
+        d.push("M  V30 END CTAB\n");
+        d.push("M  END");
+        return d.join("")
+    };
     let k = new l.MOLInterpreter;
+    f.writeMOL3 = function(b) {
+        return k.write_v3(b)
+    };
     f.readMOL = function(b, d) {
         return k.read(b, d)
     };
     f.writeMOL = function(b) {
         return k.write(b)
-    }
+    };
+
 })(ChemDoodle, ChemDoodle.ELEMENT, ChemDoodle.io, ChemDoodle.structures);
 (function(f, q, l, t, e, k, b) {
     function d(a, b, d, e, f) {

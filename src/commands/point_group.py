@@ -54,7 +54,7 @@ def pointGroup(
             max_rotation=maxRotation,
         )
 
-        session.logger.info("%s: %s" % (model.name, pg.name))
+        session.logger.info("%s: %s (symmetry number is %i)" % (model.name, pg.name, pg.symmetry_number))
         out.append(pg.name)
         if symmetryNumber:
             session.logger.info(

@@ -63,3 +63,6 @@ March 3. 2023
     
 later in the day, March 3. 2023
     Reverted to the old version of ChemDoodle
+
+August 14. 2024
+    added function to print mol3 files
