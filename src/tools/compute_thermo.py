@@ -33,6 +33,7 @@ from Qt.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QTextBrowser,
+    QTextEdit,
 )
 
 from SEQCROW.widgets import FilereaderComboBox, FakeMenu
@@ -40,6 +41,7 @@ from SEQCROW.widgets import FilereaderComboBox, FakeMenu
 from AaronTools.comp_output import CompOutput
 from AaronTools.geometry import Geometry
 from AaronTools.const import PHYSICAL, UNIT
+from AaronTools.symmetry import PointGroup
 
 class _ComputeThermoSettings(Settings):
 
@@ -210,12 +212,23 @@ class Thermochem(ToolInstance):
         
         
         
-        absolute_layout.addWidget(splitter)
+        absolute_layout.addWidget(splitter, 0, 0, 1, 3)
 
         self.status = QStatusBar()
         self.status.setSizeGripEnabled(False)
         self.status.setStyleSheet("color: red")
-        absolute_layout.addWidget(self.status, 1, 0, 1, 1, Qt.AlignTop)
+        absolute_layout.addWidget(self.status, 1, 2, 1, 1, Qt.AlignTop)
+
+        self.pg_widget = QTextEdit()
+        self.pg_widget.setReadOnly(True)
+        self.pg_widget.setMaximumHeight(
+            int(1.8 * self.pg_widget.fontMetrics().boundingRect("Q").height())
+        )
+        absolute_layout.addWidget(self.pg_widget, 1, 0, 1, 1, Qt.AlignTop)
+
+        self.pg_button = QPushButton("re-determine point group")
+        self.pg_button.clicked.connect(self.determine_pg)
+        absolute_layout.addWidget(self.pg_button, 1, 1, 1, 1, Qt.AlignTop)
 
         self.tab_widget.addTab(absolute_widget, "absolute")
 
@@ -341,6 +354,17 @@ class Thermochem(ToolInstance):
         self.tool_window.ui_area.setLayout(layout)
 
         self.tool_window.manage(None)
+
+    def determine_pg(self):
+        if self.thermo_selector.currentIndex() < 0:
+            return
+        fr, mdl = self.thermo_selector.currentData()
+        geom = Geometry(fr["atoms"], refresh_connected=False, refresh_ranks=False)
+        pg = PointGroup(geom)
+        fr["molecular_point_group"] = pg.name
+        fr["rotational_symmetry_number"] = pg.symmetry_number
+        self.set_pg_info(fr)
+        self.set_thermo()
 
     def calc_relative_thermo(self, *args):
         """changes the values on the 'relative' tab
@@ -682,8 +706,36 @@ class Thermochem(ToolInstance):
 
             if 'temperature' in fr:
                 self.temperature_line.setValue(fr['temperature'])
+            
+            self.set_pg_info(fr)
 
         self.set_thermo()
+
+    def set_pg_info(self, filereader):
+        pg = "C1"
+        sym_n = 1
+        try:
+            try:
+                pg = filereader["molecular_point_group"]
+            except KeyError:
+                pg = filereader["full_point_group"]
+        except KeyError:
+            self.session.logger.warning("point group was not parsed from %s" % filereader["name"])
+        try:
+            sym_n = filereader["rotational_symmetry_number"]
+        except KeyError:
+            self.session.logger.warning("rotational symmetry number was not parsed from %s" % filereader["name"])
+        
+        if len(pg) > 1:
+            text = "point group = %s<sub>%s</sub>, symmetry number = %i" % (
+                pg[0], pg[1:], sym_n
+            )
+        else:
+            text = "point group = %s, symmetry number = %i" % (
+                pg, sym_n
+            )
+        
+        self.pg_widget.setText(text)
 
     def check_geometry_rmsd(self, *args):
         """check RMSD between energy and frequency filereader on the absolute tab

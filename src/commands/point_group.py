@@ -53,7 +53,9 @@ def pointGroup(
             rotation_tolerance=np.deg2rad(axisTolerance),
             max_rotation=maxRotation,
         )
-
+        if model.filereaders:
+            model.filereaders[-1]["molecular_point_group"] = pg.name
+            model.filereaders[-1]["rotational_symmetry_number"] = pg.symmetry_number
         session.logger.info("%s: %s (symmetry number is %i)" % (model.name, pg.name, pg.symmetry_number))
         out.append(pg.name)
         if symmetryNumber:
