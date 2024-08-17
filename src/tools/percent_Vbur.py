@@ -62,7 +62,7 @@ cmap_names = sorted([
 skip_cmaps = set()
 
 def get_cmap_icon(cmap_name, *size):
-    cmap = plt.cm.get_cmap(cmap_name)
+    cmap = plt.get_cmap(cmap_name)
     d = int(np.ceil(np.log10(size[0])))
     pixmap_list = [
         "%i  %i  %i  %i" % (size[0], size[1], size[0], d)
@@ -864,7 +864,7 @@ class StericMap(ChildToolWindow):
         color_map, levels, contour_lines,
     ):
         self.fig, ax = plt.subplots()
-        cmap = copy.copy(plt.cm.get_cmap(color_map))
+        cmap = copy.copy(plt.get_cmap(color_map))
         cmap.set_under('w')
         steric_map = ax.contourf(
             x, y, z,
@@ -920,7 +920,7 @@ class StericMap(ChildToolWindow):
     ):
         vbur = [v1 - v2 for v1, v2 in zip(vbur1, vbur2)]
         self.fig, ax = plt.subplots()
-        cmap = copy.copy(plt.cm.get_cmap(color_map))
+        cmap = copy.copy(plt.get_cmap(color_map))
         cmap_a_not_in_b = LinearSegmentedColormap.from_list("a_not_in_b", [(0.5, 0, 0), (0.5, 0, 0)])
         cmap_b_not_in_a = LinearSegmentedColormap.from_list("a_not_in_b", [(0, 0, 0.5), (0, 0, 0.5)])
         if abs(min_alt) < abs(max_alt):
