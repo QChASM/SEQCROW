@@ -673,6 +673,15 @@ class MolBuilder(HtmlToolInstance):
 
             return
 
+        except Exception as e:
+            self.session.logger.warning("failed to retrieve structure from CACTUS web API")
+            self.session.logger.info(url)
+            self.session.logger.info("structure in V3000 format:")
+            self.session.logger.info("<pre>" + mol3file + "</pre>", is_html=True)
+            self.session.logger.info("structure in V2000 format:")
+            self.session.logger.info("<pre>" + molfile + "</pre>", is_html=True)
+            raise e
+
 
         if fr is None:
             self.session.logger.warning("structure was not generated using CACTUS - it might suck!")

@@ -35,6 +35,7 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
             just_geom=False,
             get_all=True,
             max_length=max_length,
+            log=session.logger,
         )
     except UnicodeDecodeError as e:
         session.logger.error("unable to open %s as a %s" % (file_name, format_name))
@@ -269,7 +270,8 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
                 error_msg += "\nlast line read:\n"
                 error_msg += line
                 error_msg += "\n expected number of atoms here"
-                raise RuntimeError(error_msg)
+                session.log.error(error_msg)
+                return
             comment = stream.readline().strip()
             comments.append(comment)
             coords = np.zeros((n_atoms, 3))

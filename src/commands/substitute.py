@@ -121,11 +121,14 @@ def substitute(
     if newName is None:
         newName = [None for s in substituents]
     elif any(len(name.strip()) > 4 for name in newName):
-        raise RuntimeError("residue names must be 4 characters or less")
+        from chimerax.core.errors import LimitationError
+        raise LimitationError("residue names must be 4 characters or less")
     elif not all(name.isalnum() for name in newName):
-        raise RuntimeError("invalid residue name: %s" % " ".join(newName))
+        from chimerax.core.errors import LimitationError
+        raise LimitationError("invalid residue name: %s" % " ".join(newName))
     elif len(substituents) != len(newName):
-        raise RuntimeError("number of substituents is not the same as the number of new names")
+        from chimerax.core.errors import UserError
+        raise UserError("number of substituents is not the same as the number of new names")
 
     if not guessAttachment:
         models, attached = avoidTargets(session.logger, selection)
