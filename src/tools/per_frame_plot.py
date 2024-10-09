@@ -92,6 +92,9 @@ class EnergyPlot(ToolInstance):
 
         self.opened = False
 
+        if y_data is None and "y_data" in filereader:
+            y_data = filereader["y_data"]
+
         self._build_ui(y_data)
         if not self.opened:
             self.delete()

@@ -562,6 +562,8 @@
                 <ChimeraXClassifier>ChimeraX :: Command :: monitorBonds        :: Structure Analysis :: update connectivity during trajectories</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: ~monitorBonds       :: Structure Analysis :: stop updating connectivity during trajectories</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Command :: dipoleMoment        :: Structure Analysis :: plot dipole moments</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: energyPlot          :: General            :: plot the energy vs step</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Command :: ~energyPlot         :: General            :: close the plot for energy vs step</ChimeraXClassifier>
        </Classifiers>
     
     <AdditionalPackages>

@@ -1444,6 +1444,8 @@ class GaussianSTQNJob(TSSJob):
         return "local ORCA QST job \"%s\"" % self.name
 
     def run(self):
+        self.start_time = asctime(localtime())
+
         self.scratch_dir = os.path.join(
             os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR), \
             "%s %s" % (self.name, self.start_time.replace(':', '.')), \

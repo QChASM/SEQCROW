@@ -1084,6 +1084,14 @@ class _SEQCROW_API(BundleAPI):
         elif command_info.name == "dipoleMoment":
             from .commands.dipole_moment import dipole_moment, dipole_moment_description
             register("dipoleMoment", dipole_moment_description, dipole_moment)
+        
+        elif command_info.name == "energyPlot":
+            from .commands.energy_plot import energy_plot, energy_plot_description
+            register("energyPlot", energy_plot_description, energy_plot)
+        
+        elif command_info.name == "~energyPlot":
+            from .commands.energy_plot import close_energy_plot, close_energy_plot_description
+            register("~energyPlot", close_energy_plot_description, close_energy_plot)
 
     @staticmethod
     def register_selector_menus(session):

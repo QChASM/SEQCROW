@@ -527,6 +527,15 @@ def save_xyz(session, path, **kwargs):
         coordsets = kwargs['coordsets']
     else:
         coordsets = False
+        
+    if 'append' in kwargs:
+        append = kwargs['append']
+        if append:
+            mode = "a"
+        else:
+            mode = "w"
+    else:
+        mode = "w"
 
     if 'comment' in kwargs:
         comment = kwargs['comment']
@@ -540,9 +549,9 @@ def save_xyz(session, path, **kwargs):
     
     if len(models) < 1:
         raise RuntimeError('nothing to save')
-    
-    with open(path, "w") as f:
-        for model in models:
+        
+    for model in models:
+        with open(path, mode) as f:
             if coordsets:
                 for cs in model.coordset_ids:
                     f.write("%i\n%s\n" % (model.num_atoms, comment if comment else model.name))
