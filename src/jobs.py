@@ -357,7 +357,8 @@ class ORCAJob(LocalJob):
             else:        
                 self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log)
         except FileNotFoundError:
-            self.session.logger.error(
+            from chimerax.core.errors import UserError
+            raise UserError(
                 "job could not start because ORCA executable (%s) was not found\n" % executable +
                 "ensure the correct path to executable is specified in the \"SEQCROW Jobs\"\n" +
                 "settings in Favorites/Preferences > Settings..."
@@ -429,7 +430,8 @@ class GaussianJob(LocalJob):
             else:
                 self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log)
         except FileNotFoundError:
-            self.session.logger.error(
+            from chimerax.core.errors import UserError
+            raise UserError(
                 "job could not start because Gaussian executable (%s) was not found\n" % executable +
                 "ensure the correct path to executable is specified in the \"SEQCROW Jobs\"\n" +
                 "settings in Favorites/Preferences > Settings..."
@@ -520,7 +522,8 @@ class Psi4Job(LocalJob):
             else:
                 self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log)
         except FileNotFoundError:
-            self.session.logger.error(
+            from chimerax.core.errors import UserError
+            raise UserError(
                 "job could not start because Psi4 executable (%s) was not found\n" % executable +
                 "ensure the correct path to executable is specified in the \"SEQCROW Jobs\"\n" +
                 "settings in Favorites/Preferences > Settings..."
@@ -648,7 +651,8 @@ class QChemJob(LocalJob):
                     args, cwd=self.scratch_dir, stdout=outfile, stderr=log
                 )
         except FileNotFoundError:
-            self.session.logger.error(
+            from chimerax.core.errors import UserError
+            raise UserError(
                 "job could not start because Q-Chem executable (%s) was not found\n" % executable +
                 "ensure the correct path to executable is specified in the \"SEQCROW Jobs\"\n" +
                 "settings in Favorites/Preferences > Settings..."
@@ -714,7 +718,8 @@ class XTBJob(LocalJob):
             else:        
                 self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log)
         except FileNotFoundError:
-            self.session.logger.error(
+            from chimerax.core.errors import UserError
+            raise UserError(
                 "job could not start because xTB executable (%s) was not found\n" % executable +
                 "ensure the correct path to executable is specified in the \"SEQCROW Jobs\"\n" +
                 "settings in Favorites/Preferences > Settings..."
@@ -809,7 +814,8 @@ class CRESTJob(LocalJob):
             else:        
                 self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log)
         except FileNotFoundError:
-            self.session.logger.error(
+            from chimerax.core.errors import UserError
+            raise UserError(
                 "job could not start because CREST executable (%s) was not found\n" % executable +
                 "ensure the correct path to executable is specified in the \"SEQCROW Jobs\"\n" +
                 "settings in Favorites/Preferences > Settings..."
@@ -1441,7 +1447,7 @@ class GaussianSTQNJob(TSSJob):
     format_name = "log"
     
     def __repr__(self):
-        return "local ORCA QST job \"%s\"" % self.name
+        return "local Gaussian QST job \"%s\"" % self.name
 
     def run(self):
         self.start_time = asctime(localtime())
@@ -1479,7 +1485,8 @@ class GaussianSTQNJob(TSSJob):
             else:
                 self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=log, stderr=log)
         except FileNotFoundError:
-            self.session.logger.error(
+            from chimerax.core.errors import UserError
+            raise UserError(
                 "job could not start because Gaussian executable (%s) was not found\n" % executable +
                 "ensure the correct path to executable is specified in the \"SEQCROW Jobs\"\n" +
                 "settings in Favorites/Preferences > Settings..."
@@ -1550,7 +1557,8 @@ class ORCANEBJob(TSSJob):
             else:        
                 self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log)
         except FileNotFoundError:
-            self.session.logger.error(
+            from chimerax.core.errors import UserError
+            raise UserError(
                 "job could not start because ORCA executable (%s) was not found\n" % executable +
                 "ensure the correct path to executable is specified in the \"SEQCROW Jobs\"\n" +
                 "settings in Favorites/Preferences > Settings..."
@@ -1620,7 +1628,8 @@ class QChemFSMJob(TSSJob):
                     args, cwd=self.scratch_dir, stdout=outfile, stderr=log
                 )
         except FileNotFoundError:
-            self.session.logger.error(
+            from chimerax.core.errors import UserError
+            raise UserError(
                 "job could not start because Q-Chem executable (%s) was not found\n" % executable +
                 "ensure the correct path to executable is specified in the \"SEQCROW Jobs\"\n" +
                 "settings in Favorites/Preferences > Settings..."
