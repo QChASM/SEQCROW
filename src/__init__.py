@@ -1092,6 +1092,10 @@ class _SEQCROW_API(BundleAPI):
         elif command_info.name == "~energyPlot":
             from .commands.energy_plot import close_energy_plot, close_energy_plot_description
             register("~energyPlot", close_energy_plot_description, close_energy_plot)
+        
+        elif command_info.name == "I_know_there_is_an_imaginary_frequency_but_that_is_okay":
+            from .commands.no_freq_warning import freq_warning, freq_warning_description
+            register("I_know_there_is_an_imaginary_frequency_but_that_is_okay", freq_warning_description, freq_warning)
 
     @staticmethod
     def register_selector_menus(session):

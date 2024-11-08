@@ -1142,21 +1142,21 @@ class IRSpectrum(ToolInstance):
         model = self.plot_type.model()
         vcd_item = model.item(2)
         raman_item = model.item(3)
-        if mixed_spectra.data[0].rotation is None:
+        if mixed_spectra.data[-1].rotation is None:
             vcd_item.setFlags(vcd_item.flags() & ~Qt.ItemIsEnabled)
         else:
             vcd_item.setFlags(vcd_item.flags() | Qt.ItemIsEnabled)
-        if mixed_spectra.data[0].raman_activity is None:
+        if mixed_spectra.data[-1].raman_activity is None:
             raman_item.setFlags(raman_item.flags() & ~Qt.ItemIsEnabled)
         else:
             raman_item.setFlags(raman_item.flags() | Qt.ItemIsEnabled)
         if plot_type == "VCD":
-            if not all(data.rotation is not None for data in mixed_spectra.data):
+            if not any(data.rotation is not None for data in mixed_spectra.data):
                 self.plot_type.blockSignals(True)
                 self.plot_type.setCurrentIndex(0)
                 self.plot_type.blockSignals(False)
         if plot_type == "Raman":
-            if not all(data.raman_activity is not None for data in mixed_spectra.data):
+            if not any(data.raman_activity is not None for data in mixed_spectra.data):
                 self.plot_type.blockSignals(True)
                 self.plot_type.setCurrentIndex(0)
                 self.plot_type.blockSignals(False)
@@ -1198,6 +1198,12 @@ class IRSpectrum(ToolInstance):
             quadratic_scale=quadratic,
             show_functions=show_components,
         )
+        
+        # if any(v.frequency < 0 for v in mixed_spectra.data):
+        #     for ax in self.figure.axes:
+        #         x, _ = ax.get_xlim()
+        #         y = np.mean(ax.get_ylim())
+        #         ax.text(x + 10, y, "warning: one or more imaginary frequencies", color="red")
 
         self.canvas.draw()
         if self.highlighted_mode:

@@ -293,7 +293,7 @@ class Info(ToolInstance):
         else:
             table = self.signal_tables[self.tabs.currentIndex() - 1]
             if self.settings.include_header:
-                s = delim.join([
+                s = delim + delim.join([
                     table.horizontalHeaderItem(i).text().replace(delim, "_") for i in range(0, table.columnCount())
                 ])
                 s += "\n"
@@ -301,11 +301,16 @@ class Info(ToolInstance):
                 s = ""
             
             for i in range(0, table.rowCount()):
+                if self.settings.include_header:
+                    s += table.verticalHeaderItem(i).text().replace(delim, "_")
+                    s += delim
                 s += delim.join(
                     [
-                        item.text().replace("<sub>", "").replace("</sub>", "") for item in [
-                            table.item(i, j) if table.item(i, j) is not None 
-                            else table.cellWidget(i, j) for j in range(0, table.columnCount())
+                        item.replace("<sub>", "").replace("</sub>", "") for item in [
+                            table.item(i, j).text() if table.item(i, j) is not None 
+                            else table.cellWidget(i, j).text() if table.cellWidget(i, j) is not None
+                            else ""
+                            for j in range(0, table.columnCount()) 
                         ]
                     ]
                 )
@@ -555,7 +560,11 @@ class Info(ToolInstance):
                 for i, nest in enumerate(nested_data):
                     table = QTableWidget()
                     table.setColumnCount(len(labels) + 1)
+                    table.setEditTriggers(QTableWidget.NoEditTriggers)
                     table.setHorizontalHeaderLabels(normal_labels)
+                    table.doubleClicked.connect(
+                        lambda ndx, t=table, s=self: s.copy_table_item(t, ndx)
+                    )
                     self.signal_tables.append(table)
                     for group in data:
                         signals = [group]
@@ -626,7 +635,12 @@ class Info(ToolInstance):
                 nmr = fr["nmr"]
                 table = QTableWidget()
                 table.setColumnCount(len(nmr.data))
+                table.setEditTriggers(QTableWidget.NoEditTriggers)
                 table.setHorizontalHeaderLabels([str(shift.ndx + 1) for shift in nmr.data])
+                table.doubleClicked.connect(
+                    lambda ndx, t=table, s=self: s.copy_table_item(t, ndx)
+                )
+                self.signal_tables.append(table)
                 for i, shift in enumerate(nmr.data):
                     table.insertRow(table.rowCount())
                     for j, shift2 in enumerate(nmr.data[:i]):
@@ -654,6 +668,17 @@ class Info(ToolInstance):
             self.tabs.setCurrentIndex(current_tab)
 
         self.apply_filter()
+    
+    def copy_table_item(self, table, item_coord):
+        try:
+            item = table.item(item_coord.row(), item_coord.column())
+            text = item.text()
+            app = QApplication.instance()
+            clipboard = app.clipboard()
+            clipboard.setText(text)
+            self.session.logger.status("copied %s to clipboard" % text)
+        except Exception as e:
+            print(e)
     
     def signal_name_map(self, signal_type, data_type):
         """returns a normal name for the data type"""
