@@ -890,7 +890,7 @@ class UVVisSpectrum(ToolInstance):
             j = 0
             for conf_ndx in range(2, mol.childCount(), 2):
                 conf = mol.child(conf_ndx)
-                uv_vis_file = self.tree.itemWidget(conf, 0).currentData()
+                uv_vis_file, _ = self.tree.itemWidget(conf, 0).currentData()
                 if uv_vis_file is None:
                     continue
                 conf_style = mol.child(conf_ndx + 1)
@@ -899,7 +899,7 @@ class UVVisSpectrum(ToolInstance):
                     show_button.setCheckState(Qt.Checked)
                     self.session.logger.info(
                         "Boltzmann population of %s: %.1f%%" % (
-                            uv_vis_file.name,
+                            uv_vis_file["name"],
                             100 * w[j],
                         )
                     )

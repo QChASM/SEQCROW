@@ -635,7 +635,10 @@ class NMRSpectrum(ToolInstance):
             conf = parent.child(conf_ndx)
             self.tree.itemWidget(conf, 0).destroy()
             self.tree.itemWidget(conf, 1).destroy()
-            self.tree.itemWidget(conf, 2).destroy()
+            try:
+                self.tree.itemWidget(conf, 2).destroy()
+            except AttributeError:
+                pass
         
         ndx = self.tree.indexOfTopLevelItem(parent)
         self.tree.takeTopLevelItem(ndx)
