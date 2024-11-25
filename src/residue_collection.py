@@ -54,6 +54,10 @@ class Atom(AaronToolsAtom):
         except AttributeError:
             pass
 
+    @chix_atom.deleter
+    def chix_atom(self, atom):
+        del self._chix_atom
+
     @property
     def atomspec(self):
         return self._atomspec
@@ -286,7 +290,6 @@ class Residue(Geometry):
                 atom_name = "%s%i" % (atom.name, k)
                 if len(atom_name) > 4:
                     if atom.name == atom.element.name:
-                        print("breaking:", k, atom.name)
                         break
                     atom.name = atom.element.name
                     k = 1
