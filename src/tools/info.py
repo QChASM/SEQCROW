@@ -302,7 +302,10 @@ class Info(ToolInstance):
             
             for i in range(0, table.rowCount()):
                 if self.settings.include_header:
-                    s += table.verticalHeaderItem(i).text().replace(delim, "_")
+                    if table.verticalHeaderItem(i) is None:
+                        s += delim
+                    else:
+                        s += table.verticalHeaderItem(i).text().replace(delim, "_")
                     s += delim
                 s += delim.join(
                     [

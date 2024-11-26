@@ -6085,7 +6085,7 @@ class BatchExport(ChildToolWindow):
             rescol = ResidueCollection(m)
             theory.geometry = rescol
             program = self.tool_instance.file_type.currentText()
-            contents, warnings = self.tool_instance.manager.get_info(program).get_file_contents(theory)
+            contents, warnings = self.tool_instance.manager.get_info(program).get_file_contents(theory, update_settings=n==1)
             if warnings:
                 all_warnings.extend([
                     "warnings for %s (%s):" % (m.name, m.atomspec),
