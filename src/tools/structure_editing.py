@@ -712,17 +712,17 @@ class EditStructure(ToolInstance):
   
   
 class SubstituentSelection(ChildToolWindow):
-    def __init__(self, tool_instance, title, textBox=None, **kwargs):
+    def __init__(self, tool_instance, title, textBox=None, singleSelect=False, **kwargs):
         super().__init__(tool_instance, title, **kwargs)
         
         self.textBox = textBox
         
-        self._build_ui()
+        self._build_ui(singleSelect=singleSelect)
 
-    def _build_ui(self):
+    def _build_ui(self, singleSelect=False):
         layout = QGridLayout()
         
-        self.sub_table = SubstituentTable()
+        self.sub_table = SubstituentTable(singleSelect=singleSelect)
         self.sub_table.table.itemSelectionChanged.connect(self.refresh_selection)
         layout.addWidget(self.sub_table)
         

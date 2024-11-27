@@ -1,4 +1,5 @@
 from AaronTools.utils.utils import angle_between_vectors, perp_vector, rotation_matrix
+from AaronTools.substituent import Substituent
 
 from chimerax.atomic import selected_atoms, AtomicStructure
 from chimerax.ui.gui import MainToolWindow
@@ -18,12 +19,14 @@ from Qt.QtWidgets import (
     QGridLayout,
     QGroupBox,
     QStatusBar,
+    QTabWidget,
 )
 
 from SEQCROW.widgets import ElementButton
 from SEQCROW.tools.bond_editor import ORDER_BOND_ORDER, BondOrderSpinBox, PTable2
-from SEQCROW.tools.structure_editing import _PTable
+from SEQCROW.tools.structure_editing import _PTable, SubstituentSelection
 from SEQCROW.managers.filereader_manager import apply_seqcrow_preset
+from SEQCROW.residue_collection import ResidueCollection
 
 import numpy as np
 
@@ -42,15 +45,35 @@ class ZMatrixBuilder(ToolInstance):
         )
 
     def _build_ui(self):
-        layout = QFormLayout()
+        tool_layout = QFormLayout()
+        
+        self.tabs = QTabWidget()
+        tool_layout.addRow(self.tabs)
+    
+        build_tab = QWidget()
+        layout = QFormLayout(build_tab)
         
         layout.addRow(QLabel("select up to 3 atoms to define coordinates"))
 
         layout.addRow(QLabel("if no atoms are selected, a new structure will be created"))
         
+        self.substituent_button = QPushButton("Me")
+        self.substituent_button.clicked.connect(self.open_substituent_selector)
+        
         self.element_button = ElementButton("C", single_state=True)
         self.element_button.clicked.connect(self.open_ptable)
-        layout.addRow("element:", self.element_button)
+
+        self.type_selector = QComboBox()
+        self.type_selector.addItems(["element:", "substituent:"])
+        self.type_selector.currentTextChanged.connect(self.select_shown_button)
+
+        element_or_substituent = QWidget()
+        element_or_substituent_layout = QGridLayout()
+        element_or_substituent_layout.addWidget(self.element_button, 0, 0)
+        element_or_substituent_layout.addWidget(self.substituent_button, 0, 1)
+        self.select_shown_button("element:")
+
+        layout.addRow(self.type_selector, element_or_substituent_layout)
         
         self.atom1_label = QLabel("atom 1 <i>d</i>:")
         self.distance = QDoubleSpinBox()
@@ -81,7 +104,7 @@ class ZMatrixBuilder(ToolInstance):
         self.torsion_angle.setSuffix("°")
         layout.addRow(self.atom3_label, self.torsion_angle)
         
-        add_atom = QPushButton("add atom")
+        add_atom = QPushButton("add atom/substituent")
         add_atom.clicked.connect(self.place_new_atom)
         layout.addRow(add_atom)
         
@@ -92,6 +115,8 @@ class ZMatrixBuilder(ToolInstance):
         delete_atoms = QPushButton("delete selected atoms")
         delete_atoms.clicked.connect(self.delete_selected_atoms)
         layout.addRow(delete_atoms)
+        
+        self.tabs.addTab(build_tab, "build")
         
         bond_lookup = QGroupBox("bond length lookup")
         bond_lookup_layout = QGridLayout(bond_lookup)
@@ -126,7 +151,7 @@ class ZMatrixBuilder(ToolInstance):
         bond_lookup_layout.setColumnStretch(2, 0)
         bond_lookup_layout.setColumnStretch(3, 1)
         
-        layout.addRow(bond_lookup)
+        tool_layout.addRow(bond_lookup)
         
         quick_angles = QGroupBox("quick angles")
         quick_angles_layout = QGridLayout(quick_angles)
@@ -150,16 +175,32 @@ class ZMatrixBuilder(ToolInstance):
             button.setMaximumWidth(int(1.6 * button.fontMetrics().boundingRect("0000").width()))
             quick_angles_layout.addWidget(button, 1, i + 1, 1, 1, alignment=Qt.AlignHCenter | Qt.AlignTop)
         
-        layout.addRow(quick_angles)
+        tool_layout.addRow(quick_angles)
         
         self.status = QStatusBar()
         self.status.setSizeGripEnabled(False)
-        layout.addRow(self.status)
-        
-        self.tool_window.ui_area.setLayout(layout)
+        tool_layout.addRow(self.status)
+
+        self.tool_window.ui_area.setLayout(tool_layout)
 
         self.tool_window.manage(None)
     
+    def select_shown_button(self, text):
+        if text == "element:":
+            self.element_button.setVisible(True)
+            self.substituent_button.setVisible(False)
+        else:
+            self.element_button.setVisible(False)
+            self.substituent_button.setVisible(True)
+
+    def open_substituent_selector(self, *args):
+        self.tool_window.create_child_window(
+            "select a substituent",
+            window_class=SubstituentSelection,
+            textBox=self.substituent_button,
+            singleSelect=True,
+        )
+
     def set_angle_value(self, angle):
         self.valence_angle.setValue(angle)
     
@@ -236,7 +277,7 @@ class ZMatrixBuilder(ToolInstance):
     
     def set_angle(self, coord1, coord2, coord3, target_angle):
         b1 = coord1 - coord2
-        b2 = coord3 - coord2
+        b2 = coord3[0, :] - coord2
         current_angle = angle_between_vectors(b1, b2)
         d_theta = target_angle - current_angle
         if abs(d_theta) > 1e-5:
@@ -248,15 +289,15 @@ class ZMatrixBuilder(ToolInstance):
             v = perp_vector(coords)
             R = rotation_matrix(d_theta, v)
             coord3 -= coord2
-            coord3 = np.dot(R, coord3)
+            coord3 = np.dot(R, coord3.T).T
             coord3 += coord2
             b1 = coord1 - coord2
-            b2 = coord3 - coord2
+            b2 = coord3[0, :] - coord2
             current_angle = angle_between_vectors(b1, b2)
         return abs(current_angle - target_angle) < 1e-5, coord3
     
     def set_torsion(self, coord1, coord2, coord3, coord4, target_angle):
-        b1 = coord4 - coord3
+        b1 = coord4[0, :] - coord3
         b2 = coord3 - coord2
         b3 = coord2 - coord1
         v1 = np.cross(b1, b2)
@@ -269,9 +310,9 @@ class ZMatrixBuilder(ToolInstance):
         if abs(da) > 1e-5:
             R = rotation_matrix(-da, coord2 - coord3)
             coord4 -= coord3
-            coord4 = np.dot(R, coord4)
+            coord4 = np.dot(R, coord4.T).T
             coord4 += coord3
-            b1 = coord4 - coord3
+            b1 = coord4[0, :] - coord3
             b2 = coord3 - coord2
             b3 = coord2 - coord1
             v1 = np.cross(b1, b2)
@@ -285,19 +326,35 @@ class ZMatrixBuilder(ToolInstance):
     def place_new_atom(self):
         sel = selected_atoms(self.session)
         element = self.element_button.text()
+        substituent = self.substituent_button.text()
+        placing_substituent = self.type_selector.currentText() == "substituent:"
+        if placing_substituent:
+            sub = Substituent(substituent)
+        
         if len(sel) == 0:
             # create a new structure
-            mdl = AtomicStructure(self.session, name="new")
-            res = mdl.new_residue("new", "a", 1)
-            name = self.get_atom_name(element, res)
-            atom = mdl.new_atom(name, element)
-            atom.coord = np.zeros(3)
-            res.add_atom(atom)
-            self.session.models.add([mdl])
-            apply_seqcrow_preset(
-                mdl,
-                atoms=[atom],
-            )
+            if placing_substituent:
+                rescol = ResidueCollection(sub)
+                mdl = rescol.get_chimera(
+                    self.session,
+                    apply_preset=False,
+                )
+                self.session.models.add([mdl])
+                apply_seqcrow_preset(
+                    mdl,
+                )
+            else:
+                mdl = AtomicStructure(self.session, name="new")
+                res = mdl.new_residue("new", "a", 1)
+                name = self.get_atom_name(element, res)
+                atom = mdl.new_atom(name, element)
+                atom.coord = np.zeros(3)
+                res.add_atom(atom)
+                self.session.models.add([mdl])
+                apply_seqcrow_preset(
+                    mdl,
+                    atoms=[atom],
+                )
             return
         
         if not all(a.structure is sel[0].structure for a in sel[1:]):
@@ -311,19 +368,28 @@ class ZMatrixBuilder(ToolInstance):
         atom1 = sel[-1]
         res = atom1.residue
         name = self.get_atom_name(element, res)
-        atom = atom1.structure.new_atom(name, element)
-        res.add_atom(atom)
-        coords = np.array(atom1.coord)
+        if placing_substituent:
+            coords = sub.coords
+            coords -= sub.atoms[0].coords
+        else:
+            atom = atom1.structure.new_atom(name, element)
+            res.add_atom(atom)
+            coords = np.array(atom1.coord, ndmin=2)
         dist = self.distance.value()
-        coords[2] += dist
-        atom.coord = coords
-        run(self.session, "bond %s %s reasonable true" % (atom.atomspec, atom1.atomspec))
-        apply_seqcrow_preset(
-            atom1.structure,
-            atoms=[atom],
-        )
+        coords[:, 2] += dist
+        if placing_substituent:
+            sub.coords = coords
+        else:
+            atom.coord = coords
+            run(self.session, "bond %s %s reasonable true" % (atom.atomspec, atom1.atomspec))
+            apply_seqcrow_preset(
+                atom1.structure,
+                atoms=[atom],
+            )
 
         if len(sel) < 2:
+            if self.placing_substituent:
+                self.add_new_sub_atoms(sub, atom1)
             return
         
         angle = np.deg2rad(self.valence_angle.value())
@@ -335,7 +401,8 @@ class ZMatrixBuilder(ToolInstance):
                 atom2.coord, atom1.coord, coords, angle,
             )
             i += 1
-        atom.coord = coords
+        if not placing_substituent:
+            atom.coord = coords
         
         if len(sel) < 3:
             return
@@ -353,5 +420,21 @@ class ZMatrixBuilder(ToolInstance):
                 angle,
             )
             i += 1
-        atom.coord = coords
+        
+        if placing_substituent:
+            sub.coords = coords
+            new_atoms = []
+            for atom in sub.atoms:
+                name = self.get_atom_name(atom.element, res)
+                chix_atom = atom1.structure.new_atom(name, element)
+                chix_atom.coord = atom.coords
+                new_atoms.append(chix_atom)
+            
+            run(self.session, "bond %s %s reasonable true" % (new_atoms[0].atomspec, atom1.atomspec))
+            apply_seqcrow_preset(
+                atom1.structure,
+                atoms=new_atoms,
+            )
+        else:
+            atom.coord = coords
 
