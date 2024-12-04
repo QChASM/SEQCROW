@@ -28,8 +28,21 @@ from SEQCROW.tools.structure_editing import _PTable, SubstituentSelection
 from SEQCROW.managers.filereader_manager import apply_seqcrow_preset
 from SEQCROW.residue_collection import ResidueCollection
 
+from AaronTools.internal_coordinates import *
+
 import numpy as np
 
+
+# convenient q transformation for RIC
+class CustomizableRIC(InternalCoordinateSet):
+    def __init__(self):
+        self.coordinates = {
+            "cartesian": [],
+            "bonds": [],
+            "angles": [],
+            "linear angles": [],
+            "torsions": [],
+        }
 
 class ZMatrixBuilder(ToolInstance):
     def __init__(self, session, name):
@@ -323,6 +336,21 @@ class ZMatrixBuilder(ToolInstance):
             )
         return abs(current_angle - target_angle) < 1e-5, coord4
     
+    def add_new_sub_atoms(self, sub, atom):
+            new_atoms = []
+            for a in sub.atoms:
+                name = self.get_atom_name(a.element, atom.residue)
+                chix_atom = atom.structure.new_atom(name, a.element)
+                chix_atom.coord = a.coords
+                atom.residue.add_atom(chix_atom)
+                new_atoms.append(chix_atom)
+            
+            run(self.session, "bond %s %s reasonable true" % (new_atoms[0].atomspec, atom.atomspec))
+            apply_seqcrow_preset(
+                atom.structure,
+                atoms=new_atoms,
+            )
+    
     def place_new_atom(self):
         sel = selected_atoms(self.session)
         element = self.element_button.text()
@@ -380,7 +408,7 @@ class ZMatrixBuilder(ToolInstance):
         if placing_substituent:
             sub.coords = coords
         else:
-            atom.coord = coords
+            atom.coord = coords[0]
             run(self.session, "bond %s %s reasonable true" % (atom.atomspec, atom1.atomspec))
             apply_seqcrow_preset(
                 atom1.structure,
@@ -401,8 +429,10 @@ class ZMatrixBuilder(ToolInstance):
                 atom2.coord, atom1.coord, coords, angle,
             )
             i += 1
-        if not placing_substituent:
-            atom.coord = coords
+        if placing_substituent:
+            sub.coords = coords
+        else:
+            atom.coord = coords[0]
         
         if len(sel) < 3:
             return
@@ -421,20 +451,94 @@ class ZMatrixBuilder(ToolInstance):
             )
             i += 1
         
+        ric = CustomizableRIC()
+        ric.coordinates["bonds"] = [
+            Bond(0, 1),
+        ]
+        valence_angle = self.valence_angle.value()
+        ric.coordinates["angles"] = [
+            Angle(0, 1, 2),
+        ]
+        ric.coordinates["torsions"] = [
+            Torsion([0], 1, 2, [3]),
+        ]
+        ric.coordinates["cartesian"] = [
+            CartesianCoordinate(1),
+            CartesianCoordinate(2),
+            CartesianCoordinate(3),
+        ]
         if placing_substituent:
-            sub.coords = coords
-            new_atoms = []
-            for atom in sub.atoms:
-                name = self.get_atom_name(atom.element, res)
-                chix_atom = atom1.structure.new_atom(name, element)
-                chix_atom.coord = atom.coords
-                new_atoms.append(chix_atom)
-            
-            run(self.session, "bond %s %s reasonable true" % (new_atoms[0].atomspec, atom1.atomspec))
-            apply_seqcrow_preset(
-                atom1.structure,
-                atoms=new_atoms,
-            )
+            sub_ric = InternalCoordinateSet(sub, torsion_type="all", oop_type="improper")
+            for coord_type, coords in sub_ric.coordinates.items():
+                ric.coordinates.setdefault(coord_type, [])
+                for coord in coords:
+                    if hasattr(coord, "atom1") and coord.atom1 != 0:
+                        coord.atom1 += 3
+                    if hasattr(coord, "atom2") and coord.atom2 != 0:
+                        coord.atom2 += 3
+                    if hasattr(coord, "atom3") and coord.atom3 != 0:
+                        coord.atom3 += 3
+                    if hasattr(coord, "atom") and coord.atom != 0:
+                        coord.atom += 3
+                    if hasattr(coord, "group1"):
+                        coord.group1 = [i + 3 if i != 0 else i for i in coord.group1]
+                    if hasattr(coord, "group2"):
+                        coord.group2 = [i + 3 if i != 0 else i for i in coord.group2]
+                    ric.coordinates[coord_type].append(coord)
+        print(ric.coordinates)
+        
+        if placing_substituent:
+            current_cartesians = np.array([
+                sub.atoms[0].coords,
+                atom1.coord,
+                atom2.coord,
+                atom3.coord,
+                *sub.coords[1:],
+            ])
         else:
-            atom.coord = coords
+            current_cartesians = np.array([
+                atom.coord,
+                atom1.coord,
+                atom2.coord,
+                atom3.coord,
+            ])
+        print("current cartesian")
+        print(current_cartesians)
+        current_q = ric.values(current_cartesians)
+        desired_q = current_q.copy()
+        i = 0
+        for coord_type in ric.coordinates:
+            if coord_type == "bonds":
+                desired_q[i] = dist
+            if coord_type == "angles":
+                desired_q[i] = np.deg2rad(valence_angle)
+            if coord_type == "torsions":
+                desired_q[i] = np.deg2rad(angle)
+            for coord in ric.coordinates[coord_type]:
+                i += coord.n_values
+                print(i, coord, coord.value(current_cartesians))
+
+        dq = ric.adjust_phase(desired_q - current_q)
+        print("current", current_q)
+        print("desired", desired_q)
+        print("desired change", dq)
+        new_coords, err = ric.apply_change(current_cartesians, dq)
+        print("new cartesian")
+        print(new_coords)
+        print("dq -> x error")
+        print(err)
+        new_q = ric.values(new_coords)
+        print("new", new_q)
+        final_dq = new_q - current_q
+        print("actual change", final_dq)
+        print("difference from desired", final_dq - dq)
+
+        if placing_substituent:
+            for i, a in enumerate(sub.atoms):
+                if i != 0:
+                    i += 3
+                a.coords = new_coords[i]
+            self.add_new_sub_atoms(sub, atom1)
+        else:
+            atom.coord = new_coords[0]
 
