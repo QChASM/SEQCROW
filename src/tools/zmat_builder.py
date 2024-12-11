@@ -338,12 +338,21 @@ class ZMatrixBuilder(ToolInstance):
     
     def add_new_sub_atoms(self, sub, atom):
             new_atoms = []
+            ndx = {a: i for i, a in enumerate(sub.atoms)}
             for a in sub.atoms:
                 name = self.get_atom_name(a.element, atom.residue)
                 chix_atom = atom.structure.new_atom(name, a.element)
                 chix_atom.coord = a.coords
                 atom.residue.add_atom(chix_atom)
                 new_atoms.append(chix_atom)
+            
+            for a1 in sub.atoms:
+                chix_a1 = new_atoms[ndx[a1]]
+                for a2 in a1.connected:
+                    if ndx[a2] < ndx[a1]:
+                        continue
+                    chix_a2 = new_atoms[ndx[a2]]
+                    bond = atom.structure.new_bond(chix_a1, chix_a2)
             
             run(self.session, "bond %s %s reasonable true" % (new_atoms[0].atomspec, atom.atomspec))
             apply_seqcrow_preset(
@@ -358,7 +367,12 @@ class ZMatrixBuilder(ToolInstance):
         placing_substituent = self.type_selector.currentText() == "substituent:"
         if placing_substituent:
             sub = Substituent(substituent)
-        
+            sub_angles = []
+            for atom in sub.atoms[0].connected:
+                v = sub.atoms[0].bond(atom)
+                sub_angles.append(angle_between_vectors(v, -sub.atoms[0].coords))
+            print(sub_angles)
+            
         if len(sel) == 0:
             # create a new structure
             if placing_substituent:
@@ -399,6 +413,7 @@ class ZMatrixBuilder(ToolInstance):
         if placing_substituent:
             coords = sub.coords
             coords -= sub.atoms[0].coords
+            coords += atom1.coord
         else:
             atom = atom1.structure.new_atom(name, element)
             res.add_atom(atom)
@@ -415,18 +430,27 @@ class ZMatrixBuilder(ToolInstance):
                 atoms=[atom],
             )
 
+        if placing_substituent and sub_angles:
+            v1 = atom1.coord - sub.atoms[0].coords
+            for a, angle in zip(sub.atoms[0].connected, sub_angles):
+                v2 = a.coords - sub.atoms[0].coords
+                rv = np.cross(v1, v2)
+                da = angle - angle_between_vectors(v1, v2)
+                sub.rotate(rv, da, center=sub.atoms[0])
+            coords = sub.coords
+
         if len(sel) < 2:
-            if self.placing_substituent:
+            if placing_substituent:
                 self.add_new_sub_atoms(sub, atom1)
             return
         
-        angle = np.deg2rad(self.valence_angle.value())
+        valence_angle = np.deg2rad(self.valence_angle.value())
         atom2 = sel[-2]
         angle_set = False
         i = 0
         while not angle_set and i < 10:
             angle_set, coords = self.set_angle(
-                atom2.coord, atom1.coord, coords, angle,
+                atom2.coord, atom1.coord, coords, valence_angle,
             )
             i += 1
         if placing_substituent:
@@ -435,27 +459,32 @@ class ZMatrixBuilder(ToolInstance):
             atom.coord = coords[0]
         
         if len(sel) < 3:
+            if placing_substituent:
+                self.add_new_sub_atoms(sub, atom1)
             return
         
         atom3 = sel[-3]
-        angle = np.deg2rad(self.torsion_angle.value())
+        torsion_angle = np.deg2rad(self.torsion_angle.value())
         angle_set = False
         i = 0
         while not angle_set and i < 10:
+            print("setting torsion angle", i)
             angle_set, coords = self.set_torsion(
                 atom3.coord,
                 atom2.coord,
                 atom1.coord,
                 coords,
-                angle,
+                torsion_angle,
             )
             i += 1
+        
+        if placing_substituent:
+            sub.coords = coords
         
         ric = CustomizableRIC()
         ric.coordinates["bonds"] = [
             Bond(0, 1),
         ]
-        valence_angle = self.valence_angle.value()
         ric.coordinates["angles"] = [
             Angle(0, 1, 2),
         ]
@@ -485,6 +514,12 @@ class ZMatrixBuilder(ToolInstance):
                     if hasattr(coord, "group2"):
                         coord.group2 = [i + 3 if i != 0 else i for i in coord.group2]
                     ric.coordinates[coord_type].append(coord)
+            
+            for a, angle in zip(sub.atoms[0].connected, sub_angles):
+                ric.coordinates["angles"].append(
+                    Angle(1, 0, sub.atoms.index(a) + 3)
+                )
+
         print(ric.coordinates)
         
         if placing_substituent:
@@ -508,21 +543,32 @@ class ZMatrixBuilder(ToolInstance):
         desired_q = current_q.copy()
         i = 0
         for coord_type in ric.coordinates:
+            print(coord_type, len(ric.coordinates[coord_type]))
             if coord_type == "bonds":
                 desired_q[i] = dist
             if coord_type == "angles":
-                desired_q[i] = np.deg2rad(valence_angle)
+                desired_q[i] = valence_angle
+                v = 0
+                for coord in ric.coordinates[coord_type]:
+                    print(i, coord, coord.value(current_cartesians))
+                    if coord.atom1 == 1 and coord.atom2 == 0:
+                        desired_q[i] = sub_angles[v]
+                        v += 1
+                    print(desired_q[i:i+coord.n_values], current_q[i:i+coord.n_values])
+                    i += coord.n_values
+                continue
             if coord_type == "torsions":
-                desired_q[i] = np.deg2rad(angle)
+                desired_q[i] = np.deg2rad(torsion_angle)
             for coord in ric.coordinates[coord_type]:
-                i += coord.n_values
                 print(i, coord, coord.value(current_cartesians))
+                print(desired_q[i:i+coord.n_values], current_q[i:i+coord.n_values])
+                i += coord.n_values
 
         dq = ric.adjust_phase(desired_q - current_q)
         print("current", current_q)
         print("desired", desired_q)
         print("desired change", dq)
-        new_coords, err = ric.apply_change(current_cartesians, dq)
+        new_coords, err = ric.apply_change_2(current_cartesians, dq, debug=True)
         print("new cartesian")
         print(new_coords)
         print("dq -> x error")
