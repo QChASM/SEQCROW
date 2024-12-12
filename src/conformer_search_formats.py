@@ -4,14 +4,14 @@ import os
 from AaronTools.const import AARONLIB, AARONTOOLS
 from AaronTools.theory import *
 from AaronTools.fileIO import FileWriter
-from AaronTools.theory.implicit_solvent import KNOWN_XTB_SOLVENTS
+from AaronTools.theory.implicit_solvent import KNOWN_XTB_SOLVENTS, KNOWN_ORCA_SOLVENTS
 
 from SEQCROW.tools.input_generator import (
     KeywordOptions,
     OneLayerKeyWordOption,
     TwoLayerKeyWordOption,
 )
-from SEQCROW.input_file_formats import XTBKeywordOptions
+from SEQCROW.input_file_formats import XTBKeywordOptions, ORCAKeywordOptions
 
 from chimerax.ui.options import FloatOption, IntOption, BooleanOption, EnumOption
 
@@ -157,6 +157,8 @@ for solvent_lib in solvent_libs:
 class SolventOption(EnumOption):
     values = tuple(solvents)
 
+class UphillMethodOption(EnumOption):
+    values = ("Default", "GFNFF", "GFN0XTB", "GFN1XTB", "GFN2XTB")
 
 
 class CREST(ConformerSearchInfo):
@@ -350,3 +352,121 @@ class CRESTQCG(ConformerSearchInfo):
         checkpoint_file - str, path to checkpoint file
         """
         return dict()
+
+
+class GOAT(ConformerSearchInfo):
+    # name of program
+    name = "GOAT"
+    options = {
+        "energy_window": (
+            FloatOption, {
+                "min": 2,
+                "max": 100,
+                "decimal_places": 1,
+                "step": 1,
+                "default": 6,
+                "name": "energy threshold",
+            }
+        ),
+        "use_topology": (
+            BooleanOption, {
+                "default": True,
+                "name": "use topology",
+            }
+        ),
+        "workers": (
+            IntOption, {
+                "min": 0,
+                "max": 64,
+                "default": 8,
+                "name": "workers",
+            }
+        ),
+        "optimization_cores": (
+            IntOption, {
+                "min": 1,
+                "max": 128,
+                "default": 8,
+                "name": "preopt. cores",
+            }
+        ),
+        "uphill_method": (
+            UphillMethodOption, {
+                "default": "Default",
+                "name": "uphill push L.O.T.",
+            }
+        )
+    }
+
+    parallel = True
+    memory = True
+    save_file_filter = "ORCA input file (*.inp)"
+    solvents = KNOWN_ORCA_SOLVENTS
+    keyword_options = ORCAKeywordOptions
+    methods = [
+        "xTB",
+        "AM1",
+        "HF-3c",
+        "B3LYP",
+        "r2SCAN-3c",
+    ]
+    basis_sets = [
+        "STO-3G",
+        "def2-SVP",
+    ]
+
+    def get_file_contents(self, theory):
+        contents, warnings = FileWriter.write_file(
+            theory.geometry, theory=theory, style="orca", outfile=False, return_warnings=True,
+        )
+        return contents, warnings   
+
+    def fixup_theory(
+        self,
+        theory,
+        energy_window=6,
+        use_topology=True,
+        workers=8,
+        optimization_cores=8,
+        uphill_method=None,
+        restart_file=None,
+    ):
+        for job in theory.job_type:
+            if hasattr(job, "use_topology"):
+                job.use_topology = use_topology
+                
+        new_dict = {
+            ORCA_BLOCKS: {
+                "goat": [
+                    "MaxEn %.1f" % energy_window,
+                    "MaxCoresOpt %i" % optimization_cores,
+                ],
+            }
+        }
+        if uphill_method and uphill_method != "Default":
+            new_dict[ORCA_BLOCKS]["goat"].append("GFNUphill %s" % uphill_method)
+        if workers == 0:
+            new_dict[ORCA_BLOCKS]["goat"].append("NWorkers Auto")
+        else:
+            new_dict[ORCA_BLOCKS]["goat"].append("NWorkers %i" % workers)
+        
+        new_dict[ORCA_BLOCKS]["goat"].append("Align True")
+
+        theory.kwargs = combine_dicts(
+            new_dict, theory.kwargs,
+        )
+        
+        return theory
+
+    def get_job_kw_dict(
+        self,
+        read_checkpoint,
+        checkpoint_file,
+    ):
+        """
+        get a keyword dictionary given the settings on the 'job details' tab
+        read_checkpoint - bool, read checkpoint is checked
+        checkpoint_file - str, path to checkpoint file
+        """
+        return dict()
+

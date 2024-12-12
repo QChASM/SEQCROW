@@ -978,6 +978,10 @@ class _SEQCROW_API(BundleAPI):
             if name == "CREST QCG":
                 from .conformer_search_formats import CRESTQCG
                 return CRESTQCG()
+            
+            if name == "GOAT":
+                from .conformer_search_formats import GOAT
+                return GOAT()
  
         elif mgr is session.test_manager:
             if name == "fuseRing_command":

@@ -410,6 +410,7 @@
 			<Providers manager="conformer_search_manager">
 				<Provider name="CREST"/>
 				<Provider name="CREST QCG"/>
+				<Provider name="GOAT"/>
 			</Providers>
 			
             <Classifiers>
