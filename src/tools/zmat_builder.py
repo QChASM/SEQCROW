@@ -30,6 +30,7 @@ from SEQCROW.managers.filereader_manager import apply_seqcrow_preset
 from SEQCROW.residue_collection import ResidueCollection
 
 from AaronTools.internal_coordinates import *
+from AaronTools.utils.utils import fibonacci_sphere
 
 import numpy as np
 
@@ -90,8 +91,10 @@ class ZMatrixBuilder(ToolInstance):
         self.build_layout.addRow(self.type_selector, element_or_substituent_layout)
         
         self.atom1_label = QLabel("atom 1 <i>d</i>:")
+        self.atom1_label.setToolTip("1-new distance")
         self.distance = QDoubleSpinBox()
-        self.distance.setDecimals(4)
+        self.distance.setToolTip("1-new distance")
+        self.distance.setDecimals(5)
         self.distance.setMinimum(0)
         self.distance.setMaximum(30)
         self.distance.setValue(1.51)
@@ -100,8 +103,10 @@ class ZMatrixBuilder(ToolInstance):
         self.build_layout.addRow(self.atom1_label, self.distance)
         
         self.atom2_label = QLabel("atom 2 <i>θ</i>:")
+        self.atom2_label.setToolTip("valence 2-1-new angle")
         self.valence_angle = QDoubleSpinBox()
-        self.valence_angle.setDecimals(4)
+        self.valence_angle.setToolTip("valence 2-1-new angle")
+        self.valence_angle.setDecimals(5)
         self.valence_angle.setMinimum(0)
         self.valence_angle.setMaximum(180)
         self.valence_angle.setValue(120)
@@ -110,8 +115,8 @@ class ZMatrixBuilder(ToolInstance):
         self.build_layout.addRow(self.atom2_label, self.valence_angle)
         
         coord3_widget = QWidget()
-        coord3_widget.setToolTip("φ: torsional angle for atoms 3-2-1-new\n" + \
-        "θ₂ valence angle for atoms 3-1-new")
+        coord3_widget.setToolTip("φ: 3-2-1-new torsional angle\n" + \
+        "θ₂: valence 3-1-new angle")
         coord3_layout = QHBoxLayout(coord3_widget)
         coord3_layout.setContentsMargins(0, 0, 0, 0)
         self.coord3 = QComboBox()
@@ -122,7 +127,9 @@ class ZMatrixBuilder(ToolInstance):
         coord3_layout.addWidget(self.coord3)
         coord3_layout.addWidget(self.atom3_label)
         self.torsion_angle = QDoubleSpinBox()
-        self.torsion_angle.setDecimals(4)
+        self.torsion_angle.setToolTip("φ: 3-2-1-new torsional angle\n" + \
+        "θ₂: valence 3-1-new angle")
+        self.torsion_angle.setDecimals(5)
         self.torsion_angle.setMinimum(-180)
         self.torsion_angle.setMaximum(180)
         self.torsion_angle.setSingleStep(0.5)
@@ -130,8 +137,10 @@ class ZMatrixBuilder(ToolInstance):
         self.build_layout.addRow(coord3_widget, self.torsion_angle)
         
         self.atom4_label = QLabel("atom 4 <i>θ<sub>3</sub></i>:")
+        self.atom4_label.setToolTip("valence 4-1-new angle")
         self.valence_angle2 = QDoubleSpinBox()
-        self.valence_angle2.setDecimals(4)
+        self.valence_angle2.setToolTip("valence 4-1-new angle")
+        self.valence_angle2.setDecimals(5)
         self.valence_angle2.setMinimum(0)
         self.valence_angle2.setMaximum(180)
         self.valence_angle2.setValue(120)
@@ -148,11 +157,10 @@ class ZMatrixBuilder(ToolInstance):
         
         draw_bond = QPushButton("bond selected atoms")
         draw_bond.clicked.connect(self.draw_new_bond)
-        self.build_layout.addRow(draw_bond)
         
         delete_atoms = QPushButton("delete selected atoms")
         delete_atoms.clicked.connect(self.delete_selected_atoms)
-        self.build_layout.addRow(delete_atoms)
+        self.build_layout.addRow(draw_bond, delete_atoms)
         
         self.tabs.addTab(build_tab, "build")
         
@@ -192,26 +200,68 @@ class ZMatrixBuilder(ToolInstance):
         tool_layout.addRow(bond_lookup)
         
         quick_angles = QGroupBox("quick angles")
-        quick_angles_layout = QGridLayout(quick_angles)
-        
-        quick_angles_layout.addWidget(QLabel("<i>θ</i>:"), 0, 0, 1, 1)
-        quick_angles_layout.addWidget(QLabel("<i>φ</i>:"), 1, 0, 1, 1)
-        
+        quick_angles_layout = QFormLayout(quick_angles)
+
+        quick_angle1_widget = QWidget()
+        quick_angle1_layout = QHBoxLayout(quick_angle1_widget)
+        quick_angle1_layout.setContentsMargins(0, 0, 0, 0)
+        quick_angle2_widget = QWidget()
+        quick_angle2_layout = QHBoxLayout(quick_angle2_widget)
+        quick_angle2_layout.setContentsMargins(0, 0, 0, 0)
+        quick_angle3_widget = QWidget()
+        quick_angle3_layout = QHBoxLayout(quick_angle3_widget)
+        quick_angle3_layout.setContentsMargins(0, 0, 0, 0)
         for i, angle in enumerate([90, np.rad2deg(np.arccos(-1./3)), 120, 180]):
             button = QPushButton("%.1f" % angle)
             button.clicked.connect(
                 lambda *args, a=angle: self.set_angle_value(a)
             )
             button.setMaximumWidth(int(3.2 * button.fontMetrics().boundingRect("0000").width()))
-            quick_angles_layout.addWidget(button, 0, 2 * i + 1, 1, 2, alignment=Qt.AlignHCenter | Qt.AlignTop)
+            quick_angle1_layout.addWidget(button)
+            
+            button = QPushButton("%.1f" % angle)
+            button.clicked.connect(
+                lambda *args, a=angle: self.set_angle2_value(a)
+            )
+            button.setMaximumWidth(int(3.2 * button.fontMetrics().boundingRect("0000").width()))
+            quick_angle2_layout.addWidget(button)
+            
+            button = QPushButton("%.1f" % angle)
+            button.clicked.connect(
+                lambda *args, a=angle: self.set_angle3_value(a)
+            )
+            button.setMaximumWidth(int(3.2 * button.fontMetrics().boundingRect("0000").width()))
+            quick_angle3_layout.addWidget(button)
+        quick_angles_layout.addRow(QLabel("<i>θ</i>:"), quick_angle1_widget)
+        quick_angles_layout.addRow(QLabel("<i>θ</i><sub>2</sub>:"), quick_angle2_widget)
+        quick_angles_layout.addRow(QLabel("<i>θ</i><sub>3</sub>:"), quick_angle3_widget)
+        quick_angles_layout.setRowVisible(1, False)
+        quick_angles_layout.setRowVisible(2, False)
         
+        torsion_widget = QWidget()
+        torsion_layout = QHBoxLayout(torsion_widget)
+        torsion_layout.setContentsMargins(0, 0, 0, 0)
         for i, angle in enumerate([-120, -90, -60, 0, 60, 90, 120, 180]):
             button = QPushButton("%i" % angle)
             button.clicked.connect(
                 lambda *args, a=angle: self.set_torsion_value(a)
             )
             button.setMaximumWidth(int(1.6 * button.fontMetrics().boundingRect("0000").width()))
-            quick_angles_layout.addWidget(button, 1, i + 1, 1, 1, alignment=Qt.AlignHCenter | Qt.AlignTop)
+            torsion_layout.addWidget(button)
+        
+        quick_angles_layout.addRow(QLabel("<i>φ</i>:"), torsion_widget)
+        
+        # index 0 = torsion, hide the valence 2 and 3 options and show the torsion
+        # index 1 = valence angle, do the opposite
+        self.coord3.currentIndexChanged.connect(
+            lambda x: quick_angles_layout.setRowVisible(1, bool(x))
+        )
+        self.coord3.currentIndexChanged.connect(
+            lambda x: quick_angles_layout.setRowVisible(2, bool(x))
+        )
+        self.coord3.currentIndexChanged.connect(
+            lambda x: quick_angles_layout.setRowVisible(3, not bool(x))
+        )
         
         tool_layout.addRow(quick_angles)
         
@@ -247,6 +297,12 @@ class ZMatrixBuilder(ToolInstance):
 
     def set_angle_value(self, angle):
         self.valence_angle.setValue(angle)
+    
+    def set_angle2_value(self, angle):
+        self.torsion_angle.setValue(angle)
+    
+    def set_angle3_value(self, angle):
+        self.valence_angle2.setValue(angle)
     
     def set_torsion_value(self, angle):
         self.torsion_angle.setValue(angle)
@@ -324,7 +380,7 @@ class ZMatrixBuilder(ToolInstance):
     
     def set_angle(self, coord1, coord2, coord3, target_angle):
         b1 = coord1 - coord2
-        b2 = coord3[0, :] - coord2
+        b2 = coord3 - coord2
         current_angle = angle_between_vectors(b1, b2)
         d_theta = target_angle - current_angle
         if abs(d_theta) > 1e-5:
@@ -336,16 +392,15 @@ class ZMatrixBuilder(ToolInstance):
             v = perp_vector(coords)
             R = rotation_matrix(d_theta, v)
             coord3 -= coord2
-            coord3 = np.dot(R, coord3.T).T
+            coord3 = np.dot(coord3, R.T)
             coord3 += coord2
             b1 = coord1 - coord2
-            b2 = coord3[0, :] - coord2
+            b2 = coord3 - coord2
             current_angle = angle_between_vectors(b1, b2)
-        print(np.rad2deg(current_angle))
         return abs(current_angle - target_angle) < 1e-5, coord3
     
     def set_torsion(self, coord1, coord2, coord3, coord4, target_angle):
-        b1 = coord4[0, :] - coord3
+        b1 = coord4 - coord3
         b2 = coord3 - coord2
         b3 = coord2 - coord1
         v1 = np.cross(b1, b2)
@@ -358,9 +413,9 @@ class ZMatrixBuilder(ToolInstance):
         if abs(da) > 1e-5:
             R = rotation_matrix(-da, coord2 - coord3)
             coord4 -= coord3
-            coord4 = np.dot(R, coord4.T).T
+            coord4 = np.dot(coord4, R.T)
             coord4 += coord3
-            b1 = coord4[0, :] - coord3
+            b1 = coord4 - coord3
             b2 = coord3 - coord2
             b3 = coord2 - coord1
             v1 = np.cross(b1, b2)
@@ -371,45 +426,49 @@ class ZMatrixBuilder(ToolInstance):
             )
         return abs(current_angle - target_angle) < 1e-5, coord4
     
-    def add_new_sub_atoms(self, sub, atom):
-            new_atoms = []
-            ndx = {a: i for i, a in enumerate(sub.atoms)}
-            for a in sub.atoms:
-                name = self.get_atom_name(a.element, atom.residue)
-                chix_atom = atom.structure.new_atom(name, a.element)
-                chix_atom.coord = a.coords
-                atom.residue.add_atom(chix_atom)
-                new_atoms.append(chix_atom)
-            
-            for a1 in sub.atoms:
-                chix_a1 = new_atoms[ndx[a1]]
-                for a2 in a1.connected:
-                    if ndx[a2] < ndx[a1]:
-                        continue
-                    chix_a2 = new_atoms[ndx[a2]]
-                    bond = atom.structure.new_bond(chix_a1, chix_a2)
-            
-            run(self.session, "bond %s %s reasonable true" % (new_atoms[0].atomspec, atom.atomspec))
-            apply_seqcrow_preset(
-                atom.structure,
-                atoms=new_atoms,
-            )
+    def place_substituent(self, atom, sub_name):
+        sub = Substituent(sub_name)
+        ndx = {a: i for i, a in enumerate(sub.atoms)}
+        v1 = atom.coord - atom.neighbors[0].coord
+        sub.align_to_bond(v1)
+        sub.coords -= sub.atoms[0].coords
+        sub.coords += atom.coord
+        ele = atom.element.get_element(sub.atoms[0].element)
+        atom.element = ele
+        
+        new_atoms = [atom]
+        for a in sub.atoms[1:]:
+            name = self.get_atom_name(a.element, atom.residue)
+            chix_atom = atom.structure.new_atom(name, a.element)
+            chix_atom.coord = a.coords
+            atom.residue.add_atom(chix_atom)
+            new_atoms.append(chix_atom)
+        
+        for a1 in sub.atoms:
+            chix_a1 = new_atoms[ndx[a1]]
+            if a1 is sub.atoms[0]:
+                chix_a1 = atom
+            for a2 in a1.connected:
+                if ndx[a2] < ndx[a1]:
+                    continue
+                chix_a2 = new_atoms[ndx[a2]]
+                bond = atom.structure.new_bond(chix_a1, chix_a2)
+        
+        apply_seqcrow_preset(
+            atom.structure,
+            atoms=new_atoms,
+        )
     
     def place_new_atom(self):
         sel = selected_atoms(self.session)
         element = self.element_button.text()
         substituent = self.substituent_button.text()
         placing_substituent = self.type_selector.currentText() == "substituent:"
-        if placing_substituent:
-            sub = Substituent(substituent)
-            sub_angles = []
-            for atom in sub.atoms[0].connected:
-                v = sub.atoms[0].bond(atom)
-                sub_angles.append(angle_between_vectors(v, -sub.atoms[0].coords))
-            
+
         if len(sel) == 0:
             # create a new structure
             if placing_substituent:
+                sub = Substituent(substituent)
                 rescol = ResidueCollection(sub)
                 mdl = rescol.get_chimera(
                     self.session,
@@ -442,44 +501,31 @@ class ZMatrixBuilder(ToolInstance):
             return
         
         if len(sel) > 4:
-            self.session.logger.error("cannot select more than three atoms (%i selected)" % len(sel))
+            self.session.logger.error("cannot select more than four atoms (%i selected)" % len(sel))
             return
         
+        # place the new atom the right distance away from atom1
+        # this is done by adjusting the z component of the coordinate
         atom1 = sel[-1]
         res = atom1.residue
         name = self.get_atom_name(element, res)
-        if placing_substituent:
-            coords = sub.coords
-            coords -= sub.atoms[0].coords
-            coords += atom1.coord
-        else:
-            atom = atom1.structure.new_atom(name, element)
-            res.add_atom(atom)
-            coords = np.array(atom1.coord, ndmin=2)
+        atom = atom1.structure.new_atom(name, element)
+        res.add_atom(atom)
+        coords = np.array(atom1.coord)
         dist = self.distance.value()
-        coords[:, 2] += dist
-        if placing_substituent:
-            sub.coords = coords
-        else:
-            atom.coord = coords[0]
-            run(self.session, "bond %s %s reasonable true" % (atom.atomspec, atom1.atomspec))
-            apply_seqcrow_preset(
-                atom1.structure,
-                atoms=[atom],
-            )
+        coords[2] += dist
+        atom.coord = coords
+        run(self.session, "bond %s %s reasonable true" % (atom.atomspec, atom1.atomspec))
+        apply_seqcrow_preset(
+            atom1.structure,
+            atoms=[atom],
+        )
 
-        if placing_substituent and sub_angles:
-            v1 = atom1.coord - sub.atoms[0].coords
-            for a, angle in zip(sub.atoms[0].connected, sub_angles):
-                v2 = a.coords - sub.atoms[0].coords
-                rv = np.cross(v1, v2)
-                da = angle - angle_between_vectors(v1, v2)
-                sub.rotate(rv, da, center=sub.atoms[0])
-            coords = sub.coords
-
+        # only one atom is selected, so we can't use angles or anything
+        # to further refine the coordinates
         if len(sel) < 2:
             if placing_substituent:
-                self.add_new_sub_atoms(sub, atom1)
+                self.place_substituent(atom, substituent)
             return
         
         valence_angle = np.deg2rad(self.valence_angle.value())
@@ -491,10 +537,7 @@ class ZMatrixBuilder(ToolInstance):
                 atom2.coord, atom1.coord, coords, valence_angle,
             )
             i += 1
-        if placing_substituent:
-            sub.coords = coords
-        else:
-            atom.coord = coords[0]
+        atom.coord = coords
         
         # if there's only two atoms or if it's a linear angle
         # we won't try to set the torsion
@@ -502,17 +545,27 @@ class ZMatrixBuilder(ToolInstance):
             np.isclose(valence_angle - np.pi, 0) and self.coord3.currentData() == "torsion"
         ):
             if placing_substituent:
-                self.add_new_sub_atoms(sub, atom1)
+                self.place_substituent(atom, substituent)
             return
         
+        # we do initially try to set the position
+        # this will technically work for torsions
+        # with two valence angles, it might not have a unique
+        # solution or any solution at all
+        # with three valence angles, it might have a unique
+        # solution but it might also have no solution
+        # only rotating one to match one angle at a time
+        # will probably not find a suitable solution, or
+        # we would have to iterate all angles multiple times
+        # instead we set up some internal coordinates
+        # and fit to those
         atom3 = sel[-3]
         torsion_angle = np.deg2rad(self.torsion_angle.value())
         angle_set = False
         i = 0
+        # try the initial rotation to match the angle/torsion
         if self.coord3.currentData() == "torsion":
-            print("setting torsion")
             while not angle_set and i < 10:
-                print(i)
                 angle_set, coords = self.set_torsion(
                     atom3.coord,
                     atom2.coord,
@@ -522,9 +575,7 @@ class ZMatrixBuilder(ToolInstance):
                 )
                 i += 1
         else:
-            print("setting valence angle")
             while not angle_set and i < 10:
-                print(i)
                 angle_set, coords = self.set_angle(
                     atom3.coord,
                     atom1.coord,
@@ -533,27 +584,13 @@ class ZMatrixBuilder(ToolInstance):
                 )
                 i += 1
         
-        if placing_substituent:
-            sub.coords = coords
-        else:
-            atom.coord = coords[0]
+        atom.coord = coords
         
-        valence_angle2 = 0
-        if len(sel) == 4:
-        #     print("setting valence angle 2")
-            valence_angle2 = np.deg2rad(self.valence_angle2.value())
-        #     angle_set = False
-        #     i = 0
-        #     while not angle_set and i < 10:
-        #         print(i)
-        #         angle_set, coords = self.set_angle(
-        #             sel[0].coord,
-        #             atom1.coord,
-        #             coords,
-        #             valence_angle2,
-        #         )
-        #         i += 1
+        valence_angle2 = np.deg2rad(self.valence_angle2.value())
         
+        # set up the internal coordinates
+        # numbers correspond to indices in current_cartesians
+        # which is set up later
         ric = CustomizableRIC()
         bond = Bond(0, 1)
         ric.coordinates["bonds"] = [bond]
@@ -566,6 +603,9 @@ class ZMatrixBuilder(ToolInstance):
             angle2 = Angle(0, 1, 3)
             ric.coordinates["angles"].append(angle2)
 
+        # include the cartesian coordinates of the selected atoms
+        # this will definitely prevent things from rotating/translating
+        # when the internal coordinates are fit
         ric.coordinates["cartesian"] = [
             CartesianCoordinate(1),
             CartesianCoordinate(2),
@@ -577,108 +617,65 @@ class ZMatrixBuilder(ToolInstance):
             ric.coordinates["angles"].append(angle3)
             ric.coordinates["cartesian"].append(CartesianCoordinate(4))
         
-        offset = len(sel)
-        sub_valence_angles = []
-        if placing_substituent:
-            sub_ric = InternalCoordinateSet(sub, torsion_type="all", oop_type="improper")
-            for coord_type, coords in sub_ric.coordinates.items():
-                ric.coordinates.setdefault(coord_type, [])
-                for coord in coords:
-                    if hasattr(coord, "atom1") and coord.atom1 != 0:
-                        coord.atom1 += offset
-                    if hasattr(coord, "atom2") and coord.atom2 != 0:
-                        coord.atom2 += offset
-                    if hasattr(coord, "atom3") and coord.atom3 != 0:
-                        coord.atom3 += offset
-                    if hasattr(coord, "atom") and coord.atom != 0:
-                        coord.atom += offset
-                    if hasattr(coord, "group1"):
-                        coord.group1 = [i + offset if i != 0 else i for i in coord.group1]
-                    if hasattr(coord, "group2"):
-                        coord.group2 = [i + offset if i != 0 else i for i in coord.group2]
-                    ric.coordinates[coord_type].append(coord)
-            
-            for a, angle in zip(sub.atoms[0].connected, sub_angles):
-                a = Angle(1, 0, sub.atoms.index(a) + offset)
-                ric.coordinates["angles"].append(a)
-                sub_valence_angles.append(a)
-
-
         atom_coords = [a.coord for a in sel[::-1]]
-        if placing_substituent:
-            current_cartesians = np.array([
-                sub.atoms[0].coords,
-                *atom_coords,
-                *sub.coords[1:],
-            ])
-        else:
-            current_cartesians = np.array([
-                atom.coord,
-                *atom_coords,
-            ])
-        
-        err = None
-        j = 0
-        while j < 25 and (err is None or err > 1e-3):
-            j += 1
-            current_q = ric.values(current_cartesians)
-            desired_q = current_q.copy()
-            i = 0
-            for coord_type in ric.coordinates:
-                for coord in ric.coordinates[coord_type]:
-                    if coord is bond:
-                        desired_q[i] = dist
-                    if coord is angle1:
-                        desired_q[i] = valence_angle
-                    if coord is angle2:
-                        desired_q[i] = torsion_angle
-                    if coord is angle3:
-                        desired_q[i] = valence_angle2
-                    if coord in sub_valence_angles:
-                        desired_q[i] = sub_angles[sub_valence_angles.index(coord)]
-                    i += coord.n_values
+        current_cartesians = np.array([
+            atom.coord,
+            *atom_coords,
+        ])
+        # determine the current coordinates and what we
+        # want them to be
+        current_q = ric.values(current_cartesians)
+        desired_q = current_q.copy()
+        i = 0
+        for coord_type in ric.coordinates:
+            for coord in ric.coordinates[coord_type]:
+                if coord is bond:
+                    desired_q[i] = dist
+                if coord is angle1:
+                    desired_q[i] = valence_angle
+                if coord is angle2:
+                    desired_q[i] = torsion_angle
+                if coord is angle3:
+                    desired_q[i] = valence_angle2
+                i += coord.n_values
     
-            for x1, x2 in zip(desired_q, current_q):
-                print(x1, x2)
-            dq = desired_q - current_q
-            print(dq)
-            
-            try:
-                new_coords, err = ric.apply_change(
-                    current_cartesians, dq,
-                    use_delocalized=False,
-                    debug=True,
-                )
-            except np.linalg.LinAlgError:
-                displace = np.random.random_sample(3)
-                current_cartesians[0] += displace
-                current_cartesians[offset + 1:] += displace
-                if len(sel) == 4:
-                    current_cartesians[0] += atom1.coord - sel[0].coord
-                    current_cartesians[offset + 2:] += atom1.coord - sel[0].coord
-                new_coords, err = ric.apply_change(
-                    current_cartesians, dq,
-                    use_delocalized=False,
-                    debug=True,
-                )
-                err = 1
-            current_cartesians[0] = new_coords[0]
-            if placing_substituent:
-                for i, a in enumerate(sub.atoms):
-                    if i != 0:
-                        i += offset
-                    current_cartesians[i] = new_coords[i]
+        # try numerous points around atom1 to see which point best matches
+        # the requested coordinates
+        # without this, if there are 3 valence angles given we could
+        # end up with a poor solution for the final coordinates
+        # this grid usually gets a point pretty close to the final (<0.05 error)
+        best_pt = atom.coord
+        lowest_diff = None
+        test_coords = current_cartesians.copy()
+        for pt in fibonacci_sphere(radius=dist, center=atom1.coord):
+            test_coords[0] = pt
+            test_q = ric.values(test_coords)
+            diff = np.linalg.norm(ric.adjust_phase(test_q - desired_q))
+            if lowest_diff is None or diff < lowest_diff:
+                lowest_diff = diff
+                best_pt = pt
+                current_q = test_q
+        
+        current_cartesians[0] = best_pt
+        
+        # adjust the cartesian coordinates to match the desired
+        # change in internal coordinates
+        dq = desired_q - current_q
+        
+        new_coords, err = ric.apply_change(
+            current_cartesians, dq,
+            use_delocalized=False,
+            debug=False,
+        )
+        if err > 1e-5:
+            self.session.logger.warning(
+                "could not converge structure to match specified internal coordinates\n" + \
+                "these internal coordinates might not correspond to a point in 3D space"
+            )
 
-        new_q = ric.values(current_cartesians)
-        final_dq = new_q - current_q
-        print(final_dq)
+        current_cartesians[0] = new_coords[0]
 
+        atom.coord = new_coords[0]
         if placing_substituent:
-            for i, a in enumerate(sub.atoms):
-                if i != 0:
-                    i += offset
-                a.coords = new_coords[i]
-            self.add_new_sub_atoms(sub, atom1)
-        else:
-            atom.coord = new_coords[0]
+            self.place_substituent(atom, substituent)
 
