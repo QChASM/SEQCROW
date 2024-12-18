@@ -65,7 +65,7 @@ from AaronTools.config import Config
 from AaronTools.const import TMETAL, ELEMENTS, COMMONLY_ODD_ISOTOPES
 from AaronTools.theory import *
 from AaronTools.theory.method import KNOWN_SEMI_EMPIRICAL
-from AaronTools.utils.utils import combine_dicts
+from AaronTools.utils.utils import combine_dicts, to_closing
 from AaronTools.json_extension import ATDecoder, ATEncoder
 
 # import cProfile
@@ -5987,7 +5987,7 @@ class BatchExport(ChildToolWindow):
         file_browse = QWidget()
         file_browse_layout = QGridLayout(file_browse)
         margins = file_browse_layout.contentsMargins()
-        new_margins = (margins.left(), 0, margins.right(), 0)
+        new_margins = (0, 0, margins.right(), 0)
         file_browse_layout.setContentsMargins(*new_margins)
         self.dir_path = QLineEdit()
         self.dir_path.setText(os.path.expanduser("~"))
@@ -6009,7 +6009,12 @@ class BatchExport(ChildToolWindow):
         self.filename_pattern.setToolTip(
             "words in curly brackets will be replaces with attribute values from the model\n"
             "e.g. {atomspec} could become #1 or #2 in the file name\n"
-            "{i} will be replaced with a counter for how many models have been saved"
+            "{i} will be replaced with a counter for how many models have been saved\n"
+            "substrings of attributes can be substituted with the syntax {attr/find/replace}\n"
+            "this will replace 'find' in the model's 'attr' attribute with 'replace'\n"
+            "e.g. if the model's name is constrained-optimization, {name/constrained/ts}.inp\n"
+            "would result in the files being saved to ts-optimization.inp\n"
+            "this substitution uses Regular Expressions, so be careful with special characters"
         )
         layout.addRow("filename pattern:", self.filename_pattern)
 
@@ -6064,7 +6069,7 @@ class BatchExport(ChildToolWindow):
             self.status.showMessage("no errors detected")
 
     def save_stuff(self, *args):
-        self.tool_instance.update_theory(update_settings=False)
+        self.tool_instance.update_theory(update_settings=True)
         theory = self.tool_instance.theory
         for batch_basis, basis in zip(self.basis_elements.basis_ptables, theory.basis.basis):
             elements = batch_basis.selectedElements()
@@ -6085,23 +6090,48 @@ class BatchExport(ChildToolWindow):
             rescol = ResidueCollection(m)
             theory.geometry = rescol
             program = self.tool_instance.file_type.currentText()
-            contents, warnings = self.tool_instance.manager.get_info(program).get_file_contents(theory, update_settings=n==1)
+            contents, warnings = self.tool_instance.manager.get_info(program).get_file_contents(theory)
             if warnings:
                 all_warnings.extend([
                     "warnings for %s (%s):" % (m.name, m.atomspec),
                     *warnings,
                 ])
             fname = self.filename_pattern.text()
-            substitutions = re.findall("{\S+}", fname)
+            substitutions = []
+            i = 0
+            while i < len(fname):
+                if fname[i] == "{":
+                    sub = to_closing(fname[i:], "{")
+                    if sub is not None:
+                        substitutions.append(sub)
+                        i += len(sub)
+                i += 1
+                
             for sub in substitutions:
+                find = None
+                replace = None
+                attr = sub[1:-1]
+                # attributes cannot contain special characters, so this should be safe
+                if "/" in attr:
+                    replace_pattern = re.search("(\S+)\/([^/]+)\/([^/]+)", attr)
+                    if replace_pattern:
+                        attr = replace_pattern.group(1)
+                        find = replace_pattern.group(2)
+                        replace = replace_pattern.group(3)
                 try:
-                    fname = fname.replace(sub, getattr(m, sub[1:-1]))
+                    val = getattr(m, attr)
+                    if find and replace:
+                        try:
+                            val = re.sub(find, replace, val)
+                        except re.error as e:
+                            raise e # TODO - better error message
+                    fname = fname.replace(sub, val)
                 except AttributeError:
-                    if sub[1:-1] == "i":
+                    if attr == "i":
                         fname = fname.replace(sub, str(n))
                     else:
-                        self.tool_instance.logger.error(
-                            "Error while saving batch files: model %s has no attribute %s" % (m.name, sub)
+                        self.tool_instance.session.logger.error(
+                            "Error while saving batch files: model %s has no attribute %s" % (m.name, attr)
                         )
             full_name = os.path.join(self.dir_path.text(), fname)
             os.makedirs(self.dir_path.text(), exist_ok=True)
