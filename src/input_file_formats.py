@@ -58,6 +58,9 @@ class QMInputFileInfo:
     
     # whether constrained optimization is available
     const_optimization = True
+        
+    # whether coordinate scans are available
+    coordinate_scan = True
     
     # whether frequency jobs are available
     frequency = True
@@ -330,7 +333,7 @@ class ORCAKeywordOptions(KeywordOptions):
             return TwoLayerKeyWordOption("blocks", last_dict, previous_dict, "double click to use %%%s %s end", one_opt_per_kw=False)
 
 
-class Psi4KeywordOptions(KeywordOptions):
+class Psi4KeywordOptions(KeywordOptions):   
     items = {
         'settings': PSI4_SETTINGS, 
         'job': PSI4_JOB, 
@@ -1012,6 +1015,7 @@ class ORCAFileInfo(QMInputFileInfo):
 
 class Psi4FileInfo(QMInputFileInfo):
     name = "Psi4"
+    coordinate_scan = False
 
     save_file_filter = "Psi4 input files (*.in)"
     basis_file_filter = "Basis Set Files (*.gbs)"
@@ -1141,6 +1145,7 @@ class SQMFileInfo(QMInputFileInfo):
     memory = False
     ts_optimization = False
     const_optimization = False
+    coordinate_scan = False
     frequency = False
     save_file_filter = "AMBER input files (*.mdin)"
     basis_file_filter = None
