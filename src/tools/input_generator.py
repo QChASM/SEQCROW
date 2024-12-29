@@ -120,6 +120,8 @@ class _InputGeneratorSettings(Settings):
         'last_submit_memory': 4,
         'last_spin_coupling': True,
         'last_nmr': False,
+        'last_increment': 0.5,
+        'last_steps': 5,
     }
 
     AUTO_SAVE = {
@@ -738,7 +740,6 @@ class BuildQM(ToolInstance):
                 self.job_widget.setMemory(theory.memory)
             else:
                 self.job_widget.setMemory(0)
-            
 
         if "use_solvent" in preset and preset["use_solvent"]:
             self.job_widget.setSolvent(theory.solvent)
@@ -971,7 +972,7 @@ class BuildQM(ToolInstance):
 
         rescol = ResidueCollection(self.model_selector.currentData(), bonds_matter=False)
 
-        meth = self.method_widget.getMethod(update_settings)
+        method = self.method_widget.getMethod(update_settings)
         if file_info.basis_sets is not None:
             basis = self.get_basis_set(update_settings)
         else:
@@ -982,7 +983,7 @@ class BuildQM(ToolInstance):
         grid = self.method_widget.getGrid(update_settings)
         charge = self.job_widget.getCharge(update_settings)
         mult = self.job_widget.getMultiplicity(update_settings)
-        if isinstance(meth, SAPTMethod):
+        if isinstance(method, SAPTMethod):
             charges = [widget.value() for widget in \
                 [self.method_widget.sapt_layers.tabs.widget(i).charge for i in range(0, self.method_widget.sapt_layers.tabs.count())]
             ]
@@ -1047,7 +1048,7 @@ class BuildQM(ToolInstance):
         self.theory = Theory(
             charge=charge,
             multiplicity=mult,
-            method=meth,
+            method=method,
             basis=basis,
             empirical_dispersion=dispersion,
             grid=grid,
@@ -1650,11 +1651,13 @@ class JobTypeOption(QWidget):
         self.increment.setMinimum(-1000000)
         self.increment.setMaximum(1000000)
         self.increment.setSuffix(" Å or °")
+        self.increment.setValue(self.settings.last_increment)
         scan_layout.addRow("increment:", self.increment)
         
         self.steps = QSpinBox()
         self.steps.setMinimum(2)
         self.steps.setMaximum(10000)
+        self.steps.setValue(self.settings.last_steps)
         scan_layout.addRow("steps:", self.steps)
 
         constraints_viewer = QTabWidget()
@@ -2284,6 +2287,8 @@ class JobTypeOption(QWidget):
             if opt_type == "constrained" or opt_type == "coordinate scan":
                 constraints = self.getConstraints()
                 new_constraints = {}
+                self.settings.last_steps = self.steps.value()
+                self.settings.last_increment = self.increment.value()
                 if "atoms" in constraints:
                     new_constraints["atoms"] = []
                     for atom in constraints["atoms"]:
@@ -2530,6 +2535,8 @@ class JobTypeOption(QWidget):
 
                 if atom1 is angle[2] and atom2 is angle[1] and atom3 is angle[0]:
                     return
+        elif len(current_atoms) == 0:
+            return
 
         self.constrain_angle(atom1, atom2, atom3)
 
