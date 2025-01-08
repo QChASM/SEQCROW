@@ -1,11 +1,8 @@
 import os.path
 import re
 
-from jinja2 import Template
-
 from chimerax.atomic import AtomicStructure, selected_atoms, selected_bonds, selected_pseudobonds, get_triggers
 from chimerax.core.tools import ToolInstance
-from chimerax.core.models import ADD_MODELS, REMOVE_MODELS
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
@@ -123,6 +120,8 @@ class _InputGeneratorSettings(Settings):
         'last_submit_memory': 4,
         'last_spin_coupling': True,
         'last_nmr': False,
+        'last_increment': 0.5,
+        'last_steps': 5,
     }
 
     AUTO_SAVE = {
@@ -741,7 +740,6 @@ class BuildQM(ToolInstance):
                 self.job_widget.setMemory(theory.memory)
             else:
                 self.job_widget.setMemory(0)
-            
 
         if "use_solvent" in preset and preset["use_solvent"]:
             self.job_widget.setSolvent(theory.solvent)
@@ -974,7 +972,7 @@ class BuildQM(ToolInstance):
 
         rescol = ResidueCollection(self.model_selector.currentData(), bonds_matter=False)
 
-        meth = self.method_widget.getMethod(update_settings)
+        method = self.method_widget.getMethod(update_settings)
         if file_info.basis_sets is not None:
             basis = self.get_basis_set(update_settings)
         else:
@@ -985,7 +983,7 @@ class BuildQM(ToolInstance):
         grid = self.method_widget.getGrid(update_settings)
         charge = self.job_widget.getCharge(update_settings)
         mult = self.job_widget.getMultiplicity(update_settings)
-        if isinstance(meth, SAPTMethod):
+        if isinstance(method, SAPTMethod):
             charges = [widget.value() for widget in \
                 [self.method_widget.sapt_layers.tabs.widget(i).charge for i in range(0, self.method_widget.sapt_layers.tabs.count())]
             ]
@@ -1028,6 +1026,13 @@ class BuildQM(ToolInstance):
                                 constraints[key][i] = [rescol.atoms[x].name for x in con]
                             else:
                                 constraints[key][i] = rescol.atoms[con].name
+                scans = job.scans
+                if scans:
+                    n_atoms = {"bonds": 2, "angles": 3, "torsions": 4}
+                    for key in scans:
+                        for i, con in enumerate(scans[key]):
+                            scans[key][i] = [rescol.atoms[x].name for x in con[:n_atoms[key]]]
+                            scans[key][i].extend(con[n_atoms[key]:])
             except AttributeError:
                 pass
 
@@ -1043,7 +1048,7 @@ class BuildQM(ToolInstance):
         self.theory = Theory(
             charge=charge,
             multiplicity=mult,
-            method=meth,
+            method=method,
             basis=basis,
             empirical_dispersion=dispersion,
             grid=grid,
@@ -1054,8 +1059,6 @@ class BuildQM(ToolInstance):
             geometry=rescol,
             **combined_dict
         )
-
-
 
     def change_model(self, index):
         """changes model to the one selected in self.model_selector (index is basically ignored"""
@@ -1563,21 +1566,16 @@ class JobTypeOption(QWidget):
 
 
         self.geom_opt = QWidget()
-        geom_opt_layout = QGridLayout(self.geom_opt)
-        geom_opt_layout.setContentsMargins(0, 0, 0, 0)
-        geom_opt_form_widget = QWidget()
-        geom_opt_form = QFormLayout(geom_opt_form_widget)
-        geom_opt_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        self.geom_opt_layout = QFormLayout(self.geom_opt)
+        self.geom_opt_layout.setContentsMargins(0, 0, 0, 0)
 
         self.opt_type = QComboBox()
-        self.opt_type.addItems(["local minimum", "constrained", "transition state"])
+        self.opt_type.addItems(["local minimum", "constrained", "coordinate scan", "transition state"])
         self.opt_type.currentIndexChanged.connect(self.something_changed)
-        geom_opt_form.addRow("optimization type:", self.opt_type)
+        self.geom_opt_layout.addRow("optimization type:", self.opt_type)
 
         self.constraints_widget = QWidget()
         constraints_layout = QGridLayout(self.constraints_widget)
-
-        geom_opt_layout.addWidget(geom_opt_form_widget, 0, 0, Qt.AlignTop)
 
         atom_constraints = QWidget()
         atom_constraints_layout = QGridLayout(atom_constraints)
@@ -1591,7 +1589,7 @@ class JobTypeOption(QWidget):
         self.constrained_atom_table = QTableWidget()
         self.constrained_atom_table.setColumnCount(2)
         self.constrained_atom_table.cellClicked.connect(self.clicked_atom_table)
-        self.constrained_atom_table.setHorizontalHeaderLabels(["atom", "unfreeze"])
+        self.constrained_atom_table.setHorizontalHeaderLabels(["atom", "remove"])
         self.constrained_atom_table.setEditTriggers(QTableWidget.NoEditTriggers)
         atom_constraints_layout.addWidget(self.constrained_atom_table, 1, 0)
 
@@ -1607,7 +1605,7 @@ class JobTypeOption(QWidget):
         self.constrained_bond_table = QTableWidget()
         self.constrained_bond_table.setColumnCount(3)
         self.constrained_bond_table.cellClicked.connect(self.clicked_bond_table)
-        self.constrained_bond_table.setHorizontalHeaderLabels(["atom 1", "atom 2", "unfreeze"])
+        self.constrained_bond_table.setHorizontalHeaderLabels(["atom 1", "atom 2", "remove"])
         self.constrained_bond_table.setEditTriggers(QTableWidget.NoEditTriggers)
         bond_constraints_layout.addWidget(self.constrained_bond_table, 1, 0)
 
@@ -1623,7 +1621,7 @@ class JobTypeOption(QWidget):
         self.constrained_angle_table = QTableWidget()
         self.constrained_angle_table.setColumnCount(4)
         self.constrained_angle_table.cellClicked.connect(self.clicked_angle_table)
-        self.constrained_angle_table.setHorizontalHeaderLabels(["atom 1", "atom 2", "atom 3", "unfreeze"])
+        self.constrained_angle_table.setHorizontalHeaderLabels(["atom 1", "atom 2", "atom 3", "remove"])
         self.constrained_angle_table.setEditTriggers(QTableWidget.NoEditTriggers)
         angle_constraints_layout.addWidget(self.constrained_angle_table, 1, 0)
 
@@ -1640,9 +1638,27 @@ class JobTypeOption(QWidget):
         self.constrained_torsion_table = QTableWidget()
         self.constrained_torsion_table.setColumnCount(5)
         self.constrained_torsion_table.cellClicked.connect(self.clicked_torsion_table)
-        self.constrained_torsion_table.setHorizontalHeaderLabels(["atom 1", "atom 2", "atom 3", "atom 4", "unfreeze"])
+        self.constrained_torsion_table.setHorizontalHeaderLabels(["atom 1", "atom 2", "atom 3", "atom 4", "remove"])
         self.constrained_torsion_table.setEditTriggers(QTableWidget.NoEditTriggers)
         torsion_constrains_layout.addWidget(self.constrained_torsion_table, 1, 0)
+
+        scan_options = QWidget()
+        scan_layout = QFormLayout(scan_options)
+        
+        self.increment = QDoubleSpinBox()
+        self.increment.setDecimals(2)
+        self.increment.setSingleStep(0.25)
+        self.increment.setMinimum(-1000000)
+        self.increment.setMaximum(1000000)
+        self.increment.setSuffix(" Å or °")
+        self.increment.setValue(self.settings.last_increment)
+        scan_layout.addRow("increment:", self.increment)
+        
+        self.steps = QSpinBox()
+        self.steps.setMinimum(2)
+        self.steps.setMaximum(10000)
+        self.steps.setValue(self.settings.last_steps)
+        scan_layout.addRow("steps:", self.steps)
 
         constraints_viewer = QTabWidget()
 
@@ -1650,6 +1666,7 @@ class JobTypeOption(QWidget):
         constraints_viewer.addTab(bond_constraints, "bonds")
         constraints_viewer.addTab(angle_constraints, "angles")
         constraints_viewer.addTab(torsion_constrains, "torsions")
+        constraints_viewer.addTab(scan_options, "scan options")
         constraints_viewer.setStyleSheet('QTabWidget::pane {border: 1px;}')
 
         constraints_layout.addWidget(constraints_viewer, 1, 0, 1, 2, Qt.AlignTop)
@@ -1658,14 +1675,21 @@ class JobTypeOption(QWidget):
         constraints_layout.setRowStretch(1, 1)
         constraints_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.constraints_widget.setEnabled(self.opt_type.currentText() == "constrained")
+        self.geom_opt_layout.addRow(self.constraints_widget)
         self.opt_type.currentTextChanged.connect(
-            lambda text: self.constraints_widget.setEnabled(text == "constrained")
+            lambda text: self.constraints_widget.setEnabled(
+                text == "constrained" or 
+                text == "coordinate scan"
+            )
         )
-
-        geom_opt_layout.addWidget(self.constraints_widget, 1, 0, Qt.AlignTop)
-        geom_opt_layout.setRowStretch(0, 0)
-        geom_opt_layout.setRowStretch(1, 1)
+        self.opt_type.currentTextChanged.connect(
+            lambda text: constraints_viewer.setTabVisible(0, not text == "coordinate scan")
+        )
+        self.opt_type.currentTextChanged.connect(
+            lambda text: constraints_viewer.setTabVisible(4, text == "coordinate scan")
+        )
+        constraints_viewer.setTabVisible(0, not self.opt_type.currentText() == "coordinate scan")
+        constraints_viewer.setTabVisible(4, self.opt_type.currentText() == "coordinate scan")
 
         self.job_type_opts.addTab(self.geom_opt, "optimization settings")
 
@@ -1879,6 +1903,8 @@ class JobTypeOption(QWidget):
             self.opt_type.addItem("transition state")
         if file_info.const_optimization:
             self.opt_type.addItem("constrained")
+        if file_info.coordinate_scan:
+            self.opt_type.addItem("coordinate scan")
         ndx = self.opt_type.findText(current_opt_type)
         if ndx >= 0:
             self.opt_type.setCurrentIndex(ndx)
@@ -1897,6 +1923,8 @@ class JobTypeOption(QWidget):
             else:
                 self.solvent_names.addItems(file_info.solvents)
             self.solvent_name.setText(self.settings.previous_solvent_name)
+            self.solvent_name.setEnabled(self.solvent_option.currentText() != "None")
+            self.solvent_names.setVisible(self.solvent_option.currentText() != "None")
         self.job_type_opts.setTabEnabled(1, bool(file_info.solvents))
         if not file_info.read_checkpoint_filter:
             self.use_checkpoint.setCheckState(Qt.Unchecked)
@@ -2254,11 +2282,54 @@ class JobTypeOption(QWidget):
                 constraints = new_constraints
             else:
                 constraints = None
+        if self.do_geom_opt.checkState() == Qt.Checked:
+            opt_type = self.opt_type.currentText()
+            if opt_type == "constrained" or opt_type == "coordinate scan":
+                constraints = self.getConstraints()
+                new_constraints = {}
+                self.settings.last_steps = self.steps.value()
+                self.settings.last_increment = self.increment.value()
+                if "atoms" in constraints:
+                    new_constraints["atoms"] = []
+                    for atom in constraints["atoms"]:
+                        if atom.deleted:
+                            continue
+                        new_constraints["atoms"].append(atom.structure.atoms.index(atom))
+
+                    for key in ["bonds", "angles", "torsions"]:
+                        if key in constraints:
+                            if key in constraints:
+                                new_constraints[key] = []
+                                for constraint in constraints[key]:
+                                    for atom in constraint:
+                                        if atom.deleted:
+                                            break
+                                    else:
+                                        new_constraints[key].append(
+                                            [atom.structure.atoms.index(atom) for atom in constraint]
+                                        )
+
+                if opt_type == "constrained":
+                    constraints = new_constraints
+                    scans = None
+                else:
+                    steps = self.steps.value()
+                    increment = self.increment.value()
+                    for key in ["bonds", "angles", "torsions"]:
+                        if key in new_constraints:
+                            for x in new_constraints[key]:
+                                x.extend([steps, increment])
+                    scans = new_constraints
+                    constraints = None
+            else:
+                constraints = None
+                scans = None
 
             job_types.append(
                 OptimizationJob(
                     transition_state=opt_type == "transition state",
                     constraints=constraints,
+                    scans=scans,
                 )
             )
 
@@ -2464,6 +2535,8 @@ class JobTypeOption(QWidget):
 
                 if atom1 is angle[2] and atom2 is angle[1] and atom3 is angle[0]:
                     return
+        elif len(current_atoms) == 0:
+            return
 
         self.constrain_angle(atom1, atom2, atom3)
 
@@ -2657,7 +2730,7 @@ class JobTypeOption(QWidget):
         if self.do_geom_opt.checkState() != Qt.Checked:
             return None
 
-        elif self.opt_type.currentText() != "constrained":
+        elif self.opt_type.currentText() != "constrained" and self.opt_type.currentText() != "coordinate scan":
             return None
 
         else:
@@ -6099,12 +6172,18 @@ class BatchExport(ChildToolWindow):
             fname = self.filename_pattern.text()
             substitutions = []
             i = 0
+
+            escaped = False
             while i < len(fname):
-                if fname[i] == "{":
-                    sub = to_closing(fname[i:], "{")
-                    if sub is not None:
-                        substitutions.append(sub)
+                if not escaped and fname[i] == "{":
+                    sub = to_closing(fname[i:], "{", allow_escapes=True)
+                    if sub:
                         i += len(sub)
+                        substitutions.append(sub)
+                if fname[i] == "\\":
+                    escaped = True
+                else:
+                    escaped = False
                 i += 1
                 
             for sub in substitutions:
@@ -6119,19 +6198,43 @@ class BatchExport(ChildToolWindow):
                         find = replace_pattern.group(2)
                         replace = replace_pattern.group(3)
                 try:
-                    val = getattr(m, attr)
-                    if find and replace:
+                    attr = sub[1:-1]
+                    find = None
+                    replace = None
+                    if "/" in attr:
+                        match = re.search("([^/]*)\/([^/]*)\/([^/]*)", attr)
+                        if match:
+                            attr = match.group(1)
+                            find = match.group(2)
+                            replace = match.group(3)
+                        elif n == 1:
+                            self.tool_instance.session.logger.warning(
+                                "filename substitution pattern contains '/', but could not be interpreted as attr/find/replace"
+                            )
+                    val = str(getattr(m, attr))
+                    if find or replace:
                         try:
                             val = re.sub(find, replace, val)
                         except re.error as e:
-                            raise e # TODO - better error message
+                            # this error was renamed, but not all
+                            # versions of chimerax use the newer version of re
+                            self.tool_instance.session.log.error(
+                                "failed to interpret regular expression substitution:\n" +
+                                e.msg + "\n" + e.pattern
+                            )
+                            return
                     fname = fname.replace(sub, val)
                 except AttributeError:
-                    if attr == "i":
-                        fname = fname.replace(sub, str(n))
+                    if re.match("\d*i", attr):
+                        match = re.match("(\d*)i$", attr)
+                        if match.group(1):
+                            fmt = "%" + match.group(1) + "i"
+                            fname = fname.replace(sub, fmt % n)
+                        else:
+                            fname = fname.replace(sub, str(n))
                     else:
                         self.tool_instance.session.logger.error(
-                            "Error while saving batch files: model %s has no attribute %s" % (m.name, attr)
+                            "Error while saving batch files: model %s has no attribute %s" % (m.name, sub)
                         )
             full_name = os.path.join(self.dir_path.text(), fname)
             os.makedirs(self.dir_path.text(), exist_ok=True)

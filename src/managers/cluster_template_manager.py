@@ -104,6 +104,11 @@ class ORCASubmit(ProgramSubmitTemplate):
     expected_output_ext = "out"
 
 
+class ORCAGOATSubmit(ProgramSubmitTemplate):
+    expected_input_ext = "inp"
+    expected_output_ext = "xyz"
+
+
 class Psi4Submit(ProgramSubmitTemplate):
     expected_input_ext = "in"
     expected_output_ext = "out"
@@ -121,7 +126,8 @@ class SQMSubmit(ProgramSubmitTemplate):
 
 class XTBSubmit(ProgramSubmitTemplate):
     pass
-    
+
+
 class CRESTSubmit(ProgramSubmitTemplate):
     expected_output_ext = ["crest_conformers.xyz", "deprotonated.xyz", "protomers.xyz", "tautomers.xyz"]
     
@@ -193,6 +199,7 @@ mkdir -p $SCRATCH
 cd $SCRATCH
 cp $SLURM_SUBMIT_DIR/{{ name }}.inp .
 $orcapath {{ name }}.inp > $SLURM_SUBMIT_DIR/{{ name }}.out
+cp *xyz $SLURM_SUBMIT_DIR
 cd $SLURM_SUBMIT_DIR
 rm -rf $SCRATCH
 exit"""
@@ -432,7 +439,7 @@ mkdir -p $SCRATCH
 cd $SCRATCH
 cp $PBS_O_WORKDIR/{{ name }}.inp .
 $orcapath {{ name }}.inp > $PBS_O_WORKDIR/{{ name }}.out
-
+cp *xyz $PBS_O_WORKDIR
 cd $PBS_O_WORKDIR
 rm -rf $SCRATCH
 exit"""
@@ -666,7 +673,7 @@ mkdir -p $SCRATCH
 cd $SCRATCH
 cp $SGE_O_WORKDIR/{{ name }}.inp .
 orca {{ name }}.inp > $SGE_O_WORKDIR/{{ name }}.out
-
+cp *xyz $SGE_O_WORKDIR
 cd $SGE_O_WORKDIR
 rm -rf $SCRATCH
 exit"""
@@ -900,7 +907,7 @@ mkdir -p $SCRATCH
 cd $SCRATCH
 cp $LS_SUBCWD/{{ name }}.inp .
 orca {{ name }}.inp > $LS_SUBCWD/{{ name }}.out
-
+cp *xyz $LS_SUBCWD
 cd $LS_SUBCWD
 rm -rf $SCRATCH
 exit"""

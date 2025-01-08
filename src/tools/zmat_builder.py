@@ -60,13 +60,7 @@ class ZMatrixBuilder(ToolInstance):
         )
 
     def _build_ui(self):
-        tool_layout = QFormLayout()
-        
-        self.tabs = QTabWidget()
-        tool_layout.addRow(self.tabs)
-    
-        build_tab = QWidget()
-        self.build_layout = QFormLayout(build_tab)
+        self.build_layout = QFormLayout()
         
         self.build_layout.addRow(QLabel("select up to 3 atoms to define coordinates"))
 
@@ -161,9 +155,7 @@ class ZMatrixBuilder(ToolInstance):
         delete_atoms = QPushButton("delete selected atoms")
         delete_atoms.clicked.connect(self.delete_selected_atoms)
         self.build_layout.addRow(draw_bond, delete_atoms)
-        
-        self.tabs.addTab(build_tab, "build")
-        
+
         bond_lookup = QGroupBox("bond length lookup")
         bond_lookup_layout = QGridLayout(bond_lookup)
         
@@ -197,7 +189,7 @@ class ZMatrixBuilder(ToolInstance):
         bond_lookup_layout.setColumnStretch(2, 0)
         bond_lookup_layout.setColumnStretch(3, 1)
         
-        tool_layout.addRow(bond_lookup)
+        self.build_layout.addRow(bond_lookup)
         
         quick_angles = QGroupBox("quick angles")
         quick_angles_layout = QFormLayout(quick_angles)
@@ -263,13 +255,13 @@ class ZMatrixBuilder(ToolInstance):
             lambda x: quick_angles_layout.setRowVisible(3, not bool(x))
         )
         
-        tool_layout.addRow(quick_angles)
+        self.build_layout.addRow(quick_angles)
         
         self.status = QStatusBar()
         self.status.setSizeGripEnabled(False)
-        tool_layout.addRow(self.status)
+        self.build_layout.addRow(self.status)
 
-        self.tool_window.ui_area.setLayout(tool_layout)
+        self.tool_window.ui_area.setLayout(self.build_layout)
 
         self.tool_window.manage(None)
     
