@@ -1579,6 +1579,82 @@ class ORCANEBJob(TSSJob):
         return d
 
 
+class ORCAGOATJob(LocalJob):
+    format_name = "out"
+    info_type = "ORCA"
+
+    def __repr__(self):
+        return "local ORCA GOAT job \"%s\"" % self.name
+
+    def run(self):
+        self.start_time = asctime(localtime())
+
+        self.scratch_dir = os.path.join(
+            os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR),
+            "%s %s" % (self.name, self.start_time.replace(':', '.')),
+        )
+
+        if not os.path.exists(self.scratch_dir):
+            os.makedirs(self.scratch_dir)
+
+        infile = self.name + '.inp'
+        infile = infile.replace(' ', '_')
+        infile_path = os.path.join(self.scratch_dir, infile)
+        self.write_file(infile_path)
+        executable = os.path.abspath(self.session.seqcrow_settings.settings.ORCA_EXE)
+        if not os.path.exists(executable):
+            executable = self.session.seqcrow_settings.settings.ORCA_EXE
+
+        self.output_name = [os.path.join(self.scratch_dir, self.name.replace(' ', '_') + '.out')]
+        outfile = open(self.output_name[0], 'w')
+
+        args = [executable, infile]
+
+        log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'w')
+        log.write("executing:\n%s\n\n" % " ".join(args))
+
+        log.close()
+        log = open(os.path.join(self.scratch_dir, "seqcrow_log.txt"), 'a')
+
+        if " " in infile:
+            raise RuntimeError("ORCA input files cannot contain spaces")
+
+        try:
+            if platform == "win32":
+                self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+            else:        
+                self.process = subprocess.Popen(args, cwd=self.scratch_dir, stdout=outfile, stderr=log)
+        except FileNotFoundError:
+            from chimerax.core.errors import UserError
+            raise UserError(
+                "job could not start because ORCA executable (%s) was not found\n" % executable +
+                "ensure the correct path to executable is specified in the \"SEQCROW Jobs\"\n" +
+                "settings in Favorites/Preferences > Settings..."
+            )
+            return
+
+        final_ensemble = os.path.join(self.scratch_dir, self.name.replace(" ", "_") + ".finalensemble.xyz")
+        if os.path.exists(final_ensemble):
+            self.output_name.append(final_ensemble)
+        else:
+            for f in os.listdir(self.scratch_dir):
+                if f.lower().endswith("xyz"):
+                    self.output_name.append(os.path.join(self.scratch_dir, f))
+
+        self.process.communicate()
+        self.process = None
+
+        if self.job_options.get("delete_everything_but_output_file", False):
+            self.remove_extra_files()
+
+        return 
+
+    def get_json(self):
+        d = super().get_json()
+        d["format"] = "ORCA"
+        return d
+
+
 class QChemFSMJob(TSSJob):
     tss_algorithm = "freezing string method"
     format_name = "out"

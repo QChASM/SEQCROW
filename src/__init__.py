@@ -826,6 +826,9 @@ class _SEQCROW_API(BundleAPI):
             elif name == "CREST":
                 from SEQCROW.jobs import CRESTJob
                 return CRESTJob
+            elif name == "GOAT":
+                from SEQCROW.jobs import ORCAGOATJob
+                return ORCAGOATJob
 
         elif mgr is session.seqcrow_cluster_scheduling_software_manager:
             if name == "Slurm":
@@ -842,7 +845,7 @@ class _SEQCROW_API(BundleAPI):
                 from .managers.cluster_template_manager import GaussianSlurmTemplate
                 return GaussianSlurmTemplate
             
-            elif name == "ORCA":
+            elif name == "ORCA" or name == "GOAT":
                 from .managers.cluster_template_manager import ORCASlurmTemplate
                 return ORCASlurmTemplate
             
@@ -871,7 +874,7 @@ class _SEQCROW_API(BundleAPI):
                 from .managers.cluster_template_manager import GaussianPBSTemplate
                 return GaussianPBSTemplate
             
-            elif name == "ORCA":
+            elif name == "ORCA" or name == "GOAT":
                 from .managers.cluster_template_manager import ORCAPBSTemplate
                 return ORCAPBSTemplate
             
@@ -900,7 +903,7 @@ class _SEQCROW_API(BundleAPI):
                 from .managers.cluster_template_manager import GaussianSGETemplate
                 return GaussianSGETemplate
             
-            elif name == "ORCA":
+            elif name == "ORCA" or name == "GOAT":
                 from .managers.cluster_template_manager import ORCASGETemplate
                 return ORCASGETemplate
             
@@ -929,7 +932,7 @@ class _SEQCROW_API(BundleAPI):
                 from .managers.cluster_template_manager import GaussianLSFTemplate
                 return GaussianLSFTemplate
             
-            elif name == "ORCA":
+            elif name == "ORCA" or name == "GOAT":
                 from .managers.cluster_template_manager import ORCALSFTemplate
                 return ORCALSFTemplate
             

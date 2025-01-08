@@ -238,6 +238,7 @@
                 -->
                 <Provider name="Q-Chem FSM"/>
                 <Provider name="Q-Chem"/>
+                <Provider name="GOAT"/>
             </Providers>
             
             <Providers manager="seqcrow_qm_input_manager">
