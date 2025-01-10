@@ -400,6 +400,10 @@ class BuildRaven(BuildQM, ToolInstance):
         """
         show the initial path to make sure the atoms are ordered correctly
         """
+        from cProfile import Profile
+        profile = Profile()
+        profile.enable()
+        
         reactant = self.reactant_selector.currentData()
         product = self.product_selector.currentData()
         if not reactant or not product:
@@ -421,8 +425,21 @@ class BuildRaven(BuildQM, ToolInstance):
         product.atoms = [product.atoms[i] for i in product_ndx]
         product.RMSD(reactant, align=True, sort=False)
         
+        broken, formed = product.compare_connectivity(reactant, return_idx=True)
+        for bond in broken:
+            reacant.atoms[bond[0]].connected.add(reacant.atoms[bond[1]])
+            reacant.atoms[bond[1]].connected.add(reacant.atoms[bond[0]])
+        for bond in formed:
+            reacant.atoms[bond[0]].connected.add(reacant.atoms[bond[1]])
+            reacant.atoms[bond[1]].connected.add(reacant.atoms[bond[0]])
+        
         ric = InternalCoordinateSet(reactant, torsion_type="all")
         ric.determine_coordinates(product, torsion_type="all")
+        ric.remove_equivalent_coords
+        for coord_type in ric.coordinates:
+            print(coord_type)
+            for coord in ric.coordinates[coord_type]:
+                print("\t", coord)
 
         if np.linalg.norm(reactant.coords - product.coords) < 1e-3:
             self.session.logger.error("reactant and product are the same")
@@ -434,7 +451,12 @@ class BuildRaven(BuildQM, ToolInstance):
         dq = ric.difference(reactant.coords, product.coords)
         n = 21
         coordsets = np.zeros((n, len(reactant.atoms), 3))
+        new_coords = reactant.coords
+        initial_q = ric.values(new_coords)
         for i, t in enumerate(np.linspace(0, 1, num=n)):
+            target_q = t * dq + initial_q
+            current_q = ric.values(new_coords)
+            dq_t = ric.adjust_phase(target_q - current_q)
             if i == n - 1:
                 reactant.coords = coordsets[i-1]
                 product.RMSD(reactant, align=True, sort=False)
@@ -444,10 +466,11 @@ class BuildRaven(BuildQM, ToolInstance):
                 coordsets[i] = reactant.coords
                 continue
             # if t <= 0.5:
-            new_coords, err = ric.apply_change(
-                reactant.coords,
-                t * dq,
+            ric_coords, err = ric.apply_change(
+                new_coords,
+                dq_t,
                 debug=False,
+                # use_delocalized=False,
             )
             # else:
             #     new_coords, err = ric.apply_change(
@@ -455,13 +478,16 @@ class BuildRaven(BuildQM, ToolInstance):
             #         (1 - t * dq),
             #     )
 
+            print("%.2f" % t, err)
+
             if err > 1e-3:
-                target_dq = t * dq - ric.difference(reactant.coords, coordsets[i-1])
-                B = ric.B_matrix(coordsets[i-1])
+                B = ric.B_matrix(new_coords)
                 B_inv = np.linalg.pinv(B)
-                dx = np.matmul(B_inv, target_dq)
-                new_coords = np.reshape(dx, (len(reactant.atoms), 3))
-                new_coords += coordsets[i-1]
+                dx = np.matmul(B_inv, dq_t)
+                lin_coords = new_coords + np.reshape(dx, (len(reactant.atoms), 3))
+                new_coords = lin_coords
+            else:
+                new_coords = ric_coords
 
             # print(i, err)
             coordsets[i] = new_coords
@@ -477,6 +503,8 @@ class BuildRaven(BuildQM, ToolInstance):
             
         css = CoordinateSetSlider(self.session, new_mol, pause_frames=3)
         css.play_cb()
+        profile.disable()
+        profile.print_stats()
 
     def change_tss_algorithm(self, text):
         self.file_type.blockSignals(True)

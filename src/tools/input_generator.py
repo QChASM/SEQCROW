@@ -1923,7 +1923,6 @@ class JobTypeOption(QWidget):
             else:
                 self.solvent_names.addItems(file_info.solvents)
             self.solvent_name.setText(self.settings.previous_solvent_name)
-            self.solvent_name.setEnabled(self.solvent_option.currentText() != "None")
             self.solvent_names.setVisible(self.solvent_option.currentText() != "None")
         self.job_type_opts.setTabEnabled(1, bool(file_info.solvents))
         if not file_info.read_checkpoint_filter:

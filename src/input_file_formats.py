@@ -958,7 +958,7 @@ class ORCAFileInfo(QMInputFileInfo):
         ],
     }
     aux_options = BasisSet.ORCA_AUX
-    ecps = ["def2-ECP", "dhf-ECP", "SK-MCDHF-RSC", "HayWadt", "SDD", "LANL2DZ"]
+    ecps = ["def2-ECP", "dhf-ECP", "SK-MCDHF-RSC", "HayWadt", "SDD"]
     keyword_options = ORCAKeywordOptions
     
     def get_file_contents(self, theory):

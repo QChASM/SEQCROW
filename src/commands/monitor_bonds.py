@@ -56,6 +56,8 @@ def check_bonds(trigger_name, changes, tolerance, tsTolerance):
     except KeyError:
         # make an array for how far atoms can be and still be bonded
         # to each other
+        if not len(tracked_atoms[mdl]):
+            return
         radii_list = np.vectorize(
             lambda i: RADII.get(mdl.atoms[i].element.name, 0)
         )(tracked_atoms[mdl])
