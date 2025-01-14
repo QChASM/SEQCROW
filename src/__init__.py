@@ -826,9 +826,6 @@ class _SEQCROW_API(BundleAPI):
             elif name == "CREST":
                 from SEQCROW.jobs import CRESTJob
                 return CRESTJob
-            elif name == "GOAT":
-                from SEQCROW.jobs import ORCAGOATJob
-                return ORCAGOATJob
 
         elif mgr is session.seqcrow_cluster_scheduling_software_manager:
             if name == "Slurm":
@@ -982,7 +979,7 @@ class _SEQCROW_API(BundleAPI):
                 from .conformer_search_formats import CRESTQCG
                 return CRESTQCG()
             
-            if name == "GOAT":
+            if name == "ORCA":
                 from .conformer_search_formats import GOAT
                 return GOAT()
  

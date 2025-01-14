@@ -6495,6 +6495,10 @@ class PrepClusterJob(ChildToolWindow):
 
         self.template = QComboBox()
         self.tool_instance.file_type.currentTextChanged.connect(self.set_template_list)
+        self.template.setToolTip(
+            "Job submission template for your cluster. Ensure the proper " + \
+            "cluster scheduling software is selected in your settings/preferences."
+        )
         template_layout.addWidget(self.template, 1)
 
         edit = QPushButton(template_options)

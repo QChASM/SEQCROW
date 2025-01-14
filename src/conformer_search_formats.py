@@ -356,7 +356,7 @@ class CRESTQCG(ConformerSearchInfo):
 
 class GOAT(ConformerSearchInfo):
     # name of program
-    name = "GOAT"
+    name = "ORCA"
     options = {
         "energy_window": (
             FloatOption, {

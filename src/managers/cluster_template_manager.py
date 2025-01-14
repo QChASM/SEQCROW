@@ -142,7 +142,8 @@ class GaussianSlurmTemplate(ClusterSubmitTemplate, GaussianSubmit):
 #SBATCH --mem={{ memory }}gb
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads
@@ -180,7 +181,8 @@ class ORCASlurmTemplate(ClusterSubmitTemplate, ORCASubmit):
 #SBATCH --mem={{ memory }}gb
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads
@@ -215,7 +217,8 @@ class Psi4SlurmTemplate(ClusterSubmitTemplate, Psi4Submit):
 #SBATCH --mem={{ memory }}gb
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads
@@ -252,7 +255,8 @@ class QChemSlurmTemplate(ClusterSubmitTemplate, QChemSubmit):
 #SBATCH --mem={{ memory }}gb
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads
@@ -285,7 +289,8 @@ class SQMSlurmTemplate(ClusterSubmitTemplate, SQMSubmit):
 #SBATCH --mem={{ memory }}gb
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads (sqm will not use more than 1 core)
@@ -318,7 +323,8 @@ class XTBSlurmTemplate(ClusterSubmitTemplate, XTBSubmit):
 #SBATCH --mem={{ memory }}gb
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads 
@@ -351,7 +357,8 @@ class CRESTSlurmTemplate(ClusterSubmitTemplate, CRESTSubmit):
 #SBATCH --mem={{ memory }}gb
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads 
@@ -383,7 +390,8 @@ class GaussianPBSTemplate(ClusterSubmitTemplate, GaussianSubmit):
 #PBS -l mem={{ memory }}gb
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads
@@ -454,7 +462,8 @@ class Psi4PBSTemplate(ClusterSubmitTemplate, Psi4Submit):
 #PBS -l mem={{ memory }}gb
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads
@@ -490,7 +499,8 @@ class QChemPBSTemplate(ClusterSubmitTemplate, QChemSubmit):
 #PBS -l mem={{ memory }}gb
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads
@@ -522,7 +532,8 @@ class SQMPBSTemplate(ClusterSubmitTemplate, SQMSubmit):
 #PBS -l mem={{ memory }}gb
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads (sqm will not use more than 1 core)
@@ -554,7 +565,8 @@ class XTBPBSTemplate(ClusterSubmitTemplate, XTBSubmit):
 #PBS -l mem={{ memory }}gb
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads 
@@ -586,7 +598,8 @@ class CRESTPBSTemplate(ClusterSubmitTemplate, CRESTSubmit):
 #PBS -l mem={{ memory }}gb
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads 
@@ -618,7 +631,8 @@ class GaussianSGETemplate(ClusterSubmitTemplate, GaussianSubmit):
 #$ -l s_vmem={{ memory }}G
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads
@@ -655,7 +669,8 @@ class ORCASGETemplate(ClusterSubmitTemplate, ORCASubmit):
 #$ -l s_vmem={{ memory }}G
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads
@@ -688,7 +703,8 @@ class Psi4SGETemplate(ClusterSubmitTemplate, Psi4Submit):
 #$ -l s_vmem={{ memory }}G
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads
@@ -724,7 +740,8 @@ class QChemSGETemplate(ClusterSubmitTemplate, QChemSubmit):
 #$ -l s_vmem={{ memory }}G
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads
@@ -756,7 +773,8 @@ class SQMSGETemplate(ClusterSubmitTemplate, SQMSubmit):
 #$ -l s_vmem={{ memory }}G
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads (sqm will not use more than 1 core)
@@ -788,7 +806,8 @@ class XTBSGETemplate(ClusterSubmitTemplate, XTBSubmit):
 #$ -l s_vmem={{ memory }}G
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads 
@@ -820,7 +839,8 @@ class CRESTSGETemplate(ClusterSubmitTemplate, CRESTSubmit):
 #$ -l s_vmem={{ memory }}G
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads 
@@ -852,7 +872,8 @@ class GaussianLSFTemplate(ClusterSubmitTemplate, GaussianSubmit):
 #BSUB -M {{ 1000000 * memory }}
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads
@@ -889,7 +910,8 @@ class ORCALSFTemplate(ClusterSubmitTemplate, ORCASubmit):
 #BSUB -M {{ 1000000 * memory }}
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads
@@ -922,7 +944,8 @@ class Psi4LSFTemplate(ClusterSubmitTemplate, Psi4Submit):
 #BSUB -M {{ 1000000 * memory }}
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads
@@ -958,7 +981,8 @@ class QChemLSFTemplate(ClusterSubmitTemplate, QChemSubmit):
 #BSUB -M {{ 1000000 * memory }}
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads
@@ -990,7 +1014,8 @@ class SQMLSFTemplate(ClusterSubmitTemplate, SQMSubmit):
 #BSUB -M {{ 1000000 * memory }}
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads (sqm will not use more than 1 core)
@@ -1022,7 +1047,8 @@ class XTBLSFTemplate(ClusterSubmitTemplate, XTBSubmit):
 #BSUB -M {{ 1000000 * memory }}
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads 
@@ -1054,7 +1080,8 @@ class CRESTLSFTemplate(ClusterSubmitTemplate, CRESTSubmit):
 #BSUB -M {{ 1000000 * memory }}
 
 # a variable in double curly brackets will be replaced with
-# the appropriate value
+# the appropriate value from either the "additional options"
+# tab or from the variables listed below
 # the following variables are required/strongly recommended:
 # * name - name of the job and associated input/output files
 # * processors - number of cpu cores/threads 
