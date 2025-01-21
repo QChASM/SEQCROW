@@ -6217,7 +6217,7 @@ class BatchExport(ChildToolWindow):
                         except re.error as e:
                             # this error was renamed, but not all
                             # versions of chimerax use the newer version of re
-                            self.tool_instance.session.log.error(
+                            self.tool_instance.session.logger.error(
                                 "failed to interpret regular expression substitution:\n" +
                                 e.msg + "\n" + e.pattern
                             )

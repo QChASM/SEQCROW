@@ -272,7 +272,7 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
                 error_msg += "\nlast line read:\n"
                 error_msg += line
                 error_msg += "\n expected number of atoms here"
-                session.log.error(error_msg)
+                session.logger.error(error_msg)
                 return
             comment = stream.readline().strip()
             comments.append(comment)
