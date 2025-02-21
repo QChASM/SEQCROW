@@ -180,7 +180,7 @@ def get_structure(session, elements, coordinates, name, comment, bonded_threshol
     res = struc.new_residue("UNK", "a", 1)
     ele_counts = dict()
     if all(x.isdigit() for x in elements):
-        elements = np.vectorize(lambda x: ELEMENTS.get(int(x), "X"))(elements)
+        elements = np.vectorize(lambda x: ELEMENTS[int(x)] if int(x) > 0 and int(x) < len(ELEMENTS) else "X")(elements)
     radii = np.vectorize(lambda x: RADII.get(x, 0))(elements)
     for i, ele, coord in zip(range(0, len(elements)), elements, coordinates):
         try:
