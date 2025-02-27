@@ -370,11 +370,14 @@ class ORCAJob(LocalJob):
 
         final_ensemble = os.path.join(self.scratch_dir, basename + ".finalensemble.xyz")
         if os.path.exists(final_ensemble):
-            self.output_name.append(final_ensemble)
+            self.output_name = [self.output_name, final_ensemble]
         else:
             for f in os.listdir(self.scratch_dir):
                 if f.lower().endswith("xyz"):
-                    self.output_name.append(os.path.join(self.scratch_dir, f))
+                    self.output_name = [
+                        self.output_name,
+                        os.path.join(self.scratch_dir, f)
+                    ]
 
         if self.job_options.get("delete_everything_but_output_file", False):
             self.remove_extra_files()
