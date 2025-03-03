@@ -971,6 +971,8 @@ class BuildQM(ToolInstance):
         file_info = self.manager.get_info(program)
 
         rescol = ResidueCollection(self.model_selector.currentData(), bonds_matter=False)
+        for i, a in enumerate(rescol.atoms):
+            a.name = str(i + 1)
 
         method = self.method_widget.getMethod(update_settings)
         if file_info.basis_sets is not None:
