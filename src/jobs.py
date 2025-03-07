@@ -145,9 +145,10 @@ class LocalJob(QThread):
                 item = item.replace("{{ name }}", name)
                 self.input_files.append(fname)
                 for try_encoding in [None, "utf-8", "utf-16"]:
-                    with open(fname, "w", encoding=try_encoding) as f:
-                        f.write(item)
-                        break
+                    try:
+                        with open(fname, "w", encoding=try_encoding) as f:
+                            f.write(item)
+                            break
                     except UnicodeEncodeError as e:
                         continue
                 else:
@@ -160,9 +161,10 @@ class LocalJob(QThread):
             contents = contents.replace("{{ name }}", name)
             self.input_files.append(filename)
             for try_encoding in [None, "utf-8", "utf-16"]:
-                with open(fname, "w", encoding=try_encoding) as f:
-                    f.write(contents)
-                    break
+                try:
+                    with open(fname, "w", encoding=try_encoding) as f:
+                        f.write(contents)
+                        break
                 except UnicodeEncodeError as e:
                     continue
             else:
@@ -1113,9 +1115,10 @@ class TSSJob(LocalJob):
                 item = item.replace("{{ name }}", name)
                 self.input_files.append(fname)
                 for try_encoding in [None, "utf-8", "utf-16"]:
-                    with open(fname, "w", encoding=try_encoding) as f:
-                        f.write(item)
-                        break
+                    try:
+                        with open(fname, "w", encoding=try_encoding) as f:
+                            f.write(item)
+                            break
                     except UnicodeEncodeError as e:
                         continue
                 else:
@@ -1128,9 +1131,10 @@ class TSSJob(LocalJob):
             contents = contents.replace("{{ name }}", name)
             self.input_files.append(filename)
             for try_encoding in [None, "utf-8", "utf-16"]:
-                with open(fname, "w", encoding=try_encoding) as f:
-                    f.write(contents)
-                    break
+                try:
+                    with open(fname, "w", encoding=try_encoding) as f:
+                        f.write(contents)
+                        break
                 except UnicodeEncodeError as e:
                     continue
             else:
@@ -1237,9 +1241,10 @@ class ClusterTSSJob(LocalClusterJob):
                 item = item.replace("{{ name }}", name)
                 self.input_files.append(fname)
                 for try_encoding in [None, "utf-8", "utf-16"]:
-                    with open(fname, "w", encoding=try_encoding) as f:
-                        f.write(item)
-                        break
+                    try:
+                        with open(fname, "w", encoding=try_encoding) as f:
+                            f.write(item)
+                            break
                     except UnicodeEncodeError as e:
                         continue
                 else:
@@ -1252,9 +1257,10 @@ class ClusterTSSJob(LocalClusterJob):
             contents = contents.replace("{{ name }}", name)
             self.input_files.append(filename)
             for try_encoding in [None, "utf-8", "utf-16"]:
-                with open(fname, "w", encoding=try_encoding) as f:
-                    f.write(contents)
-                    break
+                try:
+                    with open(fname, "w", encoding=try_encoding) as f:
+                        f.write(contents)
+                        break
                 except UnicodeEncodeError as e:
                     continue
             else:
