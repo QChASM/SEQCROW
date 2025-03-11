@@ -144,16 +144,33 @@ class LocalJob(QThread):
                 outname = os.path.basename(fname)
                 item = item.replace("{{ name }}", name)
                 self.input_files.append(fname)
-                with open(fname, "w") as f:
-                    f.write(item)
+                for try_encoding in [None, "utf-8", "utf-16"]:
+                    try:
+                        with open(fname, "w", encoding=try_encoding) as f:
+                            f.write(item)
+                            break
+                    except UnicodeEncodeError as e:
+                        continue
+                else:
+                    with open(fname, "w", errors="replace") as f:
+                        f.write(contents)
+
         else:
             outname = os.path.basename(filename)
             name, ext = os.path.splitext(outname)
             contents = contents.replace("{{ name }}", name)
             self.input_files.append(filename)
-            with open(filename, "w") as f:
-                f.write(contents)
-    
+            for try_encoding in [None, "utf-8", "utf-16"]:
+                try:
+                    with open(fname, "w", encoding=try_encoding) as f:
+                        f.write(contents)
+                        break
+                except UnicodeEncodeError as e:
+                    continue
+            else:
+                with open(fname, "w", errors="replace") as f:
+                    f.write(contents)
+                    
     def get_json(self):
         from AaronTools.geometry import Geometry
 
@@ -1097,16 +1114,33 @@ class TSSJob(LocalJob):
                 outname = os.path.basename(fname)
                 item = item.replace("{{ name }}", name)
                 self.input_files.append(fname)
-                with open(fname, "w") as f:
-                    f.write(item)
+                for try_encoding in [None, "utf-8", "utf-16"]:
+                    try:
+                        with open(fname, "w", encoding=try_encoding) as f:
+                            f.write(item)
+                            break
+                    except UnicodeEncodeError as e:
+                        continue
+                else:
+                    with open(fname, "w", errors="replace") as f:
+                        f.write(contents)
+
         else:
             outname = os.path.basename(filename)
             name, ext = os.path.splitext(outname)
             contents = contents.replace("{{ name }}", name)
             self.input_files.append(filename)
-            with open(filename, "w") as f:
-                f.write(contents)
-    
+            for try_encoding in [None, "utf-8", "utf-16"]:
+                try:
+                    with open(fname, "w", encoding=try_encoding) as f:
+                        f.write(contents)
+                        break
+                except UnicodeEncodeError as e:
+                    continue
+            else:
+                with open(fname, "w", errors="replace") as f:
+                    f.write(contents)
+
     def get_json(self):
         d = super().get_json()
         d.pop("geometry")
@@ -1206,15 +1240,32 @@ class ClusterTSSJob(LocalClusterJob):
                 outname = os.path.basename(fname)
                 item = item.replace("{{ name }}", name)
                 self.input_files.append(fname)
-                with open(fname, "w") as f:
-                    f.write(item)
+                for try_encoding in [None, "utf-8", "utf-16"]:
+                    try:
+                        with open(fname, "w", encoding=try_encoding) as f:
+                            f.write(item)
+                            break
+                    except UnicodeEncodeError as e:
+                        continue
+                else:
+                    with open(fname, "w", errors="replace") as f:
+                        f.write(contents)
+
         else:
             outname = os.path.basename(filename)
             name, ext = os.path.splitext(outname)
             contents = contents.replace("{{ name }}", name)
             self.input_files.append(filename)
-            with open(filename, "w") as f:
-                f.write(contents)
+            for try_encoding in [None, "utf-8", "utf-16"]:
+                try:
+                    with open(fname, "w", encoding=try_encoding) as f:
+                        f.write(contents)
+                        break
+                except UnicodeEncodeError as e:
+                    continue
+            else:
+                with open(fname, "w", errors="replace") as f:
+                    f.write(contents)
 
     def get_json(self):
         d = super().get_json()

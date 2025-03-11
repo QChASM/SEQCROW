@@ -868,14 +868,14 @@ class StericMap(ChildToolWindow):
         cmap.set_under('w')
         steric_map = ax.contourf(
             x, y, z,
-            extend="min",
+            extend="both",
             cmap=cmap,
             levels=np.linspace(min_alt, max_alt, num=levels)
         )
         if contour_lines:
             ax.contour(
                 x, y, z,
-                extend="min",
+                extend="both",
                 colors='k',
                 levels=np.linspace(min_alt, max_alt, num=levels)
             )
