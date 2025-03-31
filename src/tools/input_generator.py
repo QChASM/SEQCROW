@@ -2283,6 +2283,7 @@ class JobTypeOption(QWidget):
                 constraints = new_constraints
             else:
                 constraints = None
+        
         if self.do_geom_opt.checkState() == Qt.Checked:
             opt_type = self.opt_type.currentText()
             if opt_type == "constrained" or opt_type == "coordinate scan":
