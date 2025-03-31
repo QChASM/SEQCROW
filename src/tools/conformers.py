@@ -324,7 +324,10 @@ class ConformerTool(BuildQM):
         if update_settings:
             self.settings.save()
 
-        combined_dict = combine_dicts(kw_dict, other_kw_dict)
+        if other_kw_dict:
+            combined_dict = combine_dicts(kw_dict, other_kw_dict)
+        else:
+            combined_dict = kw_dict
 
         self.theory = Theory(
             charge=charge,
@@ -631,7 +634,7 @@ class ConformerJob(JobTypeOption):
                 self.solvent_names.addItems(file_info.solvents)
             self.solvent_name.setText(self.settings.previous_solvent_name)
         
-        self.tabs.setTabEnabled(1, bool(file_info.solvents))
+        self.tabs.setTabEnabled(2, bool(file_info.solvents))
         self.restart.setEnabled(bool(file_info.restart_filter))
         self.browse.setEnabled(bool(file_info.restart_filter))
 
@@ -642,7 +645,7 @@ class ConformerJob(JobTypeOption):
             self.algorithm_layout.removeRow(0)
         
         defaults = loads(self.settings.stored_defaults)
-        
+
         for name, option in file_info.options.items():
             cls = option[0]
             kwargs = option[1]

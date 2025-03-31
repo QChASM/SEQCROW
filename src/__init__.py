@@ -826,6 +826,9 @@ class _SEQCROW_API(BundleAPI):
             elif name == "CREST":
                 from SEQCROW.jobs import CRESTJob
                 return CRESTJob
+            elif name == "AaronTools Conformer Generation":
+                from SEQCROW.jobs import AaronToolsConfJob
+                return AaronToolsConfJob
 
         elif mgr is session.seqcrow_cluster_scheduling_software_manager:
             if name == "Slurm":
@@ -982,6 +985,10 @@ class _SEQCROW_API(BundleAPI):
             if name == "ORCA":
                 from .conformer_search_formats import GOAT
                 return GOAT()
+             
+            if name == "AaronTools Conformer Generation":
+                from .conformer_search_formats import AaronToolsConf
+                return AaronToolsConf()
  
         elif mgr is session.test_manager:
             if name == "fuseRing_command":

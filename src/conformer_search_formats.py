@@ -142,6 +142,7 @@ class ProtomersOption(EnumOption):
 class QCGOption(EnumOption):
     values = ("grow", "ensemble", "solvation free energy")
 
+
 solvent_libs = [
     os.path.join(AARONTOOLS, "Solvents"),
     os.path.join(AARONLIB, "Solvents"),
@@ -156,6 +157,7 @@ for solvent_lib in solvent_libs:
 
 class SolventOption(EnumOption):
     values = tuple(solvents)
+
 
 class UphillMethodOption(EnumOption):
     values = ("Default", "GFNFF", "GFN0XTB", "GFN1XTB", "GFN2XTB")
@@ -456,6 +458,103 @@ class GOAT(ConformerSearchInfo):
             new_dict, theory.kwargs,
         )
         
+        return theory
+
+    def get_job_kw_dict(
+        self,
+        read_checkpoint,
+        checkpoint_file,
+    ):
+        """
+        get a keyword dictionary given the settings on the 'job details' tab
+        read_checkpoint - bool, read checkpoint is checked
+        checkpoint_file - str, path to checkpoint file
+        """
+        return dict()
+
+
+class AaronToolsConf(ConformerSearchInfo):
+    # name of program
+    name = "AaronToolsConf"
+    options = {
+        "RMSD_threshold": (
+            FloatOption, {
+                "min": 0.05,
+                "max": 1.00,
+                "step": 0.1,
+                "default": 0.125,
+                "name": "RMSD threshold",
+            }
+        ),
+        "search_rings": (
+            BooleanOption, {
+                "default": True,
+                "name": "simple ring conformers",
+            }
+        ),
+        "relax": (
+            BooleanOption, {
+                "default": True,
+                "name": "relax steric clashes",
+            }
+        ),
+        "optimization_cores": (
+            IntOption, {
+                "min": 1,
+                "max": 128,
+                "default": 8,
+                "name": "preopt. cores",
+            }
+        ),
+    }
+    
+    solvents = None
+    parallel = True
+    memory = True
+    basis_sets = None
+    methods = [
+        "None",
+        "AM1 (SQM)",
+        "RM1 (SQM)",
+        "PM3 (ORCA)",
+        "PM3 (Gaussian)",
+        "PM6 (SQM)",
+        "PM6 (Gaussian)",
+        "PM7 (Gaussian)",
+        "HF-3c (ORCA)",
+        "GFNFF (xTB)",
+        "GFN1XTB (xTB)",
+        "GFN2XTB (xTB)",
+        "r2SCAN-3c (ORCA)",
+    ]
+
+    def get_file_contents(self, theory):
+        try:
+            method, program = theory.method.name.split()
+            program = program[1:-1]
+            theory.method = method
+            theory.job_type = OptimizationJob()
+            theory.kwargs["comment"] = ["input file shown for optimization of each conformer"]
+            contents, warnings = FileWriter.write_file(
+                theory.geometry, theory=theory, style=program, outfile=False, return_warnings=True,
+            )
+            return contents, warnings
+        except ValueError:
+            return "Python API will be used to generate conformers", []
+
+    def fixup_theory(
+        self,
+        theory,
+        RMSD_threshold=0.125,
+        search_rings=True,
+        relax=True,
+        restart_file=None,
+    ):
+        theory.kwargs = {
+            "RMSD_threshold": RMSD_threshold,
+            "search_rings": search_rings,
+            "relax": relax,
+        }
         return theory
 
     def get_job_kw_dict(

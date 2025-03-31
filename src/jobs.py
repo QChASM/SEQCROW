@@ -162,15 +162,15 @@ class LocalJob(QThread):
             self.input_files.append(filename)
             for try_encoding in [None, "utf-8", "utf-16"]:
                 try:
-                    with open(fname, "w", encoding=try_encoding) as f:
+                    with open(outname, "w", encoding=try_encoding) as f:
                         f.write(contents)
                         break
                 except UnicodeEncodeError as e:
                     continue
             else:
-                with open(fname, "w", errors="replace") as f:
+                with open(outname, "w", errors="replace") as f:
                     f.write(contents)
-                    
+
     def get_json(self):
         from AaronTools.geometry import Geometry
 
@@ -1132,13 +1132,13 @@ class TSSJob(LocalJob):
             self.input_files.append(filename)
             for try_encoding in [None, "utf-8", "utf-16"]:
                 try:
-                    with open(fname, "w", encoding=try_encoding) as f:
+                    with open(outname, "w", encoding=try_encoding) as f:
                         f.write(contents)
                         break
                 except UnicodeEncodeError as e:
                     continue
             else:
-                with open(fname, "w", errors="replace") as f:
+                with open(outname, "w", errors="replace") as f:
                     f.write(contents)
 
     def get_json(self):
@@ -1258,13 +1258,13 @@ class ClusterTSSJob(LocalClusterJob):
             self.input_files.append(filename)
             for try_encoding in [None, "utf-8", "utf-16"]:
                 try:
-                    with open(fname, "w", encoding=try_encoding) as f:
+                    with open(outname, "w", encoding=try_encoding) as f:
                         f.write(contents)
                         break
                 except UnicodeEncodeError as e:
                     continue
             else:
-                with open(fname, "w", errors="replace") as f:
+                with open(outname, "w", errors="replace") as f:
                     f.write(contents)
 
     def get_json(self):
@@ -1710,4 +1710,50 @@ class QChemFSMJob(TSSJob):
         d = super().get_json()
         d["format"] = "Q-Chem FSM"
         return d
+
+
+class AaronToolsConfJob(LocalJob):
+    format_name = "xyz"
+    info_type = "AaronToolsConfJob"
+    exec_options = {}
+
+    def __repr__(self):
+        return "local AaronTools job \"%s\"" % self.name
+
+    def run(self):
+        self.start_time = asctime(localtime())
+
+        self.scratch_dir = os.path.join(
+            os.path.abspath(self.session.seqcrow_settings.settings.SCRATCH_DIR),
+            "%s %s" % (self.name, self.start_time.replace(':', '.')),
+        )
+
+        if not os.path.exists(self.scratch_dir):
+            os.makedirs(self.scratch_dir)
+
+        self.output_name = os.path.join(self.scratch_dir, self.name + '.xyz')
+        
+        self.geometry.refresh_connected()
+        
+        print(self.geometry)
+        for a in self.geometry.atoms:
+            print(a, len(a.connected))
+        
+        confs = Geometry.conformers(self.geometry)
+        with open(self.output_name, "w") as f:
+            for conf in confs:
+                content = conf.write(outfile=False)
+                f.write(content)
+                f.write("\n")
+
+        return 
+
+    def get_json(self):
+        d = super().get_json()
+        d["format"] = "AaronToolsConfJob"
+        return d
+
+    def open_structure(self):
+        run(self.session, "open %s" % self.output_name)
+        
 
