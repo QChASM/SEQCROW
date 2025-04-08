@@ -162,13 +162,13 @@ class LocalJob(QThread):
             self.input_files.append(filename)
             for try_encoding in [None, "utf-8", "utf-16"]:
                 try:
-                    with open(outname, "w", encoding=try_encoding) as f:
+                    with open(filename, "w", encoding=try_encoding) as f:
                         f.write(contents)
                         break
                 except UnicodeEncodeError as e:
                     continue
             else:
-                with open(outname, "w", errors="replace") as f:
+                with open(filename, "w", errors="replace") as f:
                     f.write(contents)
 
     def get_json(self):
@@ -1128,17 +1128,18 @@ class TSSJob(LocalJob):
         else:
             outname = os.path.basename(filename)
             name, ext = os.path.splitext(outname)
+            in_name = name + "." + self.format_name
             contents = contents.replace("{{ name }}", name)
             self.input_files.append(filename)
             for try_encoding in [None, "utf-8", "utf-16"]:
                 try:
-                    with open(outname, "w", encoding=try_encoding) as f:
+                    with open(filename, "w", encoding=try_encoding) as f:
                         f.write(contents)
                         break
                 except UnicodeEncodeError as e:
                     continue
             else:
-                with open(outname, "w", errors="replace") as f:
+                with open(filename, "w", errors="replace") as f:
                     f.write(contents)
 
     def get_json(self):
