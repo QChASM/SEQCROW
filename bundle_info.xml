@@ -4,8 +4,8 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="1.8.19">
-            
+            version="1.8.21a1">
+
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
             <URL>http://qchasm.wheelergroupresearch.com/</URL>
