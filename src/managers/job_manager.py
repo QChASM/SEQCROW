@@ -298,7 +298,7 @@ class JobManager(ProviderManager):
                                 job.error = True
                             if 'error' in fr.other and fr.other['error']:
                                 job.error = True
-                except NotImplementedError:
+                except Exception:
                     pass
         
         self.triggers.activate_trigger(JOB_QUEUED, trigger_name)

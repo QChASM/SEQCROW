@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="1.8.21a1">
+            version="1.8.21a2">
 
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -413,7 +413,9 @@
 				<Provider name="CREST"/>
 				<Provider name="CREST QCG"/>
 				<Provider name="ORCA"/>
+				<!--
 				<Provider name="AaronTools Conformer Generation"/>
+				-->
 			</Providers>
 			
             <Classifiers>

@@ -175,7 +175,11 @@ class Info(ToolInstance):
         add_header.triggered.connect(self.header_check)
         export.addAction(add_header)
 
+        comma.triggered.connect(lambda *args, action=semicolon: action.setChecked(False))
+        comma.triggered.connect(lambda *args, action=tab: action.setChecked(False))
+        tab.triggered.connect(lambda *args, action=comma: action.setChecked(False))
         tab.triggered.connect(lambda *args, action=semicolon: action.setChecked(False))
+        semicolon.triggered.connect(lambda *args, action=comma: action.setChecked(False))
         semicolon.triggered.connect(lambda *args, action=tab: action.setChecked(False))
 
         archive = QAction("Include archive if present", self.tool_window.ui_area, checkable=True)
