@@ -1,4 +1,5 @@
 from sys import platform
+from multiprocessing import Process, Lock
 import os
 import subprocess
 from time import asctime, localtime, sleep
@@ -11,6 +12,8 @@ from AaronTools.theory import OptimizationJob
 
 from chimerax.core.commands import run
 from chimerax.ui.options import BooleanOption
+
+import numpy as np
 
 from jinja2 import Template
 
@@ -1722,6 +1725,8 @@ class AaronToolsConfJob(LocalJob):
         return "local AaronTools job \"%s\"" % self.name
 
     def run(self):
+        from AaronTools.finders import BondedTo
+
         self.start_time = asctime(localtime())
 
         self.scratch_dir = os.path.join(
@@ -1734,15 +1739,80 @@ class AaronToolsConfJob(LocalJob):
 
         self.output_name = os.path.join(self.scratch_dir, self.name + '.xyz')
         
-        self.geometry.refresh_connected()
-        
         print(self.geometry)
         for a in self.geometry.atoms:
             print(a, len(a.connected))
+
+        self.geometry.refresh_connected()
+        starting_confs = Geometry.ring_conformers(self.geometry, include_uncommon=True)
         
-        confs = Geometry.conformers(self.geometry)
+        print("ring confs", len(starting_confs))
+        self.geometry.detect_substituents()
+        ndx = {a: i for i, a in enumerate(self.geometry)}
+        substituents = [
+            {
+                "end": ndx[s.end],
+                "conf_num": s.conf_num,
+                "name": s.name,
+                "conf_angle": s.conf_angle,
+                "atoms": [ndx[a] for a in s]
+            } for s in self.geometry.substituents if s.conf_num > 1
+        ]
+        
+        print(substituents)
+        
+        conformers = []
+        rotations = []
+        for s in substituents:
+            conformers.append(s["conf_num"])
+            rotations.append(s["conf_angle"])
+        
+        mod_array = []
+        for i in range(0, len(rotations)):
+            mod_array.append(1)
+            for j in range(0, i):
+                mod_array[i] *= conformers[j]
+        
+        final_geoms = []
+        for geom in starting_confs:
+            prev_conf = 0
+            prev_rots = [0 for s in substituents]
+            rots = [0 for s in substituents]
+            for conf in range(0, int(np.prod(conformers))):
+                print(conf)
+                conf_string = ""
+                for i, sub in enumerate(substituents):
+                    rot = int(conf / mod_array[i]) % conformers[i]
+                    rot -= int(prev_conf / mod_array[i]) % conformers[i]
+                    angle = rotations[i] * rot
+                    rots[i] += rot
+                    conf_string += "%i=%s-%i" % (sub["end"] + 1, sub["name"], rots[i])
+                    if angle != 0:
+                        end = geom.atoms[sub["end"]]
+                        sub_atom = geom.find(
+                            [geom.atoms[a] for a in sub["atoms"]],
+                            BondedTo(end)
+                        )[0]
+                        axis = sub_atom.bond(end)
+                        center = end.coords
+                        geom.rotate(
+                            axis,
+                            angle=angle,
+                            targets=[geom.atoms[a] for a in sub["atoms"]],
+                            center=center,
+                        )
+                        
+                prev_rots = rots
+                prev_conf = conf
+                conf_string = conf_string[:-1]
+                
+                this_geom = geom.copy(copy_atoms=True)
+                this_geom.name = conf_string
+                this_geom.comment = conf_string
+                final_geoms.append(this_geom)
+
         with open(self.output_name, "w") as f:
-            for conf in confs:
+            for conf in final_geoms:
                 content = conf.write(outfile=False)
                 f.write(content)
                 f.write("\n")
@@ -1755,6 +1825,6 @@ class AaronToolsConfJob(LocalJob):
         return d
 
     def open_structure(self):
-        run(self.session, "open %s" % self.output_name)
+        run(self.session, "open \"%s\"" % self.output_name)
         
 

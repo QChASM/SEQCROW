@@ -413,9 +413,7 @@
 				<Provider name="CREST"/>
 				<Provider name="CREST QCG"/>
 				<Provider name="ORCA"/>
-				<!--
 				<Provider name="AaronTools Conformer Generation"/>
-				-->
 			</Providers>
 			
             <Classifiers>
@@ -603,6 +601,7 @@
         <DataDir>theory/valid_basis_sets</DataDir>
         <DataFile>bond_data.json</DataFile>
         <DataFile>calculated_bond_lengths.json</DataFile>
+        <DataFile>ring_conformers.json</DataFile>
         <DataFile>config.ini</DataFile>
         <DataFile>README.md</DataFile>
         <DataFile>LICENSE</DataFile>
