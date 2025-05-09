@@ -1738,15 +1738,15 @@ class AaronToolsConfJob(LocalJob):
             os.makedirs(self.scratch_dir)
 
         self.output_name = os.path.join(self.scratch_dir, self.name + '.xyz')
-        
-        print(self.geometry)
-        for a in self.geometry.atoms:
-            print(a, len(a.connected))
 
         self.geometry.refresh_connected()
-        starting_confs = Geometry.ring_conformers(self.geometry, include_uncommon=True)
+        if self.theory.kwargs["search_rings"]:
+            starting_confs = Geometry.ring_conformers(self.geometry, include_uncommon=True)
+            self.session.logger.info("update from %s:" % self.name)
+            self.session.logger.info("found %i ring conformers" % len(starting_confs))
+        else:
+            starting_confs = [self.geometry.copy()]
         
-        print("ring confs", len(starting_confs))
         self.geometry.detect_substituents()
         ndx = {a: i for i, a in enumerate(self.geometry)}
         substituents = [
@@ -1758,9 +1758,14 @@ class AaronToolsConfJob(LocalJob):
                 "atoms": [ndx[a] for a in s]
             } for s in self.geometry.substituents if s.conf_num > 1
         ]
-        
-        print(substituents)
-        
+        confs = 1
+        self.session.logger.info("update from %s:" % self.name)
+        self.session.logger.info("found the following substituents:")
+        for sub in substituents:
+            confs *= sub["conf_num"]
+            self.session.logger.info("\t%i = %s" % (sub["atoms"][0] + 1, sub["name"]))
+        self.session.logger.info("will generate %i substituent conformers for each ring conformer" % confs)
+
         conformers = []
         rotations = []
         for s in substituents:
@@ -1821,7 +1826,7 @@ class AaronToolsConfJob(LocalJob):
 
     def get_json(self):
         d = super().get_json()
-        d["format"] = "AaronToolsConfJob"
+        d["format"] = "AaronTools Conformer Generation"
         return d
 
     def open_structure(self):

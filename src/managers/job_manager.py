@@ -112,6 +112,7 @@ class JobManager(ProviderManager):
                                 "local job provider for %s jobs is no longer installed," % job["format"] +
                                 "job named '%s' will be removed from the queue" % job["name"]
                             )
+                            continue
                     
                     elif job['server'] == "cluster":
                         args = [

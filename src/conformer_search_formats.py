@@ -475,7 +475,7 @@ class GOAT(ConformerSearchInfo):
 
 class AaronToolsConf(ConformerSearchInfo):
     # name of program
-    name = "AaronToolsConf"
+    name = "AaronTools Conformer Generation"
     options = {
         "RMSD_threshold": (
             FloatOption, {
@@ -514,18 +514,19 @@ class AaronToolsConf(ConformerSearchInfo):
     basis_sets = None
     methods = [
         "None",
-        "AM1 (SQM)",
-        "RM1 (SQM)",
-        "PM3 (ORCA)",
-        "PM3 (Gaussian)",
-        "PM6 (SQM)",
-        "PM6 (Gaussian)",
-        "PM7 (Gaussian)",
-        "HF-3c (ORCA)",
-        "GFNFF (xTB)",
-        "GFN1XTB (xTB)",
-        "GFN2XTB (xTB)",
-        "r2SCAN-3c (ORCA)",
+        # TODO: run opt right after conf search
+        # "AM1 (SQM)",
+        # "RM1 (SQM)",
+        # "PM3 (ORCA)",
+        # "PM3 (Gaussian)",
+        # "PM6 (SQM)",
+        # "PM6 (Gaussian)",
+        # "PM7 (Gaussian)",
+        # "HF-3c (ORCA)",
+        # "GFNFF (xTB)",
+        # "GFN1XTB (xTB)",
+        # "GFN2XTB (xTB)",
+        # "r2SCAN-3c (ORCA)",
     ]
 
     def get_file_contents(self, theory):
