@@ -477,33 +477,22 @@ class AaronToolsConf(ConformerSearchInfo):
     # name of program
     name = "AaronTools Conformer Generation"
     options = {
-        "RMSD_threshold": (
-            FloatOption, {
-                "min": 0.05,
-                "max": 1.00,
-                "step": 0.1,
-                "default": 0.125,
-                "name": "RMSD threshold",
-            }
-        ),
         "search_rings": (
             BooleanOption, {
                 "default": True,
-                "name": "simple ring conformers",
+                "name": "sample ring conformers (WIP)",
+            }
+        ),
+        "strained_rings": (
+            BooleanOption, {
+                "default": False,
+                "name": "include strained rings",
             }
         ),
         "relax": (
             BooleanOption, {
                 "default": True,
                 "name": "relax steric clashes",
-            }
-        ),
-        "optimization_cores": (
-            IntOption, {
-                "min": 1,
-                "max": 128,
-                "default": 8,
-                "name": "preopt. cores",
             }
         ),
     }
@@ -546,14 +535,14 @@ class AaronToolsConf(ConformerSearchInfo):
     def fixup_theory(
         self,
         theory,
-        RMSD_threshold=0.125,
         search_rings=True,
         relax=True,
         restart_file=None,
+        strained_rings=False,
     ):
         theory.kwargs = {
-            "RMSD_threshold": RMSD_threshold,
             "search_rings": search_rings,
+            "strained_rings": strained_rings,
             "relax": relax,
         }
         return theory

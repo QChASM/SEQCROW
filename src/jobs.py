@@ -1721,11 +1721,18 @@ class AaronToolsConfJob(LocalJob):
     info_type = "AaronToolsConfJob"
     exec_options = {}
 
+    def __init__(self, *args, n_confs=0, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.n_confs = n_confs
+
     def __repr__(self):
         return "local AaronTools job \"%s\"" % self.name
 
     def run(self):
+        from scipy.spatial import distance
+    
         from AaronTools.finders import BondedTo
+        from AaronTools.substituent import Substituent
 
         self.start_time = asctime(localtime())
 
@@ -1741,7 +1748,10 @@ class AaronToolsConfJob(LocalJob):
 
         self.geometry.refresh_connected()
         if self.theory.kwargs["search_rings"]:
-            starting_confs = Geometry.ring_conformers(self.geometry, include_uncommon=True)
+            starting_confs = Geometry.ring_conformers(
+                self.geometry,
+                include_uncommon=self.theory.kwargs["strained_rings"]
+            )
             self.session.logger.info("update from %s:" % self.name)
             self.session.logger.info("found %i ring conformers" % len(starting_confs))
         else:
@@ -1784,7 +1794,6 @@ class AaronToolsConfJob(LocalJob):
             prev_rots = [0 for s in substituents]
             rots = [0 for s in substituents]
             for conf in range(0, int(np.prod(conformers))):
-                print(conf)
                 conf_string = ""
                 for i, sub in enumerate(substituents):
                     rot = int(conf / mod_array[i]) % conformers[i]
@@ -1816,6 +1825,36 @@ class AaronToolsConfJob(LocalJob):
                 this_geom.comment = conf_string
                 final_geoms.append(this_geom)
 
+        if self.theory.kwargs["relax"]:
+            for geom in final_geoms:
+                sub_list = [
+                    Substituent(
+                        [geom.atoms[i] for i in sub["atoms"]],
+                        detect=False,
+                        end=geom.atoms[sub["end"]],
+                    ) for sub in substituents
+                ]
+                bad_subs = geom.remove_clash(sub_list)
+
+        bad_confs = []
+        n_atoms = len(geom.atoms)
+        for i, geom in enumerate(final_geoms):
+            dist = distance.pdist(geom.coords, metric="sqeuclidean")
+            for j, a1 in enumerate(geom.atoms):
+                for k, a2 in enumerate(geom.atoms[:j]):
+                    if a2 in a1.connected:
+                        continue
+                    n = n_atoms * k + j - ((k + 2) * (k + 1)) // 2
+                    if dist[n] < 1:
+                        bad_confs.append(i)
+
+        if len(bad_confs):
+            self.session.logger.info("removed %i conformers due to clashing" % len(bad_confs))
+        for i in bad_confs[::-1]:
+            final_geoms.pop(i)
+
+        self.n_confs = len(final_geoms)
+
         with open(self.output_name, "w") as f:
             for conf in final_geoms:
                 content = conf.write(outfile=False)
@@ -1827,9 +1866,10 @@ class AaronToolsConfJob(LocalJob):
     def get_json(self):
         d = super().get_json()
         d["format"] = "AaronTools Conformer Generation"
+        d["n_confs"] = self.n_confs
         return d
 
     def open_structure(self):
-        run(self.session, "open \"%s\"" % self.output_name)
-        
+        mdl = run(self.session, "open \"%s\" max %i" % (self.output_name, self.n_confs))
+
 
