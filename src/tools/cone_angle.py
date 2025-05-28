@@ -1,10 +1,14 @@
 from io import BytesIO
 
-from chimerax.atomic import selected_atoms
+import numpy as np
+
+from chimerax.atomic import selected_atoms, AtomicShapeInfo, AtomicShapeDrawing
 from chimerax.bild.bild import read_bild
 from chimerax.core.generic3d import Generic3DModel 
 from chimerax.core.settings import Settings
 from chimerax.core.tools import ToolInstance
+from chimerax.surface import cone_geometry, sphere_geometry2
+from chimerax.geometry import z_align
 
 from Qt.QtCore import Qt
 from Qt.QtGui import QKeySequence
@@ -23,6 +27,7 @@ from Qt.QtWidgets import (
     QLabel,
     QTabWidget,
     QWidget,
+    QSpinBox,
 )
 
 from AaronTools.component import Component
@@ -43,6 +48,7 @@ class _ConeAngleSettings(Settings):
         "delimiter": "comma",
         "include_header": True,
         "split_cones": False,
+        "cone_detail": 100,
     }
 
 
@@ -118,6 +124,14 @@ class ConeAngle(ToolInstance):
         self.cone_option.currentIndexChanged.connect(
             lambda ndx: self.split_cones.setEnabled(ndx == 0)
         )
+        
+        self.cone_detail = QSpinBox()
+        self.cone_detail.setMinimum(20)
+        self.cone_detail.setMaximum(2000)
+        self.cone_detail.setSingleStep(2)
+        self.cone_detail.setValue(self.settings.cone_detail)
+        self.cone_detail.setToolTip("level of detail for cone visuals")
+        settings_layout.addRow("visual detail", self.cone_detail)
 
         remove_cone_button = QPushButton("remove cone visualizations")
         remove_cone_button.clicked.connect(self.del_cone)
@@ -302,6 +316,7 @@ class ConeAngle(ToolInstance):
         self.settings.radii = self.radii_option.currentText()
         self.settings.display_radii = self.display_radii.checkState() == Qt.Checked
         self.settings.display_cone = self.display_cone.checkState() == Qt.Checked
+        self.settings.cone_detail = self.cone_detail.value()
         
         if self.cone_option.currentText() == "Tolman (Unsymmetrical)":
             method = "tolman"
@@ -350,27 +365,30 @@ class ConeAngle(ToolInstance):
                 _, cone_angle = cone_angle
             
             if return_cones:
+                mdl = Generic3DModel("Cone angle %s" % center_atom, self.session)
+                shapes = []
                 for cone in cones:
                     apex, base, radius = cone
-                    s = ".transparency 0.5\n"
-                    s += ".cone   %6.3f %6.3f %6.3f   %6.3f %6.3f %6.3f   %.3f open\n" % (
-                        *apex, *base, radius
-                    )
-                
-                    stream = BytesIO(bytes(s, "utf-8"))
-                    bild_obj, status = read_bild(
-                        self.session,
-                        stream,
-                        "Cone angle %s" % center_atom
-                    )
                     
-                    self.session.models.add(bild_obj, parent=center_atom.structure)
-
+                    dv = apex - base
+                    height = np.sqrt(np.dot(dv, dv))
+                    v, n, t = cone_geometry(radius=radius, height=height, nc=self.settings.cone_detail, caps=False)
+                    R = z_align(apex, base)
+                    Ri = R.inverse()
+                    v = Ri * (v + [0, 0, height / 2])
+                    Ri.transform_normals(n, in_place=True, is_rotation=True)
+                    shape = AtomicShapeInfo(v, n, t, np.array((255, 255, 255, 127), dtype=np.uint8), None, "")
+                    shapes.append(shape)
+                
+                if shapes:
+                    drawing = AtomicShapeDrawing("cone")
+                    drawing.add_shapes(shapes)
+                    mdl.add_drawing(drawing)
+                    self.session.models.add([mdl], parent=center_atom.structure)
 
             if display_radii:
-                s = ".note radii\n"
-                s += ".transparency 75\n"
-                color = None
+                mdl = Generic3DModel("Cone angle radii", self.session)
+                shapes = []
                 for atom in comp.atoms:
                     chix_atom = atom.chix_atom
                     if radii.lower() == "umn":
@@ -378,20 +396,24 @@ class ConeAngle(ToolInstance):
                     elif radii.lower() == "bondi":
                         r = BONDI_RADII[chix_atom.element.name]
                     
-                    if color is None or chix_atom.color != color:
-                        color = chix_atom.color
-                        rgb = [x/255. for x in chix_atom.color]
-                        rgb.pop(-1)
-                        
-                        s += ".color %f %f %f\n" % tuple(rgb)
-                    
-                    s += ".sphere %f %f %f %f\n" % (*chix_atom.coord, r)
-            
-                stream = BytesIO(bytes(s, "utf-8"))
-                bild_obj, status = read_bild(self.session, stream, "Cone angle radii")
+                    v, n, t = sphere_geometry2(5 * self.settings.cone_detail)
+                    v = v * r + chix_atom.coord
+                    c = list(chix_atom.color)
+                    c.pop(-1)
+                    c.append(127)
+                    shape = AtomicShapeInfo(
+                        v, n, t,
+                        np.array(c, dtype=np.uint8),
+                        None
+                    )
+                    shapes.append(shape)
                 
-                self.session.models.add(bild_obj, parent=center_atom.structure)
-            
+                if shapes:
+                    drawing = AtomicShapeDrawing("atoms")
+                    drawing.add_shapes(shapes)
+                    mdl.add_drawing(drawing)
+                    self.session.models.add([mdl], parent=center_atom.structure)
+
             row = self.table.rowCount()
             self.table.insertRow(row)
             

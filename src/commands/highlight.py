@@ -136,18 +136,27 @@ def highlight(session, selection, transparency=50, color=(0, 255, 0), scale=1.5)
         model.add([ms])
 
 def erase_highlight(session, selection):
-    for atom in selection.atoms:
-        for child in atom.structure.child_models():
-            if isinstance(child, Highlight):
-                for a in child.atoms:
-                    if a._follow is atom:
-                        a.delete()    
-    
+    delete_objs = set()
     for bond in selection.bonds:
         for child in bond.structure.child_models():
             if isinstance(child, Highlight):
                 for b in child.bonds:
                     a1, a2 = b.atoms
                     if a1._follow in bond.atoms and a2._follow in bond.atoms:
-                        b.delete()
+                        delete_objs.add(b)
                         
+    for atom in selection.atoms:
+        for child in atom.structure.child_models():
+            if isinstance(child, Highlight):
+                for a in child.atoms:
+                    if a._follow is atom:
+                        delete_objs.add(a)
+
+    for obj in delete_objs:
+        try:
+            obj.delete()
+        except AttributeError as e:
+            # for some reason highlight bonds don't have a _c_pointer_ref
+            # and throw an attribute error when you try to delete them
+            pass
+            
