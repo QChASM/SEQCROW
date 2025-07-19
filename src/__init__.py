@@ -392,6 +392,11 @@ class _SEQCROW_API(BundleAPI):
             from SEQCROW.managers import ConformerSearch
             session.conformer_search_manager = ConformerSearch(session, name)
             return session.conformer_search_manager
+        
+        elif name == "external_quantum_utilities":
+            from SEQCROW.managers import ExternalUtilitiesManager
+            session.external_quantum_utilities = ExternalUtilitiesManager(session, name)
+            return session.external_quantum_utilities
 
         else:
             raise RuntimeError("manager named '%s' is unknown to SEQCROW" % name)
@@ -541,6 +546,10 @@ class _SEQCROW_API(BundleAPI):
         elif ti.name == "Dipoles":
             from .tools.dipoles import Dipoles
             return Dipoles(session, ti.name)
+        
+        elif ti.name == "External QM Utilities":
+            from .tools.external_utilities import ExternalUtilitiesInterface
+            return ExternalUtilitiesInterface(session, ti.name)
 
         else:
             raise RuntimeError("tool named '%s' is unknown to SEQCROW" % ti.name)
@@ -989,6 +998,11 @@ class _SEQCROW_API(BundleAPI):
             if name == "AaronTools Conformer Generation":
                 from .conformer_search_formats import AaronToolsConf
                 return AaronToolsConf()
+ 
+        elif mgr is session.external_quantum_utilities:
+            if name == "orca_plot":
+                from .external_orca_utilities import ORCA_plot
+                return ORCA_plot(session)
  
         elif mgr is session.test_manager:
             if name == "fuseRing_command":

@@ -297,7 +297,11 @@ class Info(ToolInstance):
         else:
             table = self.signal_tables[self.tabs.currentIndex() - 1]
             if self.settings.include_header:
-                s = delim + delim.join([
+                if self.tabs.currentIndex() == 2:
+                    s = delim
+                else:
+                    s = ""
+                s += delim.join([
                     table.horizontalHeaderItem(i).text().replace(delim, "_") for i in range(0, table.columnCount())
                 ])
                 s += "\n"
@@ -306,11 +310,12 @@ class Info(ToolInstance):
             
             for i in range(0, table.rowCount()):
                 if self.settings.include_header:
-                    if table.verticalHeaderItem(i) is None:
+                    if table.verticalHeaderItem(i) is None and self.tabs.currentIndex() == 2:
                         s += delim
-                    else:
+                    elif table.verticalHeaderItem(i) is not None:
                         s += table.verticalHeaderItem(i).text().replace(delim, "_")
-                    s += delim
+                    if self.tabs.currentIndex() == 2:
+                        s += delim
                 s += delim.join(
                     [
                         item.replace("<sub>", "").replace("</sub>", "") for item in [

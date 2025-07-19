@@ -969,11 +969,17 @@ class ResidueCollection(Geometry):
         elif isinstance(filereader.all_geom, np.ndarray):
             return filereader.all_geom
         else:
-            coordsets = np.zeros((len(filereader.all_geom), len(self.atoms), 3))
+            if hasattr(filereader, "full_atoms"):
+                frames = [data for data in filereader.all_geom if len(data["atoms"]) == len(filereader.full_atoms)]
+                coordsets = np.zeros((len(frames), len(self.atoms), 3))
+            else:
+                frames = filereader.all_geom
+                coordsets = np.zeros((len(filereader.all_geom), len(self.atoms), 3))
+            
             if isinstance(filereader.all_geom, np.ndarray):
                 coordsets = filereader.all_geom
             else:
-                for i, all_geom in enumerate(filereader.all_geom):
+                for i, all_geom in enumerate(frames):
                     atom_list = all_geom["atoms"]
                     for j, atom in enumerate(atom_list):
                         coordsets[i][j] = atom.coords

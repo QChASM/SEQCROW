@@ -94,8 +94,11 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
         
         return structures, "opened multi-structure file"
     
+    atoms = fr
+    if hasattr(fr, "full_atoms"):
+        atoms = fr.full_atoms
     try:
-        geom = ResidueCollection(fr, refresh_ranks=False).copy(
+        geom = ResidueCollection(atoms, refresh_ranks=False).copy(
             comment=fr.comment, copy_atoms=True,
         )
     except Exception as e:

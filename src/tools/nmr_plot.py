@@ -3,6 +3,7 @@ import re
 
 import numpy as np
 
+from chimerax.atomic import Atoms
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.ui.widgets import ColorButton
@@ -205,7 +206,7 @@ class NMRSpectrum(ToolInstance):
 
         tabs.addTab(component_widget, "components")
         
-        self.nulcei_widget = EquivalentNuclei()
+        self.nulcei_widget = EquivalentNuclei(self.session)
         tabs.addTab(self.nulcei_widget, "equivalent nuclei")
         
         
@@ -532,14 +533,19 @@ class NMRSpectrum(ToolInstance):
         for mol_ndx in range(1, self.tree.topLevelItemCount()):
             mol = self.tree.topLevelItem(mol_ndx)
 
+            mdls = []
+            main_fr = None
             for conf_ndx in range(2, mol.childCount(), 2):
                 conf = mol.child(conf_ndx)
                 data = self.tree.itemWidget(conf, 0).currentData()
                 if data is None:
                     continue
                 fr, mdl = data
-                geoms.append(Geometry(fr["atoms"], refresh_ranks=False))
-                break
+                if main_fr is None:
+                    main_fr = fr
+                mdls.append(mdl)
+            if main_fr:
+                geoms.append([Geometry(main_fr["atoms"], refresh_ranks=False), mdls])
         
         self.nulcei_widget.set_molecules(geoms)
 
@@ -1665,9 +1671,10 @@ class NMRSpectrum(ToolInstance):
 
 
 class EquivalentNuclei(QWidget):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, session, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
+        self.session = session
         layout = QGridLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self.tabs = QTabWidget()
@@ -1678,7 +1685,7 @@ class EquivalentNuclei(QWidget):
     def set_molecules(self, geoms):        
         self.geoms = geoms
         
-        for i, geom in enumerate(geoms):
+        for i, (geom, mdl) in enumerate(geoms):
             if i >= self.tabs.count():
                 self.create_mol_tab(i)
             elif self.check_similar(i, geom):
@@ -1692,7 +1699,7 @@ class EquivalentNuclei(QWidget):
     def check_similar(self, ndx, geom):
         tab = self.tabs.widget(ndx)
         layout = tab.layout()
-        table = layout.itemAt(2).widget()
+        table = layout.itemAt(3).widget()
         
         if table.rowCount() != len(geom.atoms):
             return False
@@ -1704,8 +1711,13 @@ class EquivalentNuclei(QWidget):
         
         return True
 
+    def label_mol_tab(self, i):
+        from SEQCROW.presets import indexLabel
+        geom, mdls = self.geoms[i]
+        indexLabel(self.session, mdls)
+ 
     def reset_mol_tab(self, i):
-        geom = self.geoms[i]
+        geom, mdls = self.geoms[i]
         ranks = geom.canonical_rank(
             break_ties=False, update=False, invariant=False,
         )
@@ -1713,7 +1725,7 @@ class EquivalentNuclei(QWidget):
 
         tab = self.tabs.widget(i)
         layout = tab.layout()
-        table = layout.itemAt(2).widget()
+        table = layout.itemAt(3).widget()
         table.clearContents()
         table.setRowCount(0)
 
@@ -1731,15 +1743,40 @@ class EquivalentNuclei(QWidget):
             ])
             ndx = rank_choice.findText(rank_labels[rank])
             rank_choice.setCurrentIndex(ndx)
+            rank_choice.currentIndexChanged.connect(lambda x, t_ndx=i: self.update_counts(t_ndx))
             
             ndx_item = QTableWidgetItem(str(j + 1))
             table.setItem(j, 0, ndx_item)
             ele_item = QTableWidgetItem(a.element)
             table.setItem(j, 1, ele_item)
             table.setCellWidget(j, 2, rank_choice)
+            
+            select_group = QPushButton("select atoms in this group")
+            select_group.clicked.connect(lambda x, t_ndx=i, a_ndx=j: self.select_group(t_ndx, a_ndx))
+            table.setCellWidget(j, 4, select_group)
+        
+        self.update_counts(i)
+        for n in range(0, table.columnCount()):
+            table.resizeColumnToContents(n)
+
+    def update_counts(self, tab_ndx):
+        tab = self.tabs.widget(tab_ndx)
+        layout = tab.layout()
+        table = layout.itemAt(3).widget()
+        
+        atom_groups = dict()
+        for j in range(0, table.rowCount()):
+            label = table.cellWidget(j, 2).currentText()
+            atom_groups.setdefault(label, 0)
+            atom_groups[label] += 1
+
+        for j in range(0, table.rowCount()):
+            label = table.cellWidget(j, 2).currentText()
+            item = QTableWidgetItem(str(atom_groups[label]))
+            table.setItem(j, 3, item)
 
     def create_mol_tab(self, i):
-        geom = self.geoms[i]
+        geom, mdls = self.geoms[i]
         widget = QWidget()
         layout = QFormLayout(widget)
         
@@ -1753,10 +1790,14 @@ class EquivalentNuclei(QWidget):
         reset_button.clicked.connect(lambda *args, ndx=i, s=self: s.reset_mol_tab(ndx))
         layout.addRow(reset_button)
         
+        ndx_label_button = QPushButton("label indices on atoms")
+        ndx_label_button.clicked.connect(lambda *args, ndx=i, s=self: s.label_mol_tab(ndx))
+        layout.addRow(ndx_label_button)
+        
         table = QTableWidget()
         table.verticalHeader().setVisible(False)
-        table.setColumnCount(3)
-        table.setHorizontalHeaderLabels(["index", "element", "group label"])
+        table.setColumnCount(5)
+        table.setHorizontalHeaderLabels(["index", "element", "group label", "count", ""])
         layout.addRow(table)
 
         self.tabs.insertTab(i, widget, "molecule %i" % (i + 1))
@@ -1769,7 +1810,7 @@ class EquivalentNuclei(QWidget):
             rank_labels = dict()
             tab = self.tabs.widget(i)
             layout = tab.layout()
-            table = layout.itemAt(2).widget()
+            table = layout.itemAt(3).widget()
 
             for j in range(0, table.rowCount()):
                 ndx = int(table.item(j, 0).text())
@@ -1786,7 +1827,7 @@ class EquivalentNuclei(QWidget):
     def get_graph(self):
         graph = list()
         offset = 0
-        for geom in self.geoms:
+        for (geom, _) in self.geoms:
             ndx = {a: i + offset for i, a in enumerate(geom.atoms)}
             for a in geom.atoms:
                 graph.append([ndx[b] for b in a.connected])
@@ -1794,6 +1835,25 @@ class EquivalentNuclei(QWidget):
         
         return graph
 
+    def select_group(self, geom_ndx, atom_type_ndx):
+        tab = self.tabs.widget(geom_ndx)
+        layout = tab.layout()
+        table = layout.itemAt(3).widget()
+        
+        atom_type = table.cellWidget(atom_type_ndx, 2).currentText()
+        atom_ndx = []
+        for j in range(0, table.rowCount()):
+            this_ndx = int(table.item(j, 0).text()) - 1
+            label = table.cellWidget(j, 2).currentText()
+            if label == atom_type:
+                atom_ndx.append(this_ndx)
+        
+        atom_ndx = np.array(atom_ndx)
+        run(self.session, "select clear")
+        atoms = Atoms()
+        for mdl in self.geoms[geom_ndx][1]:
+            atoms = atoms.merge(mdl.atoms[atom_ndx])
+        atoms.selected = True
 
 class SaveScales(ChildToolWindow):
     def __init__(self, tool_instance, title, *args, m=-1.0, b=31.9, **kwargs):

@@ -10,3 +10,4 @@ from .cluster_template_manager import (
 )
 from .tss_finder import TSSFinderManager
 from .conformer_search_manager import ConformerSearch
+from .external_quantum_utilities import ExternalUtilitiesManager

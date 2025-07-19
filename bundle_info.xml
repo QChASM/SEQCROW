@@ -4,7 +4,7 @@
             maxSessionVersion="3"
             package="SEQCROW"
             purePython="true"
-            version="1.8.21">
+            version="1.9a1">
 
             <Author>QChASM</Author>
             <Email>catalysttrends@uga.edu</Email>
@@ -104,6 +104,7 @@
                 <Manager name="LSF" uiOnly="true"/>
 				<Manager name="tss_finder_manager" uiOnly="true"/>
 				<Manager name="conformer_search_manager" uiOnly="true"/>
+				<Manager name="external_quantum_utilities" uiOnly="true"/>
             </Managers>
             
             <Providers manager="data formats">
@@ -415,6 +416,10 @@
 				<Provider name="ORCA"/>
 				<Provider name="AaronTools Conformer Generation"/>
 			</Providers>
+
+			<Providers manager="external_quantum_utilities">
+				<Provider name="orca_plot"/>
+			</Providers>
 			
             <Classifiers>
                 <PythonClassifier>Development Status :: 4 - Beta</PythonClassifier>
@@ -463,6 +468,7 @@
                 <ChimeraXClassifier>ChimeraX :: Tool :: Conformer Search               :: Structure Prediction :: automated conformer search</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: Z-Matrix Builder               :: Structure Editing    :: build structure using internal coordinates</ChimeraXClassifier>
                 <ChimeraXClassifier>ChimeraX :: Tool :: NMR Spectrum                   :: Quantum Chemistry    :: plot simulated NMR spectra from DFT computations</ChimeraXClassifier>
+                <ChimeraXClassifier>ChimeraX :: Tool :: External QM Utilities          :: Quantum Chemistry    :: run external utilities for quantum chemistry tasks</ChimeraXClassifier>
                 
                 <!-- WIP <ChimeraXClassifier>ChimeraX :: Tool :: Dipoles                        :: Quantum Chemistry    :: show dipole vectors</ChimeraXClassifier>-->
                 
