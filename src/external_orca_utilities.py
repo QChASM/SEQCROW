@@ -22,6 +22,32 @@ from Qt.QtWidgets import (
 
 from AaronTools.utils.utils import available_memory
 
+_orbital_types = [
+    "molecular orbitals",
+    "natural orbitals",
+    "corresponding orbitals",
+    "atomic orbitals",
+]
+
+_density_types = [
+    "(scf) electron density",
+    "(scf) spin density",
+    "AutoCI relaxed density",
+    "AutoCI unrelaxed density",
+    "AutoCI relaxed spin density",
+    "AutoCI unrelaxed spin density",
+    "OO-RI-MP2 density",
+    "OO-RI-MP2 spin density",
+    "MP2 relaxed density",
+    "MP2 unrelaxed density",
+    "MP2 relaxed spin density",
+    "MP2 unrelaxed spin density",
+]
+
+_esp_types = [
+    "Electrostatic Potential",
+]
+
 
 class ORCA_plot(QWidget):
     update = Signal()
@@ -174,39 +200,19 @@ class ORCA_plot(QWidget):
             self.layout.setRowVisible(self.rows["operator"], False)
             self.layout.setRowVisible(self.rows["density"], False)
         
-        if text == "molecular orbitals":
+        if text in _orbital_types:
             self.layout.setRowVisible(self.rows["orbital number"], True)
             self.layout.setRowVisible(self.rows["operator"], self.n_spins > 1)
             self.layout.setRowVisible(self.rows["density"], False)
 
-        if text == "natural orbitals":
-            self.layout.setRowVisible(self.rows["orbital number"], True)
-            self.layout.setRowVisible(self.rows["operator"], self.n_spins > 1)
-            self.layout.setRowVisible(self.rows["density"], False)
-        
-        if text == "atomic orbitals":
-            self.layout.setRowVisible(self.rows["orbital number"], True)
-            self.layout.setRowVisible(self.rows["operator"], self.n_spins > 1)
-            self.layout.setRowVisible(self.rows["density"], False)
-        
-        if text == "(scf) electron density":
-            self.layout.setRowVisible(self.rows["orbital number"], False)
-            self.layout.setRowVisible(self.rows["operator"], self.n_spins > 1)
-            self.layout.setRowVisible(self.rows["density"], True)
-        
-        if text == "(scf) spin density":
+        if text in _density_types:
             self.layout.setRowVisible(self.rows["orbital number"], False)
             self.layout.setRowVisible(self.rows["operator"], False)
             self.layout.setRowVisible(self.rows["density"], True)
         
-        if text == "Atom pair density":
+        if text in _esp_types:
             self.layout.setRowVisible(self.rows["orbital number"], False)
-            self.layout.setRowVisible(self.rows["operator"], self.n_spins > 1)
-            self.layout.setRowVisible(self.rows["density"], True)
-        
-        if text == "Electrostatic Potential":
-            self.layout.setRowVisible(self.rows["orbital number"], False)
-            self.layout.setRowVisible(self.rows["operator"], self.n_spins > 1)
+            self.layout.setRowVisible(self.rows["operator"], False)
             self.layout.setRowVisible(self.rows["density"], True)
 
     def run_executable(self, *args):
@@ -217,19 +223,13 @@ class ORCA_plot(QWidget):
         if kind == "check available plots":
             self.run_check_available()
         
-        elif kind == "molecular orbitals":
+        elif kind in _orbital_types:
             self.run_orbitals(kind)
         
-        elif kind == "natural orbitals":
-            self.run_orbitals(kind)
-        
-        elif kind == "atomic orbitals":
-            self.run_orbitals(kind)
-        
-        elif kind == "(scf) electron density":
+        elif kind in _density_types:
             self.run_density(kind)
 
-        elif kind == "Electrostatic Potential":
+        elif kind in _esp_types:
             self.run_esp(kind)
         
         else:
@@ -515,16 +515,10 @@ class ORCA_plot(QWidget):
             if reading_formats and "Enter Format:" in line:
                 reading_formats = False
 
+        for plot_type, code in self.plot_types.items():
+            print(plot_type, code)
         items = []
-        for plot_type in [
-            "molecular orbitals",
-            "natural orbitals",
-            "corresponding orbitals",
-            "atomic orbitals",
-            "(scf) electron density",
-            "(scf) spin density",
-            "Electrostatic Potential",
-        ]:
+        for plot_type in _orbital_types + _density_types + _esp_types:
             if plot_type in self.plot_types:
                 items.append(plot_type)
         
