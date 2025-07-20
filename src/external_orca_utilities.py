@@ -131,15 +131,52 @@ class ORCA_plot(QWidget):
         
         self.rows["plot type"] = self.plot_type
 
-        self.grid_points = QSpinBox()
-        self.grid_points.setMinimum(1)
-        self.grid_points.setMaximum(1000)
-        self.grid_points.setSingleStep(5)
-        self.grid_points.setSuffix("³")
-        self.grid_points.setValue(40)
-        self.layout.addRow("grid points:", self.grid_points)
+        self.density = QComboBox()
+        self.layout.addRow("density:", self.density)
         
-        self.rows["grid points"] = self.grid_points
+        self.rows["density"] = self.density
+
+        grid_widget = QWidget()
+        grid_layout = QGridLayout(grid_widget)
+        margins = grid_layout.contentsMargins()
+        new_margins = (margins.left(), 0, margins.right(), 0)
+        grid_layout.setContentsMargins(*new_margins)
+        
+        self.x_grid_points = QSpinBox()
+        self.x_grid_points.setMinimum(1)
+        self.x_grid_points.setMaximum(1000)
+        self.x_grid_points.setSingleStep(5)
+        self.x_grid_points.setValue(40)
+        grid_layout.addWidget(QLabel("x:") , 0, 0, Qt.AlignVCenter | Qt.AlignRight)
+        grid_layout.addWidget(self.x_grid_points, 0, 1, Qt.AlignVCenter)
+
+        self.y_grid_points = QSpinBox()
+        self.y_grid_points.setMinimum(1)
+        self.y_grid_points.setMaximum(1000)
+        self.y_grid_points.setSingleStep(5)
+        self.y_grid_points.setValue(40)
+        grid_layout.addWidget(QLabel("y:") , 0, 2, Qt.AlignVCenter | Qt.AlignRight)
+        grid_layout.addWidget(self.y_grid_points, 0, 3, Qt.AlignVCenter)
+
+        self.z_grid_points = QSpinBox()
+        self.z_grid_points.setMinimum(1)
+        self.z_grid_points.setMaximum(1000)
+        self.z_grid_points.setSingleStep(5)
+        self.z_grid_points.setValue(40)
+        grid_layout.addWidget(QLabel("z:") , 0, 4, Qt.AlignVCenter | Qt.AlignRight)
+        grid_layout.addWidget(self.z_grid_points, 0, 5, Qt.AlignVCenter)
+        
+        grid_layout.setColumnStretch(0, 0)
+        grid_layout.setColumnStretch(1, 1)
+        grid_layout.setColumnStretch(2, 0)
+        grid_layout.setColumnStretch(3, 1)
+        grid_layout.setColumnStretch(4, 0)
+        grid_layout.setColumnStretch(5, 1)
+        self.layout.addRow("grid points:", grid_widget)
+        
+        self.rows["x grid points"] = self.x_grid_points
+        self.rows["y grid points"] = self.y_grid_points
+        self.rows["y grid points"] = self.z_grid_points
 
         self.memory = QSpinBox()
         self.memory.setMinimum(1)
@@ -171,11 +208,6 @@ class ORCA_plot(QWidget):
         self.layout.addRow("spin operator:", self.operator)
         
         self.rows["operator"] = self.operator
-
-        self.density = QComboBox()
-        self.layout.addRow("density:", self.density)
-        
-        self.rows["density"] = self.density
 
         self.run = QPushButton("do it")
         self.run.clicked.connect(self.run_executable)
@@ -342,7 +374,7 @@ class ORCA_plot(QWidget):
 
         sequence.extend([
             self.top_level_options["Enter number of grid intervals"],
-            str(self.grid_points.value()),
+            " ".join(str(func()) for func in [self.x_grid_points.value, self.y_grid_points.value, self.z_grid_points.value]),
         ])
 
         sequence.extend([
@@ -382,7 +414,7 @@ class ORCA_plot(QWidget):
 
         sequence.extend([
             self.top_level_options["Enter number of grid intervals"],
-            str(self.grid_points.value()),
+            " ".join(str(func()) for func in [self.x_grid_points.value, self.y_grid_points.value, self.z_grid_points.value]),
         ])
 
         if "spin density" not in density_type.lower() and self.n_spins > 1:
@@ -416,7 +448,7 @@ class ORCA_plot(QWidget):
 
         sequence.extend([
             self.top_level_options["Enter number of grid intervals"],
-            str(self.grid_points.value()),
+            " ".join(str(func()) for func in [self.x_grid_points.value, self.y_grid_points.value, self.z_grid_points.value]),
         ])
 
         file_format = self.file_format.currentText()
@@ -564,8 +596,20 @@ class ORCA_plot(QWidget):
             pass
         
         try:
-            grid_points = kwargs["grid_points"]
-            self.grid_points.setValue(grid_points)
+            grid_points = kwargs["x_grid_points"]
+            self.x_grid_points.setValue(grid_points)
+        except KeyError:
+            pass
+
+        try:
+            grid_points = kwargs["y_grid_points"]
+            self.y_grid_points.setValue(grid_points)
+        except KeyError:
+            pass
+
+        try:
+            grid_points = kwargs["z_grid_points"]
+            self.z_grid_points.setValue(grid_points)
         except KeyError:
             pass
         
@@ -579,7 +623,9 @@ class ORCA_plot(QWidget):
         out = dict()
         out["exe_path"] = self.exe_path.text()
         out["infile_path"] = self.infile_path.text()
-        out["grid_points"] = self.grid_points.value()
+        out["x_grid_points"] = self.x_grid_points.value()
+        out["y_grid_points"] = self.y_grid_points.value()
+        out["z_grid_points"] = self.z_grid_points.value()
         out["memory"] = self.memory.value()
         
         return out
