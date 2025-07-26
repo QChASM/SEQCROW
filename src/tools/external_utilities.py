@@ -39,11 +39,12 @@ class ExternalUtilitiesInterface(ToolInstance):
         
         self.utilities = QComboBox()
         self.utilities.addItems(self.session.external_quantum_utilities.utilities.keys())
-        self.layout.addRow(self.utilities)
+        self.layout.addRow("utility:", self.utilities)
         
         
-        self.utilities.currentIndexChanged.connect(self.change_utility)
+        self.utilities.currentTextChanged.connect(self.change_utility)
         self.current_utility = None
+        self.previous_utility_name = None
 
         self.change_utility(self.utilities.currentText())        
 
@@ -52,11 +53,11 @@ class ExternalUtilitiesInterface(ToolInstance):
         self.tool_window.manage(None)
     
     def change_utility(self, name):
+        print(name)
         if self.current_utility is not None:
             data = loads(self.settings.data)
-            self.update_settings()
+            self.update_settings(self.previous_utility_name)
             self.layout.removeRow(self.current_utility)
-            self.current_utility.deleteLater()
         
         self.current_utility = self.session.external_quantum_utilities.get_utility_widget(name)
         data = loads(self.settings.data)
@@ -67,13 +68,16 @@ class ExternalUtilitiesInterface(ToolInstance):
         except Exception as e:
             print(e)
         self.layout.addRow(self.current_utility)
+        self.previous_utility_name = name
     
-    def update_settings(self):
+    def update_settings(self, name=None):
+        if name is None:
+            name = self.utilities.currentText()
         if self.current_utility is None:
             return
         data = loads(self.settings.data)
         try:
-            data[self.utilities.currentText()] = self.current_utility.get_values()
+            data[name] = self.current_utility.get_values()
             self.settings.data = dumps(data)
         except Exception as e:
             print(e)

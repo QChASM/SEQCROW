@@ -113,8 +113,6 @@ class ORCA_plot(QWidget):
         self.infile_path = QLineEdit()
         self.infile_path.setPlaceholderText("your GBW file")
         
-        self.infile_path.setText("E:/SEQCROW_SCRATCH/fluoroethane 6_1 Thu Jul 17 21.22.22 2025/fluoroethane_6_1.gbw")
-
         self.infile_browse_button = QPushButton("browse...")
         self.infile_browse_button.clicked.connect(self.open_set_infile_path)
         infile_browse_layout.addWidget(self.infile_path, 0, 0, Qt.AlignVCenter)
@@ -135,6 +133,29 @@ class ORCA_plot(QWidget):
         self.layout.addRow("density:", self.density)
         
         self.rows["density"] = self.density
+
+        # TOCONSIDER: a checkbox to make all orbitals?
+        # or another spinbox for a range of orbitals
+        self.orbital_number = QSpinBox()
+        self.orbital_number.setMinimum(0)
+        self.orbital_number.setMaximum(self.n_orbitals)
+        self.orbital_number.setSingleStep(1)
+        self.orbital_number.setValue(0)
+        self.orbital_number.setToolTip("first orbital is number 0")
+        self.layout.addRow("orbital number:", self.orbital_number)
+
+        self.rows["orbital number"] = self.orbital_number
+
+        self.file_format = QComboBox()
+        self.layout.addRow("file format:", self.file_format)
+        
+        self.rows["file format"] = self.file_format
+
+        self.operator = QComboBox()
+        self.operator.addItems(["α", "β"])
+        self.layout.addRow("spin operator:", self.operator)
+        
+        self.rows["operator"] = self.operator
 
         grid_widget = QWidget()
         grid_layout = QGridLayout(grid_widget)
@@ -187,27 +208,6 @@ class ORCA_plot(QWidget):
         self.layout.addRow("memory limit:", self.memory)
         
         self.rows["memory"] = self.memory
-
-        self.orbital_number = QSpinBox()
-        self.orbital_number.setMinimum(0)
-        self.orbital_number.setMaximum(self.n_orbitals)
-        self.orbital_number.setSingleStep(1)
-        self.orbital_number.setValue(0)
-        self.orbital_number.setToolTip("first orbital is number 0")
-        self.layout.addRow("orbital number:", self.orbital_number)
-
-        self.rows["orbital number"] = self.orbital_number
-
-        self.file_format = QComboBox()
-        self.layout.addRow("file format:", self.file_format)
-        
-        self.rows["file format"] = self.file_format
-
-        self.operator = QComboBox()
-        self.operator.addItems(["α", "β"])
-        self.layout.addRow("spin operator:", self.operator)
-        
-        self.rows["operator"] = self.operator
 
         self.run = QPushButton("do it")
         self.run.clicked.connect(self.run_executable)
@@ -277,6 +277,9 @@ class ORCA_plot(QWidget):
         exe_path = self.exe_path.text()
         infile = self.infile_path.text()
         memory = self.memory.value()
+        if not infile:
+            self.session.logger.error("You must specify a GBW file")
+            return "", ""
         
         avail = available_memory()
         if memory * 1e6 > (0.9 * available_memory()):

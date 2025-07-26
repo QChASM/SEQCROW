@@ -258,13 +258,7 @@ class ScientificSpinBox(QDoubleSpinBox):
     def stepUp(self):
         value = self._unmappedValue()
         mantissa, characteristic = self.getMantissaCharacteristic()
-        # if characteristic == 0:
-        #     characteristic = -self.decimals()
-        #     if self.maxAbsoluteCharacteristic:
-        #         characteristic = -(self.maxAbsoluteCharacteristic - 1)
-        #     elif self.maxAbsoluteCharacteristic and abs(characteristic) > self.maxAbsoluteCharacteristic:
-        #         characteristic = -(self.maxAbsoluteCharacteristic - 1)
-        
+
         characteristic -= 1
         value = value + self.stepMultiplier * 10 ** characteristic
         mantissa, characteristic = self.getMantissaCharacteristic(value)
@@ -273,33 +267,12 @@ class ScientificSpinBox(QDoubleSpinBox):
         ):
             value = 0
 
-        # val = self._unmappedValue() * 10
-        # if val == 0:
-        #     val = 10 ** -self.decimals()
-        #     if self.maxAbsoluteCharacteristic:
-        #         val = 10 ** -self.maxAbsoluteCharacteristic
-        # elif val < 0:
-        #     val /= 100
-        # if self.maxAbsoluteCharacteristic:
-        #     try:
-        #         char = 0 if val == 0 else np.log10(abs(val))
-        #     except (OverflowError, ValueError):
-        #         char = 0
-        #     if abs(char) > self.maxAbsoluteCharacteristic:
-        #         val = 0
-            
         self.setValue(min(value, self.maximum()))
 
     def stepDown(self):
         value = self._unmappedValue()
         mantissa, characteristic = self.getMantissaCharacteristic()
-        # if characteristic == 0:
-        #     characteristic = -self.decimals()
-        #     if self.maxAbsoluteCharacteristic:
-        #         characteristic = -(self.maxAbsoluteCharacteristic - 1)
-        #     elif self.maxAbsoluteCharacteristic and abs(characteristic) > self.maxAbsoluteCharacteristic:
-        #         characteristic = -(self.maxAbsoluteCharacteristic - 1)
- 
+
         characteristic -= 1
         value = value - self.stepMultiplier * 10 ** characteristic
         mantissa, characteristic = self.getMantissaCharacteristic(value)
@@ -308,21 +281,6 @@ class ScientificSpinBox(QDoubleSpinBox):
         ):
             value = 0
 
-        # val = self._unmappedValue() / 10
-        # if val == 0:
-        #     val = -(10 ** -self.decimals())
-        #     if self.maxAbsoluteCharacteristic:
-        #         val = -(10 ** -self.maxAbsoluteCharacteristic)
-        # elif val < 0:
-        #     val *= 100
-        # if self.maxAbsoluteCharacteristic:
-        #     try:
-        #         char = 0 if val == 0 else np.log10(abs(val))
-        #     except (OverflowError, ValueError):
-        #         char = 0
-        #     if abs(char) > self.maxAbsoluteCharacteristic:
-        #         val = 0
-            
         self.setValue(max(value, self.minimum()))
     
     def _unmappedValue(self):

@@ -419,6 +419,8 @@
 
 			<Providers manager="external_quantum_utilities">
 				<Provider name="orca_plot"/>
+				<Provider name="cubegen"/>
+				<Provider name="formchk"/>
 			</Providers>
 			
             <Classifiers>

@@ -1003,6 +1003,14 @@ class _SEQCROW_API(BundleAPI):
             if name == "orca_plot":
                 from .external_orca_utilities import ORCA_plot
                 return ORCA_plot(session)
+            
+            if name == "cubegen":
+                from .external_gaussian_utilities import CubeGen
+                return CubeGen(session)
+             
+            if name == "formchk":
+                from .external_gaussian_utilities import FormCHK
+                return FormCHK(session)
  
         elif mgr is session.test_manager:
             if name == "fuseRing_command":
