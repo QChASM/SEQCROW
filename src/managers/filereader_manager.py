@@ -42,7 +42,7 @@ class FileReaderManager(ProviderManager):
             filereaders = []
             try:
                 filereaders.extend([fr for fr in model.filereaders if fr])
-            except (IndexError, AttributeError):
+            except AttributeError:
                 pass
             if filereaders:
                 models_and_filereaders.append((model, filereaders))
@@ -55,12 +55,21 @@ class FileReaderManager(ProviderManager):
     def apply_preset(self, trigger_name, models):
         """if a graphical preset is set in SEQCROW settings, apply that preset to models"""
         for model in models:
-            if model.session.ui.is_gui:
-                try:
-                    model.filereaders[-1]
-                    apply_seqcrow_preset(model)
-                except (AttributeError, IndexError):
-                    pass
+            try:
+                if model.session.ui.is_gui:
+                    try:
+                        model.filereaders[-1]
+                        apply_seqcrow_preset(model)
+                    except (AttributeError, IndexError):
+                        # either the model doesn't have a filereaders attribute
+                        # or there are no associated filereaders
+                        pass
+            except AttributeError:
+                # model probably doesn't have a session
+                # this can happen when a command (i.e. morph) creates a model
+                # the model is created, the ADD_MODELS trigger fires, then
+                # the model gets added to the session
+                pass
 
     def add_filereader(self, trigger_name, models_and_filereaders):
         """add models with filereader data to our list"""

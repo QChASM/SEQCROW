@@ -1834,7 +1834,7 @@ class AaronToolsConfJob(LocalJob):
                 ]
                 bad_subs = geom.remove_clash(sub_list)
 
-        bad_confs = []
+        bad_confs = set()
         n_atoms = len(geom.atoms)
         for i, geom in enumerate(final_geoms):
             dist = distance.pdist(geom.coords, metric="sqeuclidean")
@@ -1844,11 +1844,11 @@ class AaronToolsConfJob(LocalJob):
                         continue
                     n = n_atoms * k + j - ((k + 2) * (k + 1)) // 2
                     if dist[n] < 1:
-                        bad_confs.append(i)
+                        bad_confs.add(i)
 
         if len(bad_confs):
             self.session.logger.info("removed %i conformers due to clashing" % len(bad_confs))
-        for i in bad_confs[::-1]:
+        for i in list(bad_confs)[::-1]:
             final_geoms.pop(i)
 
         self.n_confs = len(final_geoms)
