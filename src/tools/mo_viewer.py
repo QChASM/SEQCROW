@@ -816,6 +816,7 @@ class OrbitalViewer(ToolInstance):
             n_atoms=len(fr["atoms"]),
             n_jobs=threads,
         )
+        print(mem)
         if mem * 1e9 > (0.9 * available_memory()):
             are_you_sure = QMessageBox.warning(
                 self.mo_table,
@@ -837,7 +838,11 @@ class OrbitalViewer(ToolInstance):
             n_pts1, n_pts2, n_pts3, v1, v2, v3, com, sort=False
         )
         
+        import tracemalloc
+        tracemalloc.start()
         val = orbits.mo_value(mo, coords, alpha=alpha, n_jobs=threads)
+        print(tracemalloc.get_traced_memory())
+        tracemalloc.stop()
         val = np.reshape(val, (n_pts1, n_pts2, n_pts3))
 
         grid = OrbitalGrid(
