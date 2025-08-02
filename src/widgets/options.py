@@ -41,7 +41,6 @@ class IntegerOption(QSpinBox):
         suffix=None,
         default=None,
         tooltip=None,
-        mapping=None,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -56,14 +55,7 @@ class IntegerOption(QSpinBox):
             self.setPrefix(prefix)
         if suffix:
             self.setSuffix(suffix)
-        self.mapping = mapping
     
-    def value(self):
-        value = super().value()
-        if self.mapping:
-            return self.mapping(value)
-        return value
-
     def wheelEvent(self, event):
         pass
 
@@ -82,7 +74,6 @@ class DecimalOption(QDoubleSpinBox):
         suffix=None,
         default=None,
         tooltip=None, 
-        mapping=None,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -102,13 +93,6 @@ class DecimalOption(QDoubleSpinBox):
             self.setPrefix(prefix)
         if suffix:
             self.setSuffix(suffix)
-        self.mapping = mapping
-    
-    def value(self):
-        value = super().value()
-        if self.mapping:
-            return self.mapping(value)
-        return value
 
     def wheelEvent(self, event):
         # prevent scroll wheel from chaning things
@@ -129,9 +113,14 @@ class PercentOption(DecimalOption):
             minimum=0.0,
             maximum=100.0,
             suffix="%",
-            mapping=lambda x: x / 100,
             **kwargs,
         )
+    
+    def value(self):
+        return super().value() / 100
+    
+    def setValue(self, val):
+        super().setValue(val * 100)
 
 
 class BooleanOption(QCheckBox):
@@ -142,7 +131,6 @@ class BooleanOption(QCheckBox):
         *args,
         default=None,
         tooltip=None, 
-        mapping=None,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -151,12 +139,9 @@ class BooleanOption(QCheckBox):
             self.setChecked(default)
         if tooltip is not None:
             self.setToolTip(tooltip)
-        self.mapping = mapping
     
     def value(self):
         value = self.isChecked()
-        if self.mapping:
-            return self.mapping(value)
         return value
 
 
@@ -169,7 +154,6 @@ class Choices(QWidget):
         map_none_to_nonetype=True,
         default=None,
         tooltip=None,
-        mapping=None,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -213,7 +197,6 @@ class Choices(QWidget):
             # make sure widgets show if the first item
             # has widgets
             self._check_selected_choice(0)
-        self.mapping = mapping
     
     def _check_selected_choice(self, ndx):
         if not isinstance(self._options, dict):
@@ -229,13 +212,35 @@ class Choices(QWidget):
     def value(self):
         ndx = self._choices.currentIndex()
         value = self._ndx_map[ndx]
-        if isinstance(value, str):
-            if self.map_none_to_nonetype and value.lower() == "none":
+        if not isinstance(value, QWidget):
+            if (
+                isinstance(value, str) and
+                self.map_none_to_nonetype and
+                value.lower() == "none"
+            ):
                 return None
-            if self.mapping:
-                return self.mapping(value)
             return value
         value = value.value()
-        if self.mapping:
-            return self.mapping(value)
         return value
+
+    def setValue(self, val, val2=None):
+        
+        if val is None:
+            val = "none"
+        
+        ndx = self._choices.findText(
+            val, flags=Qt.MatchFixedString
+        )
+        if ndx > 0:
+            self._choices.setCurrentIndex(ndx)
+            option = self._ndx_map[ndx]
+            if isinstance(option, QWidget):
+                try:
+                    option.setValue(val2)
+                except Exception as e:
+                    pass
+        else:
+            # make sure widgets show if the first item
+            # has widgets
+            self._check_selected_choice(0)
+    

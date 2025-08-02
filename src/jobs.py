@@ -1764,7 +1764,7 @@ class AaronToolsConfJob(LocalJob):
                 "name": s.name,
                 "conf_angle": s.conf_angle,
                 "atoms": [ndx[a] for a in s]
-            } for s in self.geometry.substituents if s.conf_num > 1
+            } for s in self.geometry.substituents if s.conf_num and s.conf_num > 1
         ]
         confs = 1
         self.session.logger.info("update from %s:" % self.name)

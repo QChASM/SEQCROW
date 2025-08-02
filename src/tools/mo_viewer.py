@@ -97,6 +97,7 @@ class _OrbitalSettings(Settings):
         "n_radial": "20",
         "n_angular": "194",
         "vdw_radii": "UMN",
+        "one_atom_only": False,
     }
 
 
@@ -178,9 +179,19 @@ class OrbitalViewer(ToolInstance):
         self.spacing.setRange(0.05, 0.75)
         self.spacing.setDecimals(2)
         self.spacing.setValue(self.settings.spacing)
-        self.spacing.setSingleStep(0.05)
+        self.spacing.setSingleStep(0.01)
         self.spacing.setSuffix(" \u212B")
         options_layout.addRow("resolution:", self.spacing)
+
+        self.one_atom_only = QCheckBox()
+        self.one_atom_only.setCheckState(Qt.Checked if self.settings.one_atom_only else Qt.Unchecked)
+        self.one_atom_only.setToolTip(
+            "only draw orbitals around the atom with the largest MO coefficient\n" + \
+            "this is only valid when visualizing orbitals, not densities\n" + \
+            "this may be useful when visualizing highly localized orbitals at a high resolution"
+        )
+        options_layout.addRow("near atom with largest MO:", self.one_atom_only)
+
 
         color_options = QWidget()
         color_layout = QHBoxLayout(color_options)
@@ -670,7 +681,7 @@ class OrbitalViewer(ToolInstance):
     def open_link(self, doi):
         run(self.session, "open https://doi.org/%s" % doi)
 
-    def get_coords(self):
+    def get_coords(self, array=None):
         data = self.model_selector.currentData()
         if data is None:
             return
@@ -682,6 +693,7 @@ class OrbitalViewer(ToolInstance):
             ResidueCollection(fr["atoms"], refresh_connected=False, refresh_ranks=False),
             padding=padding,
             spacing=spacing,
+            array=array,
         )
 
     def show_orbit(self):
@@ -717,11 +729,40 @@ class OrbitalViewer(ToolInstance):
         self.settings.color2 = color2
         keep_open = self.keep_open.checkState() == Qt.Checked
         self.settings.keep_open = keep_open
+        one_atom_only = self.one_atom_only.checkState() == Qt.Checked
+        self.settings.one_atom_only = one_atom_only
         
-        cube = self.get_coords()
-        if cube is False:
-            return
-        n_pts1, n_pts2, n_pts3, v1, v2, v3, com, u = cube
+        if alpha:
+            arr = orbits.alpha_coefficients[mo]
+        else:
+            arr = orbits.beta_coefficients[mo]
+
+        if one_atom_only:
+            com = orbits.shell_coords[0]
+            max_coeff = None
+            ndx = 0
+            for i, coord in enumerate(orbits.shell_coords):
+                for val in arr[ndx:ndx + orbits.funcs_per_shell[i]]:
+                    if max_coeff is None or abs(val) > max_coeff[0]:
+                        max_coeff = (abs(val), coord)
+                ndx += orbits.funcs_per_shell[i]
+
+            com = max_coeff[1] - padding
+            n_pts = int(2 * padding // spacing) + 1
+            n_pts1 = n_pts
+            n_pts2 = n_pts
+            n_pts3 = n_pts
+            v1 = np.array([2 * padding / (n_pts - 1), 0, 0])
+            v2 = np.array([0, 2 * padding / (n_pts - 1), 0])
+            v3 = np.array([0, 0, 2 * padding / (n_pts - 1)])
+            u = np.eye(3)
+        
+        else:
+
+            cube = self.get_coords()
+            if cube is False:
+                return
+            n_pts1, n_pts2, n_pts3, v1, v2, v3, com, u = cube
 
         if keep_open:
             found = False
