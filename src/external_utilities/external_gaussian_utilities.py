@@ -471,7 +471,15 @@ class CubeGen(QWidget):
             self.exe_path.setText(filename)
 
     def open_set_infile_path(self):
-        filename, _ = QFileDialog.getOpenFileName(filter="Gaussian Formatted Checkpoint Files (*.fchk)")
+        dirname = None
+        current = self.infile_path.text()
+        current_dirname = os.path.dirname(current)
+        if current_dirname:
+            dirname = current_dirname
+        filename, _ = QFileDialog.getOpenFileName(
+            filter="Gaussian Formatted Checkpoint Files (*.fchk)",
+            directory=dirname
+        )
 
         if filename:
             self.infile_path.setText(filename)
@@ -483,7 +491,6 @@ class CubeGen(QWidget):
             self.outfile_path.setText(filename)
 
     def set_values(self, **kwargs):
-        print("setting values", kwargs)
         try:
             exe_path = kwargs["exe_path"]
             self.exe_path.setText(exe_path)
@@ -521,10 +528,7 @@ class CubeGen(QWidget):
         out["outfile_path"] = self.outfile_path.text()
         out["grid_points"] = self.grid_points.value()
         out["memory"] = self.memory.value()
-        
-        print("got values")
-        print(out)
-        
+
         return out
 
 
@@ -663,7 +667,15 @@ class FormCHK(QWidget):
             self.exe_path.setText(filename)
 
     def open_set_infile_path(self):
-        filename, _ = QFileDialog.getOpenFileName(filter="Gaussian Checkpoint Files (*.fchk)")
+        dirname = None
+        current = self.infile_path.text()
+        current_dirname = os.path.dirname(current)
+        if current_dirname:
+            dirname = current_dirname
+        filename, _ = QFileDialog.getOpenFileName(
+            filter="Gaussian Checkpoint Files (*.fchk)",
+            directory=dirname
+        )
 
         if filename:
             self.infile_path.setText(filename)
@@ -675,7 +687,6 @@ class FormCHK(QWidget):
             self.outfile_path.setText(filename)
 
     def set_values(self, **kwargs):
-        print("setting values", kwargs)
         try:
             exe_path = kwargs["exe_path"]
             self.exe_path.setText(exe_path)
@@ -700,7 +711,4 @@ class FormCHK(QWidget):
         out["infile_path"] = self.infile_path.text()
         out["outfile_path"] = self.outfile_path.text()
 
-        print("got values")
-        print(out)
-        
         return out

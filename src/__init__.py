@@ -1001,15 +1001,15 @@ class _SEQCROW_API(BundleAPI):
  
         elif mgr is session.external_quantum_utilities:
             if name == "orca_plot":
-                from .external_orca_utilities import ORCA_plot
+                from .external_utilities.external_orca_utilities import ORCA_plot
                 return ORCA_plot(session)
             
             if name == "cubegen":
-                from .external_gaussian_utilities import CubeGen
+                from .external_utilities.external_gaussian_utilities import CubeGen
                 return CubeGen(session)
              
             if name == "formchk":
-                from .external_gaussian_utilities import FormCHK
+                from .external_utilities.external_gaussian_utilities import FormCHK
                 return FormCHK(session)
  
         elif mgr is session.test_manager:

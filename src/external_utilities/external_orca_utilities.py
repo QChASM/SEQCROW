@@ -267,13 +267,13 @@ class ORCA_plot(QWidget):
         else:
             self.session.logger.warning("unknown plot type: %s" % kind)
 
-    def run_sequence(self, codes, dryrun=False):
+    def run_sequence(self, codes):
         """
         runs orca_plot with the specified codes and returns the stdout and stderr
         the sequence of codes should, at the end, exit orca_plot
         otherwise ChimeraX will hang
         """
-        print("this sequence:", codes)
+        self.session.logger.info("(debugging info) this sequence: " + str(codes))
         exe_path = self.exe_path.text()
         infile = self.infile_path.text()
         memory = self.memory.value()
@@ -296,9 +296,7 @@ class ORCA_plot(QWidget):
             )
             if are_you_sure != QMessageBox.Ok:
                 return "", ""
-        
-        if dryrun:
-            return
+
         def start():
             kwargs = {}
             if platform == "win32":
@@ -550,8 +548,6 @@ class ORCA_plot(QWidget):
             if reading_formats and "Enter Format:" in line:
                 reading_formats = False
 
-        for plot_type, code in self.plot_types.items():
-            print(plot_type, code)
         items = []
         for plot_type in _orbital_types + _density_types + _esp_types:
             if plot_type in self.plot_types:
@@ -580,7 +576,15 @@ class ORCA_plot(QWidget):
             self.exe_path.setText(filename)
 
     def open_set_infile_path(self):
-        filename, _ = QFileDialog.getOpenFileName(filter="ORCA orbital files (*.gbw)")
+        dirname = None
+        current = self.infile_path.text()
+        current_dirname = os.path.dirname(current)
+        if current_dirname:
+            dirname = current_dirname
+        filename, _ = QFileDialog.getOpenFileName(
+            filter="ORCA orbital files (*.gbw)",
+            directory=current_dirname
+        )
 
         if filename:
             self.infile_path.setText(filename)
@@ -597,7 +601,7 @@ class ORCA_plot(QWidget):
             self.infile_path.setText(infile_path)
         except KeyError:
             pass
-        
+
         try:
             grid_points = kwargs["x_grid_points"]
             self.x_grid_points.setValue(grid_points)

@@ -53,7 +53,6 @@ class ExternalUtilitiesInterface(ToolInstance):
         self.tool_window.manage(None)
     
     def change_utility(self, name):
-        print(name)
         if self.current_utility is not None:
             data = loads(self.settings.data)
             self.update_settings(self.previous_utility_name)
