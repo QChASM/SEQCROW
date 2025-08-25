@@ -57,7 +57,13 @@ from SEQCROW.tools.uvvis_plot import (
 )
     
 from SEQCROW.utils import iter2str
-from SEQCROW.widgets import FilereaderComboBox, FakeMenu, ScientificSpinBox, ElementButton
+from SEQCROW.widgets import (
+    FilereaderComboBox,
+    FakeMenu,
+    ScientificSpinBox,
+    ElementButton,
+    Choices,
+)
 
 
 rcParams["savefig.dpi"] = 300
@@ -84,6 +90,8 @@ class _NMRSpectrumSettings(Settings):
         'col_3': Value(150, IntArg), 
         "pulse_frequency": 90.0,
         "coupling_threshold": 0.1,
+        "point_spacing": 0.005,
+        "spacing_type": "nonlinear spacing",
 }
 
 
@@ -322,6 +330,20 @@ class NMRSpectrum(ToolInstance):
         self.coupling_threshold.setSingleStep(0.01)
         plot_settings_layout.addRow("coupling threshold:", self.coupling_threshold)
         
+        self.point_spacing = Choices(
+            options={
+                None: "nonlinear spacing",
+                ScientificSpinBox(
+                    minimum=1e-6,
+                    maximum=1,
+                    default=self.settings.point_spacing,
+                    suffix=" ppm",
+                ): "fixed spacing",
+            },
+            default=self.settings.spacing_type,
+        )
+        plot_settings_layout.addRow("point spacing:", self.point_spacing)
+        
         self.reverse_x = QCheckBox()
         self.reverse_x.setCheckState(Qt.Checked)
         plot_settings_layout.addRow("reverse x-axis:", self.reverse_x)
@@ -526,7 +548,6 @@ class NMRSpectrum(ToolInstance):
                     self.tree.setItemWidget(conf, 2, nrg_combobox)
                     trash_button.clicked.connect(lambda *args, combobox=nrg_combobox: combobox.deleteLater())
                     trash_button.clicked.connect(lambda *args, combobox=freq_combobox: combobox.deleteLater())
-
 
     def refresh_equivalent_nuclei(self):
         geoms = []
@@ -898,6 +919,7 @@ class NMRSpectrum(ToolInstance):
                 pulse_frequency=self.pulse_frequency.value(),
                 equivalent_nuclei=self.nulcei_widget.get_equivalent_nuclei(),
                 graph=self.nulcei_widget.get_graph(),
+                coupling_threshold=self.coupling_threshold.value(),
                 element=elements,
                 couple_with=couple_with,
             )
@@ -927,7 +949,7 @@ class NMRSpectrum(ToolInstance):
                 fwhm=fwhm,
                 show_functions=show_functions,
                 normalize=True,
-                point_spacing=0.001,
+                point_spacing=self.point_spacing.value(),
             )
 
             for i, (x, y) in enumerate(zip(x_values, y_values)):
@@ -1490,6 +1512,13 @@ class NMRSpectrum(ToolInstance):
         self.settings.voigt_mix = voigt_mixing
         coupling_threshold = self.coupling_threshold.value()
         self.settings.coupling_threshold = coupling_threshold
+        point_spacing = self.point_spacing.value()
+        if point_spacing is None:
+            self.settings.spacing_type = "nonlinear spacing"
+        else:
+            self.settings.point_spacing = point_spacing
+            self.settings.spacing_type = "fixed spacing"
+
         linear = self.linear.value()
         scalar = self.scalar.value()
 
@@ -1543,6 +1572,7 @@ class NMRSpectrum(ToolInstance):
             graph=graph,
             normalize=True,
             coupling_threshold=coupling_threshold,
+            point_spacing=point_spacing,
         )
 
         self.canvas.draw()

@@ -54,8 +54,13 @@ from SEQCROW.tools.uvvis_plot import (
 )
     
 from SEQCROW.utils import iter2str
-from SEQCROW.widgets import FilereaderComboBox, FakeMenu, ScientificSpinBox
-
+from SEQCROW.widgets import (
+    FilereaderComboBox,
+    FakeMenu,
+    ScientificSpinBox,
+    Choices,
+    DecimalOption,
+)
 
 rcParams["savefig.dpi"] = 300
 
@@ -80,6 +85,8 @@ class _IRSpectrumSettings(Settings):
         "weight_method": "QRRHO",
         'col_1': Value(150, IntArg), 
         'col_2': Value(150, IntArg), 
+        'point_spacing': 2,
+        'spacing_type': "nonlinear spacing",
 }
 
 
@@ -322,6 +329,20 @@ class IRSpectrum(ToolInstance):
         self.reverse_x = QCheckBox()
         self.reverse_x.setCheckState(Qt.Checked)
         plot_settings_layout.addRow("reverse x-axis:", self.reverse_x)
+        
+        self.point_spacing = Choices(
+            options={
+                None: "nonlinear spacing",
+                DecimalOption(
+                    minimum=0.1,
+                    maximum=100,
+                    default=self.settings.point_spacing,
+                    suffix="cm\u207b\u00b9",
+                ): "fixed spacing",
+            },
+            default=self.settings.spacing_type,
+        )
+        plot_settings_layout.addRow("point spacing:", self.point_spacing)
         
         tabs.addTab(plot_settings_widget, "plot settings")
         
@@ -757,6 +778,7 @@ class IRSpectrum(ToolInstance):
             voigt_mixing = self.voigt_mix.value()
             linear = self.linear.value()
             quadratic = self.quadratic.value()
+            point_spacing = self.point_spacing.value()
             intensity_attr = "intensity"
             if plot_type.lower() == "vcd":
                 intensity_attr = "rotation"
@@ -784,6 +806,7 @@ class IRSpectrum(ToolInstance):
                 fwhm=fwhm,
                 show_functions=show_functions,
                 normalize=False,
+                point_spacing=point_spacing,
             )
                 
             for i, (x, y) in enumerate(zip(x_values, y_values)):
@@ -1110,6 +1133,7 @@ class IRSpectrum(ToolInstance):
         final_mixed = Frequency.get_mixed_signals(
             mixed_freqs,
             weights=np.array(mol_fracs),
+            data_attr=data_attr,
         )
         
         if weights_only:
@@ -1170,6 +1194,12 @@ class IRSpectrum(ToolInstance):
         reverse_x = self.reverse_x.checkState() == Qt.Checked
         voigt_mixing = self.voigt_mix.value()
         self.settings.voigt_mix = voigt_mixing
+        point_spacing = self.point_spacing.value()
+        if point_spacing is None:
+            self.settings.spacing_type = "nonlinear spacing"
+        else:
+            self.settings.spacing_type = "fixed spacing"
+            self.settings.point_spacing = point_spacing
         linear = self.linear.value()
         quadratic = self.quadratic.value()
 
@@ -1197,6 +1227,7 @@ class IRSpectrum(ToolInstance):
             linear_scale=linear,
             quadratic_scale=quadratic,
             show_functions=show_components,
+            point_spacing=point_spacing,
         )
         
         # if any(v.frequency < 0 for v in mixed_spectra.data):
@@ -1270,7 +1301,7 @@ class IRSpectrum(ToolInstance):
             label += "\n%.2f cm$^{-1}$" % frequency
             if c1 or c2:
                 label += "\n$\Delta_{corr}$ = %.2f cm$^{-1}$" % (frequency - item.frequency)
-            if item.symmetry and item.symmetry != "A":
+            if hasattr(item, "symmetry") and item.symmetry and item.symmetry != "A":
                 text = item.symmetry
                 if re.search("\d", text):
                     text = re.sub(r"(\d+)", r"$_{\1", text)

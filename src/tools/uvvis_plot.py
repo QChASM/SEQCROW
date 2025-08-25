@@ -40,7 +40,13 @@ from Qt.QtWidgets import (
 
 from SEQCROW.tools.per_frame_plot import NavigationToolbar
 from SEQCROW.utils import iter2str
-from SEQCROW.widgets import FilereaderComboBox, FakeMenu
+from SEQCROW.widgets import (
+    FilereaderComboBox,
+    FakeMenu,
+    ScientificSpinBox,
+    Choices,
+)
+
 
 
 rcParams["savefig.dpi"] = 300
@@ -129,6 +135,8 @@ class _UVVisSpectrumSettings(Settings):
         'col_2': Value(150, IntArg), 
         'col_3': Value(150, IntArg), 
         'x_units': "nm",
+        "point_spacing": 0.1,
+        "spacing_type": "nonlinear spacing",
 }
 
 
@@ -381,6 +389,21 @@ class UVVisSpectrum(ToolInstance):
         self.x_units.setCurrentIndex(ndx)
         plot_settings_layout.addRow("x-axis units:", self.x_units)
         
+        spacing = ScientificSpinBox(
+            minimum=1e-6,
+            maximum=10,
+            default=self.settings.point_spacing,
+            suffix=" eV",
+        )
+        self.point_spacing = Choices(
+            options={
+                None: "nonlinear spacing",
+                spacing: "fixed spacing",
+            },
+            default=self.settings.spacing_type,
+        )
+        plot_settings_layout.addRow("point spacing:", self.point_spacing)
+
         self.spectra_type = QComboBox()
         self.spectra_type.addItems(["regular", "transient", "SOC"])
         plot_settings_layout.addRow("data:", self.spectra_type)
@@ -767,8 +790,9 @@ class UVVisSpectrum(ToolInstance):
                 normalize=True,
                 show_functions=show_functions,
                 change_x_unit_func=change_x_unit_func,
+                point_spacing=self.point_spacing.value(),
             )
-                
+
             for i, (x, y) in enumerate(zip(x_values, y_values)):
                 s += "%f,%f" % (x, y)
                 for y_vals in other_y_list:
@@ -1153,6 +1177,12 @@ class UVVisSpectrum(ToolInstance):
         shift = self.shift.value()
         x_units = self.x_units.currentText()
         self.settings.x_units = x_units
+        point_spacing = self.point_spacing.value()
+        if point_spacing is None:
+            self.settings.spacing_type = "nonlinear spacing"
+        else:
+            self.settings.point_spacing = point_spacing
+            self.settings.spacing_type = "fixed spacing"
 
         centers = None
         widths = None
@@ -1178,6 +1208,7 @@ class UVVisSpectrum(ToolInstance):
             units=x_units,
             show_functions=show_components,
             normalize=True,
+            point_spacing=point_spacing,
         )
 
         self.canvas.draw()

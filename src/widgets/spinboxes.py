@@ -11,6 +11,47 @@ from Qt.QtWidgets import (
     QDoubleSpinBox,
 )
 
+
+def getMantissaCharacteristic(value, decimals=0):
+    try:
+        characteristic = 0 if value == 0 else int(np.log10(abs(value)))
+    except (ValueError, OverflowError):
+        characteristic = 0
+
+    # need to round now, otherwise we can get like
+    # 10.00e2 instead of 1.00e3
+    mantissa = value / (10 ** characteristic)
+    if decimals:
+        mantissa = round(mantissa, decimals + 1)
+    if abs(mantissa) < 1 and abs(mantissa) > 0:
+        mantissa *= 10
+        characteristic -= 1
+    
+    return mantissa, characteristic
+
+def validateScientific(text, ndx, minimum, maximum, prefix, suffix, decimals, hasFocus):
+    match = re.match(
+        "(?:%s)?(-?\d+(?:\.\d{0,%i})?(?:[Ee]-?\d+)?)(?:%s)?$" % (prefix, decimals, suffix),
+        text, re.MULTILINE\
+    )
+    if match:
+        val = float(match.group(1))
+        if val < minimum or val > maximum:
+            if hasFocus:
+                return (QValidator.Intermediate, text, ndx)
+            return (QValidator.Invalid, text, ndx)
+        return (QValidator.Acceptable, text, ndx)
+    
+    if re.match("-?\d+(?:\.(?:\d{,%i}?(?:[Ee]-?)?))?$" % decimals, text, re.MULTILINE) or not text:
+        return (QValidator.Intermediate, text, ndx)
+    if re.match("-?\d+(?:[Ee]-?)$", text, re.MULTILINE) or not text:
+        return (QValidator.Intermediate, text, ndx)
+    if re.match("-?\d+\.$", text, re.MULTILINE) or not text:
+        return (QValidator.Intermediate, text, ndx)
+    
+    return (QValidator.Invalid, text, ndx)
+    
+
 class FPSSpinBox(QSpinBox):
     """spinbox that makes sure the value goes evenly into 60"""
     def validate(self, text, pos):
@@ -67,40 +108,47 @@ class FPSSpinBox(QSpinBox):
 class ScientificValidator(QValidator):
     """validator for scientific notation"""
     
-    def __init__(self, minimum, maximum, decimals, parent=None):
+    def __init__(self, minimum, maximum, decimals, prefix, suffix, parent=None):
         super().__init__(parent)
         self._minimum = minimum
         self._maximum = maximum
         self._decimals = decimals
+        self._prefix = prefix if prefix else ""
+        self._suffix = suffix if suffix else ""
         self.setLocale(QLocale(QLocale.English, QLocale.UnitedStates))
     
     def validate(self, text, ndx):
-        if re.match("-?\d+(?:\.\d{0,%i})?(?:[Ee]-?\d+)?$" % self._decimals, text, re.MULTILINE):
-            val = float(text)
-            if val < self._minimum or val > self._maximum:
-                if self.parent().hasFocus():
-                    return (QValidator.Intermediate, text, ndx)
-                return (QValidator.Invalid, text, ndx)
-            return (QValidator.Acceptable, text, ndx)
-        
-        if re.match("-?\d+(?:\.(?:\d{,%i}?(?:[Ee]-?)?))?$" % self._decimals, text, re.MULTILINE) or not text:
-            return (QValidator.Intermediate, text, ndx)
-        if re.match("-?\d+(?:[Ee]-?)$", text, re.MULTILINE) or not text:
-            return (QValidator.Intermediate, text, ndx)
-        if re.match("-?\d+\.$", text, re.MULTILINE) or not text:
-            return (QValidator.Intermediate, text, ndx)
-        
-        return (QValidator.Invalid, text, ndx)
-    
+        return validateScientific(
+            text, ndx,
+            self._minimum, self._maximum,
+            self._prefix, self._suffix,
+            self._decimals,
+            self.parent().hasFocus(),
+        )
+
     def fixup(self, text):
         if not text:
             return 0
-        val = float(text)
+        number = text
+        prefix = self._prefix if self._prefix else ""
+        suffix = self._suffix if self._suffix else ""
+        if prefix:
+            number = number.removeprefix(prefix)
+        if suffix:
+            number = number.removesuffix(suffix)
+
+        val = float(number)
         if val < self._minimum:
-            return str(self._minimum)
-        if val > self._maximum:
-            return str(self._maximum)
-        return text
+            val = self._minimum
+        elif val > self._maximum:
+            val = self._maximum
+        
+        mant, char = getMantissaCharacteristic(val, decimals=self._decimals)
+        
+        fmt = "%%.%ife%%i" % self._decimals
+        
+        return prefix + (fmt % (mant, char)) + suffix
+
 
 class ScientificSpinBox(QDoubleSpinBox):
     """spinbox for floating point values in scientific notation"""
@@ -160,7 +208,14 @@ class ScientificSpinBox(QDoubleSpinBox):
         if suffix:
             self.setSuffix(suffix)
     
-        self._validator = ScientificValidator(minimum, maximum, decimals, self.lineEdit())
+        self._validator = ScientificValidator(
+            minimum,
+            maximum,
+            decimals,
+            self.prefix(),
+            self.suffix(),
+            self.lineEdit(),
+        )
         self.lineEdit().setValidator(self._validator)
         self.setDecimals(decimals)
 
@@ -185,6 +240,10 @@ class ScientificSpinBox(QDoubleSpinBox):
         return self._maximum
 
     def valueFromText(self, text):
+        if self.prefix():
+            text = text.removeprefix(self.prefix())
+        if self.suffix():
+            text = text.removesuffix(self.suffix())
         return float(text)
     
     def textFromValue(self, value):
@@ -204,27 +263,13 @@ class ScientificSpinBox(QDoubleSpinBox):
         return out
     
     def validate(self, text, ndx):
-        if re.match("-?\d+(?:\.\d{0,%i})?(?:[Ee]-?\d+)?$" % self.decimals(), text, re.MULTILINE):
-            val = float(text)
-            if val < self.minimum() or val > self.maximum():
-                return (QValidator.Invalid, text, ndx)
-    
-            if self.maxAbsoluteCharacteristic:
-                mant, char = self.getMantissaCharacteristic(val)
-                if abs(char) > self.maxAbsoluteCharacteristic:
-                    return (QValidator.Invalid, text, ndx)
-            
-            return (QValidator.Acceptable, text, ndx)
-        
-        if self.lineEdit().hasFocus():        
-            if re.match("-?\d+(?:\.(?:\d{,%i}?(?:[Ee]-?)?))?$" % self.decimals(), text, re.MULTILINE) or not text:
-                return (QValidator.Intermediate, text, ndx)
-            if re.match("-?\d+(?:[Ee]-?)$", text, re.MULTILINE) or not text:
-                return (QValidator.Intermediate, text, ndx)
-            if re.match("-?\d+\.$", text, re.MULTILINE) or not text:
-                return (QValidator.Intermediate, text, ndx)
-
-        return (QValidator.Invalid, text, ndx)
+        return validateScientific(
+            text, ndx,
+            self.minimum(), self.maximum(), 
+            self.prefix(), self.suffix(),
+            self.decimals(),
+            self.lineEdit().hasFocus(),
+        )
     
     def fixup(self, value):
         return
@@ -240,20 +285,7 @@ class ScientificSpinBox(QDoubleSpinBox):
     def getMantissaCharacteristic(self, value=None):
         if value is None:
             value = self._unmappedValue()
-        try:
-            characteristic = 0 if value == 0 else int(np.log10(abs(value)))
-        except (ValueError, OverflowError):
-            characteristic = 0
-
-        # need to round now, otherwise we can get like
-        # 10.00e2 instead of 1.00e3
-        mantissa = value / (10 ** characteristic)
-        mantissa = round(mantissa, self.decimals() + 1)
-        if abs(mantissa) < 1 and abs(mantissa) > 0:
-            mantissa *= 10
-            characteristic -= 1
-        
-        return mantissa, characteristic
+        return getMantissaCharacteristic(value, decimals=self.decimals())
     
     def stepUp(self):
         value = self._unmappedValue()
