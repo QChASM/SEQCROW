@@ -17,7 +17,7 @@ from matplotlib import rcParams
 import matplotlib.patheffects as pe
 
 from Qt.QtCore import Qt, QSize
-from Qt.QtGui import QIcon, QPixmap
+from Qt.QtGui import QIcon, QPixmap, QAction
 from Qt.QtWidgets import (
     QSpinBox,
     QDoubleSpinBox,
@@ -148,7 +148,7 @@ class UVVisSpectrum(ToolInstance):
     def __init__(self, session, name):
         super().__init__(session, name)
         
-        self.tool_window = MainToolWindow(self)        
+        self.tool_window = MainToolWindow(self)      
 
         self.settings = _UVVisSpectrumSettings(session, "UV-Vis Spectrum")
 
@@ -166,6 +166,8 @@ class UVVisSpectrum(ToolInstance):
         self.exp_data = None
         
         self._build_ui()
+        
+        self.tool_window.fill_context_menu = self.fill_context_menu
 
     def _build_ui(self):
         layout = QGridLayout()
@@ -1409,4 +1411,9 @@ class UVVisSpectrum(ToolInstance):
 
         super().delete()
 
-
+    def fill_context_menu(self, menu, x, y):
+        fixed_size = QAction("fixed size", menu, checkable=True)
+        fixed_size.setChecked(self.fixed_size.isChecked())
+        fixed_size.triggered.connect(lambda checked: self.fixed_size.setChecked(checked))
+        fixed_size.triggered.connect(lambda checked: self.tool_window.shrink_to_fit())
+        menu.addAction(fixed_size)

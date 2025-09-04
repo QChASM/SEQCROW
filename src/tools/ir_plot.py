@@ -21,7 +21,7 @@ from matplotlib import rcParams
 import matplotlib.patheffects as pe
 
 from Qt.QtCore import Qt, QSize
-from Qt.QtGui import QIcon
+from Qt.QtGui import QIcon, QAction
 from Qt.QtWidgets import (
     QSpinBox,
     QDoubleSpinBox,
@@ -119,6 +119,8 @@ class IRSpectrum(ToolInstance):
         self.exp_data = None
         
         self._build_ui()
+        
+        self.tool_window.fill_context_menu = self.fill_context_menu
 
     def _build_ui(self):
         layout = QGridLayout()
@@ -1439,6 +1441,12 @@ class IRSpectrum(ToolInstance):
 
         super().delete()
 
+    def fill_context_menu(self, menu, x, y):
+        fixed_size = QAction("fixed size", menu, checkable=True)
+        fixed_size.setChecked(self.fixed_size.isChecked())
+        fixed_size.triggered.connect(lambda checked: self.fixed_size.setChecked(checked))
+        fixed_size.triggered.connect(lambda checked: self.tool_window.shrink_to_fit())
+        menu.addAction(fixed_size)
 
 class SaveScales(ChildToolWindow):
     def __init__(self, tool_instance, title, *args, c1=0.0, c2=0.0, **kwargs):

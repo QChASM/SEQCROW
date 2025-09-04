@@ -1787,11 +1787,19 @@ class AaronToolsConfJob(LocalJob):
                 mod_array[i] *= conformers[j]
         
         final_geoms = []
-        for geom in starting_confs:
+        n_atoms = len(self.geometry.atoms)
+        bad_confs = 0
+        for ring_num, geom in enumerate(starting_confs):
             prev_conf = 0
             prev_rots = [0 for s in substituents]
             rots = [0 for s in substituents]
             for conf in range(0, int(np.prod(conformers))):
+                if confs > 100 and (conf % (10 ** (int(np.log10(confs) - 1)))) == 0:
+                    self.session.logger.info(
+                        "generating conformer %i for ring conformer %i" % (
+                            conf + 1, ring_num + 1,
+                        )
+                    )
                 conf_string = ""
                 for i, sub in enumerate(substituents):
                     rot = int(conf / mod_array[i]) % conformers[i]
@@ -1817,39 +1825,42 @@ class AaronToolsConfJob(LocalJob):
                 prev_rots = rots
                 prev_conf = conf
                 conf_string = conf_string[:-1]
+
+                if self.theory.kwargs["relax"]:
+                    sub_list = [
+                        Substituent(
+                            [geom.atoms[i] for i in sub["atoms"]],
+                            detect=False,
+                            end=geom.atoms[sub["end"]],
+                        ) for sub in substituents
+                    ]
+                    bad_subs = geom.remove_clash(sub_list)
+
+                dist = distance.pdist(geom.coords, metric="sqeuclidean")
+                bad_conf = False
+                for j, a1 in enumerate(geom.atoms):
+                    for k, a2 in enumerate(geom.atoms[:j]):
+                        if a2 in a1.connected:
+                            continue
+                        n = n_atoms * k + j - ((k + 2) * (k + 1)) // 2
+                        if dist[n] < 1.5:
+                            bad_conf = True
+                            bad_confs += 1
+                            break
+                    
+                    if bad_conf:
+                        break
                 
+                if bad_conf:
+                    continue
+
                 this_geom = geom.copy(copy_atoms=True)
                 this_geom.name = conf_string
                 this_geom.comment = conf_string
                 final_geoms.append(this_geom)
 
-        if self.theory.kwargs["relax"]:
-            for geom in final_geoms:
-                sub_list = [
-                    Substituent(
-                        [geom.atoms[i] for i in sub["atoms"]],
-                        detect=False,
-                        end=geom.atoms[sub["end"]],
-                    ) for sub in substituents
-                ]
-                bad_subs = geom.remove_clash(sub_list)
-
-        bad_confs = set()
-        n_atoms = len(geom.atoms)
-        for i, geom in enumerate(final_geoms):
-            dist = distance.pdist(geom.coords, metric="sqeuclidean")
-            for j, a1 in enumerate(geom.atoms):
-                for k, a2 in enumerate(geom.atoms[:j]):
-                    if a2 in a1.connected:
-                        continue
-                    n = n_atoms * k + j - ((k + 2) * (k + 1)) // 2
-                    if dist[n] < 1:
-                        bad_confs.add(i)
-
-        if len(bad_confs):
-            self.session.logger.info("removed %i conformers due to clashing" % len(bad_confs))
-        for i in list(bad_confs)[::-1]:
-            final_geoms.pop(i)
+        if bad_confs:
+            self.session.logger.info("removed %i conformers due to clashing" % bad_confs)
 
         self.n_confs = len(final_geoms)
 
