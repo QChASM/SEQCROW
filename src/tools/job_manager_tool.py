@@ -50,6 +50,7 @@ def job_order(job, session):
 
     return 5
 
+
 class JobQueue(ToolInstance):
     SESSION_ENDURING = False
     SESSION_SAVE = False
@@ -455,7 +456,23 @@ class JobQueue(ToolInstance):
         for ndx in ndxs:
             job = jobs[ndx]
             if hasattr(job, "output_name"):
-                self.tool_window.create_child_window("%s log" % job.name, window_class=JobOutput, file=job.output_name)        
+                if job.output_name is None:
+                    self.session.logger.info("no output for %s" % job.name)
+                    continue
+                if isinstance(job.output_name, list) or isinstance(job.output_name, tuple):
+                    for name in job.output_name:
+                        self.tool_window.create_child_window(
+                            "%s log" % job.name,
+                            window_class=JobOutput,
+                            file=name,
+                        )        
+
+                else:
+                    self.tool_window.create_child_window(
+                        "%s log" % job.name,
+                        window_class=JobOutput,
+                        file=job.output_name,
+                    )        
 
     def kill_running(self):
         jobs = sorted(self.session.seqcrow_job_manager.jobs, key=lambda job, ses=self.session: job_order(job, ses))
@@ -552,9 +569,20 @@ class JobOutput(ChildToolWindow):
         super().__init__(tool_instance, title, statusbar=False, **kwargs)
         
         self._build_ui()
-    
-        with open(file, "r") as f:
-            lines = f.readlines()
+
+        if isinstance(file, list):
+            lines = ""
+            for name in file:
+                lines += "=======" + name + "======="
+                lines += "\n"
+                with open(name, "r") as f:
+                    lines = f.readlines()
+                
+                lines += "\n\n"
+        
+        else:
+            with open(file, "r") as f:
+                lines = f.readlines()
             
         self.text.setText("".join(lines))
 
