@@ -638,7 +638,7 @@ class OrbitalViewer(ToolInstance):
                 occ = "_ " if use_alpha else " _"
                 if use_alpha and alpha_ndx < orbits.n_alpha:
                     occ = "\u21bf "
-                elif beta_ndx < orbits.n_beta:
+                elif not use_alpha and beta_ndx < orbits.n_beta:
                     occ = " \u21c2"
                 occupancy = OrbitalTableItem()
                 occupancy.setData(Qt.DisplayRole, occ)

@@ -74,7 +74,7 @@ class _SEQCROWSettings(Settings):
         ),
         'MAX_FCHK_ARRAY': 10000000,
         'QUEUE_TYPE': Value(
-            getenv('AARONLIB', 'None'),
+            getenv('QUEUE_TYPE', 'None'),
             EnumOf(QueueOptions.values),
         ),
     }
