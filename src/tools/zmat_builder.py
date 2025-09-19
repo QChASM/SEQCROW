@@ -418,16 +418,16 @@ class ZMatrixBuilder(ToolInstance):
             )
         return abs(current_angle - target_angle) < 1e-5, coord4
     
-    def place_substituent(self, atom, sub_name):
+    def place_substituent(self, atom, other_atom, sub_name):
         sub = Substituent(sub_name)
         ndx = {a: i for i, a in enumerate(sub.atoms)}
-        v1 = atom.coord - atom.neighbors[0].coord
+        v1 = atom.coord - other_atom.coord
         sub.align_to_bond(v1)
         sub.coords -= sub.atoms[0].coords
         sub.coords += atom.coord
         ele = atom.element.get_element(sub.atoms[0].element)
         atom.element = ele
-        
+
         new_atoms = [atom]
         for a in sub.atoms[1:]:
             name = self.get_atom_name(a.element, atom.residue)
@@ -517,7 +517,7 @@ class ZMatrixBuilder(ToolInstance):
         # to further refine the coordinates
         if len(sel) < 2:
             if placing_substituent:
-                self.place_substituent(atom, substituent)
+                self.place_substituent(atom, sel[-1], substituent)
             return
         
         valence_angle = np.deg2rad(self.valence_angle.value())
@@ -537,7 +537,7 @@ class ZMatrixBuilder(ToolInstance):
             np.isclose(valence_angle - np.pi, 0) and self.coord3.currentData() == "torsion"
         ):
             if placing_substituent:
-                self.place_substituent(atom, substituent)
+                self.place_substituent(atom, sel[-1], substituent)
             return
         
         # we do initially try to set the position
@@ -669,5 +669,5 @@ class ZMatrixBuilder(ToolInstance):
 
         atom.coord = new_coords[0]
         if placing_substituent:
-            self.place_substituent(atom, substituent)
+            self.place_substituent(atom, sel[-1], substituent)
 
