@@ -570,7 +570,7 @@ def save_xyz(session, path, **kwargs):
     """
     from chimerax.atomic import AtomicStructure
     
-    accepted_kwargs = ['comment', 'models', 'coordsets']
+    accepted_kwargs = ['comment', 'models', 'coordsets', 'append']
     unknown_kwargs = [kw for kw in kwargs if kw not in accepted_kwargs]
     if len(unknown_kwargs) > 0:
         raise RuntimeWarning("unrecognized keyword%s %s?" % ("s" if len(unknown_kwargs) > 1 else "", ", ".join(unknown_kwargs)))
@@ -607,8 +607,8 @@ def save_xyz(session, path, **kwargs):
     if len(models) < 1:
         raise RuntimeError('nothing to save')
         
-    for model in models:
-        with open(path, mode) as f:
+    with open(path, mode) as f:
+        for model in models:
             if coordsets:
                 for cs in model.coordset_ids:
                     f.write("%i\n%s\n" % (model.num_atoms, comment if comment else model.name))
