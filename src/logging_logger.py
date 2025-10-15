@@ -16,4 +16,5 @@ class LoggingLogger:
         self._msg += msg
     
     def flush(self):
-        self._session.logger.warning(self._msg)
+        if self._msg:
+            self._session.logger.warning(self._msg)

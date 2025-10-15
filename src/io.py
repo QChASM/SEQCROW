@@ -569,7 +569,8 @@ def save_xyz(session, path, **kwargs):
         comment - str
     """
     from chimerax.atomic import AtomicStructure
-    
+    from AaronTools.utils.utils import to_closing
+
     accepted_kwargs = ['comment', 'models', 'coordsets', 'append']
     unknown_kwargs = [kw for kw in kwargs if kw not in accepted_kwargs]
     if len(unknown_kwargs) > 0:
@@ -607,8 +608,69 @@ def save_xyz(session, path, **kwargs):
     if len(models) < 1:
         raise RuntimeError('nothing to save')
         
-    with open(path, mode) as f:
-        for model in models:
+    substitutions = []
+    i = 0
+    escaped = False
+    while i < len(path):
+        if not escaped and path[i] == "{":
+            sub = to_closing(path[i:], "{", allow_escapes=True)
+            if sub:
+                i += len(sub)
+                substitutions.append(sub)
+        if path[i] == "\\":
+            escaped = True
+        else:
+            escaped = False
+        i += 1
+        
+    for model in models:
+        this_path = path
+
+        for sub in substitutions:
+            find = None
+            replace = None
+            attr = sub[1:-1]
+            # attributes cannot contain special characters, so this should be safe
+            if "/" in attr:
+                replace_pattern = re.search("(\S+)\/([^/]+)\/([^/]+)", attr)
+                if replace_pattern:
+                    attr = replace_pattern.group(1)
+                    find = replace_pattern.group(2)
+                    replace = replace_pattern.group(3)
+            try:
+                attr = sub[1:-1]
+                find = None
+                replace = None
+                if "/" in attr:
+                    match = re.search("([^/]*)\/([^/]*)\/([^/]*)", attr)
+                    if match:
+                        attr = match.group(1)
+                        find = match.group(2)
+                        replace = match.group(3)
+                    elif n == 1:
+                        self.tool_instance.session.logger.warning(
+                            "filename substitution pattern contains '/', but could not be interpreted as attr/find/replace"
+                        )
+                val = str(getattr(model, attr))
+                if find or replace:
+                    try:
+                        val = re.sub(find, replace, val)
+                    except re.error as e:
+                        # this error was renamed, but not all
+                        # versions of chimerax use the newer version of re
+                        self.tool_instance.session.logger.error(
+                            "failed to interpret regular expression substitution:\n" +
+                            e.msg + "\n" + e.pattern
+                        )
+                        return
+                this_path = this_path.replace(sub, val)
+            
+            except AttributeError:
+                self.tool_instance.session.logger.error(
+                    "Error while saving batch files: model %s has no attribute %s" % (model.name, sub)
+                )
+
+        with open(this_path, mode) as f:
             if coordsets:
                 for cs in model.coordset_ids:
                     f.write("%i\n%s\n" % (model.num_atoms, comment if comment else model.name))

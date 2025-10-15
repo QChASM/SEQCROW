@@ -748,6 +748,7 @@ class _SEQCROW_API(BundleAPI):
                             'models': ModelsArg,
                             'comment': StringArg,
                             'coordsets': BoolArg,
+                            'append': BoolArg,
                         }
 
                     def save_args_widget(self, session):
@@ -766,6 +767,9 @@ class _SEQCROW_API(BundleAPI):
                         
                         coordsets = QCheckBox()
                         layout.addRow("save all coordinates", coordsets)
+
+                        append = QCheckBox()
+                        layout.addRow("append coordinates to file", append)
                         
                         return widget
 
