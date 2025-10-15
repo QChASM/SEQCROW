@@ -35,7 +35,7 @@ from SEQCROW.widgets import FakeMenu, copy_icon
 import numpy as np
 
 
-nrg_infos = [
+nrg_infos = (
     "energy", 
     "ZPVE", 
     "enthalpy", 
@@ -64,9 +64,63 @@ nrg_infos = [
     "Induction sSAPT0",
     "Dispersion sSAPT0",
     "Total sSAPT0",
+    "Dimer Basis Electrostatics",
+    "Dimer Basis Elst10,r",
+    "Dimer Basis Exchange",
+    "Dimer Basis Exch10",
+    "Dimer Basis Exch10(S^2)",
+    "Dimer Basis Induction",
+    "Dimer Basis Ind20,r",
+    "Dimer Basis Exch-Ind20,r",
+    "Dimer Basis delta HF,r (2)",
+    "Dimer Basis Dispersion",
+    "Dimer Basis Disp20",
+    "Dimer Basis Exch-Disp20",
+    "Dimer Basis Disp20 (SS)",
+    "Dimer Basis Disp20 (OS)",
+    "Dimer Basis Exch-Disp20 (SS)",
+    "Dimer Basis Exch-Disp20 (OS)",
+    "Dimer Basis Total HF",
+    "Dimer Basis Total SAPT0",
+    "Dimer Basis Electrostatics sSAPT0",
+    "Dimer Basis Exchange sSAPT0",
+    "Dimer Basis Induction sSAPT0",
+    "Dimer Basis Dispersion sSAPT0",
+    "Monomer Basis Total sSAPT0",
+    "Monomer Basis Electrostatics",
+    "Monomer Basis Elst10,r",
+    "Monomer Basis Exchange",
+    "Monomer Basis Exch10",
+    "Monomer Basis Exch10(S^2)",
+    "Monomer Basis Induction",
+    "Monomer Basis Ind20,r",
+    "Monomer Basis Exch-Ind20,r",
+    "Monomer Basis delta HF,r (2)",
+    "Monomer Basis Dispersion",
+    "Monomer Basis Disp20",
+    "Monomer Basis Exch-Disp20",
+    "Monomer Basis Disp20 (SS)",
+    "Monomer Basis Disp20 (OS)",
+    "Monomer Basis Exch-Disp20 (SS)",
+    "Monomer Basis Exch-Disp20 (OS)",
+    "Monomer Basis Total HF",
+    "Monomer Basis Total SAPT0",
+    "Monomer Basis Electrostatics sSAPT0",
+    "Monomer Basis Exchange sSAPT0",
+    "Monomer Basis Induction sSAPT0",
+    "Monomer Basis Dispersion sSAPT0",
+    "Monomer Basis Total sSAPT0",
+    "Dimer Basis SAPT Ind20,r (A<-B)",
+    "Dimer Basis SAPT Ind20,r (B<-A)",
+    "Dimer Basis SAPT Exch-Ind20,r (A<-B)",
+    "Dimer Basis SAPT Exch-Ind20,r (B<-A)",
+    "Monomer Basis SAPT Ind20,r (A<-B)",
+    "Monomer Basis SAPT Ind20,r (B<-A)",
+    "Monomer Basis SAPT Exch-Ind20,r (A<-B)",
+    "Monomer Basis SAPT Exch-Ind20,r (B<-A)",
     "Alpha Orbital Energies",
     "Beta Orbital Energies",
-]
+)
     
 pg_infos = [
     "full_point_group",
@@ -286,7 +340,7 @@ class Info(ToolInstance):
                     continue
                 s += delim.join(
                     [
-                        item.text().replace("<sub>", "").replace("</sub>", "") for item in [
+                        item.text().replace("<sub>", "").replace("</sub>", "").replace("&larr;", "<-") for item in [
                             self.table.item(i, j) if self.table.item(i, j) is not None 
                             else self.table.cellWidget(i, j) for j in range(0, 2)
                         ]
@@ -402,6 +456,8 @@ class Info(ToolInstance):
                         info_name += " (E<sub>h</sub>)"
                     else:
                         info_name += " (%s)" % self.settings.energy
+                    if "<-" in info_name:
+                        info_name = info_name.replace("<-", "&larr;")
                     info_name = info_name.replace("orrelation", "orr.")
                     info_name = info_name.replace("Same-spin", "SS")
                     info_name = info_name.replace("Opposite-spin", "OS")

@@ -110,13 +110,17 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
         session.logger.error(repr(e))
         return [], "SEQCROW failed to open %s" % file_name
 
-    structure = geom.get_chimera(
-        session,
-        coordsets=bool(fr.all_geom),
-        filereader=fr,
-        apply_preset=False,
-        
-    )
+    for frame in fr.all_geom:
+        if len(frame["atoms"]) != len(fr["atoms"]):
+            return split_open(session, file_name, format_name, fr)
+    else:
+        structure = geom.get_chimera(
+            session,
+            coordsets=bool(fr.all_geom),
+            filereader=fr,
+            apply_preset=False,
+            
+        )
 
     if fr.all_geom and "energy" in fr.other and coordsets is not False:
         try:
@@ -166,6 +170,54 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
 
     return [structure], status
 
+
+def split_open(session, file_name, format_name, filereader):
+    from AaronTools.utils.utils import get_filename
+    from SEQCROW.residue_collection import ResidueCollection
+
+    structures = []
+    for frame in filereader.all_geom:
+        geom = ResidueCollection(frame["atoms"], refresh_ranks=False).copy(
+            comment=None, copy_atoms=True,
+        )
+        structure = geom.get_chimera(
+            session,
+            coordsets=False,
+            filereader=frame["data"],
+            apply_preset=False,
+            
+        )
+        structures.append(structure)
+
+    if format_name == "Gaussian input file":
+        a_or_an = "a"
+    elif format_name == "Gaussian output file":
+        a_or_an = "a"    
+    elif format_name == "ORCA output file":
+        a_or_an = "an"
+    elif format_name == "Psi4 output file":
+        a_or_an = "a"
+    elif format_name == "XYZ file":
+        a_or_an = "an"
+    elif format_name == "FCHK file":
+        a_or_an = "an"
+    elif format_name == "sqm output file":
+        a_or_an = "an"
+    elif format_name == "Q-Chem output file":
+        a_or_an = "a"
+
+    status = "Opened  %s as %s %s multi-structure file" % (file_name, a_or_an, format_name)
+
+    for structure in structures:
+        name = get_filename(file_name, include_parent_dir=False)
+        structure.name = name
+        structure.filereaders[-1]["name"] = name
+        structure.filename = file_name
+
+    # profile.disable()
+    # profile.print_stats()
+
+    return structures, status
 
 def get_structure(session, elements, coordinates, name, comment, bonded_threshold=0.3):
     from chimerax.atomic import AtomicStructure, Element, Atoms
