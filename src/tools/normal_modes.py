@@ -755,6 +755,22 @@ class NormalModes(ToolInstance):
         for atom, coord in zip(model.atoms, geom.coords):
             atom.coord = coord
     
+    def finite_displacement(self):
+        info = self.model_selector.currentData()
+        if not info:
+            self.session.logger.error("no model with frequency data loaded")
+            return
+        fr, model = info
+        modes = self.table.selectedItems()
+        if len([mode for mode in modes if mode.column() == 0]) != 1:
+            raise RuntimeError("one mode must be selected")
+        else:
+            for m in modes:
+                if m.column() == 0:
+                    mode = m.data(Qt.UserRole)
+
+        vector = fr['frequency'].data[mode].vector
+
     def display_help(self):
         """Show the help for this tool in the help viewer."""
         from chimerax.core.commands import run
