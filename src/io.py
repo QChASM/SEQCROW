@@ -332,7 +332,7 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
             comment = stream.readline().strip()
             comments.append(comment)
             coords = np.zeros((n_atoms, 3))
-            coord_data = ""
+            coord_data = []
             eles = []
             for i in range(0, n_atoms):
                 line = stream.readline()
@@ -356,9 +356,9 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
                     error_msg += "\n expected element symbol/number and coordinates here"
                     raise RuntimeError(error_msg)
                 try:
-                    coord_data += "%s %s %s\n" % tuple(info[1].split()[:3])
+                    coord_data.append("%s %s %s\n" % tuple(info[1].split()[:3]))
                 except IndexError:
-                    coord_data += line
+                    coord_data.append(line)
                     error_msg = get_error_msg(
                         file_name,
                         ele_sets,
@@ -375,7 +375,7 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
                     raise RuntimeError(error_msg)
             line = stream.readline()
             coords = np.reshape(
-                np.fromstring(coord_data, count=3 * n_atoms, sep=" "),
+                np.fromstring("".join(coord_data), count=3 * n_atoms, sep=" "),
                 (n_atoms, 3),
             )
             all_coordsets.append(coords)
@@ -490,7 +490,7 @@ def get_error_msg(
     error_msg += "%i\n%s\n" % (n_atoms, comment)
     error_msg += "\n".join(
         ["%-2s   %s" % (ele, coord) for ele, coord in zip(
-            eles, coord_data.splitlines(),
+            eles, coord_data,
         )]
     )
     
