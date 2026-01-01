@@ -781,7 +781,11 @@ class NormalModes(ToolInstance):
         slider.play_cb()
 
     def stop_anim(self):
-        fr, model = self.model_selector.currentData()
+        info = self.model_selector.currentData()
+        if not info:
+            self.session.logger.error("no model with frequency data loaded")
+            return
+        fr, model = info
         for tool in self.session.tools.list():
             if isinstance(tool, CoordinateSetSlider):
                 if tool.structure is model:
@@ -792,17 +796,17 @@ class NormalModes(ToolInstance):
             atom.coord = coord
     
     def displace_structure(self):
-        fr, model = self.model_selector.currentData()
-        for tool in self.session.tools.list():
-            if isinstance(tool, CoordinateSetSlider):
-                if tool.structure is model:
-                    tool.delete()
-
         info = self.model_selector.currentData()
         if not info:
             self.session.logger.error("no model with frequency data loaded")
             return
         fr, model = info
+        
+        for tool in self.session.tools.list():
+            if isinstance(tool, CoordinateSetSlider):
+                if tool.structure is model:
+                    tool.delete()
+
         modes = self.table.selectedItems()
         if len([mode for mode in modes if mode.column() == 0]) != 1:
             raise RuntimeError("one mode must be selected")

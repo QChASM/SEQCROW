@@ -777,8 +777,9 @@ class _SEQCROW_API(BundleAPI):
                         from Qt.QtWidgets import QFormLayout
                         models = widget.layout().itemAt(0).widget().options_string()
                         coordsets = widget.layout().itemAt(1, QFormLayout.FieldRole).widget().isChecked()
+                        append = widget.layout().itemAt(2, QFormLayout.FieldRole).widget().isChecked()
                         
-                        return models + " coordsets %s" % str(coordsets)
+                        return models + " coordsets %s append %s" % (str(coordsets), str(append))
 
                 return Info()
 
