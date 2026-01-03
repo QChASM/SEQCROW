@@ -1090,4 +1090,8 @@ class ResidueCollection(Geometry):
                 for atom, spin in zip(struc.atoms, filereader.other["Nuclear spins"]):
                     atom.nuclearSpin = spin
 
+            for at_atom, atom in zip(filereader["atoms"], struc.atoms):
+                if hasattr(at_atom, "layer") and at_atom.layer:
+                    atom.oniomLayer = at_atom.layer
+
         return struc

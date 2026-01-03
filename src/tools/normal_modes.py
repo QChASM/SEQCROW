@@ -597,7 +597,7 @@ class NormalModes(ToolInstance):
     def _get_coord_change(self, geom, vector, scaling, fr):
         """determine displacement given scaling and vector"""
         max_norm = None
-        dX = vector
+        dX = np.array(vector)
         if len(dX) != geom.num_atoms:
             if "QM atoms" in fr:
                 new_dX = np.zeros((geom.num_atoms, 3))
@@ -817,7 +817,7 @@ class NormalModes(ToolInstance):
 
         scale = self.disp_scale.value()
         vector = fr['frequency'].data[mode].vector
-        max_disp = np.max(np.abs(vector))
+        max_disp = max(np.linalg.norm(vector, axis=1))
         vector = scale * vector / max_disp
         
         for atom, v in zip(model.atoms, vector):
