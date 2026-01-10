@@ -3220,13 +3220,13 @@ class MethodOption(QWidget):
 
                 self.oniom_widget.extra_widgets[i]["basis set"].clear()
                 previous_basis_names = getattr(settings, "last_%s_basis" % level)
-                previous_basis_elements = getattr(settings, "last_" % level)
+                previous_basis_elements = getattr(settings, "last_%s_basis_elements" % level)
                 previous_basis_aux = getattr(settings, "last_%s_basis_aux" % level)
                 previous_basis_builtin = getattr(settings, "last_%s_custom_basis_builtin" % level)
                 previous_basis_path = getattr(settings, "last_%s_basis_path" % level)
 
                 previous_ecp_names = getattr(settings, "last_%s_ecp" % level)
-                previous_ecp_elements = getattr(settings, "last_%s_basis_ecp" % level)
+                previous_ecp_elements = getattr(settings, "last_%s_ecp_elements" % level)
                 previous_ecp_builtin = getattr(settings, "last_%s_custom_ecp_builtin" % level)
                 previous_ecp_path = getattr(settings, "last_%s_ecp_path" % level)
                 
@@ -3441,7 +3441,7 @@ class MethodOption(QWidget):
         if self.allow_oniom:
             for layer in self.oniom_widget.extra_widgets:
                 layer["method"].setOptions(file_info)
-                layer["basis"].setOptions(file_info)
+                layer["basis set"].setOptions(file_info)
                 layer["additional options"].setOptions(file_info)
 
         self.method_option.addItem("other")
