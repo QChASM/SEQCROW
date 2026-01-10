@@ -736,12 +736,15 @@ class NormalModes(ToolInstance):
 
         pause_frames = (60 // anim_fps)
 
+        # run(self.session, "coordset %s loop 100000" % model.atomspec)
+
         slider =  CoordinateSetSlider(
             self.session,
             model,
             movie_framerate=anim_fps,
             pause_frames=pause_frames,
         )
+        self.session.ui.processEvents()
         slider.play_cb()
 
     def stop_anim(self):
@@ -1467,9 +1470,10 @@ class IRPlot(ChildToolWindow):
         highlights = []
         for ax in self.figure.get_axes():
             if self.highlighted_mode is not None:
-                for mode in self.highlighted_mode:
-                    if mode in ax.collections:
-                        ax.collections.remove(mode)
+                for i, mode in enumerate(ax.collections):
+                    if mode in self.highlighted_mode:
+                        ax.collections[i].remove()
+                        break
             
             if len(items) == 0:
                 continue

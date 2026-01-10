@@ -1368,7 +1368,25 @@ class IRSpectrum(ToolInstance):
         if not filename:
             return
 
-        data = np.loadtxt(filename, delimiter=",", skiprows=self.skip_lines.value())
+        try:
+            data = np.loadtxt(filename, delimiter=",", skiprows=self.skip_lines.value())
+        except ValueError as e:
+            from chimerax.core.errors import UserError
+            error_msg = "%s could not be parsed as a comma separated value file\n" % filename
+            csv_data = ""
+            with open(filename, "r") as f:
+                line = f.readline()
+                i = 0
+                while i < max(10, 5 + self.skip_lines.value()) and line.strip():
+                    csv_data += line
+                    line = f.readline()
+                    i += 1
+            if csv_data:
+                error_msg += "top of the selected file:\n"
+                error_msg += csv_data
+            else:
+                error_msg += "file seems to be empty\n"
+            raise UserError(error_msg)
 
         color = self.line_color.get_color()
         self.settings.exp_color = tuple([c / 255. for c in color[:-1]])

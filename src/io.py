@@ -327,8 +327,9 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
                 error_msg += "\nlast line read:\n"
                 error_msg += line
                 error_msg += "\n expected number of atoms here"
-                session.logger.error(error_msg)
-                return
+                from chimerax.core.errors import UserError
+                UserError(error_msg)
+                
             comment = stream.readline().strip()
             comments.append(comment)
             coords = np.zeros((n_atoms, 3))
