@@ -98,7 +98,59 @@ class _InputGeneratorSettings(Settings):
         'last_ecp_elements': Value([], ListOf(StringArg), iter2str),
         'last_ecp_path': Value("", StringArg),
         'last_number_ecp': Value(0, IntArg),
+        
+        'last_high_basis': Value(["def2-SVP"], ListOf(StringArg), iter2str),
+        'last_high_basis_aux': Value(["no"], ListOf(StringArg), iter2str),
+        'last_high_custom_basis_kw': Value([""], ListOf(StringArg), iter2str),
+        'last_high_custom_basis_builtin': Value([""], ListOf(StringArg), iter2str),
+        'last_high_basis_elements': Value([""], ListOf(StringArg), iter2str),
+        'last_high_basis_path': Value("", StringArg),
+        'last_high_number_basis': Value(1, IntArg),
+        
+        'last_high_ecp': Value([], ListOf(StringArg), iter2str),
+        'last_high_custom_ecp_kw': Value([], ListOf(StringArg), iter2str),
+        'last_high_custom_ecp_builtin': Value([], ListOf(StringArg), iter2str),
+        'last_high_ecp_elements': Value([], ListOf(StringArg), iter2str),
+        'last_high_ecp_path': Value("", StringArg),
+        'last_high_number_ecp': Value(0, IntArg),
+        
+        'last_medium_basis': Value(["def2-SVP"], ListOf(StringArg), iter2str),
+        'last_medium_basis_aux': Value(["no"], ListOf(StringArg), iter2str),
+        'last_medium_custom_basis_kw': Value([""], ListOf(StringArg), iter2str),
+        'last_medium_custom_basis_builtin': Value([""], ListOf(StringArg), iter2str),
+        'last_medium_basis_elements': Value([""], ListOf(StringArg), iter2str),
+        'last_medium_basis_path': Value("", StringArg),
+        'last_medium_number_basis': Value(1, IntArg),
+        
+        'last_medium_ecp': Value([], ListOf(StringArg), iter2str),
+        'last_medium_custom_ecp_kw': Value([], ListOf(StringArg), iter2str),
+        'last_medium_custom_ecp_builtin': Value([], ListOf(StringArg), iter2str),
+        'last_medium_ecp_elements': Value([], ListOf(StringArg), iter2str),
+        'last_medium_ecp_path': Value("", StringArg),
+        'last_medium_number_ecp': Value(0, IntArg),
+        
+        'last_low_basis': Value([], ListOf(StringArg), iter2str),
+        'last_low_basis_aux': Value([], ListOf(StringArg), iter2str),
+        'last_low_custom_basis_kw': Value([], ListOf(StringArg), iter2str),
+        'last_low_custom_basis_builtin': Value([], ListOf(StringArg), iter2str),
+        'last_low_basis_elements': Value([], ListOf(StringArg), iter2str),
+        'last_low_basis_path': Value("", StringArg),
+        'last_low_number_basis': Value(0, IntArg),
+        
+        'last_low_ecp': Value([], ListOf(StringArg), iter2str),
+        'last_low_custom_ecp_kw': Value([], ListOf(StringArg), iter2str),
+        'last_low_custom_ecp_builtin': Value([], ListOf(StringArg), iter2str),
+        'last_low_ecp_elements': Value([], ListOf(StringArg), iter2str),
+        'last_low_ecp_path': Value("", StringArg),
+        'last_low_number_ecp': Value(0, IntArg),
+
         'previous_method': Value("B3LYP", StringArg),
+        'previous_high_method': Value("B3LYP", StringArg),
+        'previous_high_custom_func': Value("", StringArg),
+        'previous_medium_method': Value("PM6", StringArg),
+        'previous_medium_custom_func': Value("", StringArg),
+        'previous_low_method': Value("Amber", StringArg),
+        'previous_low_custom_func': Value("Amber=ReadOnly", StringArg),
         'previous_custom_func': Value("", StringArg),
         'previous_functional_names': Value([], ListOf(StringArg), iter2str),
         'previous_functional_needs_basis': Value([], ListOf(BoolArg), iter2str),
@@ -1072,6 +1124,7 @@ class BuildQM(ToolInstance):
 
         self.job_widget.setStructure(model)
         self.method_widget.sapt_layers.setStructure(model)
+        self.method_widget.oniom_widget.setStructure(model)
         self.check_elements()
 
         try:
@@ -2810,12 +2863,47 @@ class JobTypeOption(QWidget):
 class LayerWidget(QWidget):
     something_changed = Signal()
 
-    def __init__(self, settings, session, tab_text, parent=None):
+    def __init__(
+        self,
+        settings,
+        session,
+        tab_text,
+        parent=None,
+        create_tabs=1,
+        max_multiplicity=3,
+        allow_new_tabs=True,
+        extra_widgets=None,
+        display_atom_attributes=None,
+    ):
+        """
+        settings - settings
+        session - ChimeraX session
+        tab_text - descriptive text that will be placed on each tab (e.g. monomer N)
+        create_tabs - how many layer tabs to spawn when creating the widget
+        allow_new_tabs - whether the user will be able to create new tabs
+        max_multiplicity - highest multiplicity allowed
+        extra_widgets - dictionary defining other widgets to create and display on each tab
+            dictionary keys are names (str)
+            values are tuples
+                first item in the tuple is the widget class
+                second item is arguments used to create the widget instance
+                third item is the keyword dictionary used to create the widget instance
+        """
+        
         super().__init__(parent)
 
         self._session = session
         self.structure = None
         self.tab_text = tab_text
+        self.allow_new_tabs = allow_new_tabs
+        self.max_multiplicity = max_multiplicity
+        # data to create extra widgets
+        self._extra_widgets = extra_widgets
+        # actual extra widgets
+        self.extra_widgets = []
+        self.display_atom_attributes = display_atom_attributes
+        if display_atom_attributes is None:
+            self.display_atom_attributes = []
 
         self.layers = []
 
@@ -2826,29 +2914,36 @@ class LayerWidget(QWidget):
         self.tabs.setTabsClosable(True)
         self.tabs.tabCloseRequested.connect(self.tab_close_clicked)
         self.tabs.tabCloseRequested.connect(lambda *args: self.something_changed.emit())
-        layout.addWidget(self.tabs, 0, 0, 2, 1, Qt.AlignTop)
+        layout.addWidget(self.tabs, 0, 0, 1, 1, Qt.AlignTop)
 
         set_layer_button = QPushButton("current %s selected" % tab_text)
         set_layer_button.clicked.connect(self.set_layer)
-        layout.addWidget(set_layer_button, 0, 1, 1, 1, Qt.AlignBottom)
+        layout.addWidget(set_layer_button, 1, 0, 1, 1 if allow_new_tabs else 2, Qt.AlignBottom)
 
-        add_layer_button = QPushButton("new %s" % tab_text)
-        add_layer_button.clicked.connect(self.add_tab)
-        layout.addWidget(add_layer_button, 1, 1, 1, 1, Qt.AlignTop)
-
-        layout.setColumnStretch(0, 1)
-        layout.setColumnStretch(1, 0)
+        if allow_new_tabs:
+            add_layer_button = QPushButton("new %s" % tab_text)
+            add_layer_button.clicked.connect(self.add_tab)
+            layout.addWidget(add_layer_button, 1, 1, 1, 1, Qt.AlignTop)
 
         layout.setRowStretch(0, 1)
-        layout.setRowStretch(1, 1)
+        layout.setRowStretch(1, 0)
 
         self.set_layer()
+        
+        while self.tabs.count() < create_tabs:
+            self.add_tab()
+        
+        self.tabs.setCurrentIndex(0)
 
     def setStructure(self, structure):
         self.structure = structure
-        self.tabs.clear()
-        self.add_tab()
-        self.set_layer(use_atoms=structure.atoms)
+        if self.allow_new_tabs:
+            self.tabs.clear()
+            self.add_tab()
+            self.set_layer(use_atoms=structure.atoms)
+        else:
+            self.tabs.setCurrentIndex(0)
+            self.set_layer(use_atoms=structure.atoms)
 
     def set_layer(self, *args, use_atoms=False):
         cur_ndx = self.tabs.currentIndex()
@@ -2856,40 +2951,67 @@ class LayerWidget(QWidget):
             self.add_tab()
             return
 
-        table = self.tabs.widget(cur_ndx).table
+        table = self.layers[cur_ndx]["table"]
+
         table.setRowCount(0)
-        self.layers[cur_ndx] = []
+        self.layers[cur_ndx]["atoms"] = []
 
         if use_atoms:
             atoms = use_atoms
         else:
             atoms = selected_atoms(self._session)
 
+        print(cur_ndx, table, atoms)
+        print(self.layers)
+
         for atom in atoms:
-            if atom.structure is self.structure:
-                for i, layer in enumerate(self.layers):
-                    if i == cur_ndx:
-                        continue
+            print("checking atom", atom.atomspec)
+            if not atom.structure is self.structure:
+                print("wrong structure")
+                continue
+                
+            for i, layer in enumerate(self.layers):
+                if i == cur_ndx:
+                    continue
 
-                    other_layer_table = self.tabs.widget(i)
-                    if other_layer_table is None:
-                        continue
-                    else:
-                        other_layer_table = other_layer_table.table
-                    for atom2 in layer[::-1]:
-                        if atom is atom2:
-                            ndx = layer.index(atom)
-                            layer.pop(ndx)
-                            other_layer_table.removeRow(ndx)
+                print("making sure it's not in layer", i)
+                
+                other_layer_table = self.tabs.widget(i)
+                if other_layer_table is None:
+                    continue
+                else:
+                    other_layer_table = self.layers[i]["table"]
+                for atom2 in layer["atoms"][::-1]:
+                    if atom is atom2:
+                        ndx = layer["atoms"].index(atom)
+                        layer["atoms"].pop(ndx)
+                        other_layer_table.removeRow(ndx)
+                        self._session.logger.info(
+                            "removed atom %s from %s %i" % (atom.atomspec, self.tab_text, i + 1)
+                        )
 
-                row = table.rowCount()
-                table.insertRow(row)
+            print("adding table row")
+            row = table.rowCount()
+            table.insertRow(row)
 
-                atomspec = QTableWidgetItem()
-                atomspec.setData(Qt.DisplayRole, atom.atomspec)
-                table.setItem(row, 0, atomspec)
+            atomspec = QTableWidgetItem()
+            atomspec.setData(Qt.DisplayRole, atom.atomspec)
+            table.setItem(row, 0, atomspec)
+            for i, attr in enumerate(self.display_atom_attributes):
+                attr_widget = QTableWidgetItem()
+                val = getattr(atom, attr, "not set")
+                if isinstance(val, str):
+                    attr_widget.setData(Qt.DisplayRole, val)
+                elif isinstance(val, int):
+                    attr_widget.setData(Qt.DisplayRole, "%i" % val)
+                elif isinstance(val, float):
+                    attr_widget.setData(Qt.DisplayRole, "%7.3f" % val)
+                else:
+                    attr_widget.setData(Qt.DisplayRole, str(val))
+                table.setItem(row, i + 1, attr_widget)
+                
 
-                self.layers[cur_ndx].append(atom)\
+            self.layers[cur_ndx]["atoms"].append(atom)
 
         self.something_changed.emit()
 
@@ -2899,46 +3021,58 @@ class LayerWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         table = QTableWidget()
-        table.setColumnCount(1)
-        table.setHorizontalHeaderLabels(["atoms"])
+        table.setColumnCount(1 + len(self.display_atom_attributes))
+        table.setHorizontalHeaderLabels(["atoms", *self.display_atom_attributes])
         table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        layout.addWidget(table, 0, 0, 3, 1, Qt.AlignTop)
+        layout.addWidget(table, 1, 0, 1, 4, Qt.AlignTop)
 
         charge = QSpinBox()
         charge.setRange(-5, 5)
         charge.valueChanged.connect(lambda *args: self.something_changed.emit())
-        layout.addWidget(QLabel("charge:"), 0, 1, 1, 1, Qt.AlignLeft)
-        layout.addWidget(charge, 0, 2, 1, 1, Qt.AlignVCenter)
+        layout.addWidget(QLabel("charge:"), 0, 0, 1, 1, Qt.AlignRight)
+        layout.addWidget(charge, 0, 1, 1, 1, Qt.AlignVCenter | Qt.AlignLeft)
 
         multiplicity = QSpinBox()
-        multiplicity.setRange(1, 3)
+        multiplicity.setRange(1, self.max_multiplicity)
         multiplicity.valueChanged.connect(lambda *args: self.something_changed.emit())
-        layout.addWidget(QLabel("multiplicity:"), 1, 1, 1, 1, Qt.AlignLeft)
-        layout.addWidget(multiplicity, 1, 2, 1, 1, Qt.AlignTop)
-
-        layout.addWidget(QWidget(), 2, 1, 1, 1, Qt.AlignTop)
-
-        layout.setColumnStretch(0, 1)
-        layout.setColumnStretch(1, 0)
-        layout.setColumnStretch(2, 0)
+        layout.addWidget(QLabel("multiplicity:"), 0, 2, 1, 1, Qt.AlignRight)
+        layout.addWidget(multiplicity, 0, 3, 1, 1, Qt.AlignVCenter | Qt.AlignLeft)
 
         layout.setRowStretch(0, 0)
-        layout.setRowStretch(1, 0)
-        layout.setRowStretch(2, 1)
+        layout.setRowStretch(1, 1)
 
-        self.layers.append([])
+        self.layers.append({})
 
-        widget.table = table
-        widget.charge = charge
-        widget.multiplicity = multiplicity
+        self.layers[-1]["atoms"] = []
+        self.layers[-1]["table"] = table
+        self.layers[-1]["charge"] = charge
+        self.layers[-1]["multiplicity"] = multiplicity
 
-        self.tabs.addTab(widget, "%s %i" % (self.tab_text, self.tabs.count() + 1))
+        if not self._extra_widgets:
+            self.tabs.addTab(widget, "%s %i" % (self.tab_text, self.tabs.count() + 1))
+        
+        else:
+            self.extra_widgets.append(dict())
+            layer_tabs = QTabWidget()
+            layer_tabs.addTab(widget, "atoms")
+            self.extra_widgets[-1]["atoms"] = widget
+            
+            for name, widget_stuff in self._extra_widgets.items():
+                if "name" == "atoms":
+                    raise RuntimeError("extra widget name 'atoms' is reserved")
+                widget_class, args, kwargs = widget_stuff
+                this_extra_widget = widget_class(*args, **kwargs)
+                self.extra_widgets[-1][name] = this_extra_widget
+                layer_tabs.addTab(this_extra_widget, name)
+            
+            self.tabs.addTab(layer_tabs, "%s %i" % (self.tab_text, self.tabs.count() + 1))
+
         self.tabs.setCurrentIndex(self.tabs.count() - 1)
 
         if self.structure is not None:
             atoms = []
             for atom in self.structure.atoms:
-                if not any(atom in layer for layer in self.layers):
+                if not any(atom in layer["atoms"] for layer in self.layers):
                     atoms.append(atom)
 
             self.set_layer(use_atoms=atoms)
@@ -2953,18 +3087,18 @@ class LayerWidget(QWidget):
 
     def check_deleted_atoms(self, *args):
         for i, layer in enumerate(self.layers):
-            table = self.tabs.widget(i)
+            table = layer["table"]
             if table is None:
                 continue
-            table = table.table
-            for atom in layer[::-1]:
+            for atom in layer["atoms"][::-1]:
                 if atom.deleted:
-                    table.removeRow(layer.index(atom))
-                    layer.remove(atom)
+                    table.removeRow(layer["atoms"].index(atom))
+                    layer["atoms"].remove(atom)
 
     def tab_close_clicked(self, ndx):
         self.tabs.removeTab(ndx)
         self.layers.pop(ndx)
+        self.extra_widgets.pop(ndx)
         for i in range(0, self.tabs.count()):
             self.tabs.setTabText(i, "%s %i" % (self.tab_text, i + 1))
 
@@ -2982,12 +3116,14 @@ class MethodOption(QWidget):
         init_form,
         use_raven=False,
         parent=None,
+        allow_oniom=True,
     ):
         super().__init__(parent)
 
         self.settings = settings
         self.form = init_form
         self.use_raven = use_raven
+        self.allow_oniom = allow_oniom
 
         layout = QGridLayout(self)
         margins = layout.contentsMargins()
@@ -3042,7 +3178,89 @@ class MethodOption(QWidget):
         self.sapt_layers = LayerWidget(self.settings, session, "monomer")
         sapt_layout.addRow(self.sapt_layers)
         self.sapt_layers.something_changed.connect(self.something_changed)
+        sapt_row = func_form_layout.rowCount()
         func_form_layout.addRow(sapt_widget)
+
+        oniom_row = None
+        if allow_oniom:
+            self.oniom_widget = LayerWidget(
+                self.settings,
+                session,
+                "layer",
+                create_tabs=2,
+                allow_new_tabs=False,
+                display_atom_attributes=["charge"],
+                extra_widgets={
+                    "method": (
+                        MethodOption, [
+                            settings, session, init_form,
+                        ], {
+                            "use_raven": use_raven, 
+                            "allow_oniom": False,
+                        },
+                    ),
+                    "basis set": (
+                        BasisWidget, [
+                            settings, init_form,
+                        ],
+                        {},
+                    ),
+                    "additional options": (
+                        KeywordWidget, [
+                            session, settings, init_form
+                        ],
+                        {},
+                    ),
+                },
+            )
+            for i, level in zip([0, 1], ["high", "low"]):
+                self.oniom_widget.extra_widgets[i]["method"].setMethod(
+                    getattr(settings, "previous_%s_method" % level)
+                )
+
+                self.oniom_widget.extra_widgets[i]["basis set"].clear()
+                previous_basis_names = getattr(settings, "last_%s_basis" % level)
+                previous_basis_elements = getattr(settings, "last_" % level)
+                previous_basis_aux = getattr(settings, "last_%s_basis_aux" % level)
+                previous_basis_builtin = getattr(settings, "last_%s_custom_basis_builtin" % level)
+                previous_basis_path = getattr(settings, "last_%s_basis_path" % level)
+
+                previous_ecp_names = getattr(settings, "last_%s_ecp" % level)
+                previous_ecp_elements = getattr(settings, "last_%s_basis_ecp" % level)
+                previous_ecp_builtin = getattr(settings, "last_%s_custom_ecp_builtin" % level)
+                previous_ecp_path = getattr(settings, "last_%s_ecp_path" % level)
+                
+                basis_set = BasisSet(
+                    basis=[
+                        Basis(
+                            name,
+                            elements=eles,
+                            aux_type=aux,
+                            user_defined=path,
+                        ) for name, eles, aux, path in zip(
+                            previous_basis_names, 
+                            previous_basis_elements,
+                            previous_basis_aux,
+                            previous_basis_path,
+                        )
+                    ],
+                    ecp=[
+                        ECP(
+                            name,
+                            elements=eles,
+                            user_defined=path,
+                        ) for name, eles, aux, path in zip(
+                            previous_ecp_names, 
+                            previous_ecp_elements,
+                            previous_ecp_path,
+                        )
+                    ],
+                )
+                self.oniom_widget.extra_widgets[i]["basis set"].setBasis(basis_set)
+            
+            oniom_row = func_form_layout.rowCount()
+            func_form_layout.addRow(self.oniom_widget)
+        
 
         layout.addWidget(method_form, 0, 0, Qt.AlignTop)
 
@@ -3082,15 +3300,16 @@ class MethodOption(QWidget):
         self.dispersion.setToolTip("Dispersion correction for DFT methods without built-in dispersion\n" + \
                                    "Important for long- or medium-range noncovalent interactions")
         self.dispersion.currentIndexChanged.connect(self.something_changed)
-
         disp_form_layout.addRow("empirical dispersion:", self.dispersion)
 
         self.grid = QComboBox()
         self.grid.currentIndexChanged.connect(self.something_changed)
-        self.grid.setToolTip("Integration grid for methods without analytical exchange\n" + \
-                             "Finer grids result in more trustworthy results\n" + \
-                             "Analysis calculations should be performed on a structure that\n" + \
-                             "was optimized with the same grid")
+        self.grid.setToolTip(
+            "Integration grid for methods without analytical exchange\n" + \
+            "Finer grids result in more trustworthy results\n" + \
+            "Analysis calculations should be performed on a structure that\n" + \
+            "was optimized with the same grid"
+        )
 
         disp_form_layout.addRow("integration grid:", self.grid)
 
@@ -3098,13 +3317,19 @@ class MethodOption(QWidget):
 
         self.other_options = [keyword_label, self.method_kw, semi_empirical_label, self.is_semiempirical, self.previously_used_table]
 
-        layout.setRowStretch(0, 0)
-        layout.setRowStretch(1, 0)
-        layout.setRowStretch(2, 1)
+        for i in range(0, layout.rowCount() - 1):
+            layout.setRowStretch(i, 0)
+        layout.setRowStretch(layout.rowCount() - 1, 1)
         layout.setContentsMargins(0, 0, 0, 0)
 
         self.method_option.currentTextChanged.connect(self.method_changed)
-        self.method_option.currentTextChanged.connect(lambda text: sapt_widget.setVisible(text == "SAPT"))
+        self.method_option.currentTextChanged.connect(
+            lambda text: func_form_layout.setRowVisible(sapt_row, text == "SAPT")
+        )
+        if oniom_row is not None:
+            self.method_option.currentTextChanged.connect(
+                lambda text: func_form_layout.setRowVisible(oniom_row, text == "ONIOM")
+            )
         self.setOptions(self.form)
         self.setPreviousStuff()
         self.method_kw.textChanged.connect(self.apply_filter)
@@ -3207,7 +3432,18 @@ class MethodOption(QWidget):
         if self.use_raven and file_info.raven_methods:
             self.method_option.addItems(file_info.raven_methods)
         else:
-            self.method_option.addItems(file_info.methods)
+            for functional in file_info.methods:
+                if functional.lower() == "oniom" and not self.allow_oniom:
+                    continue
+                else:
+                    self.method_option.addItem(functional)
+
+        if self.allow_oniom:
+            for layer in self.oniom_widget.extra_widgets:
+                layer["method"].setOptions(file_info)
+                layer["basis"].setOptions(file_info)
+                layer["additional options"].setOptions(file_info)
+
         self.method_option.addItem("other")
 
         self.dispersion.addItem("None")
@@ -3383,6 +3619,9 @@ class MethodOption(QWidget):
         """sets method option to match the given Method"""
         if isinstance(func, Method):
             test_value = func.name
+        elif isinstance(func, list):
+            # TODO: oniom things
+            pass
         else:
             test_value = func
 
@@ -4399,13 +4638,17 @@ class BasisWidget(QWidget):
 
         return BasisSet(basis, ecp)
 
-    def setBasis(self, basis_set):
-        """sets basis to match input BasisSet"""
+    def clear(self):
         for i in range(len(self.basis_options)-1, -1, -1):
             self.close_basis_tab(i)
 
         for i in range(len(self.ecp_options)-1, -1, -1):
             self.close_ecp_tab(i)
+
+
+    def setBasis(self, basis_set):
+        """sets basis to match input BasisSet"""
+        self.clear()
 
         if basis_set:
             for i, basis in enumerate(basis_set.basis):

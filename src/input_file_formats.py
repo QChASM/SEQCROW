@@ -747,7 +747,8 @@ class GaussianFileInfo(QMInputFileInfo):
         "BP86",
         "PBE0",
         "PM6",
-        "AM1"
+        "AM1",
+        "ONIOM",
     ]
     dispersion = [
         "Grimme D2",
