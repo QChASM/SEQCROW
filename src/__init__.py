@@ -184,6 +184,9 @@ class _SEQCROW_API(BundleAPI):
         Atom.register_attr(
             session, "nuclearSpin", "seqcrow", attr_type=int,
         )
+        Atom.register_attr(
+            session, "oniomLayer", "seqcrow", attr_type=str,
+        )
 
     @staticmethod
     def register_class_snapshot_map(session):

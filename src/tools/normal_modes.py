@@ -4,7 +4,7 @@ from json import loads, dumps
 
 import numpy as np
 
-from chimerax.atomic import selected_atoms
+from chimerax.atomic import selected_atoms, check_for_changes
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.ui.widgets import ColorButton
@@ -68,7 +68,7 @@ rcParams["savefig.dpi"] = 300
 class _NormalModeSettings(Settings):
     AUTO_SAVE = {
         'arrow_color': Value((0.0, 1.0, 0.0, 1.0), TupleOf(FloatArg, 4), iter2str),
-        'arrow_scale': Value(1.5, FloatArg),
+        'arrow_scale': Value(-1.5, FloatArg),
         'anim_scale': Value(0.2, FloatArg),
         'anim_duration': Value(60, IntArg),
         'anim_fps': Value(60, IntArg), 
@@ -82,6 +82,7 @@ class _NormalModeSettings(Settings):
         'figure_height': 3.5,
         "fixed_size": False,
         "scales": "{}",
+        "displacement_scale": -0.1,
     }
 
 
@@ -243,6 +244,31 @@ class NormalModes(ToolInstance):
         anim_opts.addRow(stop_anim_button)
         self.stop_anim_button = stop_anim_button
 
+        
+        # finite displacements
+        displace_tab = QWidget()
+        displace_layout = QFormLayout(displace_tab)
+        
+        self.disp_scale = QDoubleSpinBox()
+        self.disp_scale.setSingleStep(0.01)
+        self.disp_scale.setDecimals(4)
+        self.disp_scale.setRange(-10.0, 10.0)
+        self.disp_scale.setValue(self.settings.displacement_scale)
+        self.disp_scale.setSuffix(" \u212B")
+        self.disp_scale.setToolTip(
+            "move atoms by at most this amount\n"
+            "negative values will reverse the displacement direction"
+        )
+        displace_layout.addRow("max. displacement", self.disp_scale)
+        
+        self.disp_button = QPushButton("displace along selected mode")
+        self.disp_button.clicked.connect(self.displace_structure)
+        displace_layout.addRow(self.disp_button)
+        
+        self.reset_disp_button = QPushButton("reset structure")
+        self.reset_disp_button.clicked.connect(self.stop_anim)
+        displace_layout.addRow(self.reset_disp_button)
+
         # IR plot options
         ir_tab = QWidget()
         ir_layout = QFormLayout(ir_tab)
@@ -262,6 +288,7 @@ class NormalModes(ToolInstance):
         show_plot = QPushButton("show plot")
         show_plot.clicked.connect(self.show_ir_plot)
         ir_layout.addRow(show_plot)
+
         
         # mode lookup
         mode_lookup = QWidget()
@@ -289,6 +316,7 @@ class NormalModes(ToolInstance):
         
         self.display_tabs.addTab(vector_tab, "vectors")
         self.display_tabs.addTab(animate_tab, "animate")
+        self.display_tabs.addTab(displace_tab, "displace")
         self.display_tabs.addTab(ir_tab, "IR spectrum")
         self.display_tabs.addTab(mode_lookup, "motion lookup")
 
@@ -455,15 +483,15 @@ class NormalModes(ToolInstance):
             else:
                 coord = Angle(a1, a2, a3)
         elif coord_type == "torsional rotation":
-            central_atom1 = atoms[-2]
-            central_atom2 = atoms[-1]
-            group1 = [mdl.atoms.index(a) for a in central_atom1.neighbors if a is not central_atom2]
-            group2 = [mdl.atoms.index(a) for a in central_atom2.neighbors if a is not central_atom1]
+            end_atom1 = atoms[-4]
+            central_atom1 = atoms[-3]
+            central_atom2 = atoms[-2]
+            end_atom2 = atoms[-1]
             coord = Torsion(
-                group1,
+                [mdl.atoms.index(end_atom1)],
                 mdl.atoms.index(central_atom1),
                 mdl.atoms.index(central_atom2),
-                group2,
+                [mdl.atoms.index(end_atom2)],
             )
         elif coord_type == "out-of-plane bend":
             coord = Torsion(
@@ -520,6 +548,12 @@ class NormalModes(ToolInstance):
             atom2_label = QLabel()
             self.mode_layout.insertRow(2, "atom 2:", atom2_label)
             self.coordinate_widgets.append(atom2_label)
+            atom3_label = QLabel()
+            self.mode_layout.insertRow(3, "atom 3:", atom3_label)
+            self.coordinate_widgets.append(atom3_label)
+            atom4_label = QLabel()
+            self.mode_layout.insertRow(4, "atom 4:", atom4_label)
+            self.coordinate_widgets.append(atom4_label)
         if coord == "out-of-plane bend":
             atom1_label = QLabel()
             self.mode_layout.insertRow(1, "central atom:", atom1_label)
@@ -563,7 +597,7 @@ class NormalModes(ToolInstance):
     def _get_coord_change(self, geom, vector, scaling, fr):
         """determine displacement given scaling and vector"""
         max_norm = None
-        dX = vector
+        dX = np.array(vector)
         if len(dX) != geom.num_atoms:
             if "QM atoms" in fr:
                 new_dX = np.zeros((geom.num_atoms, 3))
@@ -736,7 +770,7 @@ class NormalModes(ToolInstance):
 
         pause_frames = (60 // anim_fps)
 
-        # run(self.session, "coordset %s loop 100000" % model.atomspec)
+        check_for_changes(self.session)
 
         slider =  CoordinateSetSlider(
             self.session,
@@ -748,7 +782,11 @@ class NormalModes(ToolInstance):
         slider.play_cb()
 
     def stop_anim(self):
-        fr, model = self.model_selector.currentData()
+        info = self.model_selector.currentData()
+        if not info:
+            self.session.logger.error("no model with frequency data loaded")
+            return
+        fr, model = info
         for tool in self.session.tools.list():
             if isinstance(tool, CoordinateSetSlider):
                 if tool.structure is model:
@@ -758,12 +796,18 @@ class NormalModes(ToolInstance):
         for atom, coord in zip(model.atoms, geom.coords):
             atom.coord = coord
     
-    def finite_displacement(self):
+    def displace_structure(self):
         info = self.model_selector.currentData()
         if not info:
             self.session.logger.error("no model with frequency data loaded")
             return
         fr, model = info
+        
+        for tool in self.session.tools.list():
+            if isinstance(tool, CoordinateSetSlider):
+                if tool.structure is model:
+                    tool.delete()
+
         modes = self.table.selectedItems()
         if len([mode for mode in modes if mode.column() == 0]) != 1:
             raise RuntimeError("one mode must be selected")
@@ -772,7 +816,13 @@ class NormalModes(ToolInstance):
                 if m.column() == 0:
                     mode = m.data(Qt.UserRole)
 
+        scale = self.disp_scale.value()
         vector = fr['frequency'].data[mode].vector
+        max_disp = max(np.linalg.norm(vector, axis=1))
+        vector = scale * vector / max_disp
+        
+        for atom, v in zip(model.atoms, vector):
+            atom.coord += v
 
     def display_help(self):
         """Show the help for this tool in the help viewer."""
