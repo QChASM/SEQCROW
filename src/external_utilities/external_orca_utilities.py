@@ -224,6 +224,17 @@ class ORCA_plot(QWidget):
         self.plot_type.currentTextChanged.connect(self.update_plot_options)
         self.update_plot_options(self.plot_type.currentText())
 
+        self.infile_path.textChanged.connect(self.reset)
+
+    def reset(self, *args):
+        self.layout.setRowVisible(self.rows["orbital number"], False)
+        self.layout.setRowVisible(self.rows["operator"], False)
+        self.layout.setRowVisible(self.rows["density"], False)
+        
+        items = ["check available plots"]
+        self.plot_type.clear()
+        self.plot_type.addItems(items)
+        
     def update_plot_options(self, text):
         # some plot types don't use certain options
         # we hide them so they aren't distracting

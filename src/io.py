@@ -110,17 +110,18 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
         session.logger.error(repr(e))
         return [], "SEQCROW failed to open %s" % file_name
 
-    for frame in fr.all_geom:
-        if len(frame["atoms"]) != len(fr["atoms"]):
-            return split_open(session, file_name, format_name, fr)
-    else:
-        structure = geom.get_chimera(
-            session,
-            coordsets=bool(fr.all_geom),
-            filereader=fr,
-            apply_preset=False,
-            
-        )
+    if fr.all_geom:
+        for frame in fr.all_geom:
+            if len(frame["atoms"]) != len(fr["atoms"]):
+                return split_open(session, file_name, format_name, fr)
+    
+    structure = geom.get_chimera(
+        session,
+        coordsets=bool(fr.all_geom),
+        filereader=fr,
+        apply_preset=False,
+        
+    )
 
     if fr.all_geom and "energy" in fr.other and coordsets is not False:
         try:
@@ -218,6 +219,7 @@ def split_open(session, file_name, format_name, filereader):
     # profile.print_stats()
 
     return structures, status
+
 
 def get_structure(session, elements, coordinates, name, comment, bonded_threshold=0.3):
     from chimerax.atomic import AtomicStructure, Element, Atoms

@@ -176,6 +176,9 @@ class _SEQCROW_API(BundleAPI):
         except Exception:
             pass
         Atom.register_attr(
+            session, "charge", "seqcrow", attr_type=float,
+        )
+        Atom.register_attr(
             session, "mullikenCharge", "seqcrow", attr_type=float,
         )
         Atom.register_attr(
@@ -186,6 +189,15 @@ class _SEQCROW_API(BundleAPI):
         )
         Atom.register_attr(
             session, "oniomLayer", "seqcrow", attr_type=str,
+        )
+        Atom.register_attr(
+            session, "mm_type", "seqcrow", attr_type=str,
+        )
+        Atom.register_attr(
+            session, "link_charge", "seqcrow", attr_type=float,
+        )
+        Atom.register_attr(
+            session, "link_mm_type", "seqcrow", attr_type=str,
         )
 
     @staticmethod

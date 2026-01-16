@@ -187,6 +187,8 @@ class GaussianKeywordOptions(KeywordOptions):
         'end of file': GAUSSIAN_POST,
     }
 
+    oniom_items = ["route"]
+
     #the keys used to be an int map before this stuff got moved to AaronTools
     #old_items allows users to keep old settings
     old_items = {
@@ -777,12 +779,18 @@ class GaussianFileInfo(QMInputFileInfo):
     
     def get_file_contents(self, theory):
         """creates Gaussian input file using AaronTools"""
-        header, header_warnings = theory.make_header(style="gaussian", return_warnings=True)
-        molecule, mol_warnings = theory.make_molecule(style="gaussian", return_warnings=True)
-        footer, footer_warnings = theory.make_footer(style="gaussian", return_warnings=True)
-        contents = header + molecule + footer
-        contents = re.sub("{{\s?name\s?}}", theory.geometry.name, contents)
-        warnings = header_warnings + mol_warnings + footer_warnings
+
+        # sometimes these get called before oniom layers get set
+        # and that causes problems
+        try:
+            header, header_warnings = theory.make_header(style="gaussian", return_warnings=True)
+            molecule, mol_warnings = theory.make_molecule(style="gaussian", return_warnings=True)
+            footer, footer_warnings = theory.make_footer(style="gaussian", return_warnings=True)
+            contents = header + molecule + footer
+            contents = re.sub("{{\s?name\s?}}", theory.geometry.name, contents)
+            warnings = header_warnings + mol_warnings + footer_warnings
+        except Exception as e:
+            return "", [str(e)]
         return contents, warnings
 
     def get_job_kw_dict(

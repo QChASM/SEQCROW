@@ -111,6 +111,13 @@ def fromChimAtom(atom=None, *args, use_scene=False, serial_number=None, atomspec
     
     aarontools_atom.chix_name = atom.name
     aarontools_atom.serial_number = atom.serial_number
+    if hasattr(atom, "oniomLayer"):
+        aarontools_atom.layer = atom.oniomLayer
+    if hasattr(atom, "mm_type"):
+        aarontools_atom.atomtype = atom.mm_type
+    if hasattr(atom, "charge"):
+        aarontools_atom.charge = atom.charge
+    aarontools_atom.link_info = None
     aarontools_atom.chix_atom = atom
 
     return aarontools_atom
@@ -1001,6 +1008,10 @@ class ResidueCollection(Geometry):
         struc.comment = self.comment
 
         self.update_chix(struc, discard_residues=discard_residues, apply_preset=apply_preset)
+
+        for at_atom in self.atoms:
+            if hasattr(at_atom, "atomtype"):
+                at_atom.chix_atom.mm_type = at_atom.atomtype
 
         if coordsets and filereader is not None and filereader.all_geom is not None:
             #make a trajectory

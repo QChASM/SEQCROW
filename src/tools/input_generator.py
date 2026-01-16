@@ -1,7 +1,14 @@
 import os.path
 import re
 
-from chimerax.atomic import AtomicStructure, selected_atoms, selected_bonds, selected_pseudobonds, get_triggers
+from chimerax.atomic import (
+    AtomicStructure,
+    Atoms,
+    selected_atoms,
+    selected_bonds,
+    selected_pseudobonds,
+    get_triggers,
+)
 from chimerax.core.tools import ToolInstance
 from chimerax.ui.gui import MainToolWindow, ChildToolWindow
 from chimerax.core.settings import Settings
@@ -46,6 +53,7 @@ from Qt.QtWidgets import (
     QSizePolicy,
     QStyle,
     QMenu,
+    QTableView,
 )
 
 from SEQCROW.jobs import LocalClusterJob
@@ -57,6 +65,7 @@ from SEQCROW.widgets.comboboxes import ModelComboBox
 from SEQCROW.widgets.menu import FakeMenu
 from SEQCROW.widgets.icons import pencil_icon, plus_icon
 from SEQCROW.finders import AtomSpec
+from SEQCROW.selectors import get_fragment, canonical_rank
 
 from AaronTools.config import Config
 from AaronTools.const import TMETAL, ELEMENTS, COMMONLY_ODD_ISOTOPES
@@ -300,6 +309,7 @@ class BuildQM(ToolInstance):
         #method stuff
         self.method_widget = MethodOption(self.settings, self.session, init_form=init_form)
         self.method_widget.methodChanged.connect(self.update_preview)
+        self.method_widget.methodChanged.connect(self.is_basis_needed)
 
         #basis set stuff
         self.basis_widget = BasisWidget(self.settings, init_form=init_form)
@@ -944,6 +954,7 @@ class BuildQM(ToolInstance):
         return contents, warnings
 
     def check_changes(self, trigger_name=None, changes=None):
+        print(trigger_name, changes)
         if changes is not None:
             mdl = self.model_selector.currentData()
             if mdl in changes.modified_atomic_structures():
@@ -958,6 +969,10 @@ class BuildQM(ToolInstance):
                 self.job_widget.check_constraints()
             self.update_preview()
             self.changed = False
+
+    def is_basis_needed(self):
+        method, needs_basis = self.method_widget.getRawMethod()
+        self.tabs.setTabEnabled(2, not needs_basis)
 
     def update_preview(self):
         """whenever a setting is changed, this should be called to update the preview"""
@@ -1022,21 +1037,46 @@ class BuildQM(ToolInstance):
         program = self.file_type.currentText()
         file_info = self.manager.get_info(program)
 
-        rescol = ResidueCollection(self.model_selector.currentData(), bonds_matter=False)
-        for i, a in enumerate(rescol.atoms):
-            a.name = str(i + 1)
-
+        kwargs = {}
+        charge = self.job_widget.getCharge(update_settings)
+        mult = self.job_widget.getMultiplicity(update_settings)
         method = self.method_widget.getMethod(update_settings)
+        if isinstance(method, dict):
+            kwargs["high_method"] = method["high_method"]
+            kwargs["high_basis"] = method["high_basis"]
+            for key, value in method["high_kwargs"].items():
+                kwargs["high_" + key] = value
+            
+            kwargs["low_method"] = method["low_method"]
+            kwargs["low_basis"] = method["low_basis"]
+            for key, value in method["low_kwargs"].items():
+                kwargs["low_" + key] = value
+            
+            charge = [
+                method["low_charge"],
+                method["high_charge"],
+                method["low_charge"],
+            ]
+            mult = [
+                method["low_multiplicity"],
+                method["high_multiplicity"],
+                method["low_multiplicity"],
+            ]
+            method = None
+        
         if file_info.basis_sets is not None:
             basis = self.get_basis_set(update_settings)
         else:
             basis = None
 
+        rescol = ResidueCollection(self.model_selector.currentData(), bonds_matter=False)
+        for i, a in enumerate(rescol.atoms):
+            a.name = str(i + 1)
+
         dispersion = self.method_widget.getDispersion(update_settings)
 
         grid = self.method_widget.getGrid(update_settings)
-        charge = self.job_widget.getCharge(update_settings)
-        mult = self.job_widget.getMultiplicity(update_settings)
+
         if isinstance(method, SAPTMethod):
             charges = [widget.value() for widget in \
                 [self.method_widget.sapt_layers.tabs.widget(i).charge for i in range(0, self.method_widget.sapt_layers.tabs.count())]
@@ -1098,6 +1138,7 @@ class BuildQM(ToolInstance):
             self.settings.save()
 
         combined_dict = combine_dicts(kw_dict, other_kw_dict)
+        combined_dict = combine_dicts(kwargs, combined_dict)
 
         self.theory = Theory(
             charge=charge,
@@ -1111,7 +1152,7 @@ class BuildQM(ToolInstance):
             job_type=jobs,
             solvent=solvent,
             geometry=rescol,
-            **combined_dict
+            **combined_dict,
         )
 
     def change_model(self, index):
@@ -2860,6 +2901,252 @@ class JobTypeOption(QWidget):
                 self.constrained_torsions.remove(torsion)
 
 
+class MMUtilityWidget(QWidget):
+    def __init__(self, session, parent=None):
+    
+        super().__init__(parent=parent)
+        self.parent = parent
+        
+        self.session = session
+
+        layout = QFormLayout(self)
+        
+        charge_group = QGroupBox("partial atomic charges")
+        charge_group_layout = QFormLayout(charge_group)
+        layout.addRow(charge_group)
+        
+        self.charge_model_select = ModelComboBox(self.session)
+        charge_group_layout.addRow("take charges from:", self.charge_model_select)
+        
+        self.charge_attribute_select = QComboBox()
+        charge_group_layout.addRow("charge attribute:", self.charge_attribute_select)
+        
+        self.charge_model_select.currentIndexChanged.connect(self.set_charge_list)
+        
+        self.charge_scale_factor = QDoubleSpinBox()
+        self.charge_scale_factor.setMinimum(0.5)
+        self.charge_scale_factor.setMaximum(2.0)
+        self.charge_scale_factor.setDecimals(3)
+        self.charge_scale_factor.setSingleStep(0.01)
+        self.charge_scale_factor.setValue(1)
+        charge_group_layout.addRow("scale charges by:", self.charge_scale_factor)
+        
+        charge_do_it = QPushButton("do it")
+        charge_do_it.clicked.connect(self.set_charges)
+        charge_group_layout.addRow(charge_do_it)
+        
+        type_group = QGroupBox("molecular mechanics atom types")
+        type_group_layout = QFormLayout(type_group)
+        layout.addRow(type_group)
+        
+        self.type_model_select = ModelComboBox(self.session)
+        type_group_layout.addRow("take atom types from:", self.type_model_select)
+        self.type_model_select.currentIndexChanged.connect(self.set_type_list)
+
+        self.type_attribute_select = QComboBox()
+        type_group_layout.addRow("atom type attribute:", self.type_attribute_select)
+
+        type_do_it = QPushButton("do it")
+        type_do_it.clicked.connect(self.set_types)
+        type_group_layout.addRow(type_do_it)
+        
+        self.set_type_list()
+        self.set_charge_list()
+    
+    def set_type_list(self, *args):
+        mdl = self.type_model_select.currentData()
+        
+        if mdl is None:
+            return
+        
+        valid_attrs = {"idatm_type"}
+        a = mdl.atoms[0]
+        for attr, val in a.__dict__.items():
+            if attr == "oniomLayer":
+                continue
+            if isinstance(val, str):
+                valid_attrs.add(attr)
+        
+        self.type_attribute_select.clear()
+        self.type_attribute_select.addItems(valid_attrs)
+        
+    def set_charge_list(self, *args):
+        mdl = self.charge_model_select.currentData()
+        
+        if mdl is None:
+            return
+        
+        valid_attrs = set()
+        a = mdl.atoms[0]
+        for attr, val in a.__dict__.items():
+            if isinstance(val, float):
+                valid_attrs.add(attr)
+        
+        self.charge_attribute_select.clear()
+        self.charge_attribute_select.addItems(valid_attrs)
+    
+    def set_charges(self):
+        mdl1 = self.parent.structure
+        mdl2 = self.charge_model_select.currentData()
+        if mdl1 is None or mdl2 is None:
+            return
+        
+        scale = self.charge_scale_factor.value()
+        attr1 = "charge"
+        attr2 = self.charge_attribute_select.currentText()
+        self.determine_similar_and_set(mdl2, mdl1, attr2, attr1, scale=scale)
+
+    def set_types(self):
+        mdl1 = self.parent.structure
+        mdl2 = self.type_model_select.currentData()
+        if mdl1 is None or mdl2 is None:
+            return
+        
+        attr1 = "mm_type"
+        attr2 = self.type_attribute_select.currentText()
+        self.determine_similar_and_set(mdl2, mdl1, attr2, attr1)
+    
+    def simple_similar_and_set(self, ref_model, search_model, get_attr, set_attr, scale=1):
+        """
+        ref_model - model selected to take charges/atom types from
+        search_model - model set in the parent widget
+        get_attr - attribute to take from ref_model
+        set_attr - attribute to set in search_model
+        
+        this function tries to determine what's the same based on
+        just atom names and residues
+        """
+        
+        found_matches = [False for atom in search_model.atoms]
+        for i, a2 in enumerate(search_model.atoms):
+            res2 = a2.residue
+            for a1 in ref_model.atoms:
+                res1 = a1.residue
+                if res1.name != res2.name:
+                    continue
+                
+                if a1.name != a2.name:
+                    continue
+                
+                val = getattr(a1, get_attr)
+                setattr(a2, set_attr, scale * val)
+                found_matches[i] = True
+                break
+        
+        return found_matches
+
+    def determine_similar_and_set(self, ref_model, search_model, get_attr, set_attr, scale=1):
+        """
+        ref_model - model selected to take charges/atom types from
+        search_model - model set in the parent widget
+        get_attr - attribute to take from ref_model
+        set_attr - attribute to set in search_model
+        
+        this function splits the atoms into fragments and tries to
+        identify which are the same between the two sets
+        """
+
+        found_match = self.simple_similar_and_set(ref_model, search_model, get_attr, set_attr, scale=1)
+        if all(found_match):
+            return
+        
+        atoms1 = ref_model.atoms
+        atoms2 = search_model.atoms
+        
+        fragments1 = []
+        
+        new_frag = True
+        mdl1_atoms = Atoms(atoms1)
+        while new_frag:
+            new_frag = False
+            for i, atom in enumerate(atoms1):
+                frag = get_fragment(atom)
+                new_frag = True
+                mdl1_atoms = mdl1_atoms.subtract(frag)
+                fragments1.append(frag)
+                break
+                
+        fragments2 = []
+        frag2_ranks = dict()
+        new_frag = True
+        mdl2_atoms = Atoms(atoms2)
+        while new_frag:
+            new_frag = False
+            for i, atom in enumerate(atoms2):
+                frag = get_fragment(atom)
+                new_frag = True
+                mdl2_atoms = mdl2_atoms.subtract(frag)
+                fragments2.append(frag)
+                break
+
+        frag1_lengths = [len(f) for f in fragments1]
+        frag1_eles = [sorted(f.elements.names) for f in fragments1]
+
+        frag2_lengths = [len(f) for f in fragments2]
+        frag2_eles = [sorted(f.elements.names) for f in fragments2]
+        frag2_rank_sorted = dict()
+        found_match = [False for f in fragments2]
+        
+        for i, frag1 in enumerate(fragments1):
+            sorted_frag1 = None
+            
+            for j, frag2 in enumerate(frag2):
+                if found_match[j]:
+                    continue
+                
+                if frag2_lengths[j] != frag1_lengths[i]:
+                    continue
+                
+                if any(frag1_eles[i][k] != frag2_eles[j][k] for k in range(0, frag1_lengths[i])):
+                    continue
+                
+                if sorted_frag1 is None:
+                    ranks1 = canonical_rank(frag1, break_ties=False)
+                    sorted_frag1 = [
+                        x for _, x in sorted(zip(ranks1, frag1.instances()), key=lambda pair: pair[0])
+                    ]
+                
+                try:
+                    sorted_frag2 = frag2_rank_sorted[j]
+                except KeyError:
+                    ranks2 = canonical_rank(frag2, break_ties=False)
+                    sorted_frag2 = [
+                        x for _, x in sorted(zip(ranks2, frag2.instances()), key=lambda pair: pair[0])
+                    ]
+                    frag2_rank_sorted[j] = sorted_frag2
+                
+                for a, b in zip(sorted_frag1, sorted_frag2):
+                    if a.element.name != b.element.name:
+                        break
+                    
+                    if len(a.neighbors) != len(b.neighbors):
+                        break
+                    
+                    failed = False
+                    for m, n in zip(
+                        sorted([aa.element.name for aa in a.neighbors]),
+                        sorted([bb.element.name for bb in b.neighbors]),
+                    ):
+                        if m != n:
+                            failed = True
+                            break
+                    
+                    if failed:
+                        break
+                
+                else:
+                    found_match[j] = True
+                    for a1, a2 in zip(sorted_frag1, sorted_frag2):
+                        val = getattr(a1, get_attr)
+                        setattr(a2, set_attr, scale * val)
+
+        if not all(found_match):
+            self.session.logger.warning("could not determine matching atoms between the two models")
+
+    def deleteLater(self):
+        self.charge_model_select.deleteLater()
+        self.type_model_select.deleteLater()
+
 class LayerWidget(QWidget):
     something_changed = Signal()
 
@@ -2874,6 +3161,11 @@ class LayerWidget(QWidget):
         allow_new_tabs=True,
         extra_widgets=None,
         display_atom_attributes=None,
+        attribute_types=None,
+        attribute_labels=None,
+        create_boundary_layer=False,
+        override_tab_text=None,
+        show_mm_utils=False,
     ):
         """
         settings - settings
@@ -2895,6 +3187,7 @@ class LayerWidget(QWidget):
         self._session = session
         self.structure = None
         self.tab_text = tab_text
+        self.override_tab_text = override_tab_text
         self.allow_new_tabs = allow_new_tabs
         self.max_multiplicity = max_multiplicity
         # data to create extra widgets
@@ -2902,8 +3195,16 @@ class LayerWidget(QWidget):
         # actual extra widgets
         self.extra_widgets = []
         self.display_atom_attributes = display_atom_attributes
+        self.create_boundary_layer = create_boundary_layer
+        self.attribute_types = attribute_types
+        self.attribute_labels = attribute_labels
+        self.show_mm_utils = show_mm_utils
         if display_atom_attributes is None:
             self.display_atom_attributes = []
+        if attribute_types is None:
+            self.attribute_types = []
+        if attribute_labels is None:
+            self.attribute_labels = []
 
         self.layers = []
 
@@ -2911,12 +3212,13 @@ class LayerWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         self.tabs = QTabWidget()
-        self.tabs.setTabsClosable(True)
+        if not self.allow_new_tabs:
+            self.tabs.setTabsClosable(False)
         self.tabs.tabCloseRequested.connect(self.tab_close_clicked)
         self.tabs.tabCloseRequested.connect(lambda *args: self.something_changed.emit())
         layout.addWidget(self.tabs, 0, 0, 1, 1, Qt.AlignTop)
 
-        set_layer_button = QPushButton("current %s selected" % tab_text)
+        set_layer_button = QPushButton("set %s to atoms currently selected" % tab_text)
         set_layer_button.clicked.connect(self.set_layer)
         layout.addWidget(set_layer_button, 1, 0, 1, 1 if allow_new_tabs else 2, Qt.AlignBottom)
 
@@ -2933,6 +3235,13 @@ class LayerWidget(QWidget):
         while self.tabs.count() < create_tabs:
             self.add_tab()
         
+        if create_boundary_layer:
+            self.add_tab(boundary=True)
+        
+        if self.show_mm_utils:
+            mm_utils = MMUtilityWidget(session, parent=self)
+            self.tabs.addTab(mm_utils, "utilities")
+        
         self.tabs.setCurrentIndex(0)
 
     def setStructure(self, structure):
@@ -2942,60 +3251,94 @@ class LayerWidget(QWidget):
             self.add_tab()
             self.set_layer(use_atoms=structure.atoms)
         else:
+            self.layers[0]["atoms"] = dict()
+            self.layers[1]["atoms"] = dict()
+            for layer in self.layers:
+                table = layer["table"]
+                table.blockSignals(True)
+            for layer in self.layers:
+                table = layer["table"]
+                table.setRowCount(0)
+                table.blockSignals(False)
             self.tabs.setCurrentIndex(0)
             self.set_layer(use_atoms=structure.atoms)
 
     def set_layer(self, *args, use_atoms=False):
+
+        # from cProfile import Profile
+        # 
+        # profile = Profile()
+        # profile.enable()
+
         cur_ndx = self.tabs.currentIndex()
         if cur_ndx == -1:
             self.add_tab()
             return
+        extra_tabs = 0
+        if self.create_boundary_layer:
+            extra_tabs += 1
+        if self.show_mm_utils:
+            extra_tabs += 1
+        
+        if (
+            self.create_boundary_layer or self.show_mm_utils
+        ) and cur_ndx == (self.tabs.count() - extra_tabs):
+            return
 
         table = self.layers[cur_ndx]["table"]
+        table.blockSignals(True)
 
-        table.setRowCount(0)
-        self.layers[cur_ndx]["atoms"] = []
+        if self.allow_new_tabs:
+            table.setRowCount(0)
+            self.layers[cur_ndx]["atoms"] = dict()
 
         if use_atoms:
             atoms = use_atoms
         else:
             atoms = selected_atoms(self._session)
 
-        print(cur_ndx, table, atoms)
-        print(self.layers)
+        # print(cur_ndx, table, atoms)
+        # print(self.layers)
 
         for atom in atoms:
-            print("checking atom", atom.atomspec)
+            # print("checking atom", atom.atomspec)
             if not atom.structure is self.structure:
-                print("wrong structure")
+                # print("wrong structure")
                 continue
                 
             for i, layer in enumerate(self.layers):
                 if i == cur_ndx:
                     continue
 
-                print("making sure it's not in layer", i)
+                # print("making sure it's not in layer", i)
                 
                 other_layer_table = self.tabs.widget(i)
                 if other_layer_table is None:
                     continue
-                else:
-                    other_layer_table = self.layers[i]["table"]
-                for atom2 in layer["atoms"][::-1]:
-                    if atom is atom2:
-                        ndx = layer["atoms"].index(atom)
-                        layer["atoms"].pop(ndx)
-                        other_layer_table.removeRow(ndx)
-                        self._session.logger.info(
-                            "removed atom %s from %s %i" % (atom.atomspec, self.tab_text, i + 1)
-                        )
 
-            print("adding table row")
+                other_layer_table = self.layers[i]["table"]
+                
+                remove_items = []
+                for atom2, row in layer["atoms"].items():
+                    if atom is atom2:
+                        remove_items.append(atom)
+                        ndx = other_layer_table.row(row)
+                        other_layer_table.removeRow(ndx)
+
+                        # self._session.logger.info(
+                        #     "removed atom %s from %s %i" % (atom.atomspec, self.tab_text, i + 1)
+                        # )
+
+                for atom in remove_items:
+                    del layer["atoms"][atom]
+                    
             row = table.rowCount()
             table.insertRow(row)
 
             atomspec = QTableWidgetItem()
             atomspec.setData(Qt.DisplayRole, atom.atomspec)
+            atomspec.setData(Qt.UserRole, atom)
+            atomspec.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
             table.setItem(row, 0, atomspec)
             for i, attr in enumerate(self.display_atom_attributes):
                 attr_widget = QTableWidgetItem()
@@ -3011,45 +3354,131 @@ class LayerWidget(QWidget):
                 table.setItem(row, i + 1, attr_widget)
                 
 
-            self.layers[cur_ndx]["atoms"].append(atom)
+            self.layers[cur_ndx]["atoms"][atom] = atomspec
 
+
+        if self.create_boundary_layer:
+            self.set_boundary_layer()
+
+        table.blockSignals(False)
         self.something_changed.emit()
+        
+        # profile.disable()
+        # profile.print_stats()
 
-    def add_tab(self, *args):
+    def set_boundary_layer(self):
+        
+        table = self.layers[-1]["table"]
+        table.blockSignals(True)
+        table.setRowCount(0)
+
+        layer1 = self.layers[0]
+        layer2 = self.layers[1]
+        atoms1 = Atoms(layer1["atoms"].keys())
+        atoms2 = Atoms(layer2["atoms"].keys())
+        boundary = atoms1.neighbors.intersect(atoms2)
+        
+        for row, atom in enumerate(boundary):
+            table.insertRow(row)
+
+            atomspec = QTableWidgetItem()
+            atomspec.setData(Qt.DisplayRole, atom.atomspec)
+            atomspec.setData(Qt.UserRole, atom)
+            atomspec.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+            table.setItem(row, 0, atomspec)
+            for i, attr in enumerate(self.display_atom_attributes):
+                attr = "link_" + attr
+                attr_widget = QTableWidgetItem()
+                val = getattr(atom, attr, "not set")
+                if isinstance(val, str):
+                    attr_widget.setData(Qt.DisplayRole, val)
+                elif isinstance(val, int):
+                    attr_widget.setData(Qt.DisplayRole, "%i" % val)
+                elif isinstance(val, float):
+                    attr_widget.setData(Qt.DisplayRole, "%7.3f" % val)
+                else:
+                    attr_widget.setData(Qt.DisplayRole, str(val))
+                table.setItem(row, i + 1, attr_widget)
+        
+        table.blockSignals(False)
+
+    def layer_item_selected(self):
+        if not self.structure:
+            return
+        ndx = self.tabs.currentIndex()
+        table = self.layers[ndx]["table"]
+        items = table.selectedItems()
+        self.structure.atoms.selected = False
+        for item in items:
+            if table.column(item) != 0:
+                continue
+            
+            atom = item.data(Qt.UserRole)
+            atom.selected = True
+
+    def cell_changed(self, table, row, column):
+        atom = table.item(row, 0).data(Qt.UserRole)
+        attr = self.display_atom_attributes[column - 1]
+        val = table.item(row, column).data(Qt.DisplayRole)
+        if self.create_boundary_layer and table is self.layers[-1]["table"]:
+            attr = "link_" + attr
+        try:
+            setattr(atom, attr, self.attribute_types[column - 1](val))
+        except ValueError:
+            setattr(atom, attr, val)
+
+    def add_tab(self, *args, boundary=False):
         widget = QWidget()
         layout = QGridLayout(widget)
         layout.setContentsMargins(0, 0, 0, 0)
 
         table = QTableWidget()
         table.setColumnCount(1 + len(self.display_atom_attributes))
-        table.setHorizontalHeaderLabels(["atoms", *self.display_atom_attributes])
+        if not boundary:
+            table.setHorizontalHeaderLabels(["atoms", *self.attribute_labels])
+        else:
+            labels = ["atoms"]
+            labels += ["link " + attr for attr in self.attribute_labels]
+            table.setHorizontalHeaderLabels(labels)
         table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        layout.addWidget(table, 1, 0, 1, 4, Qt.AlignTop)
+        table.setSelectionBehavior(QTableView.SelectRows)
+        table.itemSelectionChanged.connect(self.layer_item_selected)
+        table.cellChanged.connect(lambda row, column, t=table: self.cell_changed(t, row, column))
+        layout.addWidget(table, 0 if boundary else 1, 0, 1, 4, Qt.AlignTop)
 
-        charge = QSpinBox()
-        charge.setRange(-5, 5)
-        charge.valueChanged.connect(lambda *args: self.something_changed.emit())
-        layout.addWidget(QLabel("charge:"), 0, 0, 1, 1, Qt.AlignRight)
-        layout.addWidget(charge, 0, 1, 1, 1, Qt.AlignVCenter | Qt.AlignLeft)
+        if not boundary:
+            charge = QSpinBox()
+            charge.setRange(-5, 5)
+            charge.valueChanged.connect(lambda *args: self.something_changed.emit())
+            layout.addWidget(QLabel("charge:"), 0, 0, 1, 1, Qt.AlignRight)
+            layout.addWidget(charge, 0, 1, 1, 1, Qt.AlignVCenter | Qt.AlignLeft)
+    
+            multiplicity = QSpinBox()
+            multiplicity.setRange(1, self.max_multiplicity)
+            multiplicity.valueChanged.connect(lambda *args: self.something_changed.emit())
+            layout.addWidget(QLabel("multiplicity:"), 0, 2, 1, 1, Qt.AlignRight)
+            layout.addWidget(multiplicity, 0, 3, 1, 1, Qt.AlignVCenter | Qt.AlignLeft)
 
-        multiplicity = QSpinBox()
-        multiplicity.setRange(1, self.max_multiplicity)
-        multiplicity.valueChanged.connect(lambda *args: self.something_changed.emit())
-        layout.addWidget(QLabel("multiplicity:"), 0, 2, 1, 1, Qt.AlignRight)
-        layout.addWidget(multiplicity, 0, 3, 1, 1, Qt.AlignVCenter | Qt.AlignLeft)
+        else:
+            charge = None
+            multiplicity = None
 
         layout.setRowStretch(0, 0)
         layout.setRowStretch(1, 1)
 
         self.layers.append({})
 
-        self.layers[-1]["atoms"] = []
+        self.layers[-1]["atoms"] = dict()
         self.layers[-1]["table"] = table
         self.layers[-1]["charge"] = charge
         self.layers[-1]["multiplicity"] = multiplicity
 
-        if not self._extra_widgets:
-            self.tabs.addTab(widget, "%s %i" % (self.tab_text, self.tabs.count() + 1))
+        if not self._extra_widgets or boundary:
+            if self.override_tab_text:
+                tab_name = self.override_tab_text[self.tabs.count()]
+            else:
+                tab_name = "%s %i" % (self.tab_text, self.tabs.count() + 1)
+            self.tabs.addTab(widget, tab_name)
         
         else:
             self.extra_widgets.append(dict())
@@ -3065,15 +3494,18 @@ class LayerWidget(QWidget):
                 self.extra_widgets[-1][name] = this_extra_widget
                 layer_tabs.addTab(this_extra_widget, name)
             
-            self.tabs.addTab(layer_tabs, "%s %i" % (self.tab_text, self.tabs.count() + 1))
+            if self.override_tab_text:
+                tab_name = self.override_tab_text[self.tabs.count()]
+            else:
+                tab_name = "%s %i" % (self.tab_text, self.tabs.count() + 1)
+            self.tabs.addTab(layer_tabs, tab_name)
 
         self.tabs.setCurrentIndex(self.tabs.count() - 1)
 
         if self.structure is not None:
-            atoms = []
-            for atom in self.structure.atoms:
-                if not any(atom in layer["atoms"] for layer in self.layers):
-                    atoms.append(atom)
+            atoms = set(self.structure.atoms)
+            for layer in self.layers:
+                atoms -= layer["atoms"].keys()
 
             self.set_layer(use_atoms=atoms)
 
@@ -3090,10 +3522,16 @@ class LayerWidget(QWidget):
             table = layer["table"]
             if table is None:
                 continue
-            for atom in layer["atoms"][::-1]:
+            
+            remove_items = []
+            for atom, row in layer["atoms"].items():
                 if atom.deleted:
-                    table.removeRow(layer["atoms"].index(atom))
-                    layer["atoms"].remove(atom)
+                    remove_items.append(atom)
+                    ndx = table.row(row)
+                    table.removeRow(ndx)
+            
+            for atom in remove_items:
+                del layer["atoms"][atom]
 
     def tab_close_clicked(self, ndx):
         self.tabs.removeTab(ndx)
@@ -3129,6 +3567,8 @@ class MethodOption(QWidget):
         margins = layout.contentsMargins()
         new_margins = (margins.left(), 0, margins.right(), 0)
         layout.setContentsMargins(*new_margins)
+
+        layout_row = 0
 
         method_form = QWidget()
         func_form_layout = QFormLayout(method_form)
@@ -3182,14 +3622,19 @@ class MethodOption(QWidget):
         func_form_layout.addRow(sapt_widget)
 
         oniom_row = None
-        if allow_oniom:
+        if self.allow_oniom:
             self.oniom_widget = LayerWidget(
                 self.settings,
                 session,
                 "layer",
                 create_tabs=2,
+                create_boundary_layer=True,
                 allow_new_tabs=False,
-                display_atom_attributes=["charge"],
+                display_atom_attributes=["charge", "mm_type"],
+                attribute_labels=["charge", "atom type"],
+                attribute_types=[float, str],
+                override_tab_text=["high layer", "low layer", "link atoms"],
+                show_mm_utils=True,
                 extra_widgets={
                     "method": (
                         MethodOption, [
@@ -3209,7 +3654,7 @@ class MethodOption(QWidget):
                         KeywordWidget, [
                             session, settings, init_form
                         ],
-                        {},
+                        {"oniom": True},
                     ),
                 },
             )
@@ -3262,7 +3707,9 @@ class MethodOption(QWidget):
             func_form_layout.addRow(self.oniom_widget)
         
 
-        layout.addWidget(method_form, 0, 0, Qt.AlignTop)
+        layout.addWidget(method_form, layout_row, 0, Qt.AlignTop)
+        
+        layout_row += 1
 
         self.previously_used_table = QTableWidget()
         self.previously_used_table.setColumnCount(3)
@@ -3287,35 +3734,44 @@ class MethodOption(QWidget):
         self.previously_used_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
         self.previously_used_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
 
-        layout.addWidget(self.previously_used_table, 1, 0, Qt.AlignTop)
+        layout.addWidget(self.previously_used_table, layout_row, 0, Qt.AlignTop)
 
-        dft_form = QWidget()
-        disp_form_layout = QFormLayout(dft_form)
-        disp_form_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
-        margins = disp_form_layout.contentsMargins()
-        new_margins = (margins.left(), 0, margins.right(), 0)
-        disp_form_layout.setContentsMargins(*new_margins)
+        layout_row += 1
 
-        self.dispersion = QComboBox()
-        self.dispersion.setToolTip("Dispersion correction for DFT methods without built-in dispersion\n" + \
-                                   "Important for long- or medium-range noncovalent interactions")
-        self.dispersion.currentIndexChanged.connect(self.something_changed)
-        disp_form_layout.addRow("empirical dispersion:", self.dispersion)
+        if self.allow_oniom:
+            dft_form = QWidget()
+            disp_form_layout = QFormLayout(dft_form)
+            disp_form_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+            margins = disp_form_layout.contentsMargins()
+            new_margins = (margins.left(), 0, margins.right(), 0)
+            disp_form_layout.setContentsMargins(*new_margins)
+    
+            self.dispersion = QComboBox()
+            self.dispersion.setToolTip("Dispersion correction for DFT methods without built-in dispersion\n" + \
+                                    "Important for long- or medium-range noncovalent interactions")
+            self.dispersion.currentIndexChanged.connect(self.something_changed)
+            disp_form_layout.addRow("empirical dispersion:", self.dispersion)
+    
+            self.grid = QComboBox()
+            self.grid.currentIndexChanged.connect(self.something_changed)
+            self.grid.setToolTip(
+                "Integration grid for methods without analytical exchange\n" + \
+                "Finer grids result in more trustworthy results\n" + \
+                "Analysis calculations should be performed on a structure that\n" + \
+                "was optimized with the same grid"
+            )
+    
+            disp_form_layout.addRow("integration grid:", self.grid)
+    
+            layout.addWidget(dft_form, layout_row, 0, Qt.AlignTop)
+            
+            layout_row += 1
 
-        self.grid = QComboBox()
-        self.grid.currentIndexChanged.connect(self.something_changed)
-        self.grid.setToolTip(
-            "Integration grid for methods without analytical exchange\n" + \
-            "Finer grids result in more trustworthy results\n" + \
-            "Analysis calculations should be performed on a structure that\n" + \
-            "was optimized with the same grid"
-        )
-
-        disp_form_layout.addRow("integration grid:", self.grid)
-
-        layout.addWidget(dft_form, 2, 0, Qt.AlignTop)
-
-        self.other_options = [keyword_label, self.method_kw, semi_empirical_label, self.is_semiempirical, self.previously_used_table]
+        self.other_options = [
+            keyword_label, self.method_kw,
+            semi_empirical_label, self.is_semiempirical,
+            self.previously_used_table
+        ]
 
         for i in range(0, layout.rowCount() - 1):
             layout.setRowStretch(i, 0)
@@ -3425,9 +3881,10 @@ class MethodOption(QWidget):
         """change options to what's available in the specified program"""
         current_func = self.getMethod(update_settings=False).name
         self.method_option.clear()
-        cur_disp = self.dispersion.currentText()
-        self.dispersion.clear()
-        self.grid.clear()
+        if self.allow_oniom:
+            cur_disp = self.dispersion.currentText()
+            self.dispersion.clear()
+            self.grid.clear()
         self.form = file_info
         if self.use_raven and file_info.raven_methods:
             self.method_option.addItems(file_info.raven_methods)
@@ -3446,16 +3903,17 @@ class MethodOption(QWidget):
 
         self.method_option.addItem("other")
 
-        self.dispersion.addItem("None")
-        if file_info.dispersion:
-            self.dispersion.addItems(file_info.dispersion)
-
-        self.grid.addItem("Default")
-        if file_info.grids:
-            if isinstance(file_info.grids, dict):
-                self.grid.addItems(file_info.grids.keys())
-            else:
-                self.grid.addItems(file_info.grids)
+        if self.allow_oniom:
+            self.dispersion.addItem("None")
+            if file_info.dispersion:
+                self.dispersion.addItems(file_info.dispersion)
+    
+            self.grid.addItem("Default")
+            if file_info.grids:
+                if isinstance(file_info.grids, dict):
+                    self.grid.addItems(file_info.grids.keys())
+                else:
+                    self.grid.addItems(file_info.grids)
 
         ndx = self.method_option.findText(current_func, Qt.MatchExactly)
         if ndx == -1:
@@ -3463,9 +3921,10 @@ class MethodOption(QWidget):
             self.method_kw.setText(current_func)
         self.method_option.setCurrentIndex(ndx)
 
-        ndx = self.dispersion.findText(cur_disp, Qt.MatchExactly)
-        if ndx != -1:
-            self.dispersion.setCurrentIndex(ndx)
+        if self.allow_oniom:
+            ndx = self.dispersion.findText(cur_disp, Qt.MatchExactly)
+            if ndx != -1:
+                self.dispersion.setCurrentIndex(ndx)
 
         self.methodChanged.emit()
 
@@ -3477,8 +3936,9 @@ class MethodOption(QWidget):
         grid = self.settings.previous_grid
         self.method_kw.setText(self.settings.previous_custom_func)
         self.setMethod(func)
-        self.setGrid(grid)
-        self.setDispersion(disp)
+        if self.allow_oniom:
+            self.setGrid(grid)
+            self.setDispersion(disp)
 
         self.methodChanged.emit()
 
@@ -3497,9 +3957,18 @@ class MethodOption(QWidget):
 
         self.methodChanged.emit()
 
+    def getRawMethod(self):
+        method = self.method_option.currentText()
+        no_basis = (
+            any(method.upper() == x.upper() for x in KNOWN_SEMI_EMPIRICAL) or
+            (method == "other" and self.is_semiempirical.isChecked()) or
+            method == "ONIOM"
+        )
+        return method, no_basis
+
     def getMethod(self, update_settings=True):
         """returns Method corresponding to current settings"""
-        if not any(self.method_option.currentText() == x for x in ["other", "SAPT"]):
+        if not any(self.method_option.currentText() == x for x in ["other", "SAPT", "ONIOM"]):
             method = self.method_option.currentText()
             #omega doesn't get decoded right
             if update_settings:
@@ -3532,6 +4001,39 @@ class MethodOption(QWidget):
                 self.settings.previous_method = method
 
             return SAPTMethod(method, is_semiempirical=False)
+
+        elif self.method_option.currentText() == "ONIOM":
+            high_method = self.oniom_widget.extra_widgets[0]["method"].getMethod()
+            high_basis = self.oniom_widget.extra_widgets[0]["basis set"].getBasis()
+            high_kwargs = self.oniom_widget.extra_widgets[0]["additional options"].getKWDict()
+            high_charge = self.oniom_widget.layers[0]["charge"].value()
+            high_multiplicity = self.oniom_widget.layers[0]["multiplicity"].value()
+            low_method = self.oniom_widget.extra_widgets[1]["method"].getMethod()
+            low_basis = self.oniom_widget.extra_widgets[1]["basis set"].getBasis()
+            low_kwargs = self.oniom_widget.extra_widgets[1]["additional options"].getKWDict()
+            low_charge = self.oniom_widget.layers[1]["charge"].value()
+            low_multiplicity = self.oniom_widget.layers[1]["multiplicity"].value()
+
+            high_atoms = self.oniom_widget.layers[0]["atoms"].keys()
+            for atom in high_atoms:
+                atom.oniomLayer = "H"
+
+            low_atoms = self.oniom_widget.layers[1]["atoms"].keys()
+            for atom in low_atoms:
+                atom.oniomLayer = "L"
+
+            return {
+                "high_method": high_method,
+                "high_basis": high_basis,
+                "high_kwargs": high_kwargs,
+                "high_charge": high_charge,
+                "high_multiplicity": high_multiplicity,
+                "low_method": low_method,
+                "low_basis": low_basis,
+                "low_kwargs": low_kwargs,
+                "low_charge": low_charge,
+                "low_multiplicity": low_multiplicity,
+            }
 
         elif self.method_option.currentText() == "other":
             if update_settings:
@@ -5753,6 +6255,7 @@ class KeywordOptions(QWidget):
     optionsChanged = Signal()
     settingsChanged = Signal()
     items = dict()
+    oniom_items = None
     old_items = dict()
     previous_option_name = None
     last_option_name = None
@@ -5761,7 +6264,7 @@ class KeywordOptions(QWidget):
     route_opt_fmt = "%s %s"
     comment_opt_fmt = "%s %s"
 
-    def __init__(self, info, settings, parent=None):
+    def __init__(self, info, settings, oniom=False, parent=None):
         super().__init__(parent)
         self.settings = settings
 
@@ -5779,17 +6282,24 @@ class KeywordOptions(QWidget):
 
         self.layout = QGridLayout(self)
 
+        self.available = self.items.keys()
+        if oniom:
+            self.available = self.oniom_items
+            if self.oniom_items is None:
+                self.available = []
+
         position_widget = QWidget()
         position_widget_layout = QFormLayout(position_widget)
         position_widget_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         position_selector = QComboBox()
-        position_selector.addItems([x for x in self.items.keys()])
+        position_selector.addItems(self.available)
         position_widget_layout.addRow("position:", position_selector)
 
         self.layout.addWidget(position_widget, 0, 0, 1, 1, Qt.AlignTop)
 
         self.widgets = {}
-        for item in self.items.keys():
+
+        for item in self.available:
             if self.items[item] in self.last_dict:
                 last = self.last_dict[self.items[item]]
             elif item in self.old_items and self.old_items[item] in self.last_dict:
@@ -5927,11 +6437,12 @@ class KeywordWidget(QWidget):
 
     manager_name = "seqcrow_qm_input_manager"
 
-    def __init__(self, session, settings, init_form, parent=None):
+    def __init__(self, session, settings, init_form, oniom=False, parent=None):
         super().__init__(parent)
         self.manager = getattr(session, self.manager_name)
         self.settings = settings
         self.form = init_form
+        self.oniom = oniom
 
         self.layout = QGridLayout(self)
 
@@ -5939,7 +6450,7 @@ class KeywordWidget(QWidget):
         for form in self.manager.formats:
             info = self.manager.get_info(form)
             if info.keyword_options:
-                self.widgets[form] = info.keyword_options(info, settings)
+                self.widgets[form] = info.keyword_options(info, settings, oniom=oniom)
                 self.widgets[form].optionsChanged.connect(self.options_changed)
             else:
                 self.widgets[form] = QWidget()
