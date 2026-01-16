@@ -114,7 +114,7 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
         for frame in fr.all_geom:
             if len(frame["atoms"]) != len(fr["atoms"]):
                 return split_open(session, file_name, format_name, fr)
-    
+
     structure = geom.get_chimera(
         session,
         coordsets=bool(fr.all_geom),
