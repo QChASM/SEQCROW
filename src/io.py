@@ -110,9 +110,10 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
         session.logger.error(repr(e))
         return [], "SEQCROW failed to open %s" % file_name
 
-    for frame in fr.all_geom:
-        if len(frame["atoms"]) != len(fr["atoms"]):
-            return split_open(session, file_name, format_name, fr)
+    if fr.all_geom:
+        for frame in fr.all_geom:
+            if len(frame["atoms"]) != len(fr["atoms"]):
+                return split_open(session, file_name, format_name, fr)
     else:
         structure = geom.get_chimera(
             session,
