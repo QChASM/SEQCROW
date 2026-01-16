@@ -114,14 +114,13 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
         for frame in fr.all_geom:
             if len(frame["atoms"]) != len(fr["atoms"]):
                 return split_open(session, file_name, format_name, fr)
-    else:
-        structure = geom.get_chimera(
-            session,
-            coordsets=bool(fr.all_geom),
-            filereader=fr,
-            apply_preset=False,
-            
-        )
+    structure = geom.get_chimera(
+        session,
+        coordsets=bool(fr.all_geom),
+        filereader=fr,
+        apply_preset=False,
+        
+    )
 
     if fr.all_geom and "energy" in fr.other and coordsets is not False:
         try:
