@@ -1428,6 +1428,8 @@ class BuildQM(ToolInstance):
         global_triggers.remove_handler(self._changes_done)
 
         self.model_selector.deleteLater()
+        
+        self.method_widget.deleteLater()
 
         return super().delete()
 
@@ -1439,6 +1441,8 @@ class BuildQM(ToolInstance):
         global_triggers.remove_handler(self._changes_done)
 
         self.model_selector.deleteLater()
+
+        self.method_widget.deleteLater()
 
         return super().close()
 
@@ -2969,7 +2973,7 @@ class MMUtilityWidget(QWidget):
         
         self.type_attribute_select.clear()
         self.type_attribute_select.addItems(valid_attrs)
-        
+
     def set_charge_list(self, *args):
         mdl = self.charge_model_select.currentData()
         
@@ -3146,6 +3150,9 @@ class MMUtilityWidget(QWidget):
     def deleteLater(self):
         self.charge_model_select.deleteLater()
         self.type_model_select.deleteLater()
+        self.method_widget.deleteLater()
+        return super().deleteLater()
+
 
 class LayerWidget(QWidget):
     something_changed = Signal()
@@ -3239,8 +3246,8 @@ class LayerWidget(QWidget):
             self.add_tab(boundary=True)
         
         if self.show_mm_utils:
-            mm_utils = MMUtilityWidget(session, parent=self)
-            self.tabs.addTab(mm_utils, "utilities")
+            self.mm_utils = MMUtilityWidget(session, parent=self)
+            self.tabs.addTab(self.mm_utils, "utilities")
         
         self.tabs.setCurrentIndex(0)
 
@@ -3539,6 +3546,14 @@ class LayerWidget(QWidget):
         self.extra_widgets.pop(ndx)
         for i in range(0, self.tabs.count()):
             self.tabs.setTabText(i, "%s %i" % (self.tab_text, i + 1))
+
+    def deleteLater(self):
+        try:
+            self.mm_utils.deleteLater()
+        except AttributeError:
+            pass
+        return super().deleteLater()
+
 
 
 class MethodOption(QWidget):
@@ -4168,6 +4183,10 @@ class MethodOption(QWidget):
 
         self.method_option.setCurrentIndex(ndx)
 
+    def deleteLater(self):
+        self.oniom_widget.deleteLater()
+        super().deleteLater()
+    
 
 class CompactElementList(QTableWidget):
     def __init__(self, *args, **kwargs):

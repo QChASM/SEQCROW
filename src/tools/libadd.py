@@ -429,11 +429,11 @@ class LibAdd(ToolInstance):
 
     def open_link(self, *args):
         if self.library_tabs.currentIndex() == 0:
-            link = "https://github.com/QChASM/AaronTools.py/wiki/AaronTools-Libraries#substituents"
+            link = "https://aarontools.readthedocs.io/en/latest/other_docs/libraries.html#substituents"
         elif self.library_tabs.currentIndex() == 1:
-            link = "https://github.com/QChASM/AaronTools.py/wiki/AaronTools-Libraries#rings"
+            link = "https://aarontools.readthedocs.io/en/latest/other_docs/libraries.html#rings"
         else:
-            link = "https://github.com/QChASM/AaronTools.py/wiki/AaronTools-Libraries#ligands"
+            link = "https://aarontools.readthedocs.io/en/latest/other_docs/libraries.html#ligands"
 
         run(self.session, "open %s" % link)
 
