@@ -2906,110 +2906,84 @@ class JobTypeOption(QWidget):
 
 
 class MMUtilityWidget(QWidget):
-    def __init__(self, session, parent=None):
+
+    attributesChanged = Signal()
+
+    def __init__(self, session, atom_attributes, attribute_labels, attribute_types, parent=None):
     
         super().__init__(parent=parent)
         self.parent = parent
         
         self.session = session
+        self.atom_attributes = atom_attributes
+        self.attribute_labels = attribute_labels
+        self.attribute_types = attribute_types
 
         layout = QFormLayout(self)
-        
-        charge_group = QGroupBox("partial atomic charges")
-        charge_group_layout = QFormLayout(charge_group)
-        layout.addRow(charge_group)
-        
-        self.charge_model_select = ModelComboBox(self.session)
-        charge_group_layout.addRow("take charges from:", self.charge_model_select)
-        
-        self.charge_attribute_select = QComboBox()
-        charge_group_layout.addRow("charge attribute:", self.charge_attribute_select)
-        
-        self.charge_model_select.currentIndexChanged.connect(self.set_charge_list)
-        
-        self.charge_scale_factor = QDoubleSpinBox()
-        self.charge_scale_factor.setMinimum(0.5)
-        self.charge_scale_factor.setMaximum(2.0)
-        self.charge_scale_factor.setDecimals(3)
-        self.charge_scale_factor.setSingleStep(0.01)
-        self.charge_scale_factor.setValue(1)
-        charge_group_layout.addRow("scale charges by:", self.charge_scale_factor)
-        
-        charge_do_it = QPushButton("do it")
-        charge_do_it.clicked.connect(self.set_charges)
-        charge_group_layout.addRow(charge_do_it)
-        
-        type_group = QGroupBox("molecular mechanics atom types")
-        type_group_layout = QFormLayout(type_group)
-        layout.addRow(type_group)
-        
-        self.type_model_select = ModelComboBox(self.session)
-        type_group_layout.addRow("take atom types from:", self.type_model_select)
-        self.type_model_select.currentIndexChanged.connect(self.set_type_list)
 
-        self.type_attribute_select = QComboBox()
-        type_group_layout.addRow("atom type attribute:", self.type_attribute_select)
+        self.attribute = QComboBox()
+        self.attribute.addItems(self.attribute_labels)
+        layout.addRow("set attribute:", self.attribute)
 
-        type_do_it = QPushButton("do it")
-        type_do_it.clicked.connect(self.set_types)
-        type_group_layout.addRow(type_do_it)
+        self.source_model_select = ModelComboBox(self.session)
+        layout.addRow("take values from:", self.source_model_select)
         
-        self.set_type_list()
-        self.set_charge_list()
+        self.source_attribute_select = QComboBox()
+        layout.addRow("from attribute:", self.source_attribute_select)
+        
+        self.attribute.currentIndexChanged.connect(self.set_source_attribute_list)
+        self.source_model_select.currentIndexChanged.connect(self.set_source_attribute_list)
+        
+        self.scale_factor = QDoubleSpinBox()
+        self.scale_factor.setMinimum(0.5)
+        self.scale_factor.setMaximum(2.0)
+        self.scale_factor.setDecimals(3)
+        self.scale_factor.setSingleStep(0.01)
+        self.scale_factor.setValue(1)
+        self.scale_factor_row = layout.rowCount()
+        layout.addRow("scale by:", self.scale_factor)
+        
+        do_it = QPushButton("do it")
+        do_it.clicked.connect(self.set_attribute)
+        layout.addRow(do_it)
+        
+        self.set_source_attribute_list()
     
-    def set_type_list(self, *args):
-        mdl = self.type_model_select.currentData()
+    def set_source_attribute_list(self, *args):
+        mdl = self.source_model_select.currentData()
         
         if mdl is None:
             return
         
-        valid_attrs = {"idatm_type"}
+        attr_ndx = self.attribute.currentIndex()
+        attr_type = self.attribute_types[attr_ndx]
+        self.layout().setRowVisible(self.scale_factor_row, attr_type is float)
+        valid_attrs = set()
+        if attr_type is str:
+            valid_attrs = {"idatm_type"}
         a = mdl.atoms[0]
         for attr, val in a.__dict__.items():
             if attr == "oniomLayer":
                 continue
-            if isinstance(val, str):
+            if isinstance(val, attr_type):
                 valid_attrs.add(attr)
         
-        self.type_attribute_select.clear()
-        self.type_attribute_select.addItems(valid_attrs)
+        self.source_attribute_select.clear()
+        self.source_attribute_select.addItems(valid_attrs)
 
-    def set_charge_list(self, *args):
-        mdl = self.charge_model_select.currentData()
-        
-        if mdl is None:
-            return
-        
-        valid_attrs = set()
-        a = mdl.atoms[0]
-        for attr, val in a.__dict__.items():
-            if isinstance(val, float):
-                valid_attrs.add(attr)
-        
-        self.charge_attribute_select.clear()
-        self.charge_attribute_select.addItems(valid_attrs)
-    
-    def set_charges(self):
+    def set_attribute(self):
         mdl1 = self.parent.structure
-        mdl2 = self.charge_model_select.currentData()
+        mdl2 = self.source_model_select.currentData()
         if mdl1 is None or mdl2 is None:
             return
         
-        scale = self.charge_scale_factor.value()
-        attr1 = "charge"
-        attr2 = self.charge_attribute_select.currentText()
-        self.determine_similar_and_set(mdl2, mdl1, attr2, attr1, scale=scale)
+        scale = self.scale_factor.value()
+        attr_ndx = self.attribute.currentIndex()
+        attr_type = self.attribute_types[attr_ndx]
+        attr1 = self.atom_attributes[attr_ndx]
+        attr2 = self.source_attribute_select.currentText()
+        self.determine_similar_and_set(mdl2, mdl1, attr2, attr1, scale=scale if attr_type is float else 1)
 
-    def set_types(self):
-        mdl1 = self.parent.structure
-        mdl2 = self.type_model_select.currentData()
-        if mdl1 is None or mdl2 is None:
-            return
-        
-        attr1 = "mm_type"
-        attr2 = self.type_attribute_select.currentText()
-        self.determine_similar_and_set(mdl2, mdl1, attr2, attr1)
-    
     def simple_similar_and_set(self, ref_model, search_model, get_attr, set_attr, scale=1):
         """
         ref_model - model selected to take charges/atom types from
@@ -3050,8 +3024,9 @@ class MMUtilityWidget(QWidget):
         identify which are the same between the two sets
         """
 
-        found_match = self.simple_similar_and_set(ref_model, search_model, get_attr, set_attr, scale=1)
+        found_match = self.simple_similar_and_set(ref_model, search_model, get_attr, set_attr, scale=scale)
         if all(found_match):
+            self.attributesChanged.emit()
             return
         
         atoms1 = ref_model.atoms
@@ -3144,12 +3119,14 @@ class MMUtilityWidget(QWidget):
                         val = getattr(a1, get_attr)
                         setattr(a2, set_attr, scale * val)
 
+        if any(found_match):
+            self.attributesChanged.emit()
+
         if not all(found_match):
             self.session.logger.warning("could not determine matching atoms between the two models")
 
     def deleteLater(self):
-        self.charge_model_select.deleteLater()
-        self.type_model_select.deleteLater()
+        self.source_model_select.deleteLater()
         self.method_widget.deleteLater()
         return super().deleteLater()
 
@@ -3225,9 +3202,9 @@ class LayerWidget(QWidget):
         self.tabs.tabCloseRequested.connect(lambda *args: self.something_changed.emit())
         layout.addWidget(self.tabs, 0, 0, 1, 1, Qt.AlignTop)
 
-        set_layer_button = QPushButton("set %s to atoms currently selected" % tab_text)
-        set_layer_button.clicked.connect(self.set_layer)
-        layout.addWidget(set_layer_button, 1, 0, 1, 1 if allow_new_tabs else 2, Qt.AlignBottom)
+        # set_layer_button = QPushButton("set %s to atoms currently selected" % tab_text)
+        # set_layer_button.clicked.connect(self.set_layer)
+        # layout.addWidget(set_layer_button, 1, 0, 1, 1 if allow_new_tabs else 2, Qt.AlignBottom)
 
         if allow_new_tabs:
             add_layer_button = QPushButton("new %s" % tab_text)
@@ -3246,10 +3223,45 @@ class LayerWidget(QWidget):
             self.add_tab(boundary=True)
         
         if self.show_mm_utils:
-            self.mm_utils = MMUtilityWidget(session, parent=self)
+            self.mm_utils = MMUtilityWidget(
+                session,
+                self.display_atom_attributes,
+                self.attribute_labels,
+                self.attribute_types,
+                parent=self,
+            )
+            self.mm_utils.attributesChanged.connect(self.refresh_tables)
             self.tabs.addTab(self.mm_utils, "utilities")
         
         self.tabs.setCurrentIndex(0)
+
+    def refresh_tables(self, *args):
+        for j, layer in enumerate(self.layers):
+            table = layer["table"]
+            if table is None:
+                continue
+
+            table.blockSignals(True)
+            for row in range(0, table.rowCount()):
+                atomspec = table.item(row, 0)
+                atom = atomspec.data(Qt.UserRole)
+                for i, attr in enumerate(self.display_atom_attributes):
+                    if self.create_boundary_layer and j == 2:
+                        attr = "link_" + attr
+
+                    attr_widget = table.takeItem(row, i + 1)
+                    val = getattr(atom, attr, "not set")
+                    if isinstance(val, str):
+                        attr_widget.setData(Qt.DisplayRole, val)
+                    elif isinstance(val, int):
+                        attr_widget.setData(Qt.DisplayRole, "%i" % val)
+                    elif isinstance(val, float):
+                        attr_widget.setData(Qt.DisplayRole, "%7.3f" % val)
+                    else:
+                        attr_widget.setData(Qt.DisplayRole, str(val))
+                    table.setItem(row, i + 1, attr_widget)
+            
+            table.blockSignals(False)
 
     def setStructure(self, structure):
         self.structure = structure
@@ -3359,10 +3371,8 @@ class LayerWidget(QWidget):
                 else:
                     attr_widget.setData(Qt.DisplayRole, str(val))
                 table.setItem(row, i + 1, attr_widget)
-                
 
             self.layers[cur_ndx]["atoms"][atom] = atomspec
-
 
         if self.create_boundary_layer:
             self.set_boundary_layer()
@@ -3454,6 +3464,11 @@ class LayerWidget(QWidget):
         layout.addWidget(table, 0 if boundary else 1, 0, 1, 4, Qt.AlignTop)
 
         if not boundary:
+            set_layer_button = QPushButton("set %s to atoms currently selected" % self.tab_text)
+            set_layer_button.clicked.connect(self.set_layer)
+            layout.addWidget(set_layer_button, 2, 0, 1, 4, Qt.AlignBottom)
+
+        if not boundary:
             charge = QSpinBox()
             charge.setRange(-5, 5)
             charge.valueChanged.connect(lambda *args: self.something_changed.emit())
@@ -3472,6 +3487,7 @@ class LayerWidget(QWidget):
 
         layout.setRowStretch(0, 0)
         layout.setRowStretch(1, 1)
+        layout.setRowStretch(2, 0)
 
         self.layers.append({})
 
@@ -3553,7 +3569,6 @@ class LayerWidget(QWidget):
         except AttributeError:
             pass
         return super().deleteLater()
-
 
 
 class MethodOption(QWidget):

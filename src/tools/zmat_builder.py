@@ -359,10 +359,11 @@ class ZMatrixBuilder(ToolInstance):
         i = 1
         name_found = False
         while not name_found:
+            test_name = "%s%i" % (element, i)
             for atom in residue.atoms:
                 if atom.element.name != element:
                     continue
-                if atom.element.name == element and atom.name == "%s%i" % (element, i):
+                if atom.element.name == element and atom.name == test_name:
                     i += 1
                     break
             else:
