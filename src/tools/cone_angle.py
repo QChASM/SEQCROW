@@ -31,7 +31,7 @@ from Qt.QtWidgets import (
 )
 
 from AaronTools.component import Component
-from AaronTools.const import VDW_RADII, BONDI_RADII
+from AaronTools.const import VDW_RADII, BONDI_RADII, SAMBVCA_RADII
 from AaronTools.finders import BondedTo, NotAny
 
 from SEQCROW.residue_collection import ResidueCollection
@@ -103,7 +103,7 @@ class ConeAngle(ToolInstance):
         settings_layout.addRow("method:", self.cone_option)
 
         self.radii_option = QComboBox()
-        self.radii_option.addItems(["Bondi", "UMN"])
+        self.radii_option.addItems(["Bondi", "UMN", "SambVca"])
         ndx = self.radii_option.findText(self.settings.radii, Qt.MatchExactly)
         self.radii_option.setCurrentIndex(ndx)
         settings_layout.addRow("radii:", self.radii_option)
@@ -395,6 +395,8 @@ class ConeAngle(ToolInstance):
                         r = VDW_RADII[chix_atom.element.name]
                     elif radii.lower() == "bondi":
                         r = BONDI_RADII[chix_atom.element.name]
+                    elif radii.lower() == "sambvca":
+                        r = SAMBVCA_RADII[chix_atom.element.name]
                     
                     v, n, t = sphere_geometry2(5 * self.settings.cone_detail)
                     v = v * r + chix_atom.coord

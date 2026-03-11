@@ -83,6 +83,7 @@ class _NormalModeSettings(Settings):
         "fixed_size": False,
         "scales": "{}",
         "displacement_scale": -0.1,
+        "shaft_radius": 0.02,
     }
 
 
@@ -190,6 +191,13 @@ class NormalModes(ToolInstance):
         self.vector_color = ColorButton(has_alpha_channel=True, max_size=(16, 16))
         self.vector_color.set_color(self.settings.arrow_color)
         vector_opts.addRow("vector color:", self.vector_color)
+
+        self.arrow_size = QDoubleSpinBox()
+        self.arrow_size.setDecimals(3)
+        self.arrow_size.setRange(0.001, 5)
+        self.arrow_size.setSingleStep(0.005)
+        self.arrow_size.setValue(self.settings.shaft_radius)
+        vector_opts.addRow("arrow radius:", self.arrow_size)
 
         show_vec_button = QPushButton("display selected mode")
         show_vec_button.clicked.connect(self.show_vec)
@@ -689,6 +697,9 @@ class NormalModes(ToolInstance):
 
         dX = self._get_coord_change(geom, vector, scale, fr)
         
+        r = self.arrow_size.value()
+        self.settings.shaft_radius = r
+        
         #make a bild file for the model
         s = ".color %f %f %f\n" % tuple(color[:-1])
         s += ".transparency %f\n" % (1. - color[-1])
@@ -701,10 +712,11 @@ class NormalModes(ToolInstance):
             n = np.linalg.norm(dX[i])
             info = tuple(t for s in [[x for x in geom.atoms[i].coords], \
                                      [x for x in geom.atoms[i].coords + dX[i]], \
+                                     [r, r * 2.5,], \
                                      [n/(n + 0.75)]] for t in s)
                                     
             if n > 0.1:
-                s += ".arrow %10.6f %10.6f %10.6f   %10.6f %10.6f %10.6f   0.02 0.05 %5.3f\n" % info
+                s += ".arrow %10.6f %10.6f %10.6f   %10.6f %10.6f %10.6f   %.3f %.3f %5.3f\n" % info
 
             i += 1
 

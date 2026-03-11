@@ -64,7 +64,7 @@ class LigandSterimol(ToolInstance):
         layout = QFormLayout()
 
         self.radii_option = QComboBox()
-        self.radii_option.addItems(["Bondi", "UMN"])
+        self.radii_option.addItems(["Bondi", "UMN", "SambVca"])
         ndx = self.radii_option.findText(self.settings.radii, Qt.MatchExactly)
         self.radii_option.setCurrentIndex(ndx)
         layout.addRow("radii:", self.radii_option)

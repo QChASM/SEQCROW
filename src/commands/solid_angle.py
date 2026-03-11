@@ -16,7 +16,7 @@ from chimerax.core.models import Surface
 from chimerax.geometry.sphere import sphere_triangulation
 from chimerax.graphics.drawing import Drawing
 
-from AaronTools.const import VDW_RADII, BONDI_RADII
+from AaronTools.const import VDW_RADII, BONDI_RADII, SAMBVCA_RADII
 from AaronTools.component import Component
 from AaronTools.utils.utils import rotation_matrix, fibonacci_sphere, perp_vector
 
@@ -31,7 +31,7 @@ solid_angle_description = CmdDesc(
     keyword=[
         (
             "radii",
-            EnumOf(["UMN", "Bondi"], case_sensitive=False),
+            EnumOf(["UMN", "Bondi", "SambVca"], case_sensitive=False),
         ),
         ("radius", FloatArg),
         ("points", IntArg),                                        
@@ -225,9 +225,11 @@ def solid_angle_vis(
         radii_dict = VDW_RADII
     elif radii.lower() == "bondi":
         radii_dict = BONDI_RADII
+    elif radii.lower() == "sambvca":
+        radii_dict = SAMBVCA_RADII
     else:
         raise RuntimeError(
-            "received %s for radii, must be umn or bondi" % radii
+            "received %s for radii, must be umn, bondi, or sambvca" % radii
         )
     
     coords = geom.coordinates(targets)

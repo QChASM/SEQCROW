@@ -7,7 +7,7 @@ from chimerax.atomic import AtomsArg
 from chimerax.bild.bild import read_bild
 
 from AaronTools.substituent import Substituent
-from AaronTools.const import VDW_RADII, BONDI_RADII
+from AaronTools.const import VDW_RADII, BONDI_RADII, SAMBVCA_RADII
 
 from SEQCROW.residue_collection import ResidueCollection
 from SEQCROW.finders import AtomSpec
@@ -17,7 +17,7 @@ from AaronTools.utils.utils import get_filename
 sterimol_description = CmdDesc(
     required=[("selection", AtomsArg)], \
     keyword=[
-        ("radii", EnumOf(["UMN", "Bondi"], case_sensitive=False)),
+        ("radii", EnumOf(["UMN", "Bondi", "SambVca"], case_sensitive=False)),
         ("showVectors", BoolArg),
         ("showRadii", BoolArg), 
         ("LCorrection", EnumOf(["FORTRAN", "AaronTools"], case_sensitive=False)), 
@@ -123,6 +123,8 @@ def sterimol(
                             r = VDW_RADII[chix_atom.element.name]
                         elif radii == "bondi":
                             r = BONDI_RADII[chix_atom.element.name]
+                        elif radii == "sambvca":
+                            r = SAMBVCA_RADII[chix_atom.element.name]
                         
                         if color is None or chix_atom.color != color:
                             color = chix_atom.color

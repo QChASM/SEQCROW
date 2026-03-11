@@ -20,7 +20,7 @@ from chimerax.atomic import AtomsArg, AtomicStructure, Atoms, PseudobondGroup
 from chimerax.label.label3d import ObjectLabel, ObjectLabels
 from chimerax.core.models import Surface
 
-from AaronTools.const import VDW_RADII, BONDI_RADII
+from AaronTools.const import VDW_RADII, BONDI_RADII, SAMBVCA_RADII
 from AaronTools.finders import AnyTransitionMetal
 from AaronTools.utils.utils import rotation_matrix, fibonacci_sphere, perp_vector
 
@@ -57,7 +57,7 @@ vbur_description = CmdDesc(
     keyword=[
         (
             "radii",
-            EnumOf(["UMN", "Bondi"], case_sensitive=False),
+            EnumOf(["UMN", "Bondi", "SambVca"], case_sensitive=False),
         ),
         ("radius", FloatArg), 
         ("scale", FloatArg), 
@@ -539,9 +539,11 @@ def vbur_vis(
         radii_dict = VDW_RADII
     elif radii.lower() == "bondi":
         radii_dict = BONDI_RADII
+    elif radii.lower() == "sambvca":
+        radii_dict = SAMBVCA_RADII
     else:
         raise RuntimeError(
-            "received %s for radii, must be umn or bondi" % radii
+            "received %s for radii, must be umn, bondi, or sambvca" % radii
         )
     
     if not hasattr(center, "__iter__"):
@@ -1006,9 +1008,11 @@ def vbur_difference_vis(
         radii_dict = VDW_RADII
     elif radii.lower() == "bondi":
         radii_dict = BONDI_RADII
+    elif radii.lower() == "sambvca":
+        radii_dict = SAMBVCA_RADII
     else:
         raise RuntimeError(
-            "received %s for radii, must be umn or bondi" % radii
+            "received %s for radii, must be umn, bondi, or sambvca" % radii
         )
     
     models = []
