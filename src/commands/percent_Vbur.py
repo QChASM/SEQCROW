@@ -59,7 +59,6 @@ class VoidLabels(ObjectLabels):
                 'orient': _reorient_angle(session),
                 'on_top': self.on_top,
                 'version': 1}
-        print(data)
         return data
 
     @staticmethod
@@ -557,6 +556,7 @@ def vbur_vis(
         model = Surface("%%Vbur for %s" % geom.name, session)
     else:
         model = Surface("%%Vfree for %s" % geom.name, session)
+    model.SESSION_SAVE_DRAWING = True
     # verts, norms, and triangles for the drawing
     vertices = []
     normals = []
@@ -1071,6 +1071,9 @@ def vbur_difference_vis(
     else:
         model_b = Surface("%%Vfree %s only" % geom1.name, session)
         model_a = Surface("%%Vfree %s only" % geom2.name, session)
+
+    model_a.SESSION_SAVE_DRAWING = True
+    model_b.SESSION_SAVE_DRAWING = True
 
     if isinstance(center1, np.ndarray):
         center_coords1 = center1
@@ -1700,7 +1703,7 @@ def vbur_difference_vis(
         d.use_lighting = False
         d.casts_shadows = False
         d.pickable = False
-        
+
         d_theta = np.pi / 180
         oct_radius = radius + 1e-2
         verts = [np.zeros(3)]
