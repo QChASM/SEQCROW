@@ -1292,6 +1292,12 @@ class _SEQCROW_API(BundleAPI):
         elif name == "Theory":
             from AaronTools.theory import Theory
             return Theory
+        elif name == "VoidLabel":
+            from SEQCROW.commands.percent_Vbur import VoidLabel
+            return VoidLabel
+        elif name == "VoidLabels":
+            from SEQCROW.commands.percent_Vbur import VoidLabels
+            return VoidLabels
 
     @staticmethod
     def finish(session, bundle_info):

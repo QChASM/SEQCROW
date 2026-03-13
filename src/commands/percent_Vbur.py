@@ -17,8 +17,8 @@ from chimerax.core.commands import (
     run,
 )
 from chimerax.atomic import AtomsArg, AtomicStructure, Atoms, PseudobondGroup
-from chimerax.label.label3d import ObjectLabel, ObjectLabels
-from chimerax.core.models import Surface
+from chimerax.label.label3d import ObjectLabel, ObjectLabels, label_orient, _reorient_angle
+from chimerax.core.models import Surface, Model
 
 from AaronTools.const import VDW_RADII, BONDI_RADII, SAMBVCA_RADII
 from AaronTools.finders import AnyTransitionMetal
@@ -31,12 +31,17 @@ from scipy.spatial import distance_matrix, ConvexHull
 
 
 class VoidLabel(ObjectLabel):
-    def __init__(self, text, location, view):
+    def __init__(self, obj, location, view, **kwargs):
         self._location = location
-        super().__init__(None, view, text=text)
+        super().__init__(obj, view, **kwargs)
     
     def location(self, scene_position=None):
         return self._location
+
+    def take_snapshot(self, session, flags):
+        data = super().take_snapshot(session, flags)
+        data["_location"] = self._location
+        return data
 
 
 class VoidLabels(ObjectLabels):
@@ -44,12 +49,41 @@ class VoidLabels(ObjectLabels):
         self._labels.extend(labels)
         self._count_pixel_sized_labels()
         self.update_labels()
-    
-    def labels(self, objects=None):
-        if objects is None:
-            return self._labels
-        ol = self._object_label
-        return [ol[o] for o in objects if o in ol]
+
+    def take_snapshot(self, session, flags):
+        lattrs = ('object', 'text', 'offset', 'color', 'background', 'size', 'height', 'font', 'position', "_location")
+        lstate = tuple({attr:getattr(l, attr) for attr in lattrs if hasattr(l, attr)}
+                       for l in self._labels)
+        data = {'model state': Model.take_snapshot(self, session, flags),
+                'labels state': lstate,
+                'orient': _reorient_angle(session),
+                'on_top': self.on_top,
+                'version': 1}
+        print(data)
+        return data
+
+    @staticmethod
+    def restore_snapshot(session, data):
+        s = VoidLabels(session)
+        s.set_state_from_snapshot(session, data)
+        return s
+
+    def set_state_from_snapshot(self, session, data):
+        Model.set_state_from_snapshot(self, session, data['model state'])
+        self.on_top = data['on_top']
+        if 'orient' in data:
+            label_orient(session, data['orient'])
+        self._labels = []
+        self._object_label = ol = {}
+        v = self.session.main_view
+        for ls in data['labels state']:
+            o = ls['object']
+            kw = {attr:ls[attr] for attr in ('text', 'offset', 'color', 'background',
+                                             'size', 'height', 'font', 'position') if attr in ls}
+            loc = ls["_location"]
+            ol[o] = l = VoidLabel(o, loc, v, **kw)
+            self._labels.append(l)
+        self._count_pixel_sized_labels()
 
 
 vbur_description = CmdDesc(
@@ -932,7 +966,7 @@ def vbur_vis(
                 coordinates *= radius
                 coordinates += center_coords
                 label_list.append(
-                    VoidLabel(l, coordinates, session.main_view)
+                    VoidLabel(geom.chix_atomicstructure, coordinates, session.main_view, text=l)
                 )
         else:
             quad_vbur = [
@@ -960,7 +994,7 @@ def vbur_vis(
                 coordinates *= radius
                 coordinates += center_coords
                 label_list.append(
-                    VoidLabel(l, coordinates, session.main_view)
+                    VoidLabel(geom.chix_atomicstructure, coordinates, session.main_view, text=l)
                 )
         label_object = VoidLabels(session)
         label_object.add_labels(label_list)
@@ -1746,7 +1780,7 @@ def vbur_difference_vis(
                 coordinates *= radius
                 coordinates += center_coords1
                 label_list.append(
-                    VoidLabel(l, coordinates, session.main_view)
+                    VoidLabel(geom.chix_atomicstructure, coordinates, session.main_view, text=l)
                 )
         else:
             quad_vbur = [
@@ -1774,7 +1808,7 @@ def vbur_difference_vis(
                 coordinates *= radius
                 coordinates += center_coords1
                 label_list.append(
-                    VoidLabel(l, coordinates, session.main_view)
+                    VoidLabel(geom.chix_atomicstructure, coordinates, session.main_view, text=l)
                 )
         label_object = VoidLabels(session)
         label_object.add_labels(label_list)
