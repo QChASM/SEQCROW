@@ -563,22 +563,24 @@ class OrbitalViewer(ToolInstance):
                 self.mo_table.setHorizontalHeaderLabels(
                     ["#", "Type"]
                 )
+            
+            n_mos = len(orbits.alpha_coefficients)
             for i, nrg in enumerate(orbits.alpha_nrgs[::-1]):
                 row = self.mo_table.rowCount()
                 self.mo_table.insertRow(row)
                 
                 ndx = OrbitalTableItem()
-                ndx_str = str(orbits.n_mos - i)
+                ndx_str = str(n_mos - i)
                 ndx.setData(Qt.DisplayRole, ndx_str)
-                ndx.setData(Qt.UserRole, orbits.n_mos - i - 1)
+                ndx.setData(Qt.UserRole, n_mos - i - 1)
                 ndx.setTextAlignment(Qt.AlignCenter)
                 self.mo_table.setItem(row, 0, ndx)
                 
                 occ = ""
                 change_font = True
-                if i >= (orbits.n_mos - orbits.n_alpha):
+                if i >= (n_mos - orbits.n_alpha):
                     occ += "\u21bf"
-                if i >= (orbits.n_mos - orbits.n_beta):
+                if i >= (n_mos - orbits.n_beta):
                     occ += "\u21c2"
 
                 if "orbit_kinds" in fr:
@@ -606,7 +608,7 @@ class OrbitalViewer(ToolInstance):
                 orbit_nrg.setTextAlignment(Qt.AlignCenter)
                 self.mo_table.setItem(row, 2, orbit_nrg)
             if not homo_ndx:
-                homo_ndx = orbits.n_mos - max(orbits.n_alpha, orbits.n_beta)
+                homo_ndx = n_mos - max(orbits.n_alpha, orbits.n_beta)
         else:
             self.mo_table.setColumnCount(3)
             self.mo_table.setHorizontalHeaderLabels(
