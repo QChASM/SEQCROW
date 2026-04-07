@@ -5,6 +5,7 @@ run local jobs using the input files
 
 import re
 
+from AaronTools.const import ELEMENTS
 from AaronTools.theory import *
 from AaronTools.fileIO import FileWriter
 from AaronTools.theory.implicit_solvent import (
@@ -976,16 +977,22 @@ class ORCAFileInfo(QMInputFileInfo):
         footer = theory.make_footer(style="orca", return_warnings=False)
         molecule = ""
         fmt = "{:<3s} {: 10.6f} {: 10.6f} {: 10.6f}\n"
+        Z = 0
         for atom in theory.geometry.atoms:
             if atom.is_dummy:
                 molecule += fmt.format("DA", *atom.coords)
                 continue
             molecule += fmt.format(atom.element, *atom.coords)
+            Z += ELEMENTS.index(atom.element)
 
         molecule += "*\n"
         contents = header + molecule + footer
         contents = re.sub("{{\s?name\s?}}", theory.geometry.name, contents)
         warnings = header_warnings
+
+        if abs(Z - theory.charge) % 2 == theory.multiplicity % 2:
+            warnings.append("incompatible charge and multiplicity")
+
         return contents, warnings
 
     def get_job_kw_dict(
