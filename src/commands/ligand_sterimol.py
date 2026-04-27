@@ -78,7 +78,7 @@ def avoidTargets(logger, selection):
 sterimol_description = CmdDesc(
     required=[("selection", AtomsArg)], \
     keyword=[
-        ("radii", EnumOf(["UMN", "Bondi", "SambVca"], case_sensitive=False)),
+        ("radii", EnumOf(["UMN", "Bondi", "SambVca", "ChimeraX"], case_sensitive=False)),
         ("showVectors", BoolArg),
         ("showRadii", BoolArg), 
         ("bisect_L", BoolArg),
@@ -103,6 +103,7 @@ def ligandSterimol(
     models, center, key_atoms = avoidTargets(session.logger, selection)
     
     radii = radii.lower()
+    original_radii = radii
 
     targets = []
     coord_atoms = []
@@ -151,7 +152,12 @@ def ligandSterimol(
             to_center=rescol.find(center_atomspec), 
             key_atoms=rescol.find(key_atomspec),
         )
-        
+        if original_radii == "chimerax":
+            radii = {atom.chix_atom.atomspec: atom.chix_atom.radius for atom in comp.atoms}
+            for atom in comp.atoms:
+                atom.element = atom.chix_atom.atomspec
+                atom.MASS_WARNING = False
+
         data = comp.sterimol(
             return_vector=True,
             radii=radii,
@@ -197,6 +203,8 @@ def ligandSterimol(
                     r = BONDI_RADII[chix_atom.element.name]
                 elif radii == "sambvca":
                     r = SAMBVCA_RADII[chix_atom.element.name]
+                elif original_radii == "chimerax":
+                    r = radii[chix_atom.atomspec]
                 
                 if color is None or chix_atom.color != color:
                     color = chix_atom.color

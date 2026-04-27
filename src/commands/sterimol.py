@@ -40,6 +40,7 @@ def sterimol(
     models, attached = avoidTargets(session.logger, selection)
     
     radii = radii.lower()
+    original_radii = radii
 
     old_L = False
     if LCorrection.upper() == "FORTRAN":
@@ -83,6 +84,12 @@ def sterimol(
                     detect=False,
                 )
                 
+                if original_radii == "chimerax":
+                    radii = {atom.chix_atom.atomspec: atom.chix_atom.radius for atom in sub.atoms}
+                    for atom in sub.atoms:
+                        atom.element = atom.chix_atom.atomspec
+                        atom.MASS_WARNING = False
+
                 data = sub.sterimol(
                     return_vector=True,
                     radii=radii,
@@ -125,6 +132,8 @@ def sterimol(
                             r = BONDI_RADII[chix_atom.element.name]
                         elif radii == "sambvca":
                             r = SAMBVCA_RADII[chix_atom.element.name]
+                        elif original_radii == "chimerax":
+                            r = radii[atom.chix_atom.atomspec]
                         
                         if color is None or chix_atom.color != color:
                             color = chix_atom.color

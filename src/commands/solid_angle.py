@@ -31,7 +31,7 @@ solid_angle_description = CmdDesc(
     keyword=[
         (
             "radii",
-            EnumOf(["UMN", "Bondi", "SambVca"], case_sensitive=False),
+            EnumOf(["UMN", "Bondi", "SambVca", "ChimeraX"], case_sensitive=False),
         ),
         ("radius", FloatArg),
         ("points", IntArg),                                        
@@ -68,6 +68,8 @@ def solid_angle(
     
     s = "<pre>model\tcenter\tangle (steradians)\n"
     
+    original_radii = radii
+    
     for model in models:        
         rescol = ResidueCollection(model)
         try:
@@ -103,6 +105,11 @@ def solid_angle(
                     refresh_ranks=False,
                 )
                 
+                if original_radii.lower() == "chimerax":
+                    radii = {atom.chix_atom.atomspec: atom.chix_atom.radius for atom in ligand.atoms}
+                    for atom in ligand.atoms:
+                        atom.element = atom.chix_atom.atomspec
+
                 angle = ligand.solid_angle(
                     center=c,
                     radii=radii,
@@ -150,6 +157,11 @@ def solid_angle(
                 refresh_ranks=False,
             )
             
+            if original_radii.lower() == "chimerax":
+                radii = {atom.chix_atom.atomspec: atom.chix_atom.radius for atom in ligand.atoms}
+                for atom in ligand.atoms:
+                    atom.element = atom.chix_atom.atomspec
+
             angle = ligand.solid_angle(
                 center=mdl_center,
                 radii=radii,

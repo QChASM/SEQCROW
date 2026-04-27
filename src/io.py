@@ -330,7 +330,7 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
                 error_msg += line
                 error_msg += "\n expected number of atoms here"
                 from chimerax.core.errors import UserError
-                UserError(error_msg)
+                raise UserError(error_msg)
                 
             comment = stream.readline().strip()
             comments.append(comment)

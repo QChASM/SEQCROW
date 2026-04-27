@@ -149,7 +149,7 @@ class PercentVolumeBuried(ToolInstance):
         tabs.addTab(cutout_widget, "volume cutout")
 
         self.radii_option = QComboBox()
-        self.radii_option.addItems(["Bondi", "UMN", "SambVca"])
+        self.radii_option.addItems(["Bondi", "UMN", "SambVca", "ChimeraX"])
         ndx = self.radii_option.findText(self.settings.radii, Qt.MatchExactly)
         self.radii_option.setCurrentIndex(ndx)
         settings_layout.addRow("radii:", self.radii_option)

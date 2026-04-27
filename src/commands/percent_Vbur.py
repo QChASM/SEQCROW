@@ -90,7 +90,7 @@ vbur_description = CmdDesc(
     keyword=[
         (
             "radii",
-            EnumOf(["UMN", "Bondi", "SambVca"], case_sensitive=False),
+            EnumOf(["UMN", "Bondi", "SambVca", "ChimeraX"], case_sensitive=False),
         ),
         ("radius", FloatArg), 
         ("scale", FloatArg), 
@@ -156,6 +156,10 @@ def _vbur(
     out["rescol"] = rescol
     out["targets"] = targets
 
+    if radii.lower() == "chimerax":
+        radii = {atom.chix_atom.atomspec: atom.chix_atom.radius for atom in rescol.atoms}
+        for atom in rescol.atoms:
+            atom.element = atom.chix_atom.atomspec
 
     basis = None
     
