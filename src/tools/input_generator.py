@@ -807,7 +807,10 @@ class BuildQM(ToolInstance):
             self.job_widget.setSolvent(theory.solvent)
 
         if "use_method" in preset and preset["use_method"]:
-            self.method_widget.setMethod(theory.method)
+            if theory.high_method and theory.low_method:
+                self.method_widget.setMethod(theory)
+            else:
+                self.method_widget.setMethod(theory.method)
             self.method_widget.setGrid(theory.grid)
             self.method_widget.setDispersion(theory.empirical_dispersion)
 
@@ -4151,9 +4154,27 @@ class MethodOption(QWidget):
         """sets method option to match the given Method"""
         if isinstance(func, Method):
             test_value = func.name
-        elif isinstance(func, list):
+        elif isinstance(func, Theory):
             # TODO: oniom things
-            pass
+            test_value = "ONIOM"
+            high_method = func.high_method.name
+            low_method = func.low_method.name
+            self.oniom_widget.extra_widgets[0]["method"].setMethod(high_method)
+            self.oniom_widget.extra_widgets[0]["basis set"].setBasis(func.high_basis)
+            high_kwargs = {}
+            for key, value in func.kwargs.items():
+                if key.startswith("high_"):
+                    high_kwargs[key.lstrip("high_")] = value
+            self.oniom_widget.extra_widgets[0]["additional options"].setKeywords(high_kwargs)
+
+            self.oniom_widget.extra_widgets[1]["method"].setMethod(low_method)
+            self.oniom_widget.extra_widgets[1]["basis set"].setBasis(func.low_basis)
+            low_kwargs = {}
+            for key, value in func.kwargs.items():
+                if key.startswith("low_"):
+                    low_kwargs[key.lstrip("low_")] = value
+            self.oniom_widget.extra_widgets[1]["additional options"].setKeywords(low_kwargs)
+
         else:
             test_value = func
 
@@ -4164,7 +4185,7 @@ class MethodOption(QWidget):
             test_value = "B3LYP"
 
         ndx = self.method_option.findText(test_value, Qt.MatchExactly)
-        if ndx < 0 and "sapt" not in test_value:
+        if ndx < 0 and not any(x in test_value for x in ["sapt", "ONIOM"]):
             ndx = self.method_option.findText("other", Qt.MatchExactly)
             if isinstance(func, Method):
                 self.method_kw.setText(func.name)
