@@ -74,7 +74,7 @@ from AaronTools.theory.method import KNOWN_SEMI_EMPIRICAL
 from AaronTools.utils.utils import combine_dicts, to_closing
 from AaronTools.json_extension import ATDecoder, ATEncoder
 
-# import cProfile
+import cProfile
 
 class UserRoleSortableTableWidget(QTableWidgetItem):
     def __lt__(self, other):
@@ -958,13 +958,23 @@ class BuildQM(ToolInstance):
 
     def check_changes(self, trigger_name=None, changes=None):
         print(trigger_name, changes)
+        print("check_changes")
+        profile = cProfile.Profile()
+        profile.enable()
         if changes is not None:
             mdl = self.model_selector.currentData()
             if mdl in changes.modified_atomic_structures():
                 self.changed = True
+        
+        print("changes", self.changed)
+        profile.disable()
+        profile.print_stats()
 
     def struc_mod_update_preview(self, *args, **kwargs):
         """whenever a setting is changed, this should be called to update the preview"""
+        print("struc_mod_update_preview")
+        profile = cProfile.Profile()
+        profile.enable()
         if self.changed:
             if not self.job_widget.structure.deleted:
                 self.job_widget.setStructure(self.job_widget.structure)
@@ -972,6 +982,8 @@ class BuildQM(ToolInstance):
                 self.job_widget.check_constraints()
             self.update_preview()
             self.changed = False
+        profile.disable()
+        profile.print_stats()
 
     def is_basis_needed(self):
         method, needs_basis = self.method_widget.getRawMethod()
@@ -1160,17 +1172,29 @@ class BuildQM(ToolInstance):
 
     def change_model(self, index):
         """changes model to the one selected in self.model_selector (index is basically ignored"""
+        print("change_model")
+        profile = cProfile.Profile()
+        profile.enable()
         if index == -1:
             self.basis_widget.setElements([])
             return
 
         model = self.model_selector.currentData()
 
+        self.job_widget.blockSignals(True)
+        self.method_widget.sapt_layers.blockSignals(True)
+        self.method_widget.oniom_widget.blockSignals(True)
+        self.basis_widget.blockSignals(True)
         self.job_widget.setStructure(model)
         self.method_widget.sapt_layers.setStructure(model)
         self.method_widget.oniom_widget.setStructure(model)
         self.check_elements()
 
+        self.job_widget.blockSignals(False)
+        self.method_widget.sapt_layers.blockSignals(False)
+        self.method_widget.oniom_widget.blockSignals(False)
+        self.basis_widget.blockSignals(False)
+        
         try:
             for fr in model.filereaders:
                 if 'charge' in fr:
@@ -1183,6 +1207,9 @@ class BuildQM(ToolInstance):
                     self.job_widget.setTemperature(fr['temperature'])
         except AttributeError:
             pass
+        
+        profile.disable()
+        profile.print_stats()
 
     def check_elements(self, *args, **kw):
         """ask self.basis_widget to check the elements"""
@@ -5202,7 +5229,6 @@ class BasisWidget(QWidget):
         for i in range(len(self.ecp_options)-1, -1, -1):
             self.close_ecp_tab(i)
 
-
     def setBasis(self, basis_set):
         """sets basis to match input BasisSet"""
         self.clear()
@@ -6662,8 +6688,55 @@ class BasisElements(QWidget):
         self.ecp_ptables = []
 
     def refresh_basis(self):
-        basis_set = self.tool_instance.basis_widget.getBasis(update_settings=False)
-        self.setBasis(basis_set)
+        method = self.tool_instance.method_widget.getMethod()
+        if isinstance(method, Method):
+            if method.is_mm or method.is_semiempirical:
+                self.setVisible(False)
+            else:
+                self.setVisible(True)
+                basis_set = self.tool_instance.basis_widget.getBasis(update_settings=False)
+                self.setBasis(basis_set)
+        elif isinstance(method, dict):
+            # oniom split basis set
+            self.setVisible(True)
+            self.setMultilayerBasis(method)
+
+    def setMultilayerBasis(self, method_info):
+        """display basis settings for a multilayer method"""
+        self.basis_ptables = []
+        self.ecp_ptables = []
+        
+        for i in range(self.basis_box.count()-1, -1, -1):
+            self.basis_box.removeTab(i)
+            
+        for layer in ["high", "medium", "low"]:
+            layer_basis_name = "%s_basis" % layer
+            if layer_basis_name not in method_info:
+                continue
+            
+            layer_basis = method_info[layer_basis_name]
+            for basis in layer_basis.basis:
+                element_selector = PeriodicTable(initial_elements=basis.elements)
+                self.basis_ptables.append(element_selector)
+                basis_name = basis.name
+                aux = basis.aux_type
+                if aux is not None:
+                    label = "%s: %s/%s" % (layer, basis_name, aux)
+                else:
+                    label = "%s: %s" % (layer, basis_name)
+
+                #self.basis_box.addItem(element_selector, label)
+                self.basis_box.addTab(element_selector, label)
+
+            if layer_basis.ecp is not None:
+                for ecp in layer_basis.ecp:
+                    element_selector = PeriodicTable(initial_elements=ecp.elements)
+                    self.ecp_ptables.append(element_selector)
+                    label = "%s ECP: %s" % (layer, ecp.name)
+        
+                    #self.basis_box.addItem(element_selector, label)
+                    self.basis_box.addTab(element_selector, label)
+
 
     def setBasis(self, basis_set):
         """display current basis sets and element selectors"""
@@ -6752,6 +6825,7 @@ class SavePreset(ChildToolWindow):
 
         self.basis_elements = BasisElements(tool_instance=self.tool_instance)
         self.tool_instance.basis_widget.basisChanged.connect(self.basis_elements.refresh_basis)
+        self.tool_instance.method_widget.methodChanged.connect(self.basis_elements.refresh_basis)
         self.basis_elements.refresh_basis()
         layout.addRow(self.basis_elements)
 
