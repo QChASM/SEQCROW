@@ -957,24 +957,13 @@ class BuildQM(ToolInstance):
         return contents, warnings
 
     def check_changes(self, trigger_name=None, changes=None):
-        print(trigger_name, changes)
-        print("check_changes")
-        profile = cProfile.Profile()
-        profile.enable()
         if changes is not None:
             mdl = self.model_selector.currentData()
             if mdl in changes.modified_atomic_structures():
                 self.changed = True
-        
-        print("changes", self.changed)
-        profile.disable()
-        profile.print_stats()
 
     def struc_mod_update_preview(self, *args, **kwargs):
         """whenever a setting is changed, this should be called to update the preview"""
-        print("struc_mod_update_preview")
-        profile = cProfile.Profile()
-        profile.enable()
         if self.changed:
             if not self.job_widget.structure.deleted:
                 self.job_widget.setStructure(self.job_widget.structure)
@@ -982,8 +971,6 @@ class BuildQM(ToolInstance):
                 self.job_widget.check_constraints()
             self.update_preview()
             self.changed = False
-        profile.disable()
-        profile.print_stats()
 
     def is_basis_needed(self):
         method, needs_basis = self.method_widget.getRawMethod()
@@ -1172,9 +1159,6 @@ class BuildQM(ToolInstance):
 
     def change_model(self, index):
         """changes model to the one selected in self.model_selector (index is basically ignored"""
-        print("change_model")
-        profile = cProfile.Profile()
-        profile.enable()
         if index == -1:
             self.basis_widget.setElements([])
             return
@@ -1208,8 +1192,7 @@ class BuildQM(ToolInstance):
         except AttributeError:
             pass
         
-        profile.disable()
-        profile.print_stats()
+        self.update_preview()
 
     def check_elements(self, *args, **kw):
         """ask self.basis_widget to check the elements"""

@@ -23,6 +23,10 @@ class FreqOptions(EnumOption):
     values = ['do nothing', 'open normal modes tool']
     labels = ['do nothing', 'open normal modes tool']
 
+class InfoOptions(EnumOption):
+    values = ['do nothing', 'open file info tool']
+    labels = ['do nothing', 'open file info tool']
+
 class QueueOptions(EnumOption):
     values = ['None', 'Slurm', 'PBS', 'SGE', 'LSF']
     labels = ['None', 'Slurm', 'PBS', 'SGE', 'LSF']
@@ -71,6 +75,10 @@ class _SEQCROWSettings(Settings):
         'FREQ_OPEN': Value(
             'do nothing',
             EnumOf(FreqOptions.values),
+        ),
+        'INFO_OPEN': Value(
+            'open file info tool',
+            EnumOf(InfoOptions.values),
         ),
         'MAX_FCHK_ARRAY': 10000000,
         'QUEUE_TYPE': Value(
@@ -146,7 +154,13 @@ def register_settings_options(session):
         "FREQ_OPEN": (
             "When frequency files are opened",
             FreqOptions,
-            "whether or not to open the Normal Modes tool when a file with orbital info is opened",
+            "whether or not to open the Normal Modes tool when a file with frequency data is opened",
+        ),
+
+        "INFO_OPEN": (
+            "When QM output files are opened",
+            InfoOptions,
+            "whether or not to open the File Info tool when a file with QM data info is opened",
         ),
 
         "MAX_FCHK_ARRAY": (

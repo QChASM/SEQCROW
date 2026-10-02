@@ -1308,9 +1308,10 @@ class _SEQCROW_API(BundleAPI):
 
     @classmethod
     def open_useful_tools(cls, trigger_name, models):
+        print("open useful tools")
         for model in models:
-            if hasattr(model, "filereader") and model.filereader is not None:
-                fr = model.filereader
+            if hasattr(model, "filereaders") and model.filereaders is not None:
+                fr = model.filereaders[-1]
                 if model.session.seqcrow_settings.settings.ORBIT_OPEN != "do nothing":
                     try:
                         fr["orbitals"]
@@ -1328,6 +1329,19 @@ class _SEQCROW_API(BundleAPI):
                         model.session.logger.info(
                             "automaticly opening the vibrations tool can be disabled in the settings"
                         )
+                    except Exception:
+                        pass
+                
+                if model.session.seqcrow_settings.settings.INFO_OPEN != "do nothing":
+                    try:
+                        t = run(model.session, "ui tool show \"File Info\"")
+                        ndx = -1 
+                        for i in range(0, t.file_selector.count()):
+                            fr, mdl = t.file_selector.itemData(i)
+                            if mdl is model:
+                                ndx = i
+                        if ndx >= 0:
+                            t.file_selector.setCurrentIndex(ndx)
                     except Exception:
                         pass
 

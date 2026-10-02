@@ -123,16 +123,16 @@ def open_aarontools(session, stream, file_name, format_name=None, coordsets=None
         
     )
 
-    if fr.all_geom and "energy" in fr.other and coordsets is not False:
-        try:
-            from SEQCROW.tools.per_frame_plot import EnergyPlot
-            nrg_plot = EnergyPlot(session, structure, fr)
-            if not nrg_plot.opened:
-                warn("energy plot could not be opened\n" + \
-                    "there might be a mismatch between energy entries and structure entries in %s" % file_name)
-                nrg_plot.delete()
-        except Exception as e:
-            session.logger.warning(repr(e))
+    # if fr.all_geom and "energy" in fr.other and coordsets is not False:
+    #     try:
+    #         from SEQCROW.tools.per_frame_plot import EnergyPlot
+    #         nrg_plot = EnergyPlot(session, structure, fr)
+    #         if not nrg_plot.opened:
+    #             warn("energy plot could not be opened\n" + \
+    #                 "there might be a mismatch between energy entries and structure entries in %s" % file_name)
+    #             nrg_plot.delete()
+    #     except Exception as e:
+    #         session.logger.warning(repr(e))
 
     if coordsets:
         from chimerax.std_commands.coordset_gui import CoordinateSetSlider
@@ -444,18 +444,18 @@ def open_xyz(session, stream, file_name, coordsets=None, maxModels=None):
                 break
         else:
             try:
-                from SEQCROW.tools.per_frame_plot import EnergyPlot
-                nrg_plot = EnergyPlot(
-                    session,
-                    struc,
-                    fr,
-                    ylabel="comment value",
-                    y_data=data,
-                )
-                if not nrg_plot.opened:
-                    nrg_plot.delete()
-                else:
-                    struc.filereaders[0]["y_data"] = data
+                # from SEQCROW.tools.per_frame_plot import EnergyPlot
+                # nrg_plot = EnergyPlot(
+                #     session,
+                #     struc,
+                #     fr,
+                #     ylabel="comment value",
+                #     y_data=data,
+                # )
+                # if not nrg_plot.opened:
+                #     nrg_plot.delete()
+                # else:
+                struc.filereaders[0]["y_data"] = data
             except Exception as e:
                 session.logger.warning(repr(e))
 
