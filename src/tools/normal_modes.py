@@ -622,6 +622,9 @@ class NormalModes(ToolInstance):
                     new_dX[ndx[a]] = dX[c]
                     c += 1
                 dX = new_dX
+                if np.sum(dX ** 2) == 0:
+                    self.session.logger.error("no active atoms move in this mode")
+                    return None
             else:
                 dummy_ndx = [i for i in range(0, geom.num_atoms) if geom.atoms[i].is_dummy]
                 for ndx in dummy_ndx[::-1]:
@@ -696,7 +699,9 @@ class NormalModes(ToolInstance):
         vector = fr['frequency'].data[mode].vector
 
         dX = self._get_coord_change(geom, vector, scale, fr)
-        
+        if not isinstance(dX, np.ndarray):
+            return
+
         r = self.arrow_size.value()
         self.settings.shaft_radius = r
         
@@ -753,6 +758,8 @@ class NormalModes(ToolInstance):
         vector = fr['frequency'].data[mode].vector
 
         dX = self._get_coord_change(geom, vector, scale, fr)
+        if not isinstance(dX, np.ndarray):
+            return
 
         coords = geom.coords
         Xf = coords + dX

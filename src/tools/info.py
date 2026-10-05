@@ -205,7 +205,6 @@ class Info(ToolInstance):
         self.dragging = False
         
         self._model_closed = self.session.triggers.add_handler(REMOVE_MODELS, self.check_closed_models)
-        self._model_closed = self.session.triggers.add_handler(REMOVE_MODELS, self.check_closed_models)
         self._unclick = None
         self._onclick = None
         self._drag = None
@@ -960,6 +959,8 @@ class Info(ToolInstance):
                                 for signal in signals.values():
                                     all_signals.extend(signal)
                                 signals = all_signals
+                        if signals is None:
+                            continue
                         for signal in signals:
                             row = table.rowCount()
                             table.insertRow(row)
@@ -1164,11 +1165,17 @@ class Info(ToolInstance):
     
     def delete(self):
         self.file_selector.deleteLater()
+        global_triggers = get_triggers()
+        global_triggers.remove_handler(self._changes)
+        self.session.triggers.remove_handler(self._model_closed)
 
         return super().delete()    
     
     def close(self):
         self.file_selector.deleteLater()
+        global_triggers = get_triggers()
+        global_triggers.remove_handler(self._changes)
+        self.session.triggers.remove_handler(self._model_closed)
 
         return super().close()
 

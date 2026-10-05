@@ -1,7 +1,13 @@
 from chimerax.core.settings import Settings
 from chimerax.core.configfile import Value
-from chimerax.core.commands.cli import StringArg, EnumOf
-from chimerax.ui.options import InputFolderOption, EnumOption, StringsOption, IntOption
+from chimerax.core.commands.cli import StringArg, EnumOf, BoolArg
+from chimerax.ui.options import (
+    InputFolderOption,
+    EnumOption,
+    StringsOption,
+    IntOption,
+    BooleanOption,
+)
 
 from os import getenv, path
 
@@ -49,6 +55,7 @@ class _SEQCROWSettings(Settings):
             getenv('AARONLIB', path.join(path.expanduser('~'), "Aaron_libs")),
             StringArg
         ),
+        'AUTOSELECT_VISIBLE': Value(True, BoolArg),
         'ORCA_EXE': Value("orca.exe" if platform == "win32" else "orca", StringArg),
         'GAUSSIAN_EXE': Value("g09.exe" if platform == "win32" else "g09", StringArg),
         'PSI4_EXE': Value("psi4", StringArg),
@@ -137,6 +144,12 @@ def register_settings_options(session):
             "Preset for molecules opened with SEQCROW", 
             IOPresets, 
             "Molecules opened through SEQCROW (xyz, log, etc.) will use this graphical preset"
+        ),
+
+        "AUTOSELECT_VISIBLE" : (
+            "switch to visible structure on QM Input Builder", 
+            BooleanOption, 
+            "QM Input Builder will automatically select the visible structure when only one structure is visible"
         ),
 
         "XYZ_OPEN" : (

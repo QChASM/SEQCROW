@@ -958,9 +958,18 @@ class BuildQM(ToolInstance):
 
     def check_changes(self, trigger_name=None, changes=None):
         if changes is not None:
+            if self.session.seqcrow_settings.settings.AUTOSELECT_VISIBLE:
+                visible = [m for m in self.session.models.list(type=AtomicStructure) if m.visible]
+                if len(visible) == 1:
+                    ndx = self.model_selector.findData(visible[0])
+                    if ndx >= 0:
+                        self.model_selector.setCurrentIndex(ndx)
+                    return
+                   
             mdl = self.model_selector.currentData()
             if mdl in changes.modified_atomic_structures():
                 self.changed = True
+                
 
     def struc_mod_update_preview(self, *args, **kwargs):
         """whenever a setting is changed, this should be called to update the preview"""
