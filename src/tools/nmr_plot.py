@@ -351,7 +351,7 @@ class NMRSpectrum(ToolInstance):
         plot_settings_layout.addRow("reverse x-axis:", self.reverse_x)
         
         self.elements = QHBoxLayout()
-        plot_settings_layout.addRow("elements:", self.elements)
+        plot_settings_layout.addRow("toggle elements:", self.elements)
         
         self.couple_with = QHBoxLayout()
         plot_settings_layout.addRow("couple with:", self.couple_with)
@@ -1427,6 +1427,8 @@ class NMRSpectrum(ToolInstance):
                 else:
                     ele_button.setState(ElementButton.Unchecked)
             self.elements.addWidget(ele_button, stretch=0)
+        if len(elements) == 1:
+            ele_button.setState(ElementButton.Checked)
         self.elements.addStretch(1)
 
     def set_coupling(self):
