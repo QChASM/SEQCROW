@@ -212,8 +212,6 @@ class Info(ToolInstance):
 
         global_triggers = get_triggers()
         self._changes = global_triggers.add_handler("changes", self.check_changes)
-        
-        self.circle_current_cs()
 
     def _build_ui(self):
         layout = QVBoxLayout()
@@ -583,7 +581,7 @@ class Info(ToolInstance):
         self.data = OrderedDict()
         info = []
 
-        if "all_geom" in fr.keys():
+        if "all_geom" in fr.keys() and hasattr(fr["all_geom"], "__iter__"):
             for i, (step, cs_id) in enumerate(zip(fr["all_geom"], model.coordset_ids)):
                 if isinstance(step, np.ndarray):
                     continue
@@ -732,7 +730,8 @@ class Info(ToolInstance):
             except KeyError:
                 pass
 
-        
+            self.circle_current_cs()
+
         item = QTableWidgetItem()
         item.setData(Qt.DisplayRole, "name")
         val = QTableWidgetItem()
@@ -1166,7 +1165,8 @@ class Info(ToolInstance):
     def delete(self):
         self.file_selector.deleteLater()
         global_triggers = get_triggers()
-        global_triggers.remove_handler(self._changes)
+        if hasattr(self, "_changes"):
+            global_triggers.remove_handler(self._changes)
         self.session.triggers.remove_handler(self._model_closed)
 
         return super().delete()    
@@ -1174,7 +1174,8 @@ class Info(ToolInstance):
     def close(self):
         self.file_selector.deleteLater()
         global_triggers = get_triggers()
-        global_triggers.remove_handler(self._changes)
+        if hasattr(self, "_changes"):
+            global_triggers.remove_handler(self._changes)
         self.session.triggers.remove_handler(self._model_closed)
 
         return super().close()
